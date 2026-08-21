@@ -2380,16 +2380,20 @@ run nothing and edit nothing.
 Grok's bare form is correct there rather than a defect: its installed set is
 `dely` and `superpowers`, and nothing else ships a `setup` skill, so there is
 nothing to namespace against. Claude Code, which *does* also carry `codex:setup`,
-returned the namespaced form. §11 recorded `/review` colliding three ways and
-resolving as `/bundled:review` and `/codex:review`; the same mechanism is what
-would disambiguate `setup`.
+returned the namespaced form. The reasoning from §11 still holds: `/review`
+collided three ways and resolved as `/bundled:review` and `/codex:review`;
+qualification is what would disambiguate `setup` too.
 
-**The latent hazard is worth stating before it bites.** `setup` is a generic name.
-The `delivery` skill was deliberately given a distinct one after the `/review`
-collision, and `setup` did not get that treatment. A consumer that installs the
-Codex plugin alongside `dely` in Grok will have two `setup` skills, and the bare
-`/setup` observed here will stop being unambiguous. Nothing needs changing today;
-this is the recurrence marker.
+**The predicted collision does not exist.** The reasoning was sound and only
+the premise was wrong. `codex:setup` is a command — `commands/setup.md` in
+the Codex plugin — not a skill. That plugin ships three skills and none is
+named `setup`. On Claude Code the two are separately namespaced, and both
+are plugin-qualified anyway. On a harness that flattens commands and skills
+into one slash namespace, a collision would resolve by qualifying, per §11,
+to `/dely:setup` and `/codex:setup`. `dely:setup` is already the canonical
+invocation. The cost of a collision is the loss of a bare `/setup`
+convenience, not a failure. The recurrence marker stays: an observed
+collision that qualification does not resolve.
 
 ### The quick path writes a block the doctor accepts
 
