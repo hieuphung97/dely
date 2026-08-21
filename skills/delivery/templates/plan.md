@@ -55,13 +55,18 @@ why each one — ownership, not habit.
 
 ## Acceptance
 
-| Requirement | Instrument | Discriminates? |
-| --- | --- | --- |
-| | | |
+| Requirement | Instrument | Counterexample | Observed red |
+| --- | --- | --- | --- |
+| | | | |
 
-Every row states whether its instrument can tell a pass from a failure, and how you
-settled that. A row that cannot discriminate is not acceptance; either replace the
-instrument or record that no instrument exists and that a human reads the diff.
+Design fills Counterexample; implement fills Observed red. An empty cell is an
+unfinished row. "The feature is absent" does not satisfy Counterexample. A row
+with no counterexample must say so and say a human reads the diff — that escape
+stays legal and is worth keeping only when someone actually reads it.
+
+Every row's instrument must tell a pass from a failure. A row that cannot
+discriminate is not acceptance; either replace the instrument or record that no
+instrument exists and that a human reads the diff.
 
 **Cannot be observed:** what the available instruments do not cover. A green suite
 that never exercises a surface is not evidence about that surface.

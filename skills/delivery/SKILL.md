@@ -197,13 +197,21 @@ round to that omission before this was written down.
 
 ### Acceptance
 
-One table: each requirement, the instrument that proves it, and whether that
-instrument can tell a pass from a failure.
+One table: each requirement, the instrument that proves it, the plausible wrong
+implementation that instrument rejects, and where that rejection was observed.
 
 **An acceptance row is invalid until you have settled that its instrument
 discriminates.** A row whose instrument passes both before and after the change
 proves nothing and will be found at review. This is the largest single cause of
-lost rounds in the record — eight plans.
+lost rounds in the record — nine plans. Baseline-red is insufficient: the ninth
+was an instrument observed red at baseline for the right reason, and still
+unable to tell a doctor that reads the whole file from one bounded by the
+markers.
+
+Each row names a plausible wrong implementation its instrument rejects — one
+that exists, runs, and returns a pass. "The feature is absent" does not satisfy
+Counterexample. Where no counterexample exists, the row says so and says a
+human reads the diff.
 
 Record what the available instruments cannot observe. A green suite that never
 exercises a surface is not evidence about that surface.
@@ -220,6 +228,12 @@ session's transcript.
 For each behaviour: find its owning test, observe a real failure for the intended
 reason, make the smallest change, run focused verification. Keep unrelated findings
 out.
+
+The counterexample named in each acceptance row is observed red and cited — the
+journal record, or the pasted summary line where the harness journals nothing.
+That observation is not the behaviour's own failure: one is the feature absent,
+the other is an implementation that is present, runs, returns a pass, and is
+wrong.
 
 For replacement work, enumerate every accepted behaviour that could be lost and map
 each to an owning test. That mapping belongs in the plan's one acceptance table,
