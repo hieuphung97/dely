@@ -1935,6 +1935,71 @@ in this unit is static and proves only that the skill document states the
 rule; it cannot prove an agent obeys it. The behavioural check is the
 post-release smoke above.
 
+### 2026-08-21 — This repository carries a one-line `CLAUDE.md` so its own control sessions see `AGENTS.md`
+
+#### Context
+
+Claude Code does not read `AGENTS.md`. `harness-surface.md` records it and
+`findings.md` §32 measured it: asked what this project pins the implement phase to,
+with no file reads allowed, Claude Code answered `UNKNOWN` while Codex and Grok
+both answered correctly.
+
+This repository's `control` phase is Claude Code. So the instruction inside its own
+managed block — *Planned or Critical work must invoke `dely:delivery`* — was inert
+in exactly the session that runs control, and every Claude Code session here began
+blind to the file that holds the gate commands, the phase pins and the workflow
+rules until it read the file by hand.
+
+The gap had been recorded twice and treated as a limitation for future consumers to
+worry about. That was wrong on the facts: the first consumer is this repository,
+and it was the one paying.
+
+`findings.md` §11 noted that the reference consumer's `Claude.md` is about two
+tokens and *"presumably contains only an import"*. Presumably. Measured on
+2026-08-21 in a scratch repository: a `CLAUDE.md` containing exactly `@AGENTS.md`
+makes the managed block reach Claude Code — asked the same no-file-reads question,
+it returned the scratch project's fabricated pin `Codex, gpt-5.6-luna, medium`, a
+combination that appears nowhere else and could not be guessed.
+
+#### Decision
+
+This repository carries a `CLAUDE.md` whose entire content is `@AGENTS.md`.
+
+It is not a second source of truth and holds no rules of its own. `AGENTS.md`
+remains the file every harness reads; this one exists so that one harness reads it
+at all.
+
+It is deliberately not a managed block and carries no `dely` markers. `dely:setup`
+does not own it, and `delivery-doctor` does not check it.
+
+#### Alternatives considered
+
+- **Moving the content into `CLAUDE.md` and importing it from `AGENTS.md`** —
+  rejected. Codex and Grok read `AGENTS.md` natively, and §11 records that Grok
+  does not expand Claude Code's import syntax. Reversing the direction would break
+  the two harnesses that currently work to fix the one that does not.
+- **Duplicating the phase table into `CLAUDE.md`** — rejected. Two copies of a pin
+  table is the drift this repository spends most of its effort preventing.
+- **Leaving it and relying on each Claude Code session reading `AGENTS.md`
+  itself** — rejected. It worked only because the human said so each time, and a
+  rule that depends on someone remembering is the weaker half of this project's
+  own standard.
+
+#### Consequences
+
+Claude Code sessions in this repository now load `AGENTS.md` at session start, at
+the cost of its tokens on every session. Codex and Grok are unaffected — they read
+`AGENTS.md` directly and never see this file.
+
+What this does not fix: a consumer project still has to create its own
+`CLAUDE.md`. Whether `dely:setup` should offer to do so is decided separately.
+
+#### Non-goals
+
+Not a second managed block, not a rule about what consumers must do, and not a
+change to which file is authoritative.
+
+
 ---
 
 ## Open

@@ -73,6 +73,7 @@ observation — and all three are recorded in
 ## Layout
 
 ```
+CLAUDE.md                           one line: @AGENTS.md, so Claude Code reads it
 .claude-plugin/plugin.json          Claude Code manifest
 .codex-plugin/plugin.json           Codex manifest
 skills/delivery/SKILL.md            the workflow
@@ -86,6 +87,13 @@ bin/delivery-doctor                 check that every rail is wired, not merely p
 git-hooks/pre-push                  refuse pushes that skip review
 docs/                               findings, decisions, options, harness surface
 ```
+
+**Claude Code does not read `AGENTS.md`.** Codex and Grok do. A consuming project
+whose sessions run on Claude Code needs a `CLAUDE.md` containing `@AGENTS.md` —
+one line — or the managed block never reaches it. Measured, not assumed: without
+that file a Claude Code session asked what the project pins its implement phase to
+answers `UNKNOWN`, and with it answers correctly. Grok does not expand that import,
+so the file helps one harness and is invisible to the others.
 
 A consuming project supplies its own facts through `AGENTS.md`: closure gate
 commands, artifact paths, the default branch, where its delivery log lives, and
