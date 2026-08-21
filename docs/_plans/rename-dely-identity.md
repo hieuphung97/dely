@@ -16,9 +16,10 @@ Every forward-looking statement this package makes about itself says `dely`: the
 plugin is `dely`, the marketplace is `dely`, the version is `0.5.0`, the Codex
 manifest carries the fields Codex's own first-party manifests carry, and the install
 instructions install all three harnesses from `git@github.com:hieuphung97/dely.git`
-including Grok natively. `bin/delivery-doctor` still passes on a machine wired the
-old way and still passes on a machine wired the new way, because its Grok check stops
-asserting a specific root and starts asserting a usable one.
+including Grok natively, each in the command form that harness actually accepts.
+`bin/delivery-doctor` still passes on a machine wired the old way and on a machine
+wired the new way, because its Grok check stops asserting one specific root and starts
+asserting that every root the adapter names is one a Grok worker can journal from.
 
 Out of reach: nothing on this machine is installed, uninstalled, re-trusted or
 re-wired by this plan, and no tag is created. Those are release and post-release acts.
@@ -103,23 +104,39 @@ baseline, so it distinguishes done from not-done by itself.
 install block and is reconciled by task 2, which is where that document's ownership
 sits.
 
-### 2. The install instructions install `dely@dely` from the remote, in all three harnesses
+### 2. The install instructions install from the remote, in the form each harness accepts
 
-**Behaviour.** A reader following `README.md` adds the `dely` marketplace from
-`git@github.com:hieuphung97/dely.git` and installs `dely@dely` in Claude Code, Codex
-and Grok Build, then generates `~/.grok/hooks/delivery.json` against the root of
-Grok's own installed copy. No forward-looking instruction in `README.md` or
+**Behaviour.** A reader following `README.md` installs the package from
+`git@github.com:hieuphung97/dely.git` in all three harnesses, using each harness's own
+command form — `dely@dely` from the added marketplace on Claude Code and Codex, and
+the source `hieuphung97/dely` on Grok Build — then generates
+`~/.grok/hooks/delivery.json` against the root of Grok's own installed copy. No forward-looking instruction in `README.md` or
 `AGENTS.md` names `delivery@delivery-tools` or a local directory path as the install
 source.
 
-**Direction.** Grok gains its own `plugin marketplace add` and `plugin install`
-step. The README says plainly that `grok plugin install` refuses a local directory
-without `--trust` and that whether a git remote prompts the same way is untested, so
-a reader hitting the prompt recognises it instead of treating it as a failure. The
-adapter root is *derived*, not typed: `grok plugin details dely` reports the `path:`
-of the install, and that value is what the `sed` line substitutes for
-`__PACKAGE_ROOT__`. The existing paragraph about the source-versus-cache asymmetry is
-rewritten rather than deleted — after this change all three run a cache copy, and the
+**Direction.** Grok gains its own install step, and its command form is not the one
+the other two use. `grok plugin install` takes a `<SOURCE>` — a git URL, a GitHub
+shorthand, or a local path — and its `@ref` suffix is a git ref, so `dely@dely` reads
+there as the repository `dely` at ref `dely` rather than as a marketplace selector.
+Grok installs `hieuphung97/dely`, tracking the default branch, which is the revision
+the marketplace resolves for the other two. `grok plugin marketplace add` is not
+required to install by source and is not part of the instructions. The README still
+says plainly that `grok plugin install` refuses a local directory without `--trust`
+and that whether a git remote prompts the same way is untested, so a reader hitting
+the prompt recognises it instead of treating it as a failure.
+
+The adapter root is *derived by a command*, not typed. A placeholder the reader
+substitutes by hand is typing with extra steps. The block must contain a shell
+expression that captures the `path:` line `grok plugin details dely` reports and
+feeds it to `sed`, so the reader copies the block rather than editing it.
+
+Nothing in `README.md` may assert what this unit cannot observe. Installing is not
+loading: a sentence saying a session loads `dely:delivery`, or that a permanent
+install makes the skill stay available, is a migration-time fact for the forward
+smoke and must read as intent rather than as established.
+
+The existing paragraph about the source-versus-cache asymmetry is rewritten rather
+than deleted — after this change all three run a cache copy, and the
 new hazard worth naming is two copies drifting when only one is refreshed.
 
 `hooks/grok-hooks.json.template` carries one false sentence in its `_comment` block:
@@ -150,10 +167,17 @@ and its gate list; both are changed by this unit rather than merely mentioned by
 ### 3. `delivery-doctor` asserts a usable Grok adapter rather than a specific root
 
 **Behaviour.** The Grok check passes when `~/.grok/hooks/delivery.json` is valid JSON
-and the package root its commands reference exists and contains
-`hooks/post-tool-journal.sh`. It warns when that root is absent or incomplete. It no
-longer requires the referenced root to equal the directory `delivery-doctor` was run
-from.
+and **every** command it registers resolves to a package root that exists and holds
+**both** `hooks/session-start-context.sh` and `hooks/post-tool-journal.sh`. It warns
+when any referenced root is absent or incomplete, and it warns rather than passing
+silently when a command does not match the shape the template produces. It no longer
+requires a referenced root to equal the directory `delivery-doctor` was run from.
+
+Reading only the first command is what the first implementation did, and review
+reproduced the consequence: an adapter whose `SessionStart` points at a usable root
+while both `PostToolUse` commands point at a missing one is reported `ok` while the
+journal hook it names does not exist. A check that passes on an adapter recording no
+evidence is worse than the root-equality check it replaced, because that one warned.
 
 **Direction.** This is the one behaviour change in the unit, and it is here because
 the identity change causes it: after migration the adapter points at Grok's installed
@@ -171,9 +195,13 @@ any one hook command with `jq`.
 **Files.** `bin/delivery-doctor`, `tests/delivery-doctor-grok-hook.sh`.
 
 **Focused verification.** `bash tests/delivery-doctor-grok-hook.sh`. It runs
-`delivery-doctor` three times against a temporary `HOME`: with an adapter pointing at
-a complete package root, with one pointing at a root that does not exist, and with
-malformed JSON. It asserts `ok` for the first and a non-`ok` line for the other two.
+`delivery-doctor` against a temporary `HOME` for each of: an adapter whose every
+command points at a root holding both scripts; a root that does not exist; a root
+holding only `post-tool-journal.sh`; a **mixed** adapter whose `SessionStart` root is
+complete while its `PostToolUse` commands point at a missing root; a command whose
+shape the template does not produce; and malformed JSON. It asserts `ok` for the
+first and a non-`ok` line for every other case. A complete fixture creates both
+scripts, because a fixture creating one cannot see the defect review found.
 It fails against the current `delivery-doctor` because case one — a valid adapter
 pointing somewhere other than the package root — is exactly what today's check warns
 about. Discrimination settled by running it against the baseline before the change.
@@ -195,7 +223,10 @@ than assuming it.
 | The package still validates on Grok under the new identity | `grok plugin validate .` reports `name: dely`, `version: 0.5.0`, `1 skill dir(s) … hooks` | Yes. It reports the old name and version at baseline, and it is the only instrument that reads the manifest the way a harness does |
 | The skill name and path are unchanged | `grep -c '^name: delivery$' skills/delivery/SKILL.md` returns 1, and `git diff --stat` shows no path under `skills/` | Yes for the second half — any edit shows in the diff. The first half is a guard, since it is already true at baseline |
 | No forward-looking instruction names the retired identity or a local install source | `grep -nE 'delivery@delivery-tools\|marketplace add /path/to' README.md AGENTS.md` exits 1 | Yes. Four matches at baseline, all in `README.md` |
-| The Grok adapter root is derived from `grok plugin details`, not typed | A human reads the README block. No instrument | No. Recorded honestly: no check can tell a documented derivation from a documented constant, and the substituted value only exists at migration time |
+| The Grok install command is a source Grok accepts, not a marketplace selector | `grep -n 'grok plugin install' README.md` shows `hieuphung97/dely` and no `@` selector, read against `grok plugin install --help` | Yes. The first implementation wrote `dely@dely`, which the help contradicts, so the two states are distinguishable |
+| The adapter root is derived by a command, not typed | `grep -q 'grok plugin details' README.md` and `grep -c '<that path>' README.md` returns 0 | Yes, now. The first implementation carried two `<that path>` placeholders, so this is red before and green after. The earlier version of this row had no instrument, and a human caught the defect it could not |
+| `README.md` claims nothing about loading that this unit cannot observe | A human reads the install section against the boundary paragraph below | No. No lexical check separates a claim from an intention. Review reads it |
+| `delivery-doctor` refuses a mixed adapter whose non-first command points at a missing root | `bash tests/delivery-doctor-grok-hook.sh`, mixed case | Yes. Reproduced red against the first implementation, which reported `ok` |
 | `delivery-doctor` accepts an adapter pointing at a root other than its own | `bash tests/delivery-doctor-grok-hook.sh` | Yes. Case one is red against the current script and green after, and cases two and three prove the check still refuses a broken adapter |
 | Historical evidence is untouched | `git diff --stat` lists no change to `docs/findings.md` | Yes. Any edit appears |
 | The repository still passes its own gates under the new identity | The closure-gate block below | Yes for shape and syntax. See the boundary note below for what it cannot see |

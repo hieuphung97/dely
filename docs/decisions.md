@@ -1154,6 +1154,36 @@ the selected coordinator reports the namespaced skill it loaded and the root it 
 it from. That is the same discrimination without a headless dispatch, and it is the
 shape the 0.4.3 forward smoke already ran.
 
+##### The Grok install command is a source, not a marketplace selector
+
+Found at review on 2026-08-21, after the first implementation documented
+`grok plugin install dely@dely` in good faith. The decision above says every harness
+installs from the remote, and the plan carried the Claude Code and Codex selector
+form into all three. Grok does not share it.
+
+`grok plugin install --help` on 1.0.5 declares
+`grok plugin install [OPTIONS] <SOURCE>`, where `<SOURCE>` is a "Git URL, GitHub
+shorthand (user/repo), or local path" and `@ref` is a git ref suffix, as in
+`user/repo@v1.0`. So `dely@dely` is not merely unsupported there: it reads as the
+repository `dely` at ref `dely`. `PLUGIN@MARKETPLACE` is a Claude Code and Codex
+selector and this record should never have implied it was portable.
+
+**Decided by the product owner on 2026-08-21: Grok installs `hieuphung97/dely`,**
+tracking the default branch, which is the same revision Claude Code and Codex resolve
+through the marketplace. One sentence about revisions covers all three, and the
+alternative — pinning Grok to `@v0.5.0` — was declined because it would leave the
+three harnesses pinned differently and would go stale silently, with Grok still on a
+retired release and nothing saying so.
+
+The narrow reading of "a cache copy of a pushed commit" is relaxed for the window
+between releases: what Grok gets is whatever the default branch holds at install
+time. That window is small and gate-covered, because this repository reaches its
+default branch only through a pull request.
+
+`grok plugin marketplace add` is not required to install by source and is therefore
+not part of the instructions. Adding a marketplace only affects what
+`grok plugin marketplace list` enumerates, and this package has one plugin.
+
 ##### Deferred — the journal path the session-start hook injects does not exist
 
 Observed 2026-08-21 while running the 0.4.3 forward smoke, and left alone because it is
