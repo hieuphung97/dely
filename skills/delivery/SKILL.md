@@ -52,14 +52,24 @@ results, and routes.
 ### Launching a worker
 
 Write the prompt to a file. Never inline it in a shell argument: prompts carry
-backticks, quotes and newlines, and a shell argument mangles them. Then run the
-harness non-interactively with its final message captured to a file, and read the
-file rather than parsing terminal output.
+backticks, quotes and newlines, and a shell argument mangles them. Keep that
+file for transport safety wherever the launch path accepts file input.
+
+If `AGENTS.md` selects a coordinator, load that coordinator's native skill and
+use it to launch a real interactive harness TUI for the phase. Pin the selected
+model and effort. The coordinator carries the prompt, questions and completion.
+A visible shell running a headless harness is not a TUI.
+
+A direct headless harness call is a fallback only when no coordinator is
+selected, or when the selected coordinator is unavailable and the human accepts
+the loss of its capabilities. Do not invent a wrapper, adapter, polling loop or
+compatibility matrix around that fallback.
 
 Any harness can be the control session and any can be a worker. The role is a
 choice per phase, not a property of a tool.
 
 ```bash
+# Fallback only — not the primary path when a coordinator is selected
 claude -p --permission-mode bypassPermissions --model <id> --effort <level> < prompt.md > result.md
 codex exec -m <id> -c model_reasoning_effort="<level>" -o result.md < prompt.md
 grok --prompt-file prompt.md -m <id> --reasoning-effort <level> --always-approve --output-format json > result.json
@@ -88,39 +98,21 @@ diffs count untracked files as part of the candidate, so a result file written i
 the working tree becomes an unowned change that a reviewer sees and a gate may
 refuse. Use the session's scratch directory.
 
-**Review must not modify the authoritative candidate.** That is the contract: a
-reviewer that cannot change the candidate has its independence enforced rather than
-promised. The protocol does not require the whole session to use a profile named
-`read-only`. Scratch, cache and result paths may remain writable outside the
-candidate. The selected harness owns how it enforces the boundary, and the consuming
-project's `AGENTS.md` records the concrete profile. Where a harness cannot enforce
-the boundary, say so in the review result rather than implying an independence that
-was only requested.
+**Review is independent by role, not by a phase-implied sandbox.** The reviewer
+starts fresh, reviews and reports, and does not implement or edit the candidate.
+Ordinary project permissions keep gates, native Internet access, result writes and
+coordinator completion available. `AGENTS.md` may pin a sandbox for a concrete
+risk; assigning a harness to review is not such a risk by itself. If a reviewer
+edits the candidate, that review is invalid and Control escalates.
 
-Internet research is independent of candidate isolation. For external documentation
-and issue research, use the harness's native web or search tool and cite the source.
-Shell network is not enabled merely because review may research.
+Internet research uses the harness's native web or search tool and cites the
+source. Shell network follows ordinary project permissions; do not disable it
+merely because the phase is review.
 
-**A read-only command sandbox can also block the gates.** Verified on Codex
-`--sandbox read-only`: every gate invoked through `uv` failed at
-`Operation not permitted`, unable to initialise its cache, and `--add-dir` does not
-grant the write. A reviewer under that profile may therefore judge the diff without
-reproducing a single gate.
-
-Accept that trade. A gate is a program, and running it in a second session does not
-make its output truer; independent judgement is what review alone supplies. Guard
-against a fabricated gate result by running gates where the journal records them. A
-reviewer names the gates it could not run, and does not treat an unchecked claim as
-checked.
-
-Keep the call blocking. Waiting has now been measured at about ten minutes for an
-implement dispatch, and it still does not justify a background run: the process exits
-on its own, so a blocking call plus a timeout with headroom is one line where polling
-would be a state machine. That process exit plus a complete captured result is the
-portable completion path. A coordinator-specific `worker_done` may shorten
-observation, but it is not required and the reviewer is not required to cross its
-isolation boundary to send it. Where a coordinator cannot observe that boundary, use
-the existing direct blocking fallback rather than a relay or polling state machine.
+Keep waiting blocking. A coordinator-selected worker is observed through that
+coordinator until it completes or the timeout fires. A headless fallback is a
+blocking process plus a timeout with headroom: the process exits on its own, so
+polling would be a state machine. Do not add a relay to manufacture completion.
 
 **Capture the worker's session id from its output and put it in the handoff.** It is
 how the human opens that session to inspect or steer it, and a harness need not list
@@ -128,11 +120,10 @@ a dispatched session in its own picker: Codex filters its picker to interactive
 sessions, so a session started by `codex exec` is reachable only by id. It is
 persisted and resumable either way.
 
-**Watching happens through the log file, not the picker.** Because the dispatch
-redirects the worker's output to a file and that file is written as the run
-progresses, `tail -f` on it is a live view of the worker — its model and sandbox in
-the header, then each command with its output and duration. Tell the human that path
-when a dispatch starts, so waiting is observable rather than blind.
+**Watch through the coordinator when one is selected.** Its task, dispatch and
+terminal are the live view. For a headless fallback, the redirected log file is
+the live view — model and sandbox in the header, then each command with its
+output and duration. Tell the human that path when a fallback dispatch starts.
 
 ### Model and effort per phase
 
@@ -158,6 +149,7 @@ Stop and ask the human when:
 - the worker **failed** rather than returned a stop status — a non-zero exit with no
   result file, an exhausted quota, an authentication error. A failed worker is not
   a `BLOCKED` worker, and treating one as the other loses the work
+- the selected coordinator is unavailable, before any headless fallback
 - an action needs authorization that policy reserves to the human
 - the same worker fails twice on the same input
 
@@ -293,9 +285,9 @@ and a `backgroundTaskId`. Gates run in the foreground and the wait is the point.
 
 ## review
 
-Start fresh and cannot modify the authoritative candidate. You get the decision
-record, the plan, the baseline, the diff, and the evidence. You do not get the
-implementer's reasoning.
+Start fresh. Review and report; do not implement or edit the candidate. You get
+the decision record, the plan, the baseline, the diff, and the evidence. You do
+not get the implementer's reasoning. The phase adds no sandbox by default.
 
 **Reproduce, do not accept.** Run the gates yourself. A claim you did not
 reproduce is not evidence. Re-review has caught defects by making a test red itself
