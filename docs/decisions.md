@@ -741,7 +741,7 @@ evidence; `AGENTS.md` selects the installed skill, plugin, harness and model tha
 it. This package does not become a plugin manager or translate one third-party hook
 format into another.
 
-#### Review protects the authoritative candidate; a sandbox profile does not define the phase
+#### Superseded 2026-08-21 — Review protects the authoritative candidate; a sandbox profile does not define the phase
 
 Approved by the product owner on 2026-08-20 after a Codex reviewer completed its final
 turn but could not send `worker_done` through the same read-only boundary that protected
@@ -779,6 +779,63 @@ Rejected in favour of this contract:
 - no sandbox plus a post-review tree check as the default, because detection after mutation
   is weaker than preventing it. It remains an explicitly degraded option for a trusted
   harness when a human accepts the limit.
+
+The stronger candidate-immutability requirement and the direct blocking fallback are
+superseded by the decision below. Their evidence remains valid: Codex read-only did block
+candidate writes, gates, result paths and Orca completion. What changed is which cost is
+worth paying before a reviewer has ever modified a candidate.
+
+#### Interactive workers are coordinator-first; review independence does not imply a sandbox
+
+Approved by the product owner on 2026-08-21 after the first self-update exposed two
+coupled defaults. The Control Session launched six Codex and five Grok workers through
+their headless entrypoints. After Orca was requested explicitly, it put the same headless
+commands inside visible shell tabs rather than launching either harness TUI; six such
+commands were observed and no Orca Run existed. Separately, Codex read-only had repeatedly
+blocked gates, result writes and `worker_done`, although no recorded review had modified
+the candidate it inspected.
+
+When a project selects a coordinator, that coordinator owns dispatch and observation.
+Workers launch through the harness's real interactive TUI, with the selected model and
+effort pinned, and the coordinator carries the prompt, questions and completion. A direct
+headless harness call is a fallback only when no coordinator is selected or the selected
+coordinator is unavailable and the human accepts the loss of its capabilities. Putting a
+headless command inside a coordinator terminal does not satisfy this contract.
+
+Review remains a fresh session that receives the contract, candidate and evidence without
+the implementer's reasoning. It reviews and reports; it does not implement or edit the
+candidate. The phase adds no sandbox by default. The project may select a sandbox for a
+concrete risk, but the fact that a harness is assigned to review is not such a risk by
+itself. Ordinary project permissions keep native Internet access, gate execution, result
+writes and coordinator completion available.
+
+This deliberately relies on role discipline rather than pre-emptive OS enforcement. No
+reviewer mutation exists in the recorded plans, while the cost of read-only isolation has
+recurred. If a reviewer does edit the candidate, its result is invalid and Control
+escalates; that incident is the trigger to design enforcement from the observed failure.
+There is no candidate fingerprint, disposable review worktree, sandbox adapter, completion
+relay or polling loop now.
+
+Rejected in favour of this contract:
+
+- retaining Codex read-only as the repository default, because it preserves an unobserved
+  risk while reproducing blocked gates and completion;
+- a writable disposable review worktree, because it adds checkout and dependency lifecycle
+  before a reviewer mutation has occurred; and
+- a generic coordinator adapter, because Orca is still the only selected coordinator and
+  its native skills already own the required TUI and orchestration operations.
+
+Consequences: review regains gate execution, ordinary Internet access, writable results
+and native coordinator completion. A reviewer is technically able to edit the candidate;
+doing so invalidates that review rather than opening an automatic repair path. A selected
+coordinator becoming unavailable now interrupts the human before visibility is discarded.
+
+Non-goals: this does not standardise coordinator commands, add review hardening, prove
+every harness/coordinator pairing or change the four phases and their dispositions.
+
+Deferred: reconsider mechanical candidate protection after the first observed reviewer
+mutation. Extract a coordinator adapter only after a second coordinator supplies a real
+integration to compare with Orca.
 
 Learning stays deliberately asymmetric. The journal and project delivery log are the
 input. At closure an AI may compare the new drift with recorded shapes and propose a
