@@ -2081,6 +2081,11 @@ and a future contributor may read that as licence to manage more files. The deci
 draws the line explicitly — offer one known file with one known line, warn if it is
 absent, own neither.
 
+What stays unobserved: whether setup actually makes the offer to a human, and
+whether a non-interactive run reports the skipped offer without writing the
+file. Every check in this unit is static or fixture-driven. The behavioural
+check is the post-release smoke under Deferred.
+
 #### Non-goals
 
 Not a second managed block, not a config file, not a template system, not a rule
@@ -2091,6 +2096,25 @@ about what a `CLAUDE.md` may otherwise contain, and not a change to `delivery`.
 **Offering the equivalent for any future harness that does not read `AGENTS.md`**,
 triggered by such a harness being adopted. The current offer names Claude Code
 because Claude Code is the measured case.
+
+**Post-release smoke.** After the plugin caches are refreshed, in a scratch
+repository with an `AGENTS.md` managed block and no `CLAUDE.md`:
+
+1. Run `delivery-doctor` and confirm the warn appears; add the import and
+   confirm it disappears.
+2. Invoke `dely:setup` interactively there on Claude Code and record whether
+   the offer is made and whether declining leaves the file absent.
+3. Invoke it non-interactively and record whether it writes `CLAUDE.md`
+   unasked — it must not — and whether it reports the offer it could not
+   make.
+
+Results go to `docs/findings.md` by that later unit.
+
+**Whether setup actually makes the offer to a human.** Every check in this
+unit is static or fixture-driven and proves the document states the rule and
+the doctor implements the warn. It cannot prove an agent offers rather than
+writes, and it cannot prove a human is asked. The behavioural check is the
+post-release smoke above.
 
 #### Amended 2026-08-21 after review returned `REPLAN_OR_SPLIT`
 
