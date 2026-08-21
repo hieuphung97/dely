@@ -2334,3 +2334,110 @@ This is not a probe of every future coordinator or harness pairing, and it is
 not evidence that a reviewer will never edit a candidate. Enforcement of
 candidate immutability is reconsidered only after that incident. A second
 coordinator is still required before extracting an adapter.
+
+---
+
+## 32. The forward smoke for `dely:setup`, and the one prediction it confirmed
+
+Recorded 2026-08-21 after `0.6.0` merged as `9e41a03` and every installed copy was
+refreshed. The decision
+`docs/decisions.md` — "Project configuration is a managed block in `AGENTS.md`,
+written by a second core skill `dely:setup`" — deferred these observations to
+after installation, because every harness runs a copy taken at install time and no
+static check in the delivering plan could reach them.
+
+### All three copies carry the new skill
+
+`claude plugin list` and `codex plugin list` both report `dely@dely 0.6.0`.
+`grok plugin update dely` reported `dely-33aded9b: updated (2838092 -> 9e41a03)`,
+and its installed root holds both `skills/delivery` and `skills/setup` with
+`version 0.6.0`. Codex resolves the plugin directly from its marketplace snapshot
+at `~/.codex/.tmp/marketplaces/dely`, so upgrading the marketplace updated the
+plugin in place rather than needing a separate install.
+
+The Grok adapter was regenerated from the derived root. The installed path did not
+change across this version bump, so the previous adapter would have kept working —
+but that is luck, not a property, and the regeneration is what makes it a
+property. `delivery-doctor` then passed every check, including the new
+`managed block well formed` line against this repository's own `AGENTS.md`.
+
+### Discovery works from the description alone
+
+In a scratch repository with no `AGENTS.md`, each harness was asked to configure
+the project for a delivery workflow **without the skill being named**, and told to
+run nothing and edit nothing.
+
+| Harness | Answer |
+| --- | --- |
+| Claude Code | `dely:setup` |
+| Codex | `dely:setup` |
+| Grok Build | `/setup` |
+
+Grok's bare form is correct there rather than a defect: its installed set is
+`dely` and `superpowers`, and nothing else ships a `setup` skill, so there is
+nothing to namespace against. Claude Code, which *does* also carry `codex:setup`,
+returned the namespaced form. §11 recorded `/review` colliding three ways and
+resolving as `/bundled:review` and `/codex:review`; the same mechanism is what
+would disambiguate `setup`.
+
+**The latent hazard is worth stating before it bites.** `setup` is a generic name.
+The `delivery` skill was deliberately given a distinct one after the `/review`
+collision, and `setup` did not get that treatment. A consumer that installs the
+Codex plugin alongside `dely` in Grok will have two `setup` skills, and the bare
+`/setup` observed here will stop being unambiguous. Nothing needs changing today;
+this is the recurrence marker.
+
+### The quick path writes a block the doctor accepts
+
+`dely:setup` was invoked on the scratch repository with instructions to take the
+quick path and ask nothing. It created `AGENTS.md` containing exactly one managed
+block, coordinator `none`, all four phases pinned to `claude` with `default` model
+and `default` effort. `bin/delivery-doctor` reported `ok managed block well
+formed` against it.
+
+Two observations from that run:
+
+**The literal `default` survived the round trip.** The quick path wrote it and the
+doctor accepted it, which is the behaviour the remediated case in
+`tests/managed-block-contract.sh` asserts against a stored catalogue.
+
+**A non-interactive quick path cannot offer the coordinator.** Orca is installed
+and running on this machine, and the contract says an absent coordinator selection
+offers Orca when it is genuinely available. The run was told to ask nothing, so it
+wrote `none`. That is defensible under the instruction it was given, and it means
+the coordinator offer is an interactive step that a headless invocation silently
+converts into `none`. Anyone scripting setup should pass the coordinator
+explicitly rather than assume the quick path discovers it.
+
+The skill also volunteered the Claude Code limitation in its own output without
+being asked, which is the design's stated limitation reaching behaviour.
+
+### The predicted asymmetry, measured
+
+The decision record predicted that the persistent instruction inside the managed
+block would reach Codex and Grok natively and would not reach Claude Code, because
+Claude Code does not read `AGENTS.md` and this repository has no `CLAUDE.md`.
+
+Each harness was asked, in this repository, what the project pins the implement
+phase to — told to read no files and run no commands, so only injected context
+could answer, and to say `UNKNOWN` otherwise.
+
+| Harness | Answer |
+| --- | --- |
+| Claude Code | `UNKNOWN` |
+| Codex | Grok Build, `grok-4.6`, medium reasoning effort |
+| Grok Build | Grok Build, `grok-4.6`, `medium` |
+
+The prediction holds exactly. This is the first measurement of it rather than an
+inference from `harness-surface.md`, and it is the boundary of what a managed
+block in `AGENTS.md` can do: it configures every harness that reads that file, and
+on Claude Code it is inert until the project adds a `CLAUDE.md` that imports it —
+an import §11 already recorded as expanded by Claude Code and not by Grok, so the
+two routes are not interchangeable and a consumer needs both.
+
+### What this smoke still did not observe
+
+Whether the managed block reaches a *dispatched* worker as pins on its command
+line, which needs a real delivery through a project configured by `dely:setup`
+rather than by hand. This repository's own block was written by the delivering
+plan, not by the skill, so it does not test that path either.
