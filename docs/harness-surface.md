@@ -9,6 +9,10 @@ inferences were made during research and both turned out wrong (recorded in
 Captured 2026-08-19. Claude Code observed at v2.1.229 / 2.1.234 / 2.1.235;
 Grok Build docs page last updated 2026-07-21.
 
+Model and effort sections for all three harnesses were re-read from the
+installed CLIs on 2026-08-21 and corrected; see `findings.md` §33 for what
+changed and why a catalogue is read rather than stored.
+
 Isolation, command-network and hosted-web rows in the role matrix were
 corrected 2026-08-20 from first-party documentation. Those cells are labelled
 documented versus locally observed. They are not a probe of the currently
@@ -69,9 +73,21 @@ An entrypoint field records which surface wrote each entry. Observed values:
 
 ### Model and effort
 
-`--model` (aliases `sonnet` / `opus` / `haiku`, or a full name).
-`--effort low|medium|high|xhigh|max|ultracode`. Overrides the `effortLevel`
-setting for that run only.
+Re-read from the installed CLI 2026-08-21. Both probes are answered locally:
+`claude -p "/model" --output-format json` and `claude -p "/effort"
+--output-format json` each return `duration_api_ms 0`, `num_turns 0`,
+`total_cost_usd 0`, so discovery costs nothing and reaches no model.
+
+`--model` takes an alias or a full model ID. `/model` reports the aliases as
+`sonnet`, `opus`, `haiku`, `fable`, `best`, `sonnet[1m]`, `opus[1m]`,
+`fable[1m]`, `opusplan`, `default`.
+
+`--effort low|medium|high|xhigh|max|auto`. Overrides the `effortLevel` setting
+for that run only.
+
+Changed since the 2026-08-19 capture: `ultracode` is gone and `auto` is new; the
+alias list gained `best`, `opusplan`, `default` and the `[1m]` variants. Read the
+vocabulary rather than storing it.
 
 ### Permissions
 
@@ -214,9 +230,32 @@ thread at a time; the error is "thread already has an active writer".
 
 ### Model and effort
 
-`--model`, or `-c model_reasoning_effort=<level>` with
-`minimal | low | medium | high | xhigh` (Responses API only; `xhigh` is
-model-dependent). `plan_mode_reasoning_effort` additionally accepts `none`.
+`--model`, or `-c model_reasoning_effort=<level>`.
+`plan_mode_reasoning_effort` additionally accepts `none`.
+
+**Reasoning levels are per slug, not per harness.** `codex debug models` returns
+the catalogue as JSON, each entry carrying `slug`, `default_reasoning_level`,
+`supported_reasoning_levels` and `visibility`. Read from the installed CLI
+2026-08-21:
+
+| Slug | Default | Supported levels | Visibility |
+| --- | --- | --- | --- |
+| `gpt-5.6-sol` | `low` | low, medium, high, xhigh, max, ultra | list |
+| `gpt-5.6-terra` | `medium` | low, medium, high, xhigh, max, ultra | list |
+| `gpt-5.6-luna` | `medium` | low, medium, high, xhigh, max | list |
+| `gpt-reserve` | `medium` | low, medium, high, xhigh, max | hide |
+| `gpt-5.5` | `medium` | low, medium, high, xhigh | list |
+| `gpt-5.4` | `medium` | low, medium, high, xhigh | list |
+| `gpt-5.4-mini` | `medium` | low, medium, high, xhigh | list |
+| `codex-auto-review` | `medium` | low, medium, high, xhigh, max | hide |
+
+A `visibility` of `hide` means the slug is not offered in the picker; it is still
+returned by the catalogue. Anything selecting a model for a human should filter to
+`list`.
+
+This table is a snapshot for orientation, not a stored catalogue. The 2026-08-19
+capture recorded five slugs and one shared effort vocabulary, and both were wrong
+two days later.
 
 ### Config
 
@@ -327,9 +366,19 @@ included.
 
 ### Model, effort, monitoring
 
-`-m`, `--model <MODEL>`; `--effort <LEVEL>`. `grok-4.6` supports
-low / medium / high (default) / xhigh. `grok dashboard` (also `/dashboard`,
-`Ctrl+\`) opens the Agent Dashboard.
+`-m`, `--model <MODEL>`; `--reasoning-effort <LEVEL>`, aliased `--effort`.
+`grok models` lists model ids locally: `grok-4.6` (default) and `grok-4.5`,
+confirmed 2026-08-21. `grok dashboard` (also `/dashboard`, `Ctrl+\`) opens the
+Agent Dashboard.
+
+**Effort is not locally discoverable, and this is the asymmetry that matters.**
+`--help` gives no enum for `--reasoning-effort`, and the flag is not validated by
+local subcommands: `grok --reasoning-effort bogus models` was run 2026-08-21 and
+exited 0 without complaint. The vocabulary only appears when a value reaches a
+dispatch, where an invalid one fails loudly with the valid set inline. So Grok
+effort is taken from documentation and from validation already observed —
+`low / medium / high (default) / xhigh` — and is never discovered by calling the
+model. One earlier probe of that shape cost money and another hung.
 
 ### Permissions
 
