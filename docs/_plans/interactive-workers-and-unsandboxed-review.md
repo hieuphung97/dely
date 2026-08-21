@@ -2,7 +2,7 @@
 
 Decision record: `docs/decisions.md#interactive-workers-are-coordinator-first-review-independence-does-not-imply-a-sandbox`
 
-**Baseline:**
+**Baseline:** `a39796064dbe3c576e3d7d9a651529fb1b6f2bdc`
 
 ## Goal
 
