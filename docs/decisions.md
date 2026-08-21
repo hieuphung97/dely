@@ -1804,6 +1804,13 @@ rule stays and this is a second, narrower obligation about the instrument itself
 empty Counterexample cell that review did not catch. The template check landing
 with this decision covers the shape a plan is copied from, not the plan itself.
 
+**Whether the column changes behaviour in a real delivery.** The column makes an
+empty cell visible; it cannot make a lazy sentence red. Nothing in this unit
+proves the rule changes behaviour in a live plan — the first plan written against
+`0.7.0` is that evidence, and it is not this one. This plan was written by the
+session that wrote the rule, so it is the least likely plan ever to violate it.
+Triggered by the first subsequent plan that copies the four-column template.
+
 ---
 
 ## Open
