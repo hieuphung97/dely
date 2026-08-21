@@ -1084,6 +1084,94 @@ dormant Windows branch, against 620 `global/orca-status` and 85 `global/delivery
 successes. Reproduce minimally on Grok 1.0.5 and route to Grok or Orca. This package
 adds no workaround and does not disable Claude-compatible hooks as a class.
 
+#### Amended 2026-08-21, after publication — the facts this record rests on, and where the Grok adapter points
+
+This record was written against frozen 0.4.2, a clean `main` at `9d3c10c`, an empty
+remote and an unset `core.hooksPath`. Four of those premises have moved. The contract
+above is unchanged in substance; what follows corrects the state it rests on, so the
+rename plan is not written against a repository that no longer exists.
+
+**The rollback baseline is no longer `9d3c10c`.** The remote was deleted and recreated,
+and now carries a fresh root, `338ed21`, with no ancestor in common with the
+pre-publication history. `9d3c10c` survives only in this clone, on
+`archive/pre-publication-history`. The off-machine rollback point for the rename is
+`0b73f5c`, the merge of the first pull request, which is the published 0.4.3 state.
+
+**Something is published under the retired identity, and the tag clause survives it.**
+0.4.3 shipped and merged as plugin `delivery` from marketplace `delivery-tools`. The
+clause that carried weight was that no *tag* names the retired identity, and none does:
+`git tag` is empty. `0.5.0` remains the first and only tag.
+
+**The private-clone risk is retired.** The recreated remote is public, so a
+`marketplace add` needs no per-harness credential. The acceptance row this record
+reserved for a real `marketplace add` from each harness stays, because per-harness
+reachability is still unproven; what it no longer carries is a credential failure mode.
+
+**`core.hooksPath` is installed**, so this repository now runs the `pre-push` guard it
+ships and reaches `main` through a pull request. The bootstrap conflict described above
+is spent: it applied to pushing to an empty remote, which has happened.
+
+##### The Grok adapter points at Grok's own installed copy
+
+The Deferred note above settled that the adapter stays and that the rename changes its
+path. It did not say to what. Decided by the product owner on 2026-08-21: Grok installs
+natively from the remote, the same as the other two, and
+`~/.grok/hooks/delivery.json` is regenerated against the root that
+`grok plugin details` reports for that install rather than against this working tree.
+
+That is what the install-source decision above already says on its face — every harness
+installs from the remote — and it is the only option that makes Grok independent of
+Claude Code's enabled set. Two costs are accepted rather than discovered later. Whether
+a git-remote install prompts for `--trust` the way a local directory does is untested;
+findings §30 established the local behaviour and explicitly did not establish the remote
+one. And the machine then holds two copies of the package, Claude Code's cache and
+Grok's, which can drift when only one is refreshed.
+
+Both costs land in the migration, not in the implementation, which is why the migration
+is separated below.
+
+##### The machine migration is a procedure between plans, not part of the implementation
+
+The unit changes repository content only. Uninstalling the retired identity, removing
+the local-directory marketplace, adding the `dely` marketplace in all three harnesses,
+`grok plugin install`, regenerating the adapter, re-trusting Codex hooks and refreshing
+caches all happen after release, between plans.
+
+This is not a new rule. `AGENTS.md` already fixes cache and Grok hook refresh at between
+plans and never during, and an implementation that uninstalled the running plugin would
+change the harness under its own plan. The 0.4.3 correction was carried the same way:
+accepted, released, installed, forward-tested, as four separate steps. The untested
+`--trust` behaviour therefore cannot cost the plan a round; it can only cost the
+migration a retry, where a human is present.
+
+##### The instrument that proves the skill loads changes harness
+
+This record proposed one `codex exec` probe to separate a skill that loads from a plugin
+that merely installs. That instrument predates the 0.4.3 correction, which made a
+headless harness call a fallback requiring explicit human approval. The equivalent
+evidence is now produced by the forward smoke: an interactive worker launched through
+the selected coordinator reports the namespaced skill it loaded and the root it loaded
+it from. That is the same discrimination without a headless dispatch, and it is the
+shape the 0.4.3 forward smoke already ran.
+
+##### Deferred — the journal path the session-start hook injects does not exist
+
+Observed 2026-08-21 while running the 0.4.3 forward smoke, and left alone because it is
+a behaviour defect and this unit is an identity change. Three places disagree about the
+journal's shape:
+
+- `hooks/post-tool-journal.sh:45` writes a per-session **directory**,
+  `${journal_dir}/${session_id}/`, one file per event.
+- `hooks/session-start-context.sh:46` injects
+  `${journal_dir}/${session_id}.raw.jsonl`, the flat file the writer no longer creates.
+  Every session is therefore handed a path that does not exist.
+- `bin/delivery-doctor:143` counts only `-name '*.raw.jsonl' -type f` at depth 1, so its
+  "session file(s)" count reports the obsolete shape and ignores every current session.
+
+`bin/delivery-evidence:59` already reads both shapes deliberately and is correct. The
+trigger for acting is this rename reaching closure, so the fix lands between plans in
+its own unit rather than under this one.
+
 ### 2026-08-21 — Consumer identifiers are pseudonymous; the evidence itself stays whole
 
 #### Context
