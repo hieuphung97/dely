@@ -101,28 +101,33 @@ the writable gate/result/completion operations, so the instrument discriminates.
 **Document impact.** The decision record owns the supersession; findings owns the observed
 failure; README and `AGENTS.md` own deployment choices.
 
-### 3. Publish and forward-test the corrected contract
+### 3. Wire and record the corrected contract
 
-**Behaviour.** Version `0.4.3` is installed consistently before the paused rename unit
-resumes, and a fresh Control Session selects the coordinator-first path without being
-reminded of this incident.
+**Behaviour.** This repository selects Orca with interactive workers and an unsandboxed
+Codex review explicitly, while the portable installation guidance exposes those choices
+without making Orca or Codex universal requirements.
 
-**Direction.** At release, bump both plugin manifests to `0.4.3`, close this plan, append
-one delivery-log row and commit. Refresh Claude Code and Codex caches and Grok's installed
-copy only after acceptance. Use a fresh Control TUI for the forward test; do not test the
-candidate by asking the session that designed it to recite the new words.
+**Direction.** Reconcile `AGENTS.md`, README and findings with Tasks 1 and 2. Keep the
+deployment surface to the existing project-local table and prose; add no configuration
+schema, wrapper or compatibility matrix.
 
-**Files.** `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`,
-`docs/delivery-log.md`, this plan at deletion. Cache and user configuration changes are
-post-accept installation actions, not candidate files.
+**Files.** `AGENTS.md`, `README.md`, `docs/findings.md`.
 
-**Focused verification.** All three harnesses report the installed `0.4.3` skill. A fresh
-Control dispatches one bounded worker through Orca, the human can see its TUI, and the
-worker returns through Orca lifecycle. The smoke fails if only a shell tab appears, if the
-worker process is headless, or if Control silently takes the fallback.
+**Focused verification.** The repository table selects `Coordinator: Orca`, interactive
+worker surfaces and the explicit full-access Codex review invocation. README tells another
+project where to make the same three choices without prescribing this repository's
+combination.
 
-**Document impact.** The manifests own the published version and the delivery log owns the
-closed plan's drift.
+**Document impact.** `AGENTS.md` owns this repository's choices, README owns portable
+installation guidance and findings owns the observed failure.
+
+## Post-accept release
+
+After independent review accepts the candidate, release bumps both plugin manifests to
+`0.4.3`, deletes this plan, appends one delivery-log row and commits. Cache refresh and
+user configuration changes happen only after that plan boundary. A fresh Control TUI then
+forward-tests the installed contract by dispatching one bounded worker through Orca; only
+after that smoke succeeds may the paused rename unit resume.
 
 ## Acceptance
 
