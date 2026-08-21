@@ -161,8 +161,9 @@ bin/delivery-doctor /path/to/your/repo
 Verifies the execute bit, `core.hooksPath`, that `hooks.json` parses, that the
 hook scripts parse, that something has been captured, and that a managed block
 in `AGENTS.md` is absent (the supported fallback), well formed, or broken. It
-also prints what it cannot verify, because several checks in this project looked
-conclusive and were not.
+warns when a well-formed block has no `CLAUDE.md` importing `AGENTS.md`,
+because Claude Code will not read the block. It also prints what it cannot
+verify, because several checks in this project looked conclusive and were not.
 
 Both scripts are invoked through `bash`, so no execute bit is needed. Both exit
 0 on every error path — a broken hook must not break a session.

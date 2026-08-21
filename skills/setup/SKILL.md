@@ -79,17 +79,27 @@ Where `AGENTS.md` carries no managed block, `delivery` runs on the current
 harness with harness defaults and omits the model and effort flags. Setup is
 a convenience over that fallback, not a precondition for it.
 
+## When a choice cannot be offered
+
+Where a choice cannot be offered, do not make it. Take the conservative
+action — which may be writing a conservative value, and may be doing
+nothing — and report the choice that was not offered, naming what was
+available and how to set it; do not write that report into the managed
+block.
+
+For the coordinator: if none exists and setup cannot ask, write `none`
+and report that a coordinator was available and was not offered, naming
+it and how to set it.
+
+For the `CLAUDE.md` import: if the current harness is Claude Code, the
+import is absent, and setup cannot ask, write nothing and report the
+offer that was not made.
+
 ## Coordinator
 
 Keep an existing selection. Where none exists, offer Orca only if it is
 actually available; otherwise write `none`. Do not install a coordinator. Do
 not invent an adapter.
-
-Where a selection cannot be offered, write the conservative value and report
-the choice that was not offered, naming what was available and how to set it;
-do not write that report into the managed block. For the coordinator: if
-none exists and setup cannot ask, write `none` and report that a coordinator
-was available and was not offered, naming it and how to set it.
 
 ## Refusals
 
@@ -107,7 +117,17 @@ authoritative.
 
 Claude Code does not read `AGENTS.md`. The persistent instruction reaches
 Codex and Grok natively. It reaches Claude Code only where the project has a
-`CLAUDE.md` that imports `AGENTS.md`. Report this. Do not write `CLAUDE.md`.
+`CLAUDE.md` that imports `AGENTS.md`.
+
+Where the current harness is Claude Code and the project has no `CLAUDE.md`
+importing `AGENTS.md`, offer to create a one-line `CLAUDE.md` containing
+`@AGENTS.md`. The human accepts or declines. Never write it unasked.
+
+This is not a second managed block: no markers, no configuration, a pointer
+at the block rather than a copy of it.
+
+The offer is Claude-Code-only. On Codex the file is inert, and Grok does not
+expand the import at all.
 
 ## What setup will not do
 
