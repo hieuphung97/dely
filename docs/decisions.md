@@ -1401,6 +1401,226 @@ behind a rule they were asked to follow.
 **Publishing publicly**, triggered by the product owner reading the scrubbed
 `findings.md` once with a publisher's eye, after the recreate.
 
+### 2026-08-21 — Project configuration is a managed block in `AGENTS.md`, written by a second core skill `dely:setup`
+
+#### Context
+
+`dely` ships one skill. `delivery` reads the consuming project's `AGENTS.md` for
+gates, artifact paths, default branch, coordinator and the per-phase harness,
+model and effort, and it never writes that file. Every consumer has therefore
+authored the phase table by hand, and this repository is the only project where
+that has ever happened.
+
+The cost is measurable in this repository's own log. `findings.md` §19 recorded a
+review that ran on the harness config default rather than the model chosen for the
+phase, and the `delivery` contract responded with prose — "Name the model and the
+effort on every dispatch" — plus a reason table with no names in it. The names are
+environment facts, so the skill correctly refuses to hold them; but nothing supplies
+them either, and a rule asking a worker to be careful with a value has already lost
+to a mechanism that supplies it three times in this log.
+
+The values are also not stable enough to write once and trust. Re-read from the
+installed harnesses on 2026-08-21, from this checkout:
+
+- `claude -p "/model" --output-format json` and `claude -p "/effort"
+  --output-format json` both return `duration_api_ms 0`, `num_turns 0`,
+  `total_cost_usd 0` — they are answered locally and reach no model. `/model`
+  reports aliases `sonnet, opus, haiku, fable, best, sonnet[1m], opus[1m],
+  fable[1m], opusplan, default, or a full model ID`. `/effort` reports
+  `low|medium|high|xhigh|max|auto`.
+- `codex debug models` returns eight slugs with `default_reasoning_level` and
+  `supported_reasoning_levels` per slug: `gpt-5.6-sol`, `gpt-5.6-terra`,
+  `gpt-5.6-luna`, `gpt-reserve`, `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`,
+  `codex-auto-review`. Two carry `visibility: hide`. The supported levels are not
+  uniform: `gpt-5.6-luna` stops at `max` where `gpt-5.6-sol` also accepts `ultra`.
+- `grok models` returns `grok-4.6` (default) and `grok-4.5`.
+
+`findings.md` §20 tabulated five Codex slugs and one shared effort vocabulary per
+harness, and `harness-surface.md` recorded `ultracode` as a Claude Code effort
+level. Both are now wrong. A hard-coded catalogue in this package would be wrong
+again by the next harness release, so the catalogue is read, not stored.
+
+Grok is the exception and the reason the discovery rule is asymmetric.
+`grok models` lists model ids locally, but effort has no local listing:
+`grok --reasoning-effort bogus models` was run here and exited 0 without
+validating the flag, so the vocabulary is reachable only by dispatching to the
+model. One earlier probe of that shape cost money and another hung. Grok effort
+is therefore taken from the installed CLI's own help output and from validation
+already observed, and is never discovered by calling the model.
+
+Separately, the README carries a settled question as an open one. Its **State**
+section still says it is "Still open: whether `kenryu42/cc-safety-net` retires
+`git-hooks/pre-push` and the secret-scanning plan", while the Settled decision
+*Adopt `cc-safety-net` for the safety layer, pending one test* answered both on
+2026-08-20 from observation: the secret-scanning plan is dropped, and
+`git-hooks/pre-push` is retained because `git push --dry-run origin HEAD:main`
+was not blocked.
+
+#### Decision
+
+`dely` gains a second core skill, `setup`, invoked as `dely:setup`. The `delivery`
+skill keeps its name and its contract unchanged.
+
+**What setup writes.** Exactly one managed block in the consuming project's
+`AGENTS.md`, delimited by `<!-- dely:begin -->` and `<!-- dely:end -->`. The block
+holds, at minimum, a `Dely` heading, a `Coordinator` line, and a table with the
+columns `Phase | Harness | Model | Effort` carrying one row each for `control`,
+`implement`, `review` and `release`. Setup replaces the region between its own two
+markers and touches nothing else in the file. Prose the project keeps outside the
+block — a sandbox pin, a worker-surface rule, gate commands — is not read, merged,
+moved or deleted.
+
+**Two paths.** Quick setup uses the current harness for every phase and the
+harness defaults for model and effort. Customize lets the human choose harness,
+model and effort per phase, offering the discovered values.
+
+**Discovery is dynamic, per harness.** Claude Code from `claude -p "/model"` and
+`claude -p "/effort"`, both `--output-format json`. Codex from `codex debug
+models`, parsing `slug`, `default_reasoning_level` and `supported_reasoning_levels`
+per slug. Grok model ids from `grok models`; Grok effort from the installed CLI's
+help and observed validation only. No model catalogue is stored in this package.
+
+**Pinning, and the literal `default`.** Where a managed block exists, its
+selections are pinned on every dispatch. The literal value `default` in the Model
+or Effort cell means the harness default is wanted deliberately, and the
+corresponding flag is omitted from the dispatch. That distinguishes a chosen
+default from an unset one, which was the whole defect in §19.
+
+**No block is a supported state, not a misconfiguration.** Where `AGENTS.md`
+carries no managed block, `delivery` runs workers on the current harness with
+harness defaults and omits the model and effort flags. Setup is a convenience over
+that fallback, not a precondition for it.
+
+**Setup refuses rather than repairs.** Broken markers, more than one managed block,
+or a legacy phase table that contradicts the block are reported to the human and
+left alone. Setup does not merge two tables, delete a legacy one, or guess which is
+authoritative.
+
+**Coordinator.** An existing selection is kept. Where none exists, Orca is offered
+only if it is actually available, and otherwise the value is `none`. No coordinator
+abstraction, adapter or interface is created.
+
+**Setup configures and diagnoses; it does not install.** It does not install a
+plugin or skill into any harness, does not trust hooks, does not write `~/.claude`,
+`~/.codex` or `~/.grok`, and does not install a coordinator. It may print verified
+install guidance, and only after the human explicitly asks for it.
+
+**The managed-block contract is checked by a program.** `bin/delivery-doctor`
+gains a managed-block section: absent block reported as the deliberate fallback,
+malformed or duplicated markers and a block missing a required part reported as
+failures. The check belongs there because `delivery-doctor` is already the program
+whose job is to catch a rail that reports as fine and is not.
+
+**Versioning is explicit.** Adding a core skill is a minor bump:
+`.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` both move from
+`0.5.0` to `0.6.0`. Release does not infer it.
+
+**This repository migrates itself.** Its own `AGENTS.md` phase table becomes a
+managed block, and the two columns the minimal schema does not carry — worker
+surface, and the review sandbox pin `--dangerously-bypass-approvals-and-sandbox` —
+move to prose outside the block, where they remain this project's own settled
+choices. Without this, the package would ship a feature its own repository trips
+the refusal path on.
+
+**The README is reconciled** so its **State** section stops contradicting the
+settled `cc-safety-net` decision.
+
+#### What setup cannot fix, and says so
+
+Claude Code does not read `AGENTS.md`. `harness-surface.md` records it, and this
+repository demonstrates it: there is no `CLAUDE.md` and no `.claude/` here, and a
+Claude Code control session receives no `AGENTS.md` content at session start. So
+the managed instruction that future sessions invoke `delivery` for Planned or
+Critical work reaches Codex and Grok natively, and reaches Claude Code only where
+the project has a `CLAUDE.md` importing `AGENTS.md`. `findings.md` §11 already
+notes that such an import is expanded by Claude Code and not by Grok, so the two
+routes are not interchangeable.
+
+Setup reports this and stops. Writing `CLAUDE.md` would make setup the owner of a
+second file, which contradicts the one-block rule, and it would put a Claude Code
+mechanism into a file the other two harnesses read differently.
+
+#### Alternatives considered
+
+- **A configuration file of its own** — rejected for the reason already recorded
+  when `AGENTS.md` was chosen as the project surface: every harness here reads it,
+  it already holds project facts, and a second file would need its own discovery.
+- **Storing a model catalogue in the package** — rejected by measurement. The
+  catalogue recorded on 2026-08-20 was wrong two days later on both Claude Code
+  and Codex.
+- **Discovering Grok effort by dispatch** — rejected. It costs money, one such
+  probe hung, and the value it returns is not worth a paid round trip.
+- **Extending `delivery` instead of adding a skill** — rejected. `delivery`'s
+  rule is that it holds only what survives a change of project, harness and
+  coordinator; harness catalogues and an interactive configuration path are the
+  opposite of that. Separate frontmatter also gives the configuration path its own
+  discovery surface.
+- **A `Skills` column, or a dependency resolver, in the managed block** —
+  rejected. Superpowers, Ponytail and every other workflow plugin are project-owned
+  extensions. Setup does not enumerate, install or invoke them, and a project that
+  wants them records that outside the block.
+- **Setup installing or trusting anything** — rejected. Install is per-harness and
+  per-machine, hook trust on Codex is keyed to script content and revoked by any
+  update, and a skill that writes `~/.claude` or `~/.grok` is doing something the
+  human did not ask a project-configuration step to do.
+- **A hook injecting the workflow into every prompt** — rejected. Discovery is
+  raised by frontmatter, by the Codex interface prompt, and by a persistent
+  instruction in the managed block. No classifier, daemon or new hook.
+- **Setup repairing a conflicting legacy table automatically** — rejected. Every
+  automatic merge here would guess which of two tables the project meant, and the
+  log already carries two rounds lost to a check that asserted the surroundings
+  instead of the thing itself.
+- **Nesting Superpowers brainstorming inside this design** — rejected, unchanged.
+  `writing-plans` and `executing-plans` remain rejected for the reasons in the
+  Rejected table. `delivery` already owns the observe-red, minimal-green rule and
+  the phase lifecycle; a project may adopt test-driven development or systematic
+  debugging as its own policy.
+
+#### Consequences
+
+A project that runs `dely:setup` once at the start of a Control Session has its
+per-phase pins in one place, written from values read out of the installed
+harnesses rather than remembered. A project that does not is unaffected: the
+fallback is stated, supported, and now named in a program's output rather than
+inferred from silence.
+
+`dely` core still has no mandatory third-party dependency. A coordinator's native
+skill is required only by a project that selects that coordinator.
+
+`cc-safety-net` remains the optional recommended safety rail, per harness:
+recommended on Claude Code; recommended on Codex only where the human trusts its
+hooks explicitly; and not claimed functional on Grok, which discovers plugin hooks
+and dispatches none of them.
+
+What gets worse: there are now two core skills to keep consistent, and a managed
+block is a region a human can edit into a shape the writer did not produce. The
+`delivery-doctor` check is what makes that observable instead of silent.
+
+#### Non-goals
+
+Not a plugin manager, not a coordinator adapter, not a harness abstraction, not a
+model catalogue, not a classifier, not a new hook, and not a change to the four
+phases, their dispositions or the `delivery` contract.
+
+Not a claim that any of this is proven to work before it is installed. A static
+check proves the shape of the files in this repository. Whether a session
+discovers `dely:setup`, whether the managed block reaches a worker, and whether the
+persistent instruction causes a future session to invoke `delivery` are observable
+only after each harness's cached copy is refreshed, and belong to the forward smoke
+after migration.
+
+#### Deferred
+
+**Reading the managed block from `delivery` itself**, rather than leaving each
+Control Session to read `AGENTS.md` as it already does. Triggered by a dispatch
+that pins the wrong value while a correct block exists.
+
+**A second consumer's managed block**, triggered by any project other than this one
+adopting `dely:setup`. Until then the schema is minimal on purpose.
+
+**Anything about Claude Code and `AGENTS.md` beyond reporting it**, triggered by
+Claude Code gaining native support, or by a consumer losing a round to the gap.
+
 ---
 
 ## Open
