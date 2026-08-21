@@ -1906,8 +1906,8 @@ a consumer other than this repository exists to say whether reporting is enough.
 
 What stays unobserved: whether the report is actually emitted by a real
 non-interactive run. A static check proves the skill document states the rule; it
-cannot prove an agent obeys it. The behavioural check is a post-release smoke, and
-it is named in the plan rather than claimed here.
+cannot prove an agent obeys it. The behavioural check is the post-release smoke
+under Deferred.
 
 #### Non-goals
 
@@ -1921,6 +1921,19 @@ triggered by a consumer other than this repository adopting `dely:setup`.
 
 **Revisiting the skill name**, triggered by an observed collision in a harness
 where qualification does not resolve it.
+
+**Post-release smoke.** In a scratch repository with no `AGENTS.md`, on a
+machine where Orca is available, invoke `dely:setup` non-interactively with
+instructions to ask nothing, and record whether the written block says
+`Coordinator: none` and whether the run's output names the coordinator it
+could not offer. The `0.6.0` run that produced this defect is the control: it
+wrote `none` and said nothing. Results go to `docs/findings.md` by that later
+unit. Triggered after the plugin caches are refreshed.
+
+**Whether a real non-interactive run actually emits the report.** Every check
+in this unit is static and proves only that the skill document states the
+rule; it cannot prove an agent obeys it. The behavioural check is the
+post-release smoke above.
 
 ---
 
