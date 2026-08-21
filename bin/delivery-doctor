@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# Check that every rail is actually wired, not merely present.
+#
+# Written because a rail failed silently. `git-hooks/pre-push` was installed and
+# ignored — git printed a hint about the missing execute bit and pushed anyway.
+# A guard that is absent without saying so is worse than no guard, because the
+# absence is indistinguishable from protection until the day it matters.
+#
+# Two lessons from this session are encoded here as checks rather than prose:
+#   - a configuration listing is not a behavioural test (`grok inspect` said the
+#     safety hook was loaded; it was inert)
+#   - a fact true of one mechanism is not true of another (plugin hooks are run
+#     through `bash`, git hooks are exec'd directly and need the bit)
+#
+# Usage:  delivery-doctor [repo-path]      defaults to the current directory
+# Exit:   0 all checks pass, 1 at least one failed
+
+set -u
+
+repo="${1:-$PWD}"
+pkg_root="$(cd "$(dirname "$0")/.." && pwd)"
+failures=0
+
+ok()   { printf '  ok    %s\n' "$*"; }
+bad()  { printf '  FAIL  %s\n' "$*"; failures=$((failures + 1)); }
+warn() { printf '  warn  %s\n' "$*"; }
+
+printf 'delivery-doctor\n'
+printf '  package: %s\n' "$pkg_root"
+printf '  repo:    %s\n\n' "$repo"
+
+# --- prerequisites --------------------------------------------------------
+
+if command -v jq >/dev/null 2>&1; then
+  ok "jq present"
+else
+  bad "jq missing — the SessionStart hook emits nothing and the reader cannot run"
+fi
+
+if command -v git >/dev/null 2>&1; then
+  ok "git present"
+else
+  bad "git missing"
+fi
+
+# --- git hook -------------------------------------------------------------
+
+hook="${pkg_root}/git-hooks/pre-push"
+
+if [ -f "$hook" ]; then
+  ok "pre-push hook file exists"
+  if [ -x "$hook" ]; then
+    ok "pre-push hook is executable"
+  else
+    bad "pre-push hook is NOT executable — git will ignore it and print only a hint"
+    printf '        fix: chmod +x %s\n' "$hook"
+  fi
+else
+  bad "pre-push hook missing at $hook"
+fi
+
+if [ -d "$repo/.git" ] || git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
+  configured=$(git -C "$repo" config --get core.hooksPath 2>/dev/null || printf '')
+  remotes=$(git -C "$repo" remote 2>/dev/null || printf '')
+  if [ -z "$configured" ] && [ -z "$remotes" ]; then
+    # A push guard cannot fire in a repository with nowhere to push. Reporting
+    # that as a failure is a false warning, and this package's own findings
+    # record a false warning costing two turns of work against a non-problem.
+    ok "pre-push rail not applicable — $repo has no remote"
+  elif [ -z "$configured" ]; then
+    bad "core.hooksPath is not set in $repo — the pre-push rail is not installed"
+    printf '        fix: git -C %s config core.hooksPath %s/git-hooks\n' "$repo" "$pkg_root"
+  else
+    resolved=$(cd "$repo" && cd "$configured" 2>/dev/null && pwd || printf '%s' "$configured")
+    if [ "$resolved" = "${pkg_root}/git-hooks" ]; then
+      ok "core.hooksPath points here ($configured)"
+    else
+      warn "core.hooksPath points elsewhere: $configured"
+      printf '        another tool may own git hooks in this repo; reconcile before relying on pre-push\n'
+    fi
+  fi
+else
+  warn "$repo is not a git repository — skipped hook wiring checks"
+fi
+
+# --- claude code plugin hooks --------------------------------------------
+
+hooks_json="${pkg_root}/hooks/hooks.json"
+if [ -f "$hooks_json" ] && command -v jq >/dev/null 2>&1; then
+  if jq -e . "$hooks_json" >/dev/null 2>&1; then
+    events=$(jq -r '.hooks | keys | join(", ")' "$hooks_json" 2>/dev/null)
+    ok "hooks.json parses; events: ${events}"
+  else
+    bad "hooks.json is not valid JSON — Claude Code will load no hooks from this plugin"
+  fi
+else
+  bad "hooks.json missing at $hooks_json"
+fi
+
+for script in session-start-context.sh post-tool-journal.sh; do
+  path="${pkg_root}/hooks/${script}"
+  if [ -f "$path" ]; then
+    if bash -n "$path" 2>/dev/null; then
+      ok "${script} parses"
+    else
+      bad "${script} has a syntax error — the hook will fail on every session"
+    fi
+  else
+    bad "${script} missing"
+  fi
+done
+
+# Grok discovers this plugin and reports has_hooks=true, and then runs none of
+# its hooks. Verified 2026-08-20 from its own debug log: the only hook sources it
+# executed were ~/.grok/hooks/*.json and ~/.claude/settings.json, while every
+# plugin-bundled hook — delivery, cc-safety-net, codex, superpowers — was
+# discovered and never dispatched. So a Grok worker journals nothing unless the
+# hooks are registered where Grok actually looks.
+grok_hook="${HOME}/.grok/hooks/delivery.json"
+if command -v grok >/dev/null 2>&1; then
+  if [ -f "$grok_hook" ]; then
+    if jq -e . "$grok_hook" >/dev/null 2>&1; then
+      if grep -q "$pkg_root" "$grok_hook" 2>/dev/null; then
+        ok "Grok hook registered and points here ($grok_hook)"
+      else
+        warn "Grok hook exists but does not reference $pkg_root"
+        printf '        it may be pointing at an older copy of this package\n'
+      fi
+    else
+      bad "Grok hook is not valid JSON — $grok_hook"
+    fi
+  else
+    bad "Grok is installed but has no delivery hook — a Grok worker records no evidence"
+    printf '        Grok ignores plugin-bundled hooks; register them at %s\n' "$grok_hook"
+    printf '        using the same three events as hooks/hooks.json, with absolute paths\n'
+  fi
+fi
+
+# --- journal --------------------------------------------------------------
+
+journal_dir="${DELIVERY_JOURNAL_DIR:-$HOME/.delivery-journal}"
+if [ -d "$journal_dir" ]; then
+  count=$(find "$journal_dir" -maxdepth 1 -name '*.raw.jsonl' -type f 2>/dev/null | wc -l | tr -d '[:space:]')
+  ok "journal directory exists, ${count} session file(s)"
+  if [ "${count:-0}" -eq 0 ]; then
+    warn "no sessions recorded yet — run one turn with --plugin-dir to confirm capture"
+  fi
+else
+  warn "no journal at $journal_dir — nothing has been captured yet"
+fi
+
+# --- what this cannot check ----------------------------------------------
+
+printf '\n  Not checked here, because only running the thing proves it:\n'
+printf '    - whether an inherited guard is honoured by the harness that loaded it\n'
+printf '      (Grok discovers plugin hooks and dispatches none of them, so every\n'
+printf '       plugin-bundled guard is inert there, not just cc-safety-net)\n'
+printf '    - whether a sandbox deny rule fires, which needs a real file at a\n'
+printf '      denied path; a non-existent path returns ENOENT and proves nothing\n'
+
+printf '\n'
+if [ "$failures" -eq 0 ]; then
+  printf 'all checks passed\n'
+  exit 0
+fi
+printf '%d check(s) failed\n' "$failures"
+exit 1

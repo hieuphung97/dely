@@ -1,0 +1,16 @@
+{
+  "name": "delivery-tools",
+  "description": "A delivery workflow and the rails that make its guarantees mechanical.",
+  "owner": {
+    "name": "Hieu Phung",
+    "url": "https://github.com/hieuphung97"
+  },
+  "plugins": [
+    {
+      "name": "delivery",
+      "description": "Design, implement, review independently, close. Repository identifiers arrive resolved, gate results are recorded as they run, and pushes to the default branch are refused in git.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

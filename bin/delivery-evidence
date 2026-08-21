@@ -1,0 +1,306 @@
+#!/usr/bin/env bash
+# Turn the journal into gate evidence a reviewer can read.
+#
+# The journal exists so a gate result is recorded by the tool layer instead of
+# narrated by the model. That only matters if something reads it — the previous
+# attempt at a metrics record in this workflow was never written once in nine
+# plans, and the diagnosis was that a file with no reader does not get written.
+# This is the reader. A program counts as a reader.
+#
+# Every line of output below came from the tool, not from a model.
+#
+# The two events carry DIFFERENT shapes. Both verified by observation, 2026-08-20:
+#
+#   PostToolUse         tool_response.stdout and tool_response.stderr, separate.
+#                       No exit code; success implies 0. Flag is `interrupted`.
+#   PostToolUseFailure  No tool_response at all. Instead `error`, whose first
+#                       line is "Exit code N" and whose remainder is stdout and
+#                       stderr COMBINED. Flag is `is_interrupt`.
+#
+# Nothing is lost on either path, but the streams cannot be told apart on the
+# failure path. A red gate's summary line is present; which stream it came from
+# is not recoverable.
+#
+# Usage:
+#   delivery-evidence                       newest session, all Bash calls
+#   delivery-evidence <session-id>          a specific session
+#   delivery-evidence -g 'npm test|pytest'  only matching commands
+#   delivery-evidence -n 6                  more trailing output lines
+#   delivery-evidence --json                shaped records as JSONL
+#
+# Environment:
+#   DELIVERY_JOURNAL_DIR   defaults to ~/.delivery-journal
+
+set -u
+
+journal_dir="${DELIVERY_JOURNAL_DIR:-$HOME/.delivery-journal}"
+session=''
+pattern='.'
+lines=3
+as_json=0
+
+die() { printf '%s\n' "$*" >&2; exit 1; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -g|--grep)  pattern="${2:-}"; shift 2 ;;
+    -n|--lines) lines="${2:-3}";  shift 2 ;;
+    --json)     as_json=1;        shift ;;
+    -h|--help)  sed -n '3,36p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*)         die "unknown option: $1" ;;
+    *)          session="$1";     shift ;;
+  esac
+done
+
+command -v jq >/dev/null 2>&1 || die 'delivery-evidence needs jq on PATH'
+[ -d "$journal_dir" ] || die "no journal directory at $journal_dir"
+
+# Two layouts, both read. A per-session directory holding one file per event is
+# current. A single `.raw.jsonl` per session is what earlier runs wrote, and some
+# of those files are damaged — see the note printed at the end of a read.
+if [ -n "$session" ]; then
+  target="${journal_dir}/${session}"
+  if [ -d "$target" ]; then
+    :
+  elif [ -f "${target}.raw.jsonl" ]; then
+    target="${target}.raw.jsonl"
+  else
+    die "no journal for session $session"
+  fi
+else
+  target=$(ls -td "$journal_dir"/*/ "$journal_dir"/*.raw.jsonl 2>/dev/null | head -n 1)
+  [ -n "${target:-}" ] || die "no journals found in $journal_dir"
+  target="${target%/}"
+fi
+
+# One record stream whichever layout it is.
+emit_records() {
+  if [ -d "$target" ]; then
+    find "$target" -maxdepth 1 -name '*.json' -type f 2>/dev/null | sort | while IFS= read -r f; do
+      cat "$f" 2>/dev/null
+      printf '\n'
+    done
+  else
+    # A damaged legacy journal must not cost the events that survived it. One
+    # unparseable line used to abort the entire read, which turned partial
+    # evidence loss into total evidence loss.
+    bad=0
+    while IFS= read -r line; do
+      if printf '%s' "$line" | jq -e . >/dev/null 2>&1; then
+        printf '%s\n' "$line"
+      else
+        bad=$((bad + 1))
+      fi
+    done < "$target"
+    if [ "$bad" -gt 0 ]; then
+      printf 'warning: %d damaged record(s) skipped in %s\n' "$bad" "$target" >&2
+      printf '         this is the appended-file layout, where a payload over ~4 KB could be\n' >&2
+      printf '         split and interleaved with a concurrent hook. Those events are gone.\n' >&2
+    fi
+  fi
+}
+
+case "$lines" in ''|*[!0-9]*) die "-n needs a whole number" ;; esac
+
+# Collapse both event shapes into one record.
+read -r -d '' NORMALISE <<'JQ' || true
+# Conservative lexical detection: a standalone `|` remains after `||` is
+# removed. This is not a shell parser and does not infer pipefail.
+def pipeline_present($cmd):
+  (($cmd // "") | gsub("\\|\\|"; "") | test("\\|"));
+
+# Grok gives a real number. Claude Code and Codex give one only on the failure
+# path, as the first line of `error`, and imply zero otherwise.
+def exit_code($p):
+  if ($p.tool_result | type) == "object" and ($p.tool_result.exit_code != null)
+  then ($p.tool_result.exit_code | tostring)
+  elif ($p.hook_event_name | test("PostToolUseFailure|post_tool_use_failure"))
+  then ([ ($p.error // "") | scan("^Exit code ([0-9]+)") ] | flatten | first) // "unknown"
+  else "0" end;
+
+def error_body($e):
+  (($e // "") | split("\n")) as $l
+  | (if (($l[0] // "") | test("^Exit code [0-9]+$")) then $l[1:] else $l end)
+  | join("\n");
+
+# Three harnesses, three payload vocabularies. Claude Code and Codex use
+# snake_case with `tool_response`; Grok uses camelCase with `toolResult`. Map
+# them onto one shape here so nothing below has to know which harness wrote the
+# record. Observed 2026-08-20, all three from real runs.
+def canon:
+  . as $p
+  | {
+      session_id:      ($p.session_id // $p.sessionId // "unknown"),
+      cwd:             ($p.cwd // $p.workspaceRoot // "unknown"),
+      hook_event_name: ($p.hook_event_name // $p.hookEventName // ""),
+      tool_name:       ($p.tool_name // $p.toolName // ""),
+      tool_input:      ($p.tool_input // $p.toolInput // {}),
+      tool_use_id:     ($p.tool_use_id // $p.toolUseId // "unknown"),
+      duration_ms:     ($p.duration_ms // 0),
+      model:           ($p.model // ""),
+      error:           ($p.error // null),
+      is_interrupt:    ($p.is_interrupt // false),
+      # A backgrounded call fires PostToolUse immediately, with empty output and a
+      # `backgroundTaskId`. Its real result never reaches this journal. Both signals
+      # are recorded so the reader can refuse to present it as a finished command.
+      backgrounded:    ((($p.tool_input // $p.toolInput // {}) | .run_in_background // false)
+                        or (($p.tool_response // {}) | if type == "object"
+                            then (.backgroundTaskId != null) else false end)),
+      background_id:   (($p.tool_response // {}) | if type == "object"
+                        then (.backgroundTaskId // null) else null end),
+      tool_response:   ($p.tool_response // null),
+      tool_result:     ($p.toolResult // null)
+    };
+
+# `tool_response` is an object in Claude Code and a bare string in Codex; Grok
+# sends `toolResult` with the output already prefixed by its exit code, plus a
+# real numeric `exit_code` — the one field Claude Code never supplies on the
+# success path. Resolve the shape before touching it, and report which shape was
+# found rather than hiding the difference.
+def response($p):
+  if ($p.tool_result | type) == "object" then
+    { stdout: (($p.tool_result.output_for_prompt // "") | sub("^exit: [0-9]+\n"; "")),
+      stderr: "", interrupted: ($p.tool_result.timed_out // false),
+      shape: "grok_tool_result" }
+  else
+    ($p.tool_response) as $r
+    | ($r | type) as $t
+    | if $t == "object" then
+        { stdout: ($r.stdout // ""), stderr: ($r.stderr // ""),
+          interrupted: ($r.interrupted // false), shape: "object" }
+      elif $t == "string" then
+        { stdout: $r, stderr: "", interrupted: false, shape: "string" }
+      else
+        { stdout: "", stderr: "", interrupted: false, shape: "absent" }
+      end
+  end;
+
+def normalise:
+  .observed_at as $at
+  | (.payload | canon)
+  | select(.tool_name | test("^(Bash|run_terminal_command)$"))
+  | exit_code(.) as $ec
+  # Which event fired settles it for Claude Code and Codex. Grok reports a shell
+  # command that exited non-zero as a completed tool call, so for Grok the exit
+  # code is what settles it.
+  | ((.hook_event_name | test("PostToolUseFailure|post_tool_use_failure"))
+     or ($ec != "0" and $ec != "unknown")) as $failed
+  | response(.) as $r
+  | {
+      observed_at: $at,
+      session_id:  .session_id,
+      cwd:         .cwd,
+      command:     (.tool_input.command // ""),
+      pipeline_present: pipeline_present(.tool_input.command // ""),
+      description: (.tool_input.description // ""),
+      tool_use_id: (.tool_use_id // "unknown"),
+      duration_ms: (.duration_ms // 0),
+      status:      (if $failed then "failed" elif .backgrounded then "backgrounded" else "completed" end),
+      backgrounded: .backgrounded,
+      background_id: .background_id,
+      exit_code:   $ec,
+      interrupted: (if $r.shape == "absent" then (.is_interrupt // false) else $r.interrupted end),
+      model:       (.model // ""),
+      response_shape: $r.shape,
+      # Where the text came from follows the payload shape, not the verdict. Only
+      # Claude Code and Codex move output into `error` when a call fails; Grok
+      # keeps it in `toolResult` whatever the exit code, so keying this on
+      # `$failed` blanked every failed Grok command.
+      streams:     (if $r.shape == "absent" then "combined"
+                    elif $r.shape == "string" or $r.shape == "grok_tool_result" then "combined"
+                    else "separated" end),
+      source:      (if $r.shape == "absent" then "error"
+                    elif $r.shape == "grok_tool_result" then "toolResult"
+                    else "tool_response" end),
+      stdout:      $r.stdout,
+      stderr:      $r.stderr,
+      combined:    (if $r.shape == "absent" then error_body(.error) else "" end)
+    };
+JQ
+
+if [ "$as_json" -eq 1 ]; then
+  emit_records | jq -c --arg pat "$pattern" "$NORMALISE"'
+    normalise | select(.command | test($pat))
+  '
+  exit 0
+fi
+
+emit_records | jq -rs --arg pat "$pattern" --arg file "$target" --argjson n "$lines" "$NORMALISE"'
+  def nonblank($s): (($s // "") | split("\n") | map(select(test("\\S")))) ;
+
+  # Tail-only selection loses the wrong end for some tools. A test runner puts
+  # its summary last; git puts "! [rejected] …" first and pads the rest with
+  # hint lines. Observed 2026-08-20: -n 4 on a rejected push showed four hint
+  # lines and elided the rejection itself. Keep both ends.
+  def pick($l):
+    ($l | length) as $len
+    | if $len <= ($n + 2) then $l
+      else $l[0:2] + ["… \($len - $n - 2) line(s) elided …"] + $l[-($n):] end ;
+
+  def hms($ms):
+    ($ms // 0) as $m
+    | if $m < 1000 then "\($m)ms"
+      elif $m < 60000 then "\((($m / 100) | floor) / 10)s"
+      else "\(($m / 60000) | floor)m \((($m % 60000) / 1000) | floor)s" end ;
+
+  def block($label; $text):
+    nonblank($text) as $all
+    | if ($all | length) == 0 then empty
+      else pick($all) as $shown
+        | "  \($label), verbatim, \($shown | length) of \($all | length) non-blank line(s):",
+          ($shown[] | "    \(.)") end ;
+
+  [ .[] | normalise ] as $all
+  | ($all | map(select(.command | test($pat)))) as $sel
+  | ($sel | map(select(.status == "failed")) | length) as $failed
+  # Split the failures by where their output came from. Only Claude Code and Codex
+  # route it through `error`; Grok keeps it in `toolResult`. The closing note has
+  # to say the right thing for each, or it describes evidence that is not there.
+  | ($sel | map(select(.status == "failed" and .response_shape == "absent")) | length) as $errpath
+  | ($sel | map(select(.status == "failed" and .response_shape == "grok_tool_result")) | length) as $grokfail
+  | "Journal: \($file)",
+    "Session: \($all[0].session_id // "unknown")",
+    "Working directory: \($all[0].cwd // "unknown")",
+    "Bash calls: \($all | length) total, \($sel | length) shown, \($failed) failed",
+    "",
+    ($sel[] |
+      "$ \(.command)",
+      (if .backgrounded
+       then "  status: DISPATCHED TO BACKGROUND after \(hms(.duration_ms)) — this journal has no outcome for it"
+       else "  status: \(if .status == "failed" then "FAILED" else "completed" end), exit \(.exit_code)\(if .interrupted then ", interrupted" else "" end), \(hms(.duration_ms))" end),
+      (if .pipeline_present
+       then "  warning: command contains a pipeline; the recorded status does not prove every stage. Gate evidence needs an explicit pipefail or a direct rerun."
+       else empty end),
+      "  tool_use_id: \(.tool_use_id)",
+      block("stdout"; .stdout),
+      block("stderr"; .stderr),
+      block("output, stdout and stderr combined, from `error`"; .combined),
+      # "not captured" and "produced nothing" are different claims. For a
+      # porcelain check, empty output IS the result, and calling that a capture
+      # failure would misread the evidence.
+      (if (.stdout | test("\\S")) or (.stderr | test("\\S")) or (.combined | test("\\S"))
+       then empty
+       elif .backgrounded
+       then "  the empty output is not the result. The call returned as soon as it was\n  backgrounded\(if .background_id then " as \(.background_id)" else "" end), and its exit code and output are not in this journal.\n  Treat a backgrounded gate as unevidenced."
+       elif .status == "completed"
+       then "  the command produced no output; that is the result reported by the tool, not a gap in capture"
+       else "  the payload carries no output text for this failure" end),
+      ""
+    ),
+    (if $grokfail > 0 then
+      "On the \($grokfail) failed call(s) recorded by Grok: the exit code is a real",
+      "field and the output is verbatim, with stdout and stderr already merged.",
+      ""
+     else empty end),
+    (if $errpath > 0 then
+      "On the \($errpath) failed call(s): a failed Bash call carries no tool_response.",
+      "Its output arrives in `error`, stdout and stderr already merged, after a",
+      "first line giving the exit code. Nothing is lost, but which stream a line",
+      "came from is not recoverable.",
+      ""
+     else empty end),
+    "This journal records calls that RAN. A call refused at PreToolUse — by",
+    "cc-safety-net or any other guard — never reaches PostToolUse and so does not",
+    "appear here at all. For what was attempted and refused, read the log kept by",
+    "the guard itself; `cc-safety-net logs` is the one in use."
+'
