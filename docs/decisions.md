@@ -1969,8 +1969,17 @@ It is not a second source of truth and holds no rules of its own. `AGENTS.md`
 remains the file every harness reads; this one exists so that one harness reads it
 at all.
 
-It is deliberately not a managed block and carries no `dely` markers. `dely:setup`
-does not own it, and `delivery-doctor` does not check it.
+It is deliberately not a managed block and carries no `dely` markers, so nothing
+parses it as configuration.
+
+**Amended 2026-08-21, same day.** This originally said `dely:setup` does not own it
+and `delivery-doctor` does not check it. The first half stands: setup does not own
+the file and will not write it unasked. The second half conflated two things.
+Ownership is not diagnosis, and `delivery-doctor`'s stated job is to catch a rail
+that is present but not wired — which is exactly what a managed block that Claude
+Code cannot read is. The doctor now warns about a missing import; it still does not
+own, parse or validate the file's contents beyond whether the import is there. See
+the decision below.
 
 #### Alternatives considered
 
@@ -1998,6 +2007,90 @@ What this does not fix: a consumer project still has to create its own
 
 Not a second managed block, not a rule about what consumers must do, and not a
 change to which file is authoritative.
+
+
+### 2026-08-21 — Setup offers the `CLAUDE.md` import, and the doctor warns when it is missing
+
+#### Context
+
+`skills/setup/SKILL.md` currently says, of Claude Code not reading `AGENTS.md`:
+*"Report this. Do not write `CLAUDE.md`."* That line shipped in `0.6.0` on the
+reasoning that writing a second file would make setup the owner of two
+configuration files and contradict the one-block rule.
+
+Reporting turned out to be too weak, and this repository is the evidence. The gap
+was reported in the decision record, reported again in `findings.md` §32, and
+reported by the skill itself in its own output during the forward smoke — three
+times — and the repository whose control phase is Claude Code still had no
+`CLAUDE.md` until a human asked why. A report that everyone reads and nobody acts
+on is indistinguishable from silence.
+
+The fix is one line of content, now measured rather than presumed: a `CLAUDE.md`
+containing exactly `@AGENTS.md` makes the managed block reach Claude Code.
+
+#### Decision
+
+**Setup offers to create the import.** Where the current harness is Claude Code and
+the project has no `CLAUDE.md` importing `AGENTS.md`, setup offers to create a
+one-line `CLAUDE.md` containing `@AGENTS.md`. The human accepts or declines. Setup
+does not write it unasked.
+
+This does not breach the one-block rule. `CLAUDE.md` carries no `dely` markers,
+holds no configuration, and is not a second managed block; it is a pointer at the
+first one. Setup still owns exactly one managed block, in exactly one file.
+
+Where setup cannot ask — a non-interactive run — the rule settled earlier today
+already governs: it writes nothing and reports the choice it could not offer. No
+new mechanism is needed for that path, which is the test of whether that rule was
+stated generally enough.
+
+**The doctor warns when the import is missing.** Where a project has a well-formed
+managed block and no `CLAUDE.md` importing `AGENTS.md`, `bin/delivery-doctor`
+reports that Claude Code will not read the block. It is a `warn`, never a `FAIL`: a
+project that runs only Codex and Grok is correctly configured without the file, in
+the same way a project with no managed block at all is correctly configured.
+
+The doctor checks whether the import is present. It does not parse, validate or own
+the file's other contents.
+
+The package moves to `0.9.0`.
+
+#### Alternatives considered
+
+- **Keeping report-only** — rejected by this repository's own record. Three
+  reports produced no action.
+- **Writing `CLAUDE.md` automatically** — rejected. It creates a file the human
+  never agreed to, in their repository root, on a harness-specific mechanism. The
+  same reasoning that rejected auto-selecting a coordinator applies: setup surfaces
+  choices, it does not make them.
+- **Making the doctor `FAIL`** — rejected. It would fail every correctly configured
+  Codex-or-Grok-only project, and a check that is red for supported configurations
+  trains people to ignore it.
+- **Offering it on every harness rather than only Claude Code** — rejected. On
+  Codex and Grok the file is inert, and `findings.md` §11 records that Grok does not
+  expand the import at all. Offering it there would be cargo cult.
+
+#### Consequences
+
+A Claude Code project that runs setup interactively ends up with a working
+persistent instruction rather than a documented reason why it does not work. A
+project on other harnesses sees no offer and no warning.
+
+What gets worse: setup now has a reason to look at a file outside the managed block,
+and a future contributor may read that as licence to manage more files. The decision
+draws the line explicitly — offer one known file with one known line, warn if it is
+absent, own neither.
+
+#### Non-goals
+
+Not a second managed block, not a config file, not a template system, not a rule
+about what a `CLAUDE.md` may otherwise contain, and not a change to `delivery`.
+
+#### Deferred
+
+**Offering the equivalent for any future harness that does not read `AGENTS.md`**,
+triggered by such a harness being adopted. The current offer names Claude Code
+because Claude Code is the measured case.
 
 
 ---
