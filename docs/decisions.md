@@ -1621,6 +1621,35 @@ adopting `dely:setup`. Until then the schema is minimal on purpose.
 **Anything about Claude Code and `AGENTS.md` beyond reporting it**, triggered by
 Claude Code gaining native support, or by a consumer losing a round to the gap.
 
+**Forward smoke, after every cache is refreshed.** Nothing in this unit's static
+checks proves skill discovery, managed-block delivery to a worker, or the
+persistent instruction's effect, because every harness runs a copy taken at
+install time. Run the procedure below after the caches are refreshed; record
+results in `docs/findings.md` in that later observation-owned unit.
+
+1. `claude plugin list` reports `dely@dely` at `0.6.0`; the equivalent for Codex
+   and for `grok plugin details dely`.
+2. In a scratch repository with no `AGENTS.md`, open a session in each harness and
+   ask it to configure the project for delivery without naming the skill. Record
+   whether `dely:setup` was discovered and invoked, or had to be named.
+3. Invoke `dely:setup`, take the quick path, and record whether the written block
+   passes `delivery-doctor` and whether the values it wrote match what the harness
+   itself reports.
+4. Re-run the Grok adapter regeneration from the newly installed root, since a
+   version bump moves that path.
+5. In this repository, open a fresh session in each harness and ask for a Planned
+   change without naming a skill. Record whether the managed instruction caused
+   `dely:delivery` to be invoked — and expect the answer to differ between Claude
+   Code and the other two, for the `AGENTS.md` discovery reason recorded above.
+
+**A discriminating instrument, not a present one.** This unit's acceptance table
+needed a counterexample against each row, not merely that the row ran. Two rows
+were present and green while still proving nothing, until each was rewritten
+around a failure mode a weaker check would also pass. The `delivery` skill
+already states the rule; it is recorded here because the plan file was its only
+home for this unit. Triggered by the next acceptance row whose instrument would
+also pass the failure mode.
+
 ---
 
 ## Open
