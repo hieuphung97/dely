@@ -85,6 +85,12 @@ Keep an existing selection. Where none exists, offer Orca only if it is
 actually available; otherwise write `none`. Do not install a coordinator. Do
 not invent an adapter.
 
+Where a selection cannot be offered, write the conservative value and report
+the choice that was not offered, naming what was available and how to set it;
+do not write that report into the managed block. For the coordinator: if
+none exists and setup cannot ask, write `none` and report that a coordinator
+was available and was not offered, naming it and how to set it.
+
 ## Refusals
 
 Stop and report to the human, unchanged, when:

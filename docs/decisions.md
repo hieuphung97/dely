@@ -1811,6 +1811,130 @@ proves the rule changes behaviour in a live plan — the first plan written agai
 session that wrote the rule, so it is the least likely plan ever to violate it.
 Triggered by the first subsequent plan that copies the four-column template.
 
+### 2026-08-21 — Setup states the coordinator choice it could not offer, and the skill keeps the name `setup`
+
+#### Context
+
+Two items from the `dely:setup` forward smoke, `findings.md` §32. One is a real
+defect and one turned out not to be.
+
+**The defect.** `skills/setup/SKILL.md` says: *"Keep an existing selection. Where
+none exists, offer Orca only if it is actually available; otherwise write `none`."*
+It has no rule for the case where setup **cannot offer at all**, because it is
+running without a human to answer.
+
+Observed during the smoke: setup was invoked headlessly with instructions to take
+the quick path and ask nothing. Orca was installed and running on that machine. It
+wrote `Coordinator: none` and said nothing about it. The value is defensible, and
+the silence is not: a project can end up with no coordinator selected while the
+coordinator it would have chosen was sitting there available, and nothing in the
+written block or the run's output records that a choice was skipped.
+
+This is the shape this repository keeps finding — a value written quietly that
+reads afterwards as a deliberate selection. `AGENTS.md` cannot distinguish
+`Coordinator: none` chosen by a human from `Coordinator: none` defaulted by a
+non-interactive run.
+
+**The item that dissolved.** §32 recorded that `setup` is a generic skill name and
+predicted a collision with `codex:setup`, reasoning from §11 where `/review`
+collided three ways. Inspected properly:
+
+- `codex:setup` is a **command** — `commands/setup.md` in the Codex plugin — not a
+  skill. The Codex plugin ships three skills and none is named `setup`.
+- On Claude Code the two are in different namespaces and both are plugin-qualified
+  anyway, so no collision exists.
+- On a harness that flattens commands and skills into one slash namespace, a
+  collision would resolve the way §11 recorded: by qualifying, to `/dely:setup` and
+  `/codex:setup`. `dely:setup` is already the canonical invocation in the README
+  and in the onboarding sequence.
+- The cost of a collision is therefore the loss of a bare `/setup` convenience,
+  not a failure.
+
+Against that, §32 also measured something worth protecting: all three harnesses
+discovered the skill from its name and description without being told it existed.
+Renaming to something less obvious risks the property that was actually measured,
+to avoid a degradation that resolves itself by qualifying.
+
+#### Decision
+
+**Setup states any choice it could not offer.** Where no coordinator selection
+exists and setup cannot ask — a non-interactive run, or a human who declined to
+choose — it writes `Coordinator: none` and reports, in its own output, that a
+coordinator was available and was not offered, naming it and saying how to set it.
+The written value is unchanged; the silence is what is removed.
+
+This generalises to one line in the skill rather than a special case: a value setup
+picks because it could not ask is reported as such.
+
+**The skill keeps the name `setup`.** The predicted collision does not exist today,
+resolves by qualification if it ever does, and the canonical invocation is already
+qualified. The measured discovery property is worth more than the bare-name
+convenience.
+
+`findings.md` §32's collision paragraph is corrected in place — not deleted, since
+the reasoning was sound and only the premise was wrong.
+
+The package moves to `0.8.0`.
+
+#### Alternatives considered
+
+- **Refusing to write the block when the coordinator cannot be offered** —
+  rejected. Setup's refusals are for states it must not guess at: broken markers,
+  two blocks, a conflicting legacy table. A missing coordinator is not ambiguous;
+  `none` is a legal, working configuration, and the fallback path is explicitly
+  supported. Refusing would break scripted setup to avoid a message.
+- **Auto-selecting an available coordinator without asking** — rejected. The
+  contract deliberately keeps the coordinator choice with the human, and a
+  non-interactive run is the worst moment to make it for them. It would also write
+  a pin that no human ever agreed to, which is the failure this decision exists to
+  remove rather than to relocate.
+- **Recording the skipped offer inside the managed block** — rejected. The block is
+  configuration, not a log. A comment there would be read as contract by the next
+  session and by `delivery-doctor`.
+- **Renaming the skill** — rejected on the evidence above. Recorded rather than
+  silently dropped, because §32 predicted the opposite and a later reader deserves
+  the correction.
+
+#### Consequences
+
+A scripted setup keeps working and gains one line of output. A human running setup
+interactively sees no change, because the offer happens.
+
+What this does not fix: setup still cannot make `AGENTS.md` reach Claude Code,
+which does not read it. That limitation is reported and remains out of scope until
+a consumer other than this repository exists to say whether reporting is enough.
+
+What stays unobserved: whether the report is actually emitted by a real
+non-interactive run. A static check proves the skill document states the rule; it
+cannot prove an agent obeys it. The behavioural check is the post-release smoke
+under Deferred.
+
+#### Non-goals
+
+Not a rename, not a change to the managed-block schema, not a coordinator
+installer, not a change to `delivery`, and not a second managed file.
+
+#### Deferred
+
+**Whether reporting the Claude Code `AGENTS.md` limitation is sufficient**,
+triggered by a consumer other than this repository adopting `dely:setup`.
+
+**Revisiting the skill name**, triggered by an observed collision in a harness
+where qualification does not resolve it.
+
+**Post-release smoke.** In a scratch repository with no `AGENTS.md`, on a
+machine where Orca is available, invoke `dely:setup` non-interactively with
+instructions to ask nothing, and record whether the written block says
+`Coordinator: none` and whether the run's output names the coordinator it
+could not offer. The `0.6.0` run that produced this defect is the control: it
+wrote `none` and said nothing. Results go to `docs/findings.md` by that later
+unit. Triggered after the plugin caches are refreshed.
+
+**Whether a real non-interactive run actually emits the report.** Every check
+in this unit is static and proves only that the skill document states the
+rule; it cannot prove an agent obeys it. The behavioural check is the
+post-release smoke above.
+
 ---
 
 ## Open

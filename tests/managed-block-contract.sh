@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Focused check: delivery-doctor distinguishes an absent managed block from a
-# well-formed one and from a broken one; the setup skill exists; both plugin
-# manifests share a bumped version. Does not require claude, codex, grok or orca.
+# well-formed one and from a broken one; the setup skill exists and states the
+# non-offerable-choice rule in its Coordinator section; both plugin manifests
+# share a bumped version. Does not require claude, codex, grok or orca.
 set -u
 
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
@@ -102,6 +103,53 @@ Coordinator: Orca
 EOF
 }
 
+# Text of ## Coordinator up to the next ## heading.
+coordinator_section() {
+  awk '
+    /^## Coordinator[[:space:]]*$/ { p = 1; next }
+    p && /^## / { exit }
+    p { print }
+  ' "$1"
+}
+
+# Returns 0 if the document states the non-offerable-choice rule in the
+# Coordinator section. Prints FAIL lines to stderr and returns 1 otherwise.
+# Inspects only the given file; does not increment the driver counter.
+check_setup_skill_rule() {
+  local file=$1
+  local section
+  local tmp=0
+
+  if [ ! -f "$file" ]; then
+    printf '%s\n' "FAIL: missing setup skill: $file" >&2
+    return 1
+  fi
+
+  section=$(coordinator_section "$file")
+  if [ -z "$section" ]; then
+    printf '%s\n' "FAIL: $file has no Coordinator section" >&2
+    return 1
+  fi
+
+  if ! printf '%s\n' "$section" | grep -Ei 'cannot|could not|unable' >/dev/null; then
+    printf '%s\n' "FAIL: Coordinator section does not state a choice that cannot be offered" >&2
+    tmp=1
+  fi
+  if ! printf '%s\n' "$section" | grep -Ei 'report' >/dev/null; then
+    printf '%s\n' "FAIL: Coordinator section does not report a choice that could not be offered" >&2
+    tmp=1
+  fi
+  if ! printf '%s\n' "$section" | grep -Ei 'available' >/dev/null; then
+    printf '%s\n' "FAIL: Coordinator section does not name what was available" >&2
+    tmp=1
+  fi
+  if ! printf '%s\n' "$section" | grep -Ei 'how to set' >/dev/null; then
+    printf '%s\n' "FAIL: Coordinator section does not say how to set the unoffered choice" >&2
+    tmp=1
+  fi
+  return $tmp
+}
+
 # --- skill frontmatter -------------------------------------------------------
 
 skill="$root/skills/setup/SKILL.md"
@@ -128,6 +176,29 @@ else
   case "$skill_check" in
     *description*) fail "skills/setup/SKILL.md frontmatter description is empty or missing" ;;
   esac
+  if ! check_setup_skill_rule "$skill"; then
+    fail "skills/setup/SKILL.md does not state the non-offerable-choice rule"
+  fi
+
+  # Negative: Coordinator section unchanged; the words live only in Refusals.
+  skill_ce="$scratch/skill-not-offered-in-refusals.md"
+  awk '
+    /^## Coordinator[[:space:]]*$/ { print; in_c = 1; next }
+    in_c && /^## / { in_c = 0 }
+    in_c && tolower($0) ~ /cannot|could not|unable|report|how to set|conservative/ { next }
+    /^## Refusals[[:space:]]*$/ { print; in_r = 1; next }
+    in_r && /^## / {
+      print "A coordinator that was not offered is still a legal configuration."
+      print ""
+      in_r = 0
+    }
+    { print }
+  ' "$skill" >"$skill_ce"
+  ce_out="$scratch/out-skill-not-offered"
+  if check_setup_skill_rule "$skill_ce" >"$ce_out" 2>&1; then
+    fail "skill document with unchanged Coordinator and \"not offered\" only in Refusals passed the rule check"
+    cat "$ce_out" >&2
+  fi
 fi
 
 # --- manifests --------------------------------------------------------------
@@ -138,8 +209,8 @@ if [ -z "$claude_ver" ] || [ -z "$codex_ver" ]; then
   fail "a plugin manifest is missing version"
 elif [ "$claude_ver" != "$codex_ver" ]; then
   fail "plugin manifest versions differ: claude=${claude_ver} codex=${codex_ver}"
-elif [ "$claude_ver" = "0.5.0" ]; then
-  fail "plugin manifest version is still 0.5.0"
+elif [ "$claude_ver" = "0.7.0" ]; then
+  fail "plugin manifest version is still 0.7.0"
 fi
 
 # --- doctor fixtures --------------------------------------------------------
