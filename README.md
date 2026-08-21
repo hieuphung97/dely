@@ -3,10 +3,11 @@
 A delivery workflow and the rails that make its guarantees mechanical, packaged for
 Claude Code, Codex CLI and Grok Build.
 
-The workflow is one file: `skills/delivery/SKILL.md`. Every rule in it is one that a
+The workflow is `skills/delivery/SKILL.md`. Every rule in it is one that a
 real delivery lost a round without, across 41 recorded plans. Rules that could not
 show that were dropped, and rules a mechanism can enforce were replaced by the
-mechanism.
+mechanism. Project pins — coordinator and per-phase harness, model and effort —
+are written into `AGENTS.md` by a second core skill, `dely:setup`.
 
 ## Why
 
@@ -53,10 +54,16 @@ the verbatim output, pass or fail, the exit code, the duration and a correlation
 id. No OpenTelemetry collector is needed, no wrapping of gate commands, no
 `PreToolUse` rewriting. `bin/delivery-evidence` reads it back.
 
-Still open: whether `kenryu42/cc-safety-net` retires `git-hooks/pre-push` and the
-secret-scanning plan, and whether `intellectronica/ruler` retires per-harness
-manifests. Both are ranked first in [`docs/options.md`](docs/options.md) precisely
-because they can delete code that exists here.
+`cc-safety-net` is settled as of 2026-08-20: the secret-scanning plan is
+dropped, and `git-hooks/pre-push` is retained because
+`git push --dry-run origin HEAD:main` was not blocked. It is an optional
+recommended rail — recommended on Claude Code, recommended on Codex only with
+explicit hook trust, and not claimed functional on Grok, which discovers plugin
+hooks and dispatches none of them.
+
+Still open: whether `intellectronica/ruler` retires per-harness manifests,
+ranked first in [`docs/options.md`](docs/options.md) because it can delete
+code that exists here.
 
 Two of the three defects found so far were in this repository's own hooks, and
 one was in its reader. All three were the same mistake — a shape inferred from one
@@ -68,7 +75,8 @@ observation — and all three are recorded in
 ```
 .claude-plugin/plugin.json          Claude Code manifest
 .codex-plugin/plugin.json           Codex manifest
-skills/delivery/SKILL.md            the workflow, one file
+skills/delivery/SKILL.md            the workflow
+skills/setup/SKILL.md               writes one managed block into AGENTS.md
 skills/delivery/templates/          decision-record.md, plan.md
 hooks/hooks.json                    SessionStart + PostToolUse + PostToolUseFailure
 hooks/session-start-context.sh      resolve identifiers via git
@@ -81,12 +89,14 @@ docs/                               findings, decisions, options, harness surfac
 
 A consuming project supplies its own facts through `AGENTS.md`: closure gate
 commands, artifact paths, the default branch, where its delivery log lives, and
-its current phase mapping. Record three dispatch choices there rather than
-treating any of them as a package default: whether a coordinator is selected and
-which one; whether workers run as interactive harness TUIs under that
-coordinator; and the review invocation, including any sandbox flag or an explicit
-full-access flag. There is no configuration file, because `AGENTS.md` is read by
-every harness here and already holds project facts.
+its current phase mapping. `dely:setup` writes the coordinator and the
+per-phase harness, model and effort into one managed block between
+`<!-- dely:begin -->` and `<!-- dely:end -->`. A project with no managed block
+still works: `delivery` runs on the current harness with harness defaults.
+Record any extra dispatch choices — worker surface, a review sandbox pin —
+as prose outside the block rather than treating them as a package default.
+There is no configuration file, because `AGENTS.md` is read by every harness
+here and already holds project facts.
 
 This repository's combination is Orca, interactive TUIs, and Codex review pinned
 to `--dangerously-bypass-approvals-and-sandbox`. Another project may choose none
@@ -141,9 +151,10 @@ bin/delivery-doctor /path/to/your/repo
 ```
 
 Verifies the execute bit, `core.hooksPath`, that `hooks.json` parses, that the
-hook scripts parse, and that something has been captured. It also prints what it
-cannot verify, because several checks in this project looked conclusive and were
-not.
+hook scripts parse, that something has been captured, and that a managed block
+in `AGENTS.md` is absent (the supported fallback), well formed, or broken. It
+also prints what it cannot verify, because several checks in this project looked
+conclusive and were not.
 
 Both scripts are invoked through `bash`, so no execute bit is needed. Both exit
 0 on every error path — a broken hook must not break a session.
@@ -209,8 +220,17 @@ script changes its hash and revokes that trust silently, so re-trust after every
 package update.
 
 `--plugin-dir` still works for one invocation and touches nothing. A permanent
-install in each harness is intended to keep the skill available across
-sessions; the forward smoke after migration is what establishes that it loaded.
+install in each harness is intended to keep the skills available across
+sessions; the forward smoke after migration is what establishes that they loaded.
+
+## Onboarding
+
+Four steps, and nothing more:
+
+1. Install `dely` in the harness.
+2. Open a session in the project.
+3. Invoke `dely:setup`.
+4. Ask for a change normally.
 
 ## Try it
 

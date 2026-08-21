@@ -1,6 +1,6 @@
 {
   "name": "dely",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "A cross-harness delivery workflow for coding agents.",
   "license": "MIT",
   "keywords": ["delivery", "workflow", "review", "hooks", "evidence"],
@@ -15,7 +15,7 @@
     "displayName": "Delivery",
     "shortDescription": "Design, implement, review independently, close",
     "defaultPrompt": [
-      "Use the delivery skill to classify and handle this change."
+      "Use the delivery skill to classify and handle this change, and the setup skill to configure the project."
     ]
   }
 }
