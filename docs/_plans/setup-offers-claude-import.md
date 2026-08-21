@@ -132,16 +132,51 @@ wiring" list names the new check.
 
 **Document impact.** This task is the reconciliation for tasks 1 and 2.
 
+### 4. The non-offerable-choice rule becomes structurally general
+
+**Behaviour.** A worker reading `skills/setup/SKILL.md` finds the rule about a
+choice that cannot be offered in a section of its own, stated in action-neutral
+terms, with the coordinator and the `CLAUDE.md` import both reading as instances of
+it. A non-interactive Claude Code run leaves `CLAUDE.md` absent and reports the
+offer it could not make.
+
+**Direction.** Added after review returned `REPLAN_OR_SPLIT` on the previous
+version of this plan, which deliberately added no rule here and bet that the
+`0.8.0` rule already covered it. It does not.
+
+Move the rule out of `## Coordinator` into its own heading. Replace the
+value-shaped verbs: a choice that cannot be offered is **not made**, the
+conservative action is taken — which may be writing a conservative value, and may
+be doing nothing — and the choice is **reported** either way. Leave the coordinator
+paragraph as an instance beneath it, and add the `CLAUDE.md` import as a second
+instance: nothing is written, and the offer is reported.
+
+The literal-reading hazard is the reason this is structural rather than a reworded
+sentence. `write the conservative value` applied to a file offer could be read as
+licence to create `CLAUDE.md` unasked, which contradicts `never write it unasked`
+two paragraphs away. The new wording must not be readable that way.
+
+**Files.** `skills/setup/SKILL.md`.
+
+**Focused verification.** `tests/managed-block-contract.sh`. Its existing
+`check_setup_skill_rule` reads only the `## Coordinator` section; it must be
+retargeted at the rule's new home, or moving the rule turns the gate red for the
+wrong reason and passing it would mean the rule never moved.
+
+**Document impact.** None beyond this file.
+
 ## Acceptance
 
 | Requirement | Instrument | Counterexample | Observed red |
 | --- | --- | --- | --- |
-| The skill offers the import rather than refusing to write it | `bash tests/managed-block-contract.sh`, skill-document case | The unmodified `0.8.0` document. It already contains `CLAUDE.md`, `AGENTS.md` and a paragraph about Claude Code not reading it, so any check grepping for those terms passes a document whose actual rule is `Do not write CLAUDE.md` — the opposite of the contract | to be filled by implement |
-| The doctor warns when the import is missing | same test, case 2 | A doctor that prints the warn unconditionally whenever `CLAUDE.md` is absent, which also fires on a project with no managed block — the supported fallback | to be filled by implement |
-| The warn is about the import, not the file | same test, case 3 | A doctor testing only that `CLAUDE.md` exists, which a file of unrelated prose satisfies while the block stays unreachable | to be filled by implement |
-| The warn does not fire without a block | same test, case 4 | A doctor whose warn is emitted before the block is parsed, so a bare repository with neither block nor import is told Claude Code cannot read a block it does not have | to be filled by implement |
-| A malformed block still fails | same test, case 5 | A doctor whose new warn replaces the existing failure path, so a broken block reports as a Claude Code reachability warning instead of an error | to be filled by implement |
-| Both manifests declare `0.9.0` | same test, version case | Both left at `0.8.0`, which a check asserting only that the two agree accepts | to be filled by implement |
+| The skill offers the import rather than refusing to write it | `bash tests/managed-block-contract.sh`, skill-document case | The unmodified `0.8.0` document. It already contains `CLAUDE.md`, `AGENTS.md` and a paragraph about Claude Code not reading it, so any check grepping for those terms passes a document whose actual rule is `Do not write CLAUDE.md` — the opposite of the contract | Complete copy with baseline `skills/setup/SKILL.md`. Naive grep for those three terms passed. The copy's test exited 1: `FAIL: Claude Code section still refuses to write CLAUDE.md` (and the missing-offer lines). `managed-block-contract: 1 failure(s)` |
+| The doctor warns when the import is missing | same test, case 2 | A doctor that prints the warn unconditionally whenever `CLAUDE.md` is absent, which also fires on a project with no managed block — the supported fallback | Complete copy; early `warn` whenever `CLAUDE.md` is absent. Copy's test exited 1: `FAIL: unexpected Claude Code import warn for no AGENTS.md and no CLAUDE.md (no block to be unreachable)` |
+| The warn is about the import, not the file | same test, case 3 | A doctor testing only that `CLAUDE.md` exists, which a file of unrelated prose satisfies while the block stays unreachable | Complete copy; well-formed branch tests only file existence. Copy's test exited 1: `FAIL: expected Claude Code import warn for CLAUDE.md present but holding unrelated prose` |
+| The warn does not fire without a block | same test, case 4 | A doctor whose warn is emitted before the block is parsed, so a bare repository with neither block nor import is told Claude Code cannot read a block it does not have | Complete copy; import warn moved before the block parse. Copy's test exited 1: `FAIL: unexpected Claude Code import warn for no AGENTS.md and no CLAUDE.md (no block to be unreachable)` |
+| A malformed block still fails | same test, case 5 | A doctor whose new warn replaces the existing failure path, so a broken block reports as a Claude Code reachability warning instead of an error | Complete copy; `begin with no matching end` now `warn`s the Claude Code line instead of `bad`. Copy's test exited 1: `FAIL: missing FAIL managed-block line for begin with no end` |
+| The non-offerable-choice rule is not scoped to the coordinator | `bash tests/managed-block-contract.sh`, rule-location case | The `0.9.0` candidate as first implemented. Its Claude Code section offers the import and says never to write it unasked, and the `0.8.0` rule still sits under `## Coordinator` — so a check reading that heading passes while a non-interactive run has no instruction to report the skipped offer | to be filled by implement |
+| The rule does not read as licence to write the file | a human reads the diff at review | No instrument. The hazard is a literal reading of `write the conservative value` applied to file creation, which no grep distinguishes from a correct reading. Review reads it | n/a |
+| Both manifests declare `0.9.0` | same test, version case | Both left at `0.8.0`, which a check asserting only that the two agree accepts | Complete copy with both manifests at `0.8.0`. Copy's test exited 1: `FAIL: plugin manifest version is 0.8.0, expected 0.9.0` |
 | The existing doctor rails still pass | `bash tests/delivery-doctor-grok-hook.sh` | Not applicable — regression guard over the same program this unit edits, with ten adapter shapes proven in earlier units | n/a |
 | Other rails still pass | `bash tests/delivery-evidence-pipeline.sh`, `bash tests/plan-template-shape.sh` | Not applicable — regression guards | n/a |
 
@@ -150,10 +185,15 @@ check here is static or fixture-driven and proves the document states the rule a
 the doctor implements the warn. It cannot prove an agent offers rather than writes,
 and it cannot prove a human is asked.
 
-Also unobserved: whether the `0.8.0` non-interactive rule genuinely covers this new
-offer without amendment. Task 1 deliberately adds no rule for that path. A
-non-interactive run that writes `CLAUDE.md` unasked, or that says nothing about the
-offer it skipped, would disprove it — and no static check here detects either.
+**Settled by review, not by a check.** The first version of this plan bet that the
+`0.8.0` rule covered this offer without amendment, and added no rule for the
+non-interactive path. Review disproved the bet and returned `REPLAN_OR_SPLIT`; task
+4 is the correction. The bet was worth making — it was the only way to find out
+whether that rule was general in fact rather than in description — and the answer
+is recorded in the decision record.
+
+Still unobserved: whether a real non-interactive run now reports the skipped offer.
+That remains a post-release smoke, below.
 
 **Post-release smoke,** after the caches are refreshed. Record in `docs/findings.md`:
 

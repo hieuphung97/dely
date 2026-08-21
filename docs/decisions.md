@@ -2092,6 +2092,37 @@ about what a `CLAUDE.md` may otherwise contain, and not a change to `delivery`.
 triggered by such a harness being adopted. The current offer names Claude Code
 because Claude Code is the measured case.
 
+#### Amended 2026-08-21 after review returned `REPLAN_OR_SPLIT`
+
+The plan deliberately added no non-interactive rule for this offer, betting that
+the rule shipped in `0.8.0` already covered it. Independent review disproved the
+bet, and the reasoning is worth keeping because the bet was the point of the test.
+
+The `0.8.0` rule reads: *"Where a selection cannot be offered, write the
+conservative value and report the choice that was not offered … do not write that
+report into the managed block."* Every noun and verb in it belongs to a value
+written into the managed block — `selection`, `conservative value`, `write`, `how
+to set it`. It also sits under the `## Coordinator` heading, and the test enforcing
+it inspects only that section.
+
+Against an offer to **create a file**, that rule does not merely fail to apply. Read
+literally, *"write the conservative value"* could be taken as licence to create
+`CLAUDE.md` unasked — the exact opposite of the rule two paragraphs later. A gap
+that inverts under a literal reading is worse than an absent rule.
+
+The correction is structural rather than verbal. The rule moves out of
+`## Coordinator` into a section of its own, and its verbs become action-neutral: a
+choice that cannot be offered is **not made** — the conservative action may be
+writing a conservative value, and it may be doing nothing — and it is **reported**
+either way. The coordinator and the `CLAUDE.md` import then both read as instances
+of it rather than as the rule itself.
+
+The lesson generalises past this unit: `0.8.0` was written to be general and was
+described as general in its own decision record, but it was placed under a
+harness-specific heading with domain-specific verbs, and its test only ever looked
+at that heading. Stating that a rule is general does not make it general. Where it
+lives and what its test reads are what make it general.
+
 
 ---
 
