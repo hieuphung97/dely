@@ -8,7 +8,7 @@
     "",
     "Paths are absolute because CLAUDE_PLUGIN_ROOT is a plugin variable and this is",
     "not a plugin hook. Install with the sed line in the README, which substitutes",
-    "__PACKAGE_ROOT__ for this repository's path.",
+    "__PACKAGE_ROOT__ for the installed plugin root grok plugin details reports.",
     "",
     "The matcher carries both tool names: Grok's shell tool is",
     "run_terminal_command, Claude Code's is Bash, and this file is only read by",

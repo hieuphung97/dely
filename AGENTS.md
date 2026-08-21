@@ -1,7 +1,7 @@
 # delivery-evidence — Agent Instructions
 
-This repository contains the `delivery` skill and its evidence rails for Claude
-Code, Codex CLI, and Grok Build.
+This repository contains the `dely` package: the `delivery` skill and its
+evidence rails for Claude Code, Codex CLI, and Grok Build.
 
 ## Source of truth
 
@@ -22,10 +22,12 @@ Repository artifacts are written in English.
   `docs/_plans/`.
 - The delivery log is `docs/delivery-log.md`.
 - A self-update uses the frozen installed plugin version. Candidate changes run in
-  the project folder. Do not edit `hooks/` or `bin/` while a plan is running: Grok
-  executes those scripts from this checkout by absolute path, so editing one changes
-  the harness under a live worker. Plugin caches and Grok hook wiring are refreshed
-  only between plans.
+  the project folder. Do not edit `hooks/session-start-context.sh` or
+  `hooks/post-tool-journal.sh` while a plan is running: Grok executes those two
+  scripts by absolute path from whichever copy the adapter points at — this
+  checkout before migration, Grok's installed copy after — so editing one
+  changes the harness under a live worker. Plugin caches and Grok hook wiring
+  are refreshed only between plans.
 
 ## Phase dispatch
 
@@ -69,6 +71,10 @@ jq -e . .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin
 
 ```bash
 bash tests/delivery-evidence-pipeline.sh
+```
+
+```bash
+bash tests/delivery-doctor-grok-hook.sh
 ```
 
 ```bash

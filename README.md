@@ -150,53 +150,67 @@ Both scripts are invoked through `bash`, so no execute bit is needed. Both exit
 
 ## Install
 
-The plugin is `delivery`, served from a marketplace defined in this repository.
-One installation reaches Claude Code, and Grok Build reads Claude Code's enabled
-plugins so the **skill** reaches Grok too. Codex reads `.codex-plugin/plugin.json`
-and the same `marketplace.json`.
+The plugin is `dely`, served from the `dely` marketplace at
+`git@github.com:hieuphung97/dely.git`. Install it in each harness from that
+remote. The skill keeps the name `delivery`; the intended namespaced name is
+`dely:delivery`. Whether a session actually loads it is established by the
+forward smoke after migration, not by installing. The marketplace entry keeps
+`"source": "./"`, which is what makes the plugin resolve inside its own
+repository whether the marketplace is added by path or by git URL.
 
 ```bash
-claude plugin marketplace add /path/to/project-delivery-procedure
-claude plugin install delivery@delivery-tools
+claude plugin marketplace add git@github.com:hieuphung97/dely.git
+claude plugin install dely@dely
 
 # Codex, from the same marketplace manifest
-codex plugin marketplace add /path/to/project-delivery-procedure
-codex plugin add delivery@delivery-tools
+codex plugin marketplace add git@github.com:hieuphung97/dely.git
+codex plugin add dely@dely
+
+# Grok Build, natively — it does not inherit Claude Code's enabled set.
+# grok plugin install takes a source (git URL, GitHub shorthand, or local
+# path), not a marketplace selector; @ref is a git ref, so dely@dely would
+# mean repository dely at ref dely. Tracking the default branch is the same
+# revision the marketplace resolves for the other two.
+grok plugin install hieuphung97/dely
 ```
 
-**The hooks do not reach Grok this way, and that is the step most easily missed.**
-Grok discovers the plugin, reports that it has hooks, and dispatches none of them.
-Register them where Grok does look:
+`grok plugin install` refuses a local directory without `--trust`. Whether a
+git-remote install prompts the same way is untested; if the prompt appears, it
+is the install asking for trust, not a failure.
+
+**The hooks still do not reach Grok through plugin install, and that is the
+step most easily missed.** Grok discovers the plugin, reports that it has
+hooks, and dispatches none of them. Register them where Grok does look, against
+the root of Grok's own installed copy. Derive that root; do not type it.
+The block captures the `path:` line `grok plugin details dely` reports and
+feeds it to `sed`.
 
 ```bash
-cd /path/to/project-delivery-procedure
+plugin_root=$(grok plugin details dely | sed -n 's/^[[:space:]]*path: //p')
 mkdir -p ~/.grok/hooks
-sed "s#__PACKAGE_ROOT__#$PWD#g" hooks/grok-hooks.json.template > ~/.grok/hooks/delivery.json
+sed "s#__PACKAGE_ROOT__#${plugin_root}#g" \
+  "${plugin_root}/hooks/grok-hooks.json.template" \
+  > ~/.grok/hooks/delivery.json
 ```
 
 `bin/delivery-doctor` fails if this file is missing while `grok` is on `PATH`,
 because without it a Grok worker records no evidence at all and nothing says so.
 
-Note the asymmetry this creates, because it has bitten once already. Claude Code and
-Codex run a **copy** of this package taken at install time, so editing the source
-changes nothing for them until `claude plugin update` and `codex plugin add` run again.
-Grok runs the scripts at the path above, which is the source. So a mid-session edit to
-a hook script reaches Grok immediately and the other two not at all. Bump the version
-and refresh both caches whenever a rule or a script changes, or the harnesses disagree
-about what the workflow says.
+All three harnesses run a **copy** of this package taken at install time, so
+editing the source changes nothing until each cache is refreshed. The remaining
+hazard is two copies drifting when only one is refreshed: Claude Code's cache
+and Grok's. Bump the version and refresh every copy — and regenerate the Grok
+adapter from the installed root — whenever a rule or a script changes, or the
+harnesses disagree about what the workflow says.
 
 **Codex needs its hooks trusted, and trust is keyed to their content.** Open
-`/hooks`, select the `delivery` entries, press `t`. Any later change to a hook
+`/hooks`, select the `dely` entries, press `t`. Any later change to a hook
 script changes its hash and revokes that trust silently, so re-trust after every
 package update.
 
-A local path works; the marketplace manifest must exist at
-`.claude-plugin/marketplace.json` with `"source": "./"` for a plugin living in the
-same repository.
-
-`--plugin-dir` still works for one invocation and touches nothing, but note that
-Grok inherits plugins from Claude Code's enabled set, not from a `--plugin-dir`
-flag. A permanent install is what makes the skill reach Grok.
+`--plugin-dir` still works for one invocation and touches nothing. A permanent
+install in each harness is intended to keep the skill available across
+sessions; the forward smoke after migration is what establishes that it loaded.
 
 ## Try it
 
