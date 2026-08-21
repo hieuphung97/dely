@@ -1374,6 +1374,10 @@ which is better coverage than gate output has.
 
 ### Every id and effort level, read from the harness
 
+> **Superseded 2026-08-21 by §33.** Every row of this table except Grok's models
+> was wrong within two days. Read it as the observation that dated, not as the
+> catalogue.
+
 | Harness | Models | Effort levels |
 | --- | --- | --- |
 | Claude Code | aliases `opus`, `sonnet`, `fable`, or a full name | `low medium high xhigh max` |
@@ -2441,3 +2445,102 @@ Whether the managed block reaches a *dispatched* worker as pins on its command
 line, which needs a real delivery through a project configured by `dely:setup`
 rather than by hand. This repository's own block was written by the delivering
 plan, not by the skill, so it does not test that path either.
+
+---
+
+## 33. The catalogue dated in two days, and a keepalive stream that killed a waiter
+
+Two corrections recorded 2026-08-21, both found while designing and running the
+`dely:setup` unit rather than by going looking.
+
+### §20's table was wrong within two days, and that is the point
+
+§20 tabulated models and effort levels per harness on 2026-08-19. Re-read from the
+same installed CLIs on 2026-08-21, every row except Grok's model list had changed
+or had been wrong to begin with.
+
+**Claude Code.** `/effort` reports `low|medium|high|xhigh|max|auto`. `ultracode` is
+gone; `auto` is new. `/model` reports aliases `sonnet, opus, haiku, fable, best,
+sonnet[1m], opus[1m], fable[1m], opusplan, default, or a full model ID` — §20 knew
+three of those. Both probes return `duration_api_ms 0`, `num_turns 0`,
+`total_cost_usd 0`: they are answered locally and reach no model, so this is free
+to re-read at any time.
+
+**Codex.** `codex debug models` returns eight slugs, not five. The three §20 never
+had are `gpt-reserve`, `gpt-5.4-mini` and `codex-auto-review`, and two of those
+carry `visibility: hide` — present in the catalogue, absent from the picker.
+
+More importantly, §20's single "effort levels" column for Codex was a category
+error. **Reasoning levels are per slug.** `gpt-5.6-luna` stops at `max` where
+`gpt-5.6-sol` and `gpt-5.6-terra` also accept `ultra`, and `gpt-5.5`, `gpt-5.4`
+and `gpt-5.4-mini` stop at `xhigh`. Each entry carries its own
+`default_reasoning_level` too, and they differ: `gpt-5.6-sol` defaults to `low`
+while everything else defaults to `medium`. A per-harness vocabulary cannot express
+that, so anything validating an effort against a harness rather than against a slug
+will eventually pass a value the model rejects.
+
+**Grok.** Models unchanged — `grok-4.6` (default) and `grok-4.5`. Effort is the
+asymmetry: `--help` gives no enum, and the flag is not validated locally.
+`grok --reasoning-effort bogus models` was run here and **exited 0 without
+complaint**, so the vocabulary is reachable only by dispatching to the model. §20
+recorded that an invalid effort returns the valid set inline, which is true at
+dispatch and is exactly what makes it expensive to discover: one earlier probe of
+that shape cost money and another hung.
+
+`docs/harness-surface.md` is corrected in place, because it is a current-state
+reference. §20 keeps its table with a pointer here, because this file is a log and
+the fact that the table dated is itself the finding.
+
+**The consequence was already acted on before it was written down.** The
+`dely:setup` contract reads these catalogues from the installed CLIs at run time
+and stores none of them. This section is the evidence that the choice was right,
+two days after it was made.
+
+### `orca orchestration check --wait --json` streams keepalives, and a naive client dies
+
+Recorded from the Control Session of the `dely:setup` unit. It cost no round, but
+it silently removed the coordinator's only view of its worker, which is the same
+shape as every other finding in this file.
+
+`orca orchestration check --wait --json` does not block silently and then print one
+object. It emits keepalive objects on their own lines while it waits:
+
+```
+{"_keepalive":true,"_heartbeat":true,"elapsedMs":15002,"deadlineMs":550000}
+{"_keepalive":true,"_heartbeat":true,"elapsedMs":30003,"deadlineMs":550000}
+```
+
+and then the actual result, pretty-printed across many lines. They arrive every 15
+seconds: four waits in this session recorded 12 keepalives over 180s and 21 over
+315s, so the count is the wait's duration and carries no other signal.
+
+Control piped that stream straight into a single `json.load`. It died on line 2
+with `Extra data: line 2 column 1 (char 76)`, taking the waiting client with it.
+
+The failure was invisible in the way that matters:
+
+- The dispatch was unaffected — the worker kept running and finished normally.
+- The **runtime still held the waiter registration**, so the next two
+  `check --wait` calls were refused with `waiter_exists: Run … already has an
+  active actionable waiter`, which reads like correct behaviour rather than like a
+  dead client.
+- An already-sent `worker_done` sat undelivered until Control stopped waiting and
+  checked the Run directly.
+
+So a coordinator can lose its worker's completion while every individual signal
+looks healthy: the worker is alive, the runtime says a waiter exists, and the
+delivery is simply never consumed.
+
+**Handling.** Parse the stream line by line and ignore objects carrying
+`_keepalive`, or redirect to a file and strip those lines before parsing. Do not
+treat a `waiter_exists` refusal as proof that a waiter is alive; it proves a
+registration exists. Cross-check the dispatch itself with
+`orca orchestration worker-show --dispatch <id> --json`, which is what recovered
+this one — it reported `status: completed`, `state: succeeded` while the
+coordinator still believed it was waiting.
+
+Incidental, from the same run: `worker-release` on a terminal the coordinator
+created itself returns `state: retained, reason: external_terminal`. Orca closes
+only terminals it opened through `worker-start`, so a custom-argv worker — which is
+the only way to pin a model on Grok, per §23 — must be cleaned up by whoever made
+it.
