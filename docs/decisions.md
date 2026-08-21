@@ -301,6 +301,11 @@ All three invocations are verified. What was missing was the skill telling the
 control session to do it — it described phases as things a worker does and left the
 human to move between sessions. That gap is now closed in `SKILL.md`.
 
+**Amended 2026-08-21.** Those headless recipes remain the verified fallback. When a
+coordinator is selected, workers launch as interactive harness TUIs through that
+coordinator's native skill; wrapping a headless command in a visible shell does not
+satisfy the contract. See the decision below.
+
 Rejected in its favour: **a shell script driving the four phases.** A script would
 have to reimplement the routing the skill already states, hold state the repository
 already holds, and it could not brainstorm. The control session can do all three
@@ -829,6 +834,9 @@ Consequences: review regains gate execution, ordinary Internet access, writable 
 and native coordinator completion. A reviewer is technically able to edit the candidate;
 doing so invalidates that review rather than opening an automatic repair path. A selected
 coordinator becoming unavailable now interrupts the human before visibility is discarded.
+This repository pins Codex review to `--dangerously-bypass-approvals-and-sandbox` in
+`AGENTS.md`, so the absence of a sandbox is an explicit invocation rather than a hidden
+default.
 
 Non-goals: this does not standardise coordinator commands, add review hardening, prove
 every harness/coordinator pairing or change the four phases and their dispositions.

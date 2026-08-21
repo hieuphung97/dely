@@ -31,19 +31,23 @@ Repository artifacts are written in English.
 
 Name the model and reasoning effort on every dispatch.
 
-| Phase | Harness | Model | Reasoning effort | Sandbox |
-| --- | --- | --- | --- | --- |
-| `control` | Claude Code | `opus` | `high` | — |
-| `implement` | Grok Build | `grok-4.6` | `medium` | — |
-| `review` | Codex | `gpt-5.6-sol` | `medium` | `--sandbox read-only` |
-| `release` | Grok Build | `grok-4.6` | `medium` | — |
+| Phase | Coordinator | Worker surface | Harness | Model | Reasoning effort | Sandbox |
+| --- | --- | --- | --- | --- | --- | --- |
+| `control` | Orca | interactive TUI | Claude Code | `opus` | `high` | — |
+| `implement` | Orca | interactive TUI | Grok Build | `grok-4.6` | `medium` | — |
+| `review` | Orca | interactive TUI | Codex | `gpt-5.6-sol` | `medium` | `--dangerously-bypass-approvals-and-sandbox` |
+| `release` | Orca | interactive TUI | Grok Build | `grok-4.6` | `medium` | — |
 
 The table is this repository's deployment selection, not the portable protocol.
-The protocol requires a reviewer that cannot modify the authoritative candidate;
-the harness and sandbox column are how this project currently enforces that.
-Review Internet lookup uses the harness-native tool by default. Shell network is
-not enabled for that reason. Keep Codex `--sandbox read-only` until a separately
-observed role swap changes it.
+Load Orca's native skill to launch and supervise each worker TUI. Do not wrap a
+headless `claude -p`, `codex exec` or `grok --prompt-file` in a shell tab.
+
+Review is independent by role: a fresh session that does not implement or edit
+the candidate. This project adds no phase-implied sandbox. Codex review is pinned
+to `--dangerously-bypass-approvals-and-sandbox` so that choice is explicit rather
+than a hidden default. Native Internet access, closure gates, result writes and
+coordinator completion stay available. If the selected coordinator is unavailable,
+stop and ask the human before any headless fallback.
 
 `design` runs in the control session and is not dispatched.
 

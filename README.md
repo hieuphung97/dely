@@ -80,11 +80,18 @@ docs/                               findings, decisions, options, harness surfac
 ```
 
 A consuming project supplies its own facts through `AGENTS.md`: closure gate
-commands, artifact paths, the default branch, where its delivery log lives, its
-current phase mapping, and its review isolation. Record those last two in
-`AGENTS.md` rather than treating a harness profile as a package default. There is
-no configuration file, because `AGENTS.md` is read by every harness here and
-already holds project facts.
+commands, artifact paths, the default branch, where its delivery log lives, and
+its current phase mapping. Record three dispatch choices there rather than
+treating any of them as a package default: whether a coordinator is selected and
+which one; whether workers run as interactive harness TUIs under that
+coordinator; and the review invocation, including any sandbox flag or an explicit
+full-access flag. There is no configuration file, because `AGENTS.md` is read by
+every harness here and already holds project facts.
+
+This repository's combination is Orca, interactive TUIs, and Codex review pinned
+to `--dangerously-bypass-approvals-and-sandbox`. Another project may choose none
+of those values. The skill loads the selected coordinator's native skill; it does
+not ship a coordinator adapter.
 
 The skill owns the delivery log's **shape** — five columns, and the rule that
 instructions change only on recurrence. The project owns the **file**, because the

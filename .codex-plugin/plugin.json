@@ -1,6 +1,6 @@
 {
   "name": "delivery",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "A delivery workflow plus the rails that make its guarantees mechanical: resolved repository identifiers, recorded gate evidence, and a push guard that lives in git.",
   "license": "MIT",
   "keywords": ["delivery", "workflow", "review", "hooks", "evidence"],

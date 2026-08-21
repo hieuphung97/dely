@@ -2284,3 +2284,53 @@ exact command to re-run. On success it **copies** the plugin into
 running a cache copy rather than the source. The install source decision for `dely`
 must account for `--trust` being required, and the probe did not establish whether a
 git remote install prompts the same way.
+
+---
+
+## 31. Coordinator-first dispatch and unsandboxed review, after a real Control miss
+
+Recorded 2026-08-21 from the first self-update Control run, not inferred from
+documentation. The decision
+`docs/decisions.md#interactive-workers-are-coordinator-first-review-independence-does-not-imply-a-sandbox`
+holds the contract; this section holds the recurrence.
+
+### Headless workers while a coordinator was selected
+
+The Control Session launched six Codex and five Grok workers through their
+headless entrypoints. After Orca was requested explicitly, the same headless
+commands were placed in visible shell tabs rather than either harness TUI. Six
+such commands were observed. No Orca Run existed.
+
+That is the same failure class as treating `claude -p`, `codex exec` and
+`grok --prompt-file` as the default launch path. A visible shell is not an
+interactive harness TUI, and wrapping a headless process does not create
+coordinator lifecycle. The skill's unconditional non-interactive recipe was the
+instruction that produced this.
+
+### Read-only review still blocked the work it was asked to do
+
+Separately, Codex `--sandbox read-only` again blocked closure gates, result
+writes and `worker_done`. The cost is the same one measured in §19: `uv` cannot
+initialise its cache, `--add-dir` does not grant the write, and a reviewer under
+that profile can judge a diff without reproducing a gate or reporting completion
+through the coordinator.
+
+No recorded review in this package's plans has modified the candidate it
+inspected. The sandbox therefore paid a recurring cost against an unobserved
+risk. Historical probes that showed Codex read-only blocking candidate writes
+remain valid; they are not rewritten. What changed is which cost this project
+pays before a reviewer mutation has occurred.
+
+### What follows, and what does not
+
+The portable skill now launches through a selected coordinator's native skill,
+keeps headless recipes as fallback, and treats review independence as role
+ownership. This repository records Orca, interactive TUIs, and Codex
+`--dangerously-bypass-approvals-and-sandbox` in `AGENTS.md`. Installed copies
+still run frozen 0.4.2 until review accepts and caches refresh; source text is
+not yet the executing contract.
+
+This is not a probe of every future coordinator or harness pairing, and it is
+not evidence that a reviewer will never edit a candidate. Enforcement of
+candidate immutability is reconsidered only after that incident. A second
+coordinator is still required before extracting an adapter.
