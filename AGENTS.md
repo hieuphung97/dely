@@ -44,7 +44,7 @@ Coordinator: Orca
 | --- | --- | --- | --- |
 | `control` | Claude Code | `opus` | `high` |
 | `implement` | Grok Build | `grok-4.6` | `medium` |
-| `review` | Codex | `gpt-5.6-sol` | `medium` |
+| `review` | Grok Build | `grok-4.6` | `xhigh` |
 | `release` | Grok Build | `grok-4.6` | `medium` |
 <!-- dely:end -->
 
@@ -53,10 +53,13 @@ Load Orca's native skill to launch and supervise each worker TUI. Do not wrap a
 headless `claude -p`, `codex exec` or `grok --prompt-file` in a shell tab.
 
 Review is independent by role: a fresh session that does not implement or edit
-the candidate. This project adds no phase-implied sandbox. Codex review is pinned
-to `--dangerously-bypass-approvals-and-sandbox` so that choice is explicit rather
-than a hidden default. Native Internet access, closure gates, result writes and
-coordinator completion stay available. If the selected coordinator is unavailable,
+the candidate. This project adds no phase-implied sandbox. Grok review is pinned
+to `--always-approve` so that choice is explicit rather than a hidden default.
+`cc-safety-net` is inert on Grok, which discovers plugin hooks and dispatches none
+of them, so the reviewer has no mechanical guard against in-repository git
+destruction; that gap is accepted and bounded by every phase boundary committing.
+Native Internet access, closure gates, result writes and coordinator completion
+stay available. If the selected coordinator is unavailable,
 stop and ask the human before any headless fallback.
 
 `design` runs in the control session and is not dispatched.
