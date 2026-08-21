@@ -198,6 +198,135 @@ if command -v grok >/dev/null 2>&1; then
   fi
 fi
 
+# --- managed block --------------------------------------------------------
+# The consuming project's AGENTS.md may carry exactly one managed block
+# between <!-- dely:begin --> and <!-- dely:end -->. No block is the
+# supported fallback, not a failure. Each required phase has exactly one
+# row of four non-empty cells. Values in Model and Effort are not
+# checked against any catalogue; the literal default is legal.
+
+agents="${repo}/AGENTS.md"
+begin_mark='<!-- dely:begin -->'
+end_mark='<!-- dely:end -->'
+
+if [ ! -f "$agents" ]; then
+  warn "managed block absent — no AGENTS.md; using the supported fallback (current harness, harness defaults)"
+else
+  begins=$(grep -cF "$begin_mark" "$agents" 2>/dev/null || true)
+  ends=$(grep -cF "$end_mark" "$agents" 2>/dev/null || true)
+  [ -n "$begins" ] || begins=0
+  [ -n "$ends" ] || ends=0
+
+  if [ "$begins" -eq 0 ] && [ "$ends" -eq 0 ]; then
+    warn "managed block absent — no markers in AGENTS.md; using the supported fallback (current harness, harness defaults)"
+  elif [ "$begins" -gt 1 ]; then
+    bad "managed block: more than one begin marker"
+  elif [ "$ends" -gt 1 ]; then
+    bad "managed block: more than one end marker"
+  elif [ "$begins" -eq 0 ]; then
+    bad "managed block: end marker with no matching begin"
+  elif [ "$ends" -eq 0 ]; then
+    bad "managed block: begin with no matching end"
+  else
+    begin_line=$(awk -v m="$begin_mark" 'index($0, m){print NR; exit}' "$agents")
+    end_line=$(awk -v m="$end_mark" 'index($0, m){print NR; exit}' "$agents")
+    if [ "$end_line" -le "$begin_line" ]; then
+      bad "managed block: end before begin"
+    else
+      block=$(awk -v b="$begin_line" -v e="$end_line" 'NR>b && NR<e {print}' "$agents")
+      block_fail=0
+      if ! printf '%s\n' "$block" | grep -Eq '^#{1,6}[[:space:]]+Dely[[:space:]]*$'; then
+        bad "managed block: missing Dely heading"
+        block_fail=1
+      fi
+      if ! printf '%s\n' "$block" | grep -Eq '^[[:space:]]*(\*\*)?Coordinator(\*\*)?[[:space:]]*:'; then
+        bad "managed block: missing Coordinator line"
+        block_fail=1
+      fi
+      saw_header=0
+      saw_control=0
+      saw_implement=0
+      saw_review=0
+      saw_release=0
+      while IFS= read -r raw || [ -n "$raw" ]; do
+        case "$raw" in
+          *'|'*) ;;
+          *) continue ;;
+        esac
+        stripped=$(printf '%s' "$raw" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^|//' -e 's/|$//' -e 's/[[:space:]]*|[[:space:]]*/ | /g' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+        case "$stripped" in
+          'Phase | Harness | Model | Effort') saw_header=1; continue ;;
+        esac
+        first=$(printf '%s' "$stripped" | awk -F ' \\| ' '{print $1}' | tr -d '`' | tr -d '[:space:]')
+        case "$first" in
+          ---*|:-*) continue ;;
+          control|implement|review|release) ;;
+          *) continue ;;
+        esac
+        case "$first" in
+          control)
+            [ "$saw_control" -eq 0 ] || { bad "managed block: duplicate phase row: control"; block_fail=1; }
+            saw_control=1
+            ;;
+          implement)
+            [ "$saw_implement" -eq 0 ] || { bad "managed block: duplicate phase row: implement"; block_fail=1; }
+            saw_implement=1
+            ;;
+          review)
+            [ "$saw_review" -eq 0 ] || { bad "managed block: duplicate phase row: review"; block_fail=1; }
+            saw_review=1
+            ;;
+          release)
+            [ "$saw_release" -eq 0 ] || { bad "managed block: duplicate phase row: release"; block_fail=1; }
+            saw_release=1
+            ;;
+        esac
+        cell_info=$(printf '%s\n' "$raw" | awk -F '|' '
+          {
+            start=1; end=NF
+            if ($1 ~ /^[[:space:]]*$/) start=2
+            if ($NF ~ /^[[:space:]]*$/) end=NF-1
+            n=end-start+1
+            empty=0
+            for (i=start; i<=end; i++) {
+              val=$i
+              gsub(/^[[:space:]]+|[[:space:]]+$/, "", val)
+              gsub(/^`+|`+$/, "", val)
+              gsub(/^[[:space:]]+|[[:space:]]+$/, "", val)
+              if (val == "") empty=1
+            }
+            print n " " empty
+          }')
+        n_cells=${cell_info%% *}
+        has_empty=${cell_info##* }
+        if [ "${n_cells:-0}" -ne 4 ]; then
+          bad "managed block: phase row $first does not have four cells"
+          block_fail=1
+        elif [ "${has_empty:-0}" -eq 1 ]; then
+          bad "managed block: empty required cell in phase row: $first"
+          block_fail=1
+        fi
+      done < <(printf '%s\n' "$block")
+      if [ "$saw_header" -eq 0 ]; then
+        bad "managed block: missing table header Phase | Harness | Model | Effort"
+        block_fail=1
+      fi
+      missing_phases=""
+      [ "$saw_control" -eq 1 ] || missing_phases="${missing_phases:+$missing_phases }control"
+      [ "$saw_implement" -eq 1 ] || missing_phases="${missing_phases:+$missing_phases }implement"
+      [ "$saw_review" -eq 1 ] || missing_phases="${missing_phases:+$missing_phases }review"
+      [ "$saw_release" -eq 1 ] || missing_phases="${missing_phases:+$missing_phases }release"
+      if [ -n "$missing_phases" ]; then
+        bad "managed block: missing phase row: $missing_phases"
+        block_fail=1
+      fi
+      if [ "$block_fail" -eq 0 ]; then
+        ok "managed block well formed"
+      fi
+    fi
+  fi
+fi
+
 # --- journal --------------------------------------------------------------
 
 journal_dir="${DELIVERY_JOURNAL_DIR:-$HOME/.delivery-journal}"

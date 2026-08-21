@@ -33,12 +33,20 @@ Repository artifacts are written in English.
 
 Name the model and reasoning effort on every dispatch.
 
-| Phase | Coordinator | Worker surface | Harness | Model | Reasoning effort | Sandbox |
-| --- | --- | --- | --- | --- | --- | --- |
-| `control` | Orca | interactive TUI | Claude Code | `opus` | `high` | — |
-| `implement` | Orca | interactive TUI | Grok Build | `grok-4.6` | `medium` | — |
-| `review` | Orca | interactive TUI | Codex | `gpt-5.6-sol` | `medium` | `--dangerously-bypass-approvals-and-sandbox` |
-| `release` | Orca | interactive TUI | Grok Build | `grok-4.6` | `medium` | — |
+<!-- dely:begin -->
+## Dely
+
+Planned or Critical work must invoke `dely:delivery`.
+
+Coordinator: Orca
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| `control` | Claude Code | `opus` | `high` |
+| `implement` | Grok Build | `grok-4.6` | `medium` |
+| `review` | Codex | `gpt-5.6-sol` | `medium` |
+| `release` | Grok Build | `grok-4.6` | `medium` |
+<!-- dely:end -->
 
 The table is this repository's deployment selection, not the portable protocol.
 Load Orca's native skill to launch and supervise each worker TUI. Do not wrap a
@@ -62,7 +70,7 @@ git diff --check
 ```
 
 ```bash
-bash -n bin/delivery-doctor bin/delivery-evidence git-hooks/pre-push hooks/post-tool-journal.sh hooks/session-start-context.sh
+bash -n bin/delivery-doctor bin/delivery-evidence git-hooks/pre-push hooks/post-tool-journal.sh hooks/session-start-context.sh tests/managed-block-contract.sh
 ```
 
 ```bash
@@ -75,6 +83,10 @@ bash tests/delivery-evidence-pipeline.sh
 
 ```bash
 bash tests/delivery-doctor-grok-hook.sh
+```
+
+```bash
+bash tests/managed-block-contract.sh
 ```
 
 ```bash
