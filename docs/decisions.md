@@ -1184,6 +1184,22 @@ default branch only through a pull request.
 not part of the instructions. Adding a marketplace only affects what
 `grok plugin marketplace list` enumerates, and this package has one plugin.
 
+##### The Grok adapter check is universal: every command, both scripts, unexpected shape warns
+
+After migration the adapter points at Grok's installed copy while `delivery-doctor`
+is run from the checkout, so the check can no longer require a referenced root to
+equal the directory it was run from. What it must still prove is that a Grok worker
+can journal: **every** command the adapter registers, **both** hook scripts at the
+extracted root, and a warning rather than a silent pass when a command does not
+match the template shape `bash "<root>/hooks/<script>"`.
+
+Two false `ok` results were reproduced at review. Reading only the first command
+certified an adapter whose `SessionStart` root was complete while both `PostToolUse`
+commands pointed at a missing one. Skipping an empty command certified an adapter
+that registered no journal hook on that event. Each reports-as-fine-and-is-not, in
+the one program whose job is to catch exactly that. A later "simplification" that
+drops any of the three legs certifies the opposite of the claim.
+
 ##### Deferred — the journal path the session-start hook injects does not exist
 
 Observed 2026-08-21 while running the 0.4.3 forward smoke, and left alone because it is
