@@ -120,11 +120,73 @@ grok_hook="${HOME}/.grok/hooks/delivery.json"
 if command -v grok >/dev/null 2>&1; then
   if [ -f "$grok_hook" ]; then
     if jq -e . "$grok_hook" >/dev/null 2>&1; then
-      if grep -q "$pkg_root" "$grok_hook" 2>/dev/null; then
-        ok "Grok hook registered and points here ($grok_hook)"
-      else
-        warn "Grok hook exists but does not reference $pkg_root"
-        printf '        it may be pointing at an older copy of this package\n'
+      unexpected_shape=0
+      command_count=0
+      saw_session_start=0
+      saw_post_tool_use=0
+      saw_post_tool_use_failure=0
+      incomplete_roots=""
+      usable_roots=""
+      while IFS="$(printf '\t')" read -r grok_event grok_cmd; do
+        command_count=$((command_count + 1))
+        adapter_root=""
+        case "$grok_event:$grok_cmd" in
+          SessionStart:bash\ \"*/hooks/session-start-context.sh\"|\
+          PostToolUse:bash\ \"*/hooks/post-tool-journal.sh\"|\
+          PostToolUseFailure:bash\ \"*/hooks/post-tool-journal.sh\")
+            quoted=${grok_cmd#bash \"}
+            quoted=${quoted%\"}
+            adapter_root=${quoted%/hooks/*}
+            ;;
+        esac
+        if [ -z "$adapter_root" ]; then
+          unexpected_shape=1
+          continue
+        fi
+        case "$grok_event" in
+          SessionStart) saw_session_start=1 ;;
+          PostToolUse) saw_post_tool_use=1 ;;
+          PostToolUseFailure) saw_post_tool_use_failure=1 ;;
+        esac
+        if [ -f "$quoted" ]; then
+          case " $usable_roots " in
+            *" $adapter_root "*) ;;
+            *) usable_roots="${usable_roots:+$usable_roots }$adapter_root" ;;
+          esac
+        else
+          case " $incomplete_roots " in
+            *" $adapter_root "*) ;;
+            *) incomplete_roots="${incomplete_roots:+$incomplete_roots }$adapter_root" ;;
+          esac
+        fi
+      done < <(jq -r '.hooks | to_entries[] | .key as $event | .value[]?.hooks[]? | "\($event)\t\(.command // "")"' "$grok_hook" 2>/dev/null || true)
+
+      if [ "$unexpected_shape" -eq 1 ]; then
+        warn "Grok hook command does not match the template shape (bash \"<root>/hooks/<script>\")"
+        printf '        regenerate ~/.grok/hooks/delivery.json from the installed package\n'
+      fi
+      if [ -n "$incomplete_roots" ]; then
+        warn "Grok hook exists but referenced root is missing or incomplete: $incomplete_roots"
+        printf '        regenerate ~/.grok/hooks/delivery.json from the installed package\n'
+      fi
+      missing_events=""
+      if [ "$saw_session_start" -eq 0 ]; then
+        missing_events="SessionStart"
+      fi
+      if [ "$saw_post_tool_use" -eq 0 ]; then
+        missing_events="${missing_events:+$missing_events }PostToolUse"
+      fi
+      if [ "$saw_post_tool_use_failure" -eq 0 ]; then
+        missing_events="${missing_events:+$missing_events }PostToolUseFailure"
+      fi
+      if [ -n "$missing_events" ]; then
+        warn "Grok hook is missing required event: $missing_events"
+        printf '        regenerate ~/.grok/hooks/delivery.json from the installed package\n'
+      fi
+      if [ "$command_count" -eq 0 ]; then
+        warn "Grok hook exists but registers no commands"
+      elif [ "$unexpected_shape" -eq 0 ] && [ -z "$incomplete_roots" ] && [ -z "$missing_events" ]; then
+        ok "Grok hook registered and referenced root is usable ($usable_roots)"
       fi
     else
       bad "Grok hook is not valid JSON — $grok_hook"

@@ -1,14 +1,14 @@
 {
-  "name": "delivery-tools",
-  "description": "A delivery workflow and the rails that make its guarantees mechanical.",
+  "name": "dely",
+  "description": "A cross-harness delivery workflow for coding agents.",
   "owner": {
     "name": "Hieu Phung",
     "url": "https://github.com/hieuphung97"
   },
   "plugins": [
     {
-      "name": "delivery",
-      "description": "Design, implement, review independently, close. Repository identifiers arrive resolved, gate results are recorded as they run, and pushes to the default branch are refused in git.",
+      "name": "dely",
+      "description": "A cross-harness delivery workflow for coding agents.",
       "source": "./",
       "category": "productivity"
     }

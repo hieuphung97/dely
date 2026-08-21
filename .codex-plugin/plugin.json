@@ -1,12 +1,21 @@
 {
-  "name": "delivery",
-  "version": "0.4.3",
-  "description": "A delivery workflow plus the rails that make its guarantees mechanical: resolved repository identifiers, recorded gate evidence, and a push guard that lives in git.",
+  "name": "dely",
+  "version": "0.5.0",
+  "description": "A cross-harness delivery workflow for coding agents.",
   "license": "MIT",
   "keywords": ["delivery", "workflow", "review", "hooks", "evidence"],
+  "author": {
+    "name": "Hieu Phung",
+    "url": "https://github.com/hieuphung97"
+  },
+  "homepage": "https://github.com/hieuphung97/dely",
+  "repository": "https://github.com/hieuphung97/dely",
+  "skills": "./skills/",
   "interface": {
     "displayName": "Delivery",
     "shortDescription": "Design, implement, review independently, close",
-    "defaultPrompt": "Use the delivery skill to classify and handle this change."
+    "defaultPrompt": [
+      "Use the delivery skill to classify and handle this change."
+    ]
   }
 }
