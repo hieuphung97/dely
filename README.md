@@ -98,8 +98,8 @@ as prose outside the block rather than treating them as a package default.
 There is no configuration file, because `AGENTS.md` is read by every harness
 here and already holds project facts.
 
-This repository's combination is Orca, interactive TUIs, and Codex review pinned
-to `--dangerously-bypass-approvals-and-sandbox`. Another project may choose none
+This repository's combination is Orca, interactive TUIs, and Grok Build review
+pinned to `--always-approve`. Another project may choose none
 of those values. The skill loads the selected coordinator's native skill; it does
 not ship a coordinator adapter.
 

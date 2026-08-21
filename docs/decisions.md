@@ -834,9 +834,30 @@ Consequences: review regains gate execution, ordinary Internet access, writable 
 and native coordinator completion. A reviewer is technically able to edit the candidate;
 doing so invalidates that review rather than opening an automatic repair path. A selected
 coordinator becoming unavailable now interrupts the human before visibility is discarded.
-This repository pins Codex review to `--dangerously-bypass-approvals-and-sandbox` in
-`AGENTS.md`, so the absence of a sandbox is an explicit invocation rather than a hidden
-default.
+This repository pins its review invocation explicitly in `AGENTS.md`, so the absence of a
+sandbox is an explicit invocation rather than a hidden default.
+
+**Amended 2026-08-21.** That pin was `--dangerously-bypass-approvals-and-sandbox` while
+review ran on Codex. The product owner moved review to Grok Build `grok-4.6` at `xhigh`,
+and the Codex flag does not exist there, so the pin is now `--always-approve`. The
+property is unchanged and only its spelling is per-harness: the reviewer runs unattended,
+under no phase-implied sandbox, and that is stated on the command line rather than
+inherited from a config default.
+
+Two consequences follow from the harness, not from the phase. `cc-safety-net` is inert on
+Grok, so the reviewer loses the guard it had on Codex; `findings.md` §12 and §25 already
+record why, and the in-repository git destruction gap was already accepted for Grok
+implement and release workers. And `implement`, `review` and `release` now all run on Grok
+Build, so review independence rests entirely on role discipline — a fresh session that
+does not implement or edit the candidate — with no incidental difference of tool behind
+it. Roles were already settled as a choice per phase rather than a property of a tool, so
+this is within that decision; it removes a backstop nobody had claimed.
+
+Not verified today: Grok accepts `xhigh` for `grok-4.6`. `findings.md` §20 and
+`harness-surface.md` both record it, but this session established that Grok validates
+effort only at dispatch, so the value could not be confirmed without paying for a model
+call. An invalid effort fails loudly with the valid set inline, so the first real review
+dispatch is the check.
 
 Non-goals: this does not standardise coordinator commands, add review hardening, prove
 every harness/coordinator pairing or change the four phases and their dispositions.
