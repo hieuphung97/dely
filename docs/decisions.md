@@ -1671,6 +1671,139 @@ already states the rule; it is recorded here because the plan file was its only
 home for this unit. Triggered by the next acceptance row whose instrument would
 also pass the failure mode.
 
+### 2026-08-21 — Baseline-red is not discrimination; an acceptance row names the wrong implementation it rejects
+
+#### Context
+
+`SKILL.md` already carries the rule: *"An acceptance row is invalid until you have
+settled that its instrument discriminates. A row whose instrument passes both
+before and after the change proves nothing and will be found at review. This is the
+largest single cause of lost rounds in the record — eight plans."*
+
+It has now lost a ninth time, in this repository, in the plan that delivered
+`dely:setup`. Two rows claimed discrimination and had none:
+
+- The row proving `bin/delivery-doctor` reads only between the managed-block
+  markers used a fixture whose inner block was **valid**, with an extra table
+  outside it. An implementation that grepped the whole file passes that fixture and
+  passes the plain well-formed fixture too.
+- The row proving the doctor does not validate values against a stored catalogue
+  used the literal `default`. A validator whose catalogue happened to contain
+  `default` also passes.
+
+Both were written by the design session, marked `Yes` with a paragraph of
+reasoning, and neither was ever run against anything. Independent review found both
+by building a fixture; the unit cost one `REMEDIATE_ONCE` round.
+
+**The precise gap is narrower than the existing rule, which is why the existing
+rule did not close it.** The instrument in question *was* observed red at the
+baseline, correctly, and the journal records it:
+`bash tests/managed-block-contract.sh` printed `FAIL: skills/setup/SKILL.md is
+absent`. `SKILL.md`'s implement rule — *"observe a real failure for the intended
+reason"* — was followed.
+
+But it was red because the feature did not exist yet. Every check of an absent
+feature is red. Baseline-red is therefore satisfied trivially by any instrument
+whatsoever, and it says nothing about whether the instrument can detect an
+implementation that is **present and wrong**. The two failures above are exactly
+that: a doctor that exists, runs, returns `ok`, and is wrong.
+
+The existing rule asks the designer to *settle* that the instrument discriminates,
+and accepts prose as the settlement. Nine times, plausible prose was written and
+was false. `SKILL.md` states the remedy for its own situation: *"Before adding a
+rule, check whether a mechanism can enforce the fact instead. A rule asking a
+worker to be careful with a value is weaker than a program that supplies the
+value."* This rule is standing in the position it warns about.
+
+#### Decision
+
+**An acceptance row names the wrong implementation its instrument rejects, and the
+implementer observes that rejection.**
+
+The plan's acceptance table gains a fourth column. The three-column form is
+replaced:
+
+| Requirement | Instrument | Counterexample | Observed red |
+| --- | --- | --- | --- |
+
+- **Counterexample** is filled by design. It names a *plausible wrong
+  implementation* — one that exists, runs, and returns a pass — which the
+  instrument must reject. "The feature is absent" is not a counterexample and does
+  not satisfy the column.
+- **Observed red** is filled by implement. It cites where the counterexample was
+  run and recorded red: the journal record, or the pasted summary line where the
+  harness journals nothing.
+
+An empty cell in either column is an unfinished row, visible without reading the
+prose around it. That is the same property that makes `END OF HANDOFF` load-bearing
+— the mechanism is that absence is detectable, not that the text is persuasive.
+
+**Baseline-red is named as insufficient** in the skill, because it is the specific
+thing that was mistaken for discrimination.
+
+**Where no counterexample exists**, the row says so and says a human reads the
+diff. That remains legal and is already recorded as worth keeping only when someone
+actually reads it. What stops being legal is the word `Yes` with reasoning behind
+it and nothing run.
+
+The package moves to `0.7.0`. A contract change is a minor bump, stated here so
+release does not infer it.
+
+#### Alternatives considered
+
+- **Tightening the prose of the existing `Discriminates?` column** — rejected. That
+  is the mechanism that has now failed nine times. Asking for a better paragraph in
+  the same cell changes nothing that a designer under time pressure will notice.
+- **A program that lints the plan's acceptance table** — rejected for now. Plans
+  live under `docs/_plans` and are deleted at closure, the check would be lexical
+  over prose, and this repository has lost two rounds to lexical checks that
+  asserted the surroundings rather than the thing. The column shape is checkable in
+  the *template*, which is what the next plan copies, and that is where the check
+  goes.
+- **Requiring design to run the counterexample** — rejected. The instrument usually
+  does not exist at design time; it is written during implement. Splitting the
+  obligation across the two phases is what makes it executable at all.
+- **Doing nothing, on the grounds that review caught it** — rejected, though it was
+  argued. Review did catch both, and the cost was one remediation round rather than
+  a lost delivery. But the rule exists precisely to spend a design minute instead of
+  a review round, the record now holds nine occurrences, and the skill's own
+  standard for changing itself — the same failure recurring — is met several times
+  over.
+
+#### Consequences
+
+Design does slightly more work per acceptance row, and it is the work that was
+supposed to be happening already. The counterexample is usually one clause: a
+parser that reads the first field and stops, a check that greps the whole file, a
+validator with a hard-coded list.
+
+Review gains a cheaper job. Instead of inferring whether an instrument
+discriminates, it reads the named counterexample and reproduces the cited red
+record. Both defects this session were found by a reviewer building a fixture from
+scratch; the column hands the reviewer the fixture to build.
+
+What gets worse: the acceptance table is wider and will wrap in narrow terminals,
+and a determined worker can still write a weak counterexample. The column does not
+prevent that; it makes the weakness visible in one cell rather than buried in a
+paragraph.
+
+This does not claim the ninth occurrence would have been prevented. It claims the
+two rows would have been visibly empty, and that an empty cell is harder to ship
+than a confident sentence.
+
+#### Non-goals
+
+Not a plan linter, not a new gate over prose, not a change to the four phases,
+their dispositions, the handoff shape, or the delivery log. Not a change to the
+implement rule about observing a real failure for the behaviour under test — that
+rule stays and this is a second, narrower obligation about the instrument itself.
+
+#### Deferred
+
+**A program that checks a live plan's table**, triggered by a plan shipping with an
+empty Counterexample cell that review did not catch. The template check landing
+with this decision covers the shape a plan is copied from, not the plan itself.
+
 ---
 
 ## Open
