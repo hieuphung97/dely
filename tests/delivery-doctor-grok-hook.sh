@@ -2,7 +2,9 @@
 # Focused check: delivery-doctor accepts a Grok adapter whose every command
 # points at a root that is not the directory the doctor was run from, and
 # still refuses a missing root, a root missing either hook script, a mixed
-# adapter, an unexpected command shape, or malformed JSON.
+# adapter, an unexpected command shape, malformed JSON, a command that names
+# a missing script beside both real ones, a known script on the wrong event,
+# or a required event removed.
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
@@ -164,5 +166,50 @@ mv "$scratch/empty-cmd.json" "$home7/.grok/hooks/delivery.json"
 out7="$scratch/out-empty-cmd"
 run_doctor "$home7" "$out7"
 expect_non_ok "$out7" "an otherwise complete adapter with one command blanked to empty"
+
+# --- case 8: every command names a missing not-journal.sh beside both real scripts ---
+
+wrong_target=$(mktemp -d "$scratch/wrong-target.XXXXXX")
+mkdir -p "$wrong_target/hooks"
+: >"$wrong_target/hooks/session-start-context.sh"
+: >"$wrong_target/hooks/post-tool-journal.sh"
+
+home8="$scratch/home-wrong-target"
+write_adapter "$home8/.grok/hooks/delivery.json" "$wrong_target"
+jq --arg cmd "bash \"${wrong_target}/hooks/not-journal.sh\"" '
+  .hooks.SessionStart[0].hooks[0].command = $cmd |
+  .hooks.PostToolUse[0].hooks[0].command = $cmd |
+  .hooks.PostToolUseFailure[0].hooks[0].command = $cmd
+' "$home8/.grok/hooks/delivery.json" >"$scratch/wrong-target.json"
+mv "$scratch/wrong-target.json" "$home8/.grok/hooks/delivery.json"
+
+out8="$scratch/out-wrong-target"
+run_doctor "$home8" "$out8"
+expect_non_ok "$out8" "commands targeting a nonexistent not-journal.sh beside both real scripts"
+
+# --- case 9: PostToolUse calls session-start-context.sh (wrong event) ------
+
+home9="$scratch/home-wrong-event"
+write_adapter "$home9/.grok/hooks/delivery.json" "$foreign"
+jq '
+  .hooks.PostToolUse[0].hooks[0].command |=
+    sub("post-tool-journal.sh"; "session-start-context.sh")
+' "$home9/.grok/hooks/delivery.json" >"$scratch/wrong-event.json"
+mv "$scratch/wrong-event.json" "$home9/.grok/hooks/delivery.json"
+
+out9="$scratch/out-wrong-event"
+run_doctor "$home9" "$out9"
+expect_non_ok "$out9" "PostToolUse calling session-start-context.sh"
+
+# --- case 10: otherwise correct adapter with PostToolUseFailure removed ----
+
+home10="$scratch/home-missing-event"
+write_adapter "$home10/.grok/hooks/delivery.json" "$foreign"
+jq 'del(.hooks.PostToolUseFailure)' "$home10/.grok/hooks/delivery.json" >"$scratch/missing-event.json"
+mv "$scratch/missing-event.json" "$home10/.grok/hooks/delivery.json"
+
+out10="$scratch/out-missing-event"
+run_doctor "$home10" "$out10"
+expect_non_ok "$out10" "an otherwise correct adapter with PostToolUseFailure removed"
 
 printf '%s\n' "delivery-doctor-grok-hook: ok"
