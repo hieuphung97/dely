@@ -1969,8 +1969,17 @@ It is not a second source of truth and holds no rules of its own. `AGENTS.md`
 remains the file every harness reads; this one exists so that one harness reads it
 at all.
 
-It is deliberately not a managed block and carries no `dely` markers. `dely:setup`
-does not own it, and `delivery-doctor` does not check it.
+It is deliberately not a managed block and carries no `dely` markers, so nothing
+parses it as configuration.
+
+**Amended 2026-08-21, same day.** This originally said `dely:setup` does not own it
+and `delivery-doctor` does not check it. The first half stands: setup does not own
+the file and will not write it unasked. The second half conflated two things.
+Ownership is not diagnosis, and `delivery-doctor`'s stated job is to catch a rail
+that is present but not wired — which is exactly what a managed block that Claude
+Code cannot read is. The doctor now warns about a missing import; it still does not
+own, parse or validate the file's contents beyond whether the import is there. See
+the decision below.
 
 #### Alternatives considered
 
@@ -1998,6 +2007,145 @@ What this does not fix: a consumer project still has to create its own
 
 Not a second managed block, not a rule about what consumers must do, and not a
 change to which file is authoritative.
+
+
+### 2026-08-21 — Setup offers the `CLAUDE.md` import, and the doctor warns when it is missing
+
+#### Context
+
+`skills/setup/SKILL.md` currently says, of Claude Code not reading `AGENTS.md`:
+*"Report this. Do not write `CLAUDE.md`."* That line shipped in `0.6.0` on the
+reasoning that writing a second file would make setup the owner of two
+configuration files and contradict the one-block rule.
+
+Reporting turned out to be too weak, and this repository is the evidence. The gap
+was reported in the decision record, reported again in `findings.md` §32, and
+reported by the skill itself in its own output during the forward smoke — three
+times — and the repository whose control phase is Claude Code still had no
+`CLAUDE.md` until a human asked why. A report that everyone reads and nobody acts
+on is indistinguishable from silence.
+
+The fix is one line of content, now measured rather than presumed: a `CLAUDE.md`
+containing exactly `@AGENTS.md` makes the managed block reach Claude Code.
+
+#### Decision
+
+**Setup offers to create the import.** Where the current harness is Claude Code and
+the project has no `CLAUDE.md` importing `AGENTS.md`, setup offers to create a
+one-line `CLAUDE.md` containing `@AGENTS.md`. The human accepts or declines. Setup
+does not write it unasked.
+
+This does not breach the one-block rule. `CLAUDE.md` carries no `dely` markers,
+holds no configuration, and is not a second managed block; it is a pointer at the
+first one. Setup still owns exactly one managed block, in exactly one file.
+
+Where setup cannot ask — a non-interactive run — the rule settled earlier today
+already governs: it writes nothing and reports the choice it could not offer. No
+new mechanism is needed for that path, which is the test of whether that rule was
+stated generally enough.
+
+**The doctor warns when the import is missing.** Where a project has a well-formed
+managed block and no `CLAUDE.md` importing `AGENTS.md`, `bin/delivery-doctor`
+reports that Claude Code will not read the block. It is a `warn`, never a `FAIL`: a
+project that runs only Codex and Grok is correctly configured without the file, in
+the same way a project with no managed block at all is correctly configured.
+
+The doctor checks whether the import is present. It does not parse, validate or own
+the file's other contents.
+
+The package moves to `0.9.0`.
+
+#### Alternatives considered
+
+- **Keeping report-only** — rejected by this repository's own record. Three
+  reports produced no action.
+- **Writing `CLAUDE.md` automatically** — rejected. It creates a file the human
+  never agreed to, in their repository root, on a harness-specific mechanism. The
+  same reasoning that rejected auto-selecting a coordinator applies: setup surfaces
+  choices, it does not make them.
+- **Making the doctor `FAIL`** — rejected. It would fail every correctly configured
+  Codex-or-Grok-only project, and a check that is red for supported configurations
+  trains people to ignore it.
+- **Offering it on every harness rather than only Claude Code** — rejected. On
+  Codex and Grok the file is inert, and `findings.md` §11 records that Grok does not
+  expand the import at all. Offering it there would be cargo cult.
+
+#### Consequences
+
+A Claude Code project that runs setup interactively ends up with a working
+persistent instruction rather than a documented reason why it does not work. A
+project on other harnesses sees no offer and no warning.
+
+What gets worse: setup now has a reason to look at a file outside the managed block,
+and a future contributor may read that as licence to manage more files. The decision
+draws the line explicitly — offer one known file with one known line, warn if it is
+absent, own neither.
+
+What stays unobserved: whether setup actually makes the offer to a human, and
+whether a non-interactive run reports the skipped offer without writing the
+file. Every check in this unit is static or fixture-driven. The behavioural
+check is the post-release smoke under Deferred.
+
+#### Non-goals
+
+Not a second managed block, not a config file, not a template system, not a rule
+about what a `CLAUDE.md` may otherwise contain, and not a change to `delivery`.
+
+#### Deferred
+
+**Offering the equivalent for any future harness that does not read `AGENTS.md`**,
+triggered by such a harness being adopted. The current offer names Claude Code
+because Claude Code is the measured case.
+
+**Post-release smoke.** After the plugin caches are refreshed, in a scratch
+repository with an `AGENTS.md` managed block and no `CLAUDE.md`:
+
+1. Run `delivery-doctor` and confirm the warn appears; add the import and
+   confirm it disappears.
+2. Invoke `dely:setup` interactively there on Claude Code and record whether
+   the offer is made and whether declining leaves the file absent.
+3. Invoke it non-interactively and record whether it writes `CLAUDE.md`
+   unasked — it must not — and whether it reports the offer it could not
+   make.
+
+Results go to `docs/findings.md` by that later unit.
+
+**Whether setup actually makes the offer to a human.** Every check in this
+unit is static or fixture-driven and proves the document states the rule and
+the doctor implements the warn. It cannot prove an agent offers rather than
+writes, and it cannot prove a human is asked. The behavioural check is the
+post-release smoke above.
+
+#### Amended 2026-08-21 after review returned `REPLAN_OR_SPLIT`
+
+The plan deliberately added no non-interactive rule for this offer, betting that
+the rule shipped in `0.8.0` already covered it. Independent review disproved the
+bet, and the reasoning is worth keeping because the bet was the point of the test.
+
+The `0.8.0` rule reads: *"Where a selection cannot be offered, write the
+conservative value and report the choice that was not offered … do not write that
+report into the managed block."* Every noun and verb in it belongs to a value
+written into the managed block — `selection`, `conservative value`, `write`, `how
+to set it`. It also sits under the `## Coordinator` heading, and the test enforcing
+it inspects only that section.
+
+Against an offer to **create a file**, that rule does not merely fail to apply. Read
+literally, *"write the conservative value"* could be taken as licence to create
+`CLAUDE.md` unasked — the exact opposite of the rule two paragraphs later. A gap
+that inverts under a literal reading is worse than an absent rule.
+
+The correction is structural rather than verbal. The rule moves out of
+`## Coordinator` into a section of its own, and its verbs become action-neutral: a
+choice that cannot be offered is **not made** — the conservative action may be
+writing a conservative value, and it may be doing nothing — and it is **reported**
+either way. The coordinator and the `CLAUDE.md` import then both read as instances
+of it rather than as the rule itself.
+
+The lesson generalises past this unit: `0.8.0` was written to be general and was
+described as general in its own decision record, but it was placed under a
+harness-specific heading with domain-specific verbs, and its test only ever looked
+at that heading. Stating that a rule is general does not make it general. Where it
+lives and what its test reads are what make it general.
 
 
 ---

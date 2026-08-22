@@ -322,6 +322,10 @@ else
       fi
       if [ "$block_fail" -eq 0 ]; then
         ok "managed block well formed"
+        claude_md="${repo}/CLAUDE.md"
+        if [ ! -f "$claude_md" ] || ! grep -Fq '@AGENTS.md' "$claude_md"; then
+          warn "CLAUDE.md does not import AGENTS.md — Claude Code will not read the managed block"
+        fi
       fi
     fi
   fi
