@@ -2612,3 +2612,45 @@ the old and new installed copies answers it.
 Whether a consumer other than this project reads the offer as clear. The
 interactive path was driven by the Control Session acting as the human through a
 coordinator terminal — a faithful test of the mechanism, not of a first encounter.
+
+---
+
+## 35. The `0.9.1` three-harness forward smoke, and a public HTTPS install
+
+Recorded 2026-08-22 after `0.9.1` was installed on Claude Code, Codex and Grok
+Build. Does not restage §30's Grok adapter finding or §34's Codex content-keying;
+those stand.
+
+### Forward smoke
+
+Plugin version `0.9.1` is the installed copy on all three harnesses.
+
+A fresh Claude Code `2.1.239` TUI, model `opus`, effort `high`, session
+`7a834d94-ba09-49b9-8243-31c7a4c923dd`, received
+`/Users/hieuphung/.delivery-journal/7a834d94-ba09-49b9-8243-31c7a4c923dd` from
+SessionStart. That directory existed. It ran exactly `git status --porcelain`.
+`delivery-evidence` reported one completed call, exit 0, with no output.
+
+Fresh Codex and Grok TUI probes for `0.9.1` were already recorded by Control
+outside the repository: Codex received the current journal-directory shape and
+journaled one command; Grok did the same after its native adapter was
+regenerated.
+
+### Isolated public install
+
+A clean isolated install under `/tmp/dely-clean-install.FM4ObB` succeeded without
+SSH credentials.
+
+| Harness | Command | Result |
+| --- | --- | --- |
+| Claude Code | `marketplace add https://github.com/hieuphung97/dely.git`, then `install dely@dely` | plugin list reported `0.9.1` enabled |
+| Codex | the same HTTPS marketplace URL, then `add dely@dely` | plugin list reported `0.9.1` enabled with `authPolicy ON_INSTALL` |
+| Grok | `plugin install hieuphung97/dely --trust` | plugin list reported `0.9.1`; plugin details exposed the installed path |
+
+Regenerating `~/.grok/hooks/delivery.json` from that derived Grok path produced
+three valid commands whose targets all existed.
+
+§34 already proves Codex trust is content-keyed. README had overstated that as
+re-trust after every update; it now says re-trust only after a hook file
+changes. This `0.9.1` install used `ON_INSTALL` and a fresh Codex TUI ran both
+hooks without an extra manual trust step. That last step is not generalised.

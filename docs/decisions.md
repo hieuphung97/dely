@@ -3,7 +3,7 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-08-21.
+Last updated 2026-08-22.
 
 ---
 
@@ -479,7 +479,13 @@ where Claude Code implies zero and Codex says nothing.
 Codex's trust is keyed to hook content, so any change to a hook script revokes it
 without a word. That is two silent-failure modes in one rail, which is why
 `bin/delivery-doctor` now checks for the Grok file and why the README says to
-re-trust after every package update.
+re-trust after a hook file changes, not after every package update.
+
+**Amended 2026-08-22.** Findings §34 measured the content-keying: hook files
+byte-identical across `0.6.0`–`0.9.0` kept the trusted hashes. Findings §35
+recorded a `0.9.1` Codex install with `authPolicy ON_INSTALL` whose fresh TUI
+then ran both hooks without an extra manual trust step. That last step is not
+generalised.
 
 The reader maps all three vocabularies in one place. Output selection follows the
 payload shape rather than the pass/fail verdict, because only two of the three move a
@@ -525,7 +531,9 @@ Two things Orca documents are overridden, and both were established by probe:
 Also observed and worth knowing before relying on it: `worker-start` returns
 `state: ready, stage: input_accepted`, and on a freshly launched agent terminal the
 task text was typed into the input box and left unsubmitted for three minutes until
-one `terminal send --enter`. It did not recur when the terminal already existed. And
+one `terminal send --enter`. **Amended 2026-08-22.** The first probe did not recur
+on an existing terminal; later deliveries reproduced the same unsubmitted draft
+there. The race is not scoped to a freshly launched terminal. And
 an unacknowledged Delivery replays until `check --ack <delivery_id>`, so a loop that
 forgets the id spins on its first message.
 
@@ -1243,6 +1251,24 @@ its own unit rather than under this one.
 per-session directory the writer creates; `delivery-doctor` counts that layout and
 the legacy `.raw.jsonl` files without calling every current target a session file;
 README installation verification reads the journal through `bin/delivery-evidence`.
+
+#### Amended 2026-08-22 — Claude Code and Codex install from the public HTTPS URL
+
+The Decision sentence "Every harness installs from
+`git@github.com:hieuphung97/dely.git`" overstates the transport. The remote is
+public — this record already retired the private-clone risk — and the
+instructions now name the verified public HTTPS URL for Claude Code and Codex.
+Grok keeps the GitHub shorthand `hieuphung97/dely`.
+
+Findings §35 observed a clean isolated install under
+`/tmp/dely-clean-install.FM4ObB` with no SSH credentials: Claude Code
+`marketplace add https://github.com/hieuphung97/dely.git` then `install dely@dely`
+reported `0.9.1` enabled; Codex used the same HTTPS marketplace URL then
+`add dely@dely` and reported `0.9.1` enabled with `authPolicy ON_INSTALL`; Grok
+`plugin install hieuphung97/dely --trust` reported `0.9.1` and exposed an
+installed path whose regenerated adapter commands all targeted existing files.
+The acceptance row this record reserved for a real `marketplace add` from each
+harness is closed by that probe.
 
 ### 2026-08-21 — Consumer identifiers are pseudonymous; the evidence itself stays whole
 
@@ -2161,6 +2187,100 @@ described as general in its own decision record, but it was placed under a
 harness-specific heading with domain-specific verbs, and its test only ever looked
 at that heading. Stating that a rule is general does not make it general. Where it
 lives and what its test reads are what make it general.
+
+### 2026-08-22 — A coordinator verifies prompt submission before the long wait
+
+#### Context
+
+Orca can accept a dispatch while leaving its task text in the worker TUI's input
+box. `findings.md` §23 first observed `stage: input_accepted`, a null heartbeat and
+three minutes of idle time until one Enter submitted the prompt. The
+`coordinator-not-offered` delivery then lost roughly nine minutes to the same
+shape on an existing terminal. The `setup-offers-claude-import` delivery observed
+it on two more dispatches and also disproved a 25-second visual check that had
+called the prompt submitted. In those later runs, no dispatch heartbeat arrived
+for 90 seconds; reading the TUI showed the pending prompt, and one Enter released
+it.
+
+The current `delivery` contract says to wait for `tui-idle` before dispatch and
+then keep the coordinator wait blocking. It says nothing about the boundary
+between Orca accepting input and the harness submitting it. The recurrence has
+now crossed three deliveries, so the skill's recurrence threshold is met.
+
+#### Decision
+
+After a coordinator-selected dispatch, `input_accepted` is a transport receipt,
+not proof that the harness submitted the prompt. Control allows 90 seconds for a
+dispatch heartbeat or visible agent progress. If neither appears, Control reads
+the worker TUI. Only when that read shows the task still pending in the input box
+does Control send Enter, exactly once, then returns to the normal blocking wait.
+
+Control does not send Enter when the worker is already reasoning, using a tool,
+asking a question or reporting completion. It does not infer submission from a
+rendered copy of the prompt alone. A second missing signal is a liveness problem
+to inspect, not permission to keep pressing Enter.
+
+This is a bounded recovery inside the coordinator's existing terminal surface.
+It adds no wrapper, polling loop, relay, background process or harness-specific
+adapter. The package moves to `0.10.0` because the portable workflow contract
+changes. Cache refresh and the first real post-release recurrence are the
+behavioural smoke and happen between plans.
+
+#### Alternatives considered
+
+- Trust `input_accepted` and wait for the ordinary timeout. Rejected because that
+  is the behaviour that lost time in three deliveries and cannot distinguish a
+  running worker from an unsubmitted draft.
+- Send Enter immediately after every dispatch. Rejected because a worker that has
+  already started can receive an unintended blank follow-up; the TUI read is the
+  discriminating observation.
+- Add a daemon, prompt wrapper or automatic retry state machine. Rejected because
+  Orca already exposes the terminal and one conditional Enter fixes the observed
+  failure.
+- Lower the 90-second boundary. Rejected because model startup and first-turn
+  latency are real; the measured signal was absence after 90 seconds, not after an
+  arbitrary shorter interval.
+
+#### Consequences
+
+A broken submission costs at most 90 seconds before the bounded recovery instead
+of consuming the worker timeout. A healthy dispatch gets no extra input. Control
+must read one terminal only on the no-signal path, so the ordinary blocking wait
+stays ordinary.
+
+The focused instrument can prove that the contract contains the guard, the TUI
+read and the one-Enter limit. It cannot force an agent to obey prose or make the
+Orca race occur. The first post-release dispatch that hits the race is the
+behavioural smoke.
+
+#### Non-goals
+
+- No change to Orca, any harness CLI, worker heartbeat implementation or
+  `check --wait` keepalive framing.
+- No generic terminal-state parser and no promise that rendered TUI text is a
+  stable API.
+- No retry, worker replacement or deadline-policy change.
+- No change to hooks, evidence payloads, setup or project configuration.
+
+#### Deferred
+
+Replace the conditional human-readable TUI check only if Orca exposes a native
+`input_submitted` receipt or the one-Enter recovery itself causes a real duplicate
+submission. Until either trigger occurs, another mechanism would be speculative.
+
+**Post-release smoke.** After the plugin caches are refreshed, the first real
+coordinator dispatch that sits in the input box with no heartbeat for 90 seconds
+is the behavioural check: Control reads the TUI, sends Enter exactly once if
+the prompt is still pending, and the worker starts. A static fixture cannot make
+Orca leave a prompt unsubmitted, cannot prove an agent follows the rule, and
+cannot prove 90 seconds is universally optimal. The recurrence is the design
+evidence; that first post-release hit is the behavioural evidence. Results go
+to `docs/findings.md` by that later unit.
+
+**Whether a coordinator actually recovers an unsubmitted prompt.** Every check
+in this unit is static or fixture-driven and proves only that the skill document
+states the guard, the TUI read and the one-Enter limit. The behavioural check
+is the post-release smoke above.
 
 
 ---

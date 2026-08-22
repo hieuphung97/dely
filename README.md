@@ -171,7 +171,7 @@ Both scripts are invoked through `bash`, so no execute bit is needed. Both exit
 ## Install
 
 The plugin is `dely`, served from the `dely` marketplace at
-`git@github.com:hieuphung97/dely.git`. Install it in each harness from that
+`https://github.com/hieuphung97/dely.git`. Install it in each harness from that
 remote. The skill keeps the name `delivery`; the intended namespaced name is
 `dely:delivery`. Whether a session actually loads it is established by the
 forward smoke after migration, not by installing. The marketplace entry keeps
@@ -179,11 +179,11 @@ forward smoke after migration, not by installing. The marketplace entry keeps
 repository whether the marketplace is added by path or by git URL.
 
 ```bash
-claude plugin marketplace add git@github.com:hieuphung97/dely.git
+claude plugin marketplace add https://github.com/hieuphung97/dely.git
 claude plugin install dely@dely
 
 # Codex, from the same marketplace manifest
-codex plugin marketplace add git@github.com:hieuphung97/dely.git
+codex plugin marketplace add https://github.com/hieuphung97/dely.git
 codex plugin add dely@dely
 
 # Grok Build, natively — it does not inherit Claude Code's enabled set.
@@ -224,9 +224,9 @@ adapter from the installed root — whenever a rule or a script changes, or the
 harnesses disagree about what the workflow says.
 
 **Codex needs its hooks trusted, and trust is keyed to their content.** Open
-`/hooks`, select the `dely` entries, press `t`. Any later change to a hook
-script changes its hash and revokes that trust silently, so re-trust after every
-package update.
+`/hooks`, select the `dely` entries, press `t`. A later change to a hook file
+changes its hash and revokes that trust silently, so re-trust after a hook file
+changes, not after every package update.
 
 `--plugin-dir` still works for one invocation and touches nothing. A permanent
 install in each harness is intended to keep the skills available across
