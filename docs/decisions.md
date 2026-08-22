@@ -1930,6 +1930,10 @@ could not offer. The `0.6.0` run that produced this defect is the control: it
 wrote `none` and said nothing. Results go to `docs/findings.md` by that later
 unit. Triggered after the plugin caches are refreshed.
 
+**Run 2026-08-22 on `0.9.0`; results in `findings.md` §34.** The non-interactive
+run created nothing and named both choices it could not offer, the coordinator and
+the `CLAUDE.md` import. This deferred item is closed.
+
 **Whether a real non-interactive run actually emits the report.** Every check
 in this unit is static and proves only that the skill document states the
 rule; it cannot prove an agent obeys it. The behavioural check is the
@@ -2109,6 +2113,12 @@ repository with an `AGENTS.md` managed block and no `CLAUDE.md`:
    make.
 
 Results go to `docs/findings.md` by that later unit.
+
+**Run 2026-08-22 on `0.9.0`; results in `findings.md` §34.** All three steps
+passed: the warn fires without an import, is absent with one, and still fires on a
+`CLAUDE.md` of unrelated prose; the interactive run presented the offer as a
+question and declining left the file absent; the non-interactive run created
+nothing. This deferred item is closed.
 
 **Whether setup actually makes the offer to a human.** Every check in this
 unit is static or fixture-driven and proves the document states the rule and
