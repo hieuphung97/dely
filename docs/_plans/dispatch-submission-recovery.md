@@ -3,7 +3,7 @@
 Decision record: `docs/decisions.md`, "2026-08-22 — A coordinator verifies
 prompt submission before the long wait"
 
-**Baseline:**
+**Baseline:** `5b0978284b05d409e38d03df174f502a5e3635e1`
 
 ## Goal
 
