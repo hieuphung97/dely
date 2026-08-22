@@ -43,7 +43,7 @@ fi
 
 journal_dir="${DELIVERY_JOURNAL_DIR:-$HOME/.delivery-journal}"
 if [ -n "$session_id" ]; then
-  journal_line="- This session's evidence journal: ${journal_dir}/${session_id}.raw.jsonl"
+  journal_line="- This session's evidence journal: ${journal_dir}/${session_id}"
 else
   journal_line="- This session's evidence journal: unresolved — quote gate output verbatim instead of citing a file"
 fi

@@ -257,13 +257,11 @@ claude --plugin-dir /path/to/project-delivery-procedure -p 'Two things, nothing 
 Then:
 
 ```bash
-ls -la ~/.delivery-journal/                                   # PostToolUse fired?
-jq -r '.payload | keys[]' ~/.delivery-journal/*.raw.jsonl | sort -u
-jq '.payload.tool_response' ~/.delivery-journal/*.raw.jsonl   # exit code present?
+bin/delivery-evidence                      # newest session, every Bash call
 ```
 
-A journal file means `PostToolUse` fired. The session quoting the identifiers
-block means `SessionStart` fired and injection worked.
+A session in the reader output means `PostToolUse` fired. The session quoting
+the identifiers block means `SessionStart` fired and injection worked.
 
 Journal location overrides with `DELIVERY_JOURNAL_DIR`.
 

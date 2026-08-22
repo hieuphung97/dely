@@ -1239,6 +1239,11 @@ journal's shape:
 trigger for acting is this rename reaching closure, so the fix lands between plans in
 its own unit rather than under this one.
 
+**Run 2026-08-22; this deferred item is closed.** SessionStart advertises the
+per-session directory the writer creates; `delivery-doctor` counts that layout and
+the legacy `.raw.jsonl` files without calling every current target a session file;
+README installation verification reads the journal through `bin/delivery-evidence`.
+
 ### 2026-08-21 — Consumer identifiers are pseudonymous; the evidence itself stays whole
 
 #### Context
