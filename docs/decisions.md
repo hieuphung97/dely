@@ -479,7 +479,13 @@ where Claude Code implies zero and Codex says nothing.
 Codex's trust is keyed to hook content, so any change to a hook script revokes it
 without a word. That is two silent-failure modes in one rail, which is why
 `bin/delivery-doctor` now checks for the Grok file and why the README says to
-re-trust after every package update.
+re-trust after a hook file changes, not after every package update.
+
+**Amended 2026-08-22.** Findings §34 measured the content-keying: hook files
+byte-identical across `0.6.0`–`0.9.0` kept the trusted hashes. Findings §35
+recorded a `0.9.1` Codex install with `authPolicy ON_INSTALL` whose fresh TUI
+then ran both hooks without an extra manual trust step. That last step is not
+generalised.
 
 The reader maps all three vocabularies in one place. Output selection follows the
 payload shape rather than the pass/fail verdict, because only two of the three move a
@@ -1243,6 +1249,24 @@ its own unit rather than under this one.
 per-session directory the writer creates; `delivery-doctor` counts that layout and
 the legacy `.raw.jsonl` files without calling every current target a session file;
 README installation verification reads the journal through `bin/delivery-evidence`.
+
+#### Amended 2026-08-22 — Claude Code and Codex install from the public HTTPS URL
+
+The Decision sentence "Every harness installs from
+`git@github.com:hieuphung97/dely.git`" overstates the transport. The remote is
+public — this record already retired the private-clone risk — and the
+instructions now name the verified public HTTPS URL for Claude Code and Codex.
+Grok keeps the GitHub shorthand `hieuphung97/dely`.
+
+Findings §35 observed a clean isolated install under
+`/tmp/dely-clean-install.FM4ObB` with no SSH credentials: Claude Code
+`marketplace add https://github.com/hieuphung97/dely.git` then `install dely@dely`
+reported `0.9.1` enabled; Codex used the same HTTPS marketplace URL then
+`add dely@dely` and reported `0.9.1` enabled with `authPolicy ON_INSTALL`; Grok
+`plugin install hieuphung97/dely --trust` reported `0.9.1` and exposed an
+installed path whose regenerated adapter commands all targeted existing files.
+The acceptance row this record reserved for a real `marketplace add` from each
+harness is closed by that probe.
 
 ### 2026-08-21 — Consumer identifiers are pseudonymous; the evidence itself stays whole
 
