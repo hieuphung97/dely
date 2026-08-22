@@ -2186,6 +2186,85 @@ harness-specific heading with domain-specific verbs, and its test only ever look
 at that heading. Stating that a rule is general does not make it general. Where it
 lives and what its test reads are what make it general.
 
+### 2026-08-22 — A coordinator verifies prompt submission before the long wait
+
+#### Context
+
+Orca can accept a dispatch while leaving its task text in the worker TUI's input
+box. `findings.md` §23 first observed `stage: input_accepted`, a null heartbeat and
+three minutes of idle time until one Enter submitted the prompt. The
+`coordinator-not-offered` delivery then lost roughly nine minutes to the same
+shape on an existing terminal. The `setup-offers-claude-import` delivery observed
+it on two more dispatches and also disproved a 25-second visual check that had
+called the prompt submitted. In those later runs, no dispatch heartbeat arrived
+for 90 seconds; reading the TUI showed the pending prompt, and one Enter released
+it.
+
+The current `delivery` contract says to wait for `tui-idle` before dispatch and
+then keep the coordinator wait blocking. It says nothing about the boundary
+between Orca accepting input and the harness submitting it. The recurrence has
+now crossed three deliveries, so the skill's recurrence threshold is met.
+
+#### Decision
+
+After a coordinator-selected dispatch, `input_accepted` is a transport receipt,
+not proof that the harness submitted the prompt. Control allows 90 seconds for a
+dispatch heartbeat or visible agent progress. If neither appears, Control reads
+the worker TUI. Only when that read shows the task still pending in the input box
+does Control send Enter, exactly once, then returns to the normal blocking wait.
+
+Control does not send Enter when the worker is already reasoning, using a tool,
+asking a question or reporting completion. It does not infer submission from a
+rendered copy of the prompt alone. A second missing signal is a liveness problem
+to inspect, not permission to keep pressing Enter.
+
+This is a bounded recovery inside the coordinator's existing terminal surface.
+It adds no wrapper, polling loop, relay, background process or harness-specific
+adapter. The package moves to `0.10.0` because the portable workflow contract
+changes; installed `0.9.1` remains frozen until this plan closes.
+
+#### Alternatives considered
+
+- Trust `input_accepted` and wait for the ordinary timeout. Rejected because that
+  is the behaviour that lost time in three deliveries and cannot distinguish a
+  running worker from an unsubmitted draft.
+- Send Enter immediately after every dispatch. Rejected because a worker that has
+  already started can receive an unintended blank follow-up; the TUI read is the
+  discriminating observation.
+- Add a daemon, prompt wrapper or automatic retry state machine. Rejected because
+  Orca already exposes the terminal and one conditional Enter fixes the observed
+  failure.
+- Lower the 90-second boundary. Rejected because model startup and first-turn
+  latency are real; the measured signal was absence after 90 seconds, not after an
+  arbitrary shorter interval.
+
+#### Consequences
+
+A broken submission costs at most 90 seconds before the bounded recovery instead
+of consuming the worker timeout. A healthy dispatch gets no extra input. Control
+must read one terminal only on the no-signal path, so the ordinary blocking wait
+stays ordinary.
+
+The focused instrument can prove that the contract contains the guard, the TUI
+read and the one-Enter limit. It cannot force an agent to obey prose or make the
+Orca race occur. The first post-release dispatch that hits the race is the
+behavioural smoke.
+
+#### Non-goals
+
+- No change to Orca, any harness CLI, worker heartbeat implementation or
+  `check --wait` keepalive framing.
+- No generic terminal-state parser and no promise that rendered TUI text is a
+  stable API.
+- No retry, worker replacement or deadline-policy change.
+- No change to hooks, evidence payloads, setup or project configuration.
+
+#### Deferred
+
+Replace the conditional human-readable TUI check only if Orca exposes a native
+`input_submitted` receipt or the one-Enter recovery itself causes a real duplicate
+submission. Until either trigger occurs, another mechanism would be speculative.
+
 
 ---
 
