@@ -73,7 +73,7 @@ git diff --check
 ```
 
 ```bash
-bash -n bin/delivery-doctor bin/delivery-evidence git-hooks/pre-push hooks/post-tool-journal.sh hooks/session-start-context.sh tests/managed-block-contract.sh tests/plan-template-shape.sh
+bash -n bin/delivery-doctor bin/delivery-evidence git-hooks/pre-push hooks/post-tool-journal.sh hooks/session-start-context.sh tests/dispatch-submission-contract.sh tests/managed-block-contract.sh tests/plan-template-shape.sh
 ```
 
 ```bash
@@ -90,6 +90,10 @@ bash tests/delivery-doctor-grok-hook.sh
 
 ```bash
 bash tests/journal-path-shape.sh
+```
+
+```bash
+bash tests/dispatch-submission-contract.sh
 ```
 
 ```bash

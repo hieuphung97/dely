@@ -1,6 +1,6 @@
 {
   "name": "dely",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "A cross-harness delivery workflow for coding agents.",
   "license": "MIT",
   "keywords": ["delivery", "workflow", "review", "hooks", "evidence"],

@@ -531,7 +531,9 @@ Two things Orca documents are overridden, and both were established by probe:
 Also observed and worth knowing before relying on it: `worker-start` returns
 `state: ready, stage: input_accepted`, and on a freshly launched agent terminal the
 task text was typed into the input box and left unsubmitted for three minutes until
-one `terminal send --enter`. It did not recur when the terminal already existed. And
+one `terminal send --enter`. **Amended 2026-08-22.** The first probe did not recur
+on an existing terminal; later deliveries reproduced the same unsubmitted draft
+there. The race is not scoped to a freshly launched terminal. And
 an unacknowledged Delivery replays until `check --ack <delivery_id>`, so a loop that
 forgets the id spins on its first message.
 

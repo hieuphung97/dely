@@ -114,6 +114,19 @@ coordinator until it completes or the timeout fires. A headless fallback is a
 blocking process plus a timeout with headroom: the process exits on its own, so
 polling would be a state machine. Do not add a relay to manufacture completion.
 
+**`input_accepted` is not submission.** After a coordinator-selected dispatch,
+`input_accepted` is a transport receipt, not proof that the harness submitted
+the prompt. Allow 90 seconds for a dispatch heartbeat or visible agent
+progress. If neither appears, read the worker TUI. Only when that read shows
+the task still pending in the input box does Control send Enter, exactly once,
+then return to the normal blocking wait.
+
+Do not send Enter when the worker is already reasoning, using a tool, asking a
+question or reporting completion. Do not infer submission from a rendered copy
+of the prompt alone. A second missing signal is a liveness problem to inspect,
+not permission to keep pressing Enter. This bounded recovery adds no wrapper,
+polling loop, relay, background process or harness-specific adapter.
+
 **Capture the worker's session id from its output and put it in the handoff.** It is
 how the human opens that session to inspect or steer it, and a harness need not list
 a dispatched session in its own picker: Codex filters its picker to interactive
