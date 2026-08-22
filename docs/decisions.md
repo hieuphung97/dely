@@ -3,7 +3,7 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-08-21.
+Last updated 2026-08-22.
 
 ---
 
@@ -2223,7 +2223,8 @@ to inspect, not permission to keep pressing Enter.
 This is a bounded recovery inside the coordinator's existing terminal surface.
 It adds no wrapper, polling loop, relay, background process or harness-specific
 adapter. The package moves to `0.10.0` because the portable workflow contract
-changes; installed `0.9.1` remains frozen until this plan closes.
+changes. Cache refresh and the first real post-release recurrence are the
+behavioural smoke and happen between plans.
 
 #### Alternatives considered
 
@@ -2266,6 +2267,20 @@ behavioural smoke.
 Replace the conditional human-readable TUI check only if Orca exposes a native
 `input_submitted` receipt or the one-Enter recovery itself causes a real duplicate
 submission. Until either trigger occurs, another mechanism would be speculative.
+
+**Post-release smoke.** After the plugin caches are refreshed, the first real
+coordinator dispatch that sits in the input box with no heartbeat for 90 seconds
+is the behavioural check: Control reads the TUI, sends Enter exactly once if
+the prompt is still pending, and the worker starts. A static fixture cannot make
+Orca leave a prompt unsubmitted, cannot prove an agent follows the rule, and
+cannot prove 90 seconds is universally optimal. The recurrence is the design
+evidence; that first post-release hit is the behavioural evidence. Results go
+to `docs/findings.md` by that later unit.
+
+**Whether a coordinator actually recovers an unsubmitted prompt.** Every check
+in this unit is static or fixture-driven and proves only that the skill document
+states the guard, the TUI read and the one-Enter limit. The behavioural check
+is the post-release smoke above.
 
 
 ---
