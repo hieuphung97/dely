@@ -89,6 +89,10 @@ bash tests/delivery-doctor-grok-hook.sh
 ```
 
 ```bash
+bash tests/journal-path-shape.sh
+```
+
+```bash
 bash tests/managed-block-contract.sh
 ```
 

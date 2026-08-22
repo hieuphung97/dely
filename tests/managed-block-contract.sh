@@ -4,7 +4,7 @@
 # has no CLAUDE.md importing AGENTS.md; the setup skill exists, states the
 # non-offerable-choice rule in its own section, and offers the
 # Claude Code import instead of refusing to write CLAUDE.md; both plugin
-# manifests share version 0.9.0. Does not require claude, codex, grok or orca.
+# manifests share version 0.9.1. Does not require claude, codex, grok or orca.
 set -u
 
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
@@ -393,8 +393,8 @@ if [ -z "$claude_ver" ] || [ -z "$codex_ver" ]; then
   fail "a plugin manifest is missing version"
 elif [ "$claude_ver" != "$codex_ver" ]; then
   fail "plugin manifest versions differ: claude=${claude_ver} codex=${codex_ver}"
-elif [ "$claude_ver" != "0.9.0" ]; then
-  fail "plugin manifest version is ${claude_ver}, expected 0.9.0"
+elif [ "$claude_ver" != "0.9.1" ]; then
+  fail "plugin manifest version is ${claude_ver}, expected 0.9.1"
 fi
 
 # --- doctor fixtures --------------------------------------------------------

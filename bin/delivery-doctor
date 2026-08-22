@@ -335,8 +335,10 @@ fi
 
 journal_dir="${DELIVERY_JOURNAL_DIR:-$HOME/.delivery-journal}"
 if [ -d "$journal_dir" ]; then
-  count=$(find "$journal_dir" -maxdepth 1 -name '*.raw.jsonl' -type f 2>/dev/null | wc -l | tr -d '[:space:]')
-  ok "journal directory exists, ${count} session file(s)"
+  current=$(find "$journal_dir" -mindepth 1 -maxdepth 1 -type d ! -name unparsed 2>/dev/null | wc -l | tr -d '[:space:]')
+  legacy=$(find "$journal_dir" -maxdepth 1 -name '*.raw.jsonl' -type f 2>/dev/null | wc -l | tr -d '[:space:]')
+  count=$(( ${current:-0} + ${legacy:-0} ))
+  ok "journal directory exists, ${count} session(s)"
   if [ "${count:-0}" -eq 0 ]; then
     warn "no sessions recorded yet — run one turn with --plugin-dir to confirm capture"
   fi
