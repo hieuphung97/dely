@@ -2548,3 +2548,67 @@ created itself returns `state: retained, reason: external_terminal`. Orca closes
 only terminals it opened through `worker-start`, so a custom-argv worker — which is
 the only way to pin a model on Grok, per §23 — must be cleaned up by whoever made
 it.
+
+---
+
+## 34. The `0.9.0` post-release smoke, and Codex trust is content-keyed
+
+Recorded 2026-08-22 after `0.9.0` merged as `5131332` and all three copies were
+refreshed. Deferred by the `setup-offers-claude-import` decision because no static
+check reaches it.
+
+**Setup, reproducible.** A scratch git repository holding a well-formed managed
+block with four phases pinned to Claude Code, and no `CLAUDE.md`. All three
+installed copies at `0.9.0`; Grok adapter regenerated from the derived root;
+`delivery-doctor` green on this repository.
+
+### Step 1 — the doctor's warn
+
+| Fixture | Result |
+| --- | --- |
+| no `CLAUDE.md` | `warn  CLAUDE.md does not import AGENTS.md — Claude Code will not read the managed block` |
+| `CLAUDE.md` containing `@AGENTS.md` | warn absent |
+| `CLAUDE.md` of unrelated prose, no import | warn still fires |
+
+The third row is the discriminating one: the check is about the import, not the
+file.
+
+### Step 2 — interactive: the offer is a question, and declining leaves nothing
+
+A fresh interactive Claude Code session took the quick path, rewrote the block to
+`Claude Code` / `default` / `default` for all four phases, then asked:
+
+```
+Create a one-line CLAUDE.md with @AGENTS.md so Claude Code picks up the Dely block?
+  1. Yes, create it     2. No, skip
+```
+
+Declined. Transcript recorded `→ No, skip`; `CLAUDE.md` absent afterwards;
+`git status` showed `AGENTS.md` modified and nothing created.
+
+### Step 3 — non-interactive: nothing written, both skipped offers reported
+
+A fresh headless session, told no one could answer, created nothing — `git status`
+empty, `CLAUDE.md` never present — and reported **both** choices it could not
+offer: the coordinator, with Orca installed and not selected, and the `CLAUDE.md`
+import.
+
+One run exercising both instances is what moving the rule out of `## Coordinator`
+was for, and it answers the `0.8.0` deferred smoke at the same time.
+
+### Codex trust is content-keyed, so "re-trust after every update" is too strong
+
+`hooks.json`, `post-tool-journal.sh` and `session-start-context.sh` are
+byte-identical from `0.6.0` to `0.9.0` — three bumps that never touched a hook — so
+the trusted hashes still matched and no re-trust was needed. Confirmed
+behaviourally rather than from config: a fresh `codex exec` fired `SessionStart`,
+received the identifiers block, and journaled its command verbatim.
+
+Re-trust is needed after an update **that changes a hook file**. One `diff` between
+the old and new installed copies answers it.
+
+### Not observed
+
+Whether a consumer other than this project reads the offer as clear. The
+interactive path was driven by the Control Session acting as the human through a
+coordinator terminal — a faithful test of the mechanism, not of a first encounter.
