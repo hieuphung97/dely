@@ -103,10 +103,11 @@ git grep -Ei 'pace.?id' -- . ':!docs/_plans' && exit 1 || true
 git grep -E '(^|[^A-Za-z0-9])[A-Z][0-9]+[a-z]?([^A-Za-z0-9]|$)' -- . ':!docs/_plans' && exit 1 || true
 ```
 
-The first three gates prove repository shape and syntax only. A Planned change to
-runtime behaviour must also name a focused instrument that distinguishes the
-changed behaviour from its failure mode. The absence commands distinguish a
-deleted rail from documentation that merely says it is deleted.
+The first three gates prove repository shape and syntax only. A Bounded or
+Architectural change to runtime behaviour must also name a focused instrument
+that distinguishes the changed behaviour from its failure mode. The absence
+commands distinguish a deleted rail from documentation that merely says it is
+deleted.
 
 The disclosure grep is lexical. It catches named consumer identifiers; it does
 not catch a quoted consumer path, a branch name, or a session id. A green result

@@ -11,6 +11,7 @@ set -u
 
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 skill="$root/skills/delivery/SKILL.md"
+agents="$root/AGENTS.md"
 
 failures=0
 fail() {
@@ -179,6 +180,103 @@ check_remediation() {
   return $tmp
 }
 
+# --- reviewer role disposition, separate from Control routing -----------------
+
+# Extracts the active `## Review` section (through the `### Remediation`
+# subsection) and stops at the next `## ` heading. Scoped so this checker
+# cannot be satisfied by implementation stop statuses or Control routing text
+# that legitimately lives elsewhere (e.g. the Remediation/Failure tables).
+review_section() {
+  awk '/^## Review$/ { p = 1 } p && /^## / && !/^## Review$/ { exit } p { print }' "$1"
+}
+
+check_reviewer_disposition() {
+  local file=$1
+  local section
+  local flat
+  local return_line
+  local tmp=0
+
+  if [ ! -f "$file" ]; then
+    diag "missing skill: $file"
+    return 1
+  fi
+
+  section=$(review_section "$file")
+  if [ -z "$section" ]; then
+    diag "$file has no active Review section"
+    return 1
+  fi
+  flat=$(printf '%s\n' "$section" | tr '\n' ' ')
+
+  return_line=$(printf '%s' "$flat" | grep -Eio 'Return exactly one( role)? disposition:[^.]*\.')
+  if [ -z "$return_line" ]; then
+    diag "active Review section has no reviewer disposition return sentence"
+    return 1
+  fi
+
+  if ! printf '%s\n' "$return_line" | grep -F 'ACCEPT' >/dev/null; then
+    diag "reviewer disposition sentence omits ACCEPT"
+    tmp=1
+  fi
+  if ! printf '%s\n' "$return_line" | grep -F 'CHANGES_REQUESTED' >/dev/null; then
+    diag "reviewer disposition sentence omits CHANGES_REQUESTED"
+    tmp=1
+  fi
+  if ! printf '%s\n' "$return_line" | grep -F 'BLOCKED' >/dev/null; then
+    diag "reviewer disposition sentence omits BLOCKED"
+    tmp=1
+  fi
+  if printf '%s\n' "$return_line" | grep -F 'REMEDIATE_ONCE' >/dev/null; then
+    diag "reviewer disposition sentence tells the reviewer to return REMEDIATE_ONCE, a Control routing decision"
+    tmp=1
+  fi
+  if printf '%s\n' "$return_line" | grep -F 'REPLAN_OR_SPLIT' >/dev/null; then
+    diag "reviewer disposition sentence tells the reviewer to return REPLAN_OR_SPLIT, a Control routing decision"
+    tmp=1
+  fi
+
+  return $tmp
+}
+
+# --- active repository taxonomy (Bounded/Architectural, not Planned) ----------
+
+# Extracts the paragraph naming the focused-instrument closure rule. Blank
+# lines delimit paragraphs, so this survives normal prose wrapping.
+closure_paragraph() {
+  awk -v RS='' '/focused instrument/ { print; exit }' "$1"
+}
+
+check_active_taxonomy() {
+  local file=$1
+  local para
+  local flat
+  local tmp=0
+
+  if [ ! -f "$file" ]; then
+    diag "missing project instructions: $file"
+    return 1
+  fi
+
+  para=$(closure_paragraph "$file")
+  if [ -z "$para" ]; then
+    diag "$file has no active focused-instrument closure paragraph"
+    return 1
+  fi
+  flat=$(printf '%s\n' "$para" | tr '\n' ' ')
+
+  if printf '%s' "$flat" | grep -Eq '(^|[^A-Za-z])A Planned change'; then
+    diag "active focused-instrument rule is attached to nonexistent Planned work, not Bounded or Architectural"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -F 'Bounded or Architectural' >/dev/null; then
+    diag "active focused-instrument rule does not apply to Bounded or Architectural work"
+    tmp=1
+  fi
+
+  return $tmp
+}
+
 # --- native (non-journal) evidence --------------------------------------------
 
 check_native_evidence() {
@@ -297,6 +395,7 @@ run_all_checks() {
   check_frontmatter_routing "$file" || tmp=1
   check_orca_mandatory "$file" || tmp=1
   check_freshness_review "$file" || tmp=1
+  check_reviewer_disposition "$file" || tmp=1
   check_remediation "$file" || tmp=1
   check_native_evidence "$file" || tmp=1
   check_release "$file" || tmp=1
@@ -313,6 +412,17 @@ else
     cat "$shipped_out" >&2
   fi
   rm -f "$shipped_out"
+fi
+
+if [ ! -f "$agents" ]; then
+  fail "AGENTS.md is absent"
+else
+  agents_out=$(mktemp "${TMPDIR:-/tmp}/delivery-contract-agents.XXXXXX")
+  if ! check_active_taxonomy "$agents" >"$agents_out" 2>&1; then
+    fail "active AGENTS.md closure paragraph failed the taxonomy check"
+    cat "$agents_out" >&2
+  fi
+  rm -f "$agents_out"
 fi
 
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/delivery-contract.XXXXXX")
@@ -370,6 +480,41 @@ if [ -f "$skill" ]; then
   expect_check_fail check_frontmatter_routing "$scratch/contradictory-frontmatter.md" \
     "complete-looking skill whose frontmatter forbids Bounded work" \
     "$scratch/out-contradictory-frontmatter"
+fi
+
+# Fixture 2c: a real degraded copy of the shipped skill — everything else
+# intact — with the active reviewer disposition sentence replaced by Control
+# routing values. This is the exact present-but-wrong shape a whole-file grep
+# for REPLAN_OR_SPLIT alone would miss, since that value also appears
+# legitimately in the Remediation/Failure text.
+if [ -f "$skill" ]; then
+  awk -v RS='' -v ORS='\n\n' '
+    /Return exactly one/ {
+      gsub(/\n/, " ")
+      gsub(/Return exactly one( role)? disposition: `ACCEPT`, `[A-Z_]+`, or `[A-Z_]+`\./, \
+        "Return exactly one role disposition: `ACCEPT`, `REMEDIATE_ONCE`, or `REPLAN_OR_SPLIT`.")
+    }
+    { print }
+  ' "$skill" >"$scratch/degraded-review-vocab.md"
+  expect_check_fail check_reviewer_disposition "$scratch/degraded-review-vocab.md" \
+    "reviewer disposition replaced by REMEDIATE_ONCE/REPLAN_OR_SPLIT Control routing values" \
+    "$scratch/out-degraded-review-vocab"
+fi
+
+# Fixture 2d: a real degraded copy of the active AGENTS.md — everything else
+# intact — with the focused-instrument closure subject forced back to the
+# nonexistent `Planned` shape.
+if [ -f "$agents" ]; then
+  awk -v RS='' -v ORS='\n\n' '
+    /focused instrument/ {
+      gsub(/\n/, " ")
+      gsub(/A (Planned|Bounded or Architectural) change to/, "A Planned change to")
+    }
+    { print }
+  ' "$agents" >"$scratch/degraded-agents-taxonomy.md"
+  expect_check_fail check_active_taxonomy "$scratch/degraded-agents-taxonomy.md" \
+    "active focused-instrument rule attached to nonexistent Planned work" \
+    "$scratch/out-degraded-agents-taxonomy"
 fi
 
 # Fixture 3: says Orca is preferred but keeps a headless fallback.

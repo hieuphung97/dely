@@ -2694,3 +2694,32 @@ This does not retire the underlying lesson from §2 and §3: identifiers and
 evidence still fail where they cross a boundary. What changed is which
 program is trusted to hold the boundary — Orca's dispatch record now, this
 package's own hooks before.
+
+## 37. Role disposition and Control routing are distinct, and the focused suite must inspect the active subject, not just token presence
+
+The final exact-HEAD review at `de85132e66ff0514e79c38ff5c589fe971c6a441` found
+two present-but-wrong shapes the shipped skill's own green contract check did
+not catch: the reviewer-disposition sentence returned `REMEDIATE_ONCE` and
+`REPLAN_OR_SPLIT` in place of the approved `ACCEPT` / `CHANGES_REQUESTED` /
+`BLOCKED` role vocabulary, and the active `AGENTS.md` closure paragraph still
+attached the focused-instrument rule to the retired `Planned` shape instead of
+`Bounded or Architectural`. The prior contract check only grepped for
+`REPLAN_OR_SPLIT`'s presence anywhere in the file — satisfied even though the
+token belonged to a reviewer-facing sentence rather than a Control-routing one
+— and never inspected the active `AGENTS.md` subject at all.
+
+The standing distinction: a reviewer returns exactly one role disposition —
+`ACCEPT`, `CHANGES_REQUESTED`, or `BLOCKED` — describing what it found.
+`REMEDIATE_ONCE` and `REPLAN_OR_SPLIT` are Control's routing decisions in
+response to that disposition, never a value a reviewer returns itself. A first
+in-contract `CHANGES_REQUESTED` routes to the single original-party
+remediation; a scoped re-review that still does not accept routes to
+`REPLAN_OR_SPLIT`. `BLOCKED` preserves the candidate and escalates the
+unresolved dependency or authority question to Control, separately from a
+failed worker process, which is not `BLOCKED`.
+
+`tests/delivery-contract.sh` now scopes a reviewer-disposition checker to the
+active `## Review` section's return sentence and a taxonomy checker to the
+active `AGENTS.md` focused-instrument paragraph, each with a real degraded
+fixture derived from the shipped file rather than a synthetic one, so a
+whole-file token search can no longer pass while the owning sentence is wrong.

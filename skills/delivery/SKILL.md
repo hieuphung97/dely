@@ -242,21 +242,24 @@ security risk. **Important** — missing required behaviour, test, or
 reconciliation. **Minor** — useful, does not block. **Out of scope** —
 recorded, not absorbed.
 
-Return exactly one disposition: `ACCEPT`, `REMEDIATE_ONCE`, or
-`REPLAN_OR_SPLIT`. A contradiction you cannot resolve is `REPLAN_OR_SPLIT`.
+Return exactly one role disposition: `ACCEPT`, `CHANGES_REQUESTED`, or
+`BLOCKED`. A contradiction you cannot resolve is `CHANGES_REQUESTED`.
 Do not open remediation over wording when deterministic checks already prove
 the contract.
 
 ### Remediation
 
-One pass. For an in-contract finding, the **original implementer** verifies
-it, fixes the root cause, reruns the affected instruments and closure gates,
-and writes a separate remediation commit. The **reviewer that raised the
-finding** checks its reproduction and the fix-only diff. If that scoped
-re-review does not accept, Control returns `REPLAN_OR_SPLIT` — it does not
-start another repair loop. A fresh replacement reviewer is used only when the
-original reviewer is unavailable or contested, and for the Architectural
-integration review.
+One pass. For an in-contract `CHANGES_REQUESTED` finding, the **original
+implementer** verifies it, fixes the root cause, reruns the affected
+instruments and closure gates, and writes a separate remediation commit —
+this is the single original-party remediation. The **reviewer that raised
+the finding** checks its reproduction and the fix-only diff. If that scoped
+re-review does not accept, Control routes to `REPLAN_OR_SPLIT` — it does not
+start another repair loop. `BLOCKED` preserves the candidate and escalates
+the unresolved dependency or authority question to Control separately from a
+failed worker process; it is not remediated by the original implementer. A
+fresh replacement reviewer is used only when the original reviewer is
+unavailable or contested, and for the Architectural integration review.
 
 ## Release
 
