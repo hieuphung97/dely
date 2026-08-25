@@ -370,36 +370,48 @@ check_design_boundary_core() {
   check_design_boundary_rejects "$file" || tmp=1
   flat=$(tr '\n' ' ' <"$file")
 
-  if ! printf '%s' "$flat" | grep -Ei 'design outcome and approval boundary' >/dev/null; then
+  if ! printf '%s' "$flat" | grep -Ei 'design.outcome and approval boundary' >/dev/null; then
     diag "does not say Dely owns the design outcome and approval boundary"
     tmp=1
   fi
-  if ! printf '%s' "$flat" | grep -Ei 'user, project, and harness' >/dev/null; then
+  if ! printf '%s' "$flat" | grep -Ei 'user,? project,? and harness|user/project/harness' >/dev/null; then
     diag "does not say the user, project, and harness determine active design skills and native modes"
     tmp=1
   fi
-  if ! printf '%s' "$flat" | grep -Ei 'question and plan surfaces' >/dev/null; then
+  if ! printf '%s' "$flat" | grep -Ei 'question and plan surfaces|question/plan/artifact/transition surfaces' >/dev/null; then
     diag "Plan Mode's question and plan surfaces are not named"
     tmp=1
   fi
-  if ! printf '%s' "$flat" | grep -Ei 'artifact representation' >/dev/null; then
+  if ! printf '%s' "$flat" | grep -Ei 'artifact representation|question/plan/artifact/transition surfaces' >/dev/null; then
     diag "Plan Mode's artifact representation is not named"
     tmp=1
   fi
-  if ! printf '%s' "$flat" | grep -Ei 'mode transitions' >/dev/null; then
+  if ! printf '%s' "$flat" | grep -Ei 'mode transitions|question/plan/artifact/transition surfaces' >/dev/null; then
     diag "Plan Mode's mode transitions are not named"
     tmp=1
   fi
-  if ! printf '%s' "$flat" | grep -Ei 'refine (exploration and )?(design )?methodology' >/dev/null; then
-    diag "compatible design skills are not said to refine methodology within Plan Mode's constraints"
+  if ! printf '%s' "$flat" | grep -Ei 'within (those|its) constraints|native constraints' >/dev/null; then
+    diag "compatible-skill refinement is not said to stay within Plan Mode's constraints"
     tmp=1
   fi
-  if ! printf '%s' "$flat" | grep -Ei 'instruction and tool precedence' >/dev/null; then
+  if ! printf '%s' "$flat" | grep -Ei 'refine (exploration and )?(design )?methodology|compatible-skill refinement' >/dev/null; then
+    diag "compatible design skills are not said to refine methodology"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -Ei 'instruction and tool precedence|under normal precedence' >/dev/null; then
     diag "does not defer overlap to normal harness instruction and tool precedence"
     tmp=1
   fi
-  if ! printf '%s' "$flat" | grep -Ei 'does not select, activate' >/dev/null; then
+  if ! printf '%s' "$flat" | grep -Ei 'does not select,? activate|no Dely selection' >/dev/null; then
     diag "does not say Dely does not select or activate either mechanism"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -Ei 'emulate,? or compose|no Dely selection or composition' >/dev/null; then
+    diag "does not say Dely neither emulates nor composes the mechanisms"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -Ei "(cannot|can not|neither|does not|no) [a-zA-Z' ]{0,25}bypass[a-zA-Z' ]{0,25}approval|no approval bypass|approval invariant remains authoritative" >/dev/null; then
+    diag "does not say neither mechanism can bypass approval"
     tmp=1
   fi
 
@@ -433,9 +445,10 @@ check_design_boundary() {
   return $tmp
 }
 
-# Runs a boundary checker (full = positive assertions + rejects; reject =
-# rejects only) against one extractor's output, so each owning surface is
-# checked on its own active section rather than the whole file. A regression
+# Runs a boundary checker (core = shared positive core + rejects; full = core
+# plus the skill/design-only strict clauses) against one extractor's output,
+# so each owning surface is checked on its own active section rather than the
+# whole file. A regression
 # in one owner must fail even when matching tokens survive elsewhere in that
 # same file (e.g. a historical comment, or another owner's paragraph).
 check_design_boundary_section() {
@@ -652,6 +665,17 @@ expect_check_fail() {
   fi
 }
 
+# Proves a decision-record mutation actually changed the extracted
+# `decision_section`, so a negative fixture's rejection cannot be mistaken
+# for a mutation that missed its target and left the live boundary intact.
+assert_decision_mutated() {
+  local mutated=$1
+  local why=$2
+  if diff -q <(decision_section "$decisions") <(decision_section "$mutated") >/dev/null 2>&1; then
+    fail "mutation for ${why} left the extracted decision_section unchanged (no-op)"
+  fi
+}
+
 # Fixture 1: a complete-looking flow where Plan Mode approval bypasses Dely's
 # invariant — present but wrong for the approval-invariant row.
 cat >"$scratch/bypass.md" <<'EOF'
@@ -772,11 +796,41 @@ fi
 
 # Fixture 2i: a real degraded copy of the active decisions.md — everything
 # else byte-identical — whose active Decision capability paragraph is
-# replaced entirely by neutral prose disclaiming any boundary, while the
-# same historical tokens survive elsewhere in the file, outside the extracted
-# `#### Decision` subsection. A reject-only check cannot tell this apart from
-# a correct decision: no forbidden phrase appears, so it must be caught by a
-# positive requirement instead.
+# replaced entirely by neutral prose disclaiming any boundary in BOTH live
+# formulations (the full capability paragraph and the compact scoped
+# re-review clarification), while the same historical tokens survive
+# elsewhere in the file, outside the extracted `#### Decision` subsection. A
+# reject-only check cannot tell this apart from a correct decision: no
+# forbidden phrase appears, so it must be caught by a positive requirement
+# instead. Neutralizing only the first paragraph would leave the compact
+# clarification's positive core live and must not be mistaken for true
+# absence.
+if [ -f "$decisions" ]; then
+  awk -v RS='' -v ORS='\n\n' '
+    /Dely owns only the design outcome and approval boundary/ {
+      gsub(/\n/, " ")
+      gsub(/Dely owns only the design outcome and approval boundary, task boundaries, role independence, bounded remediation, exception routing, and exact-HEAD closure\. The user, project, and harness determine which design skills and native modes are active\. Native Plan Mode governs its enforced action constraints, question and plan surfaces, artifact representation, and mode transitions; compatible active design skills may refine methodology within those constraints\. Normal harness instruction and tool precedence governs when more than one applies\. Dely does not select, activate, emulate, or compose them, and neither can bypass approval\./, \
+        "The design-method capability boundary is intentionally unspecified here; another artifact owns it.")
+    }
+    /Clarified after the scoped design-boundary re-review/ {
+      gsub(/\n/, " ")
+      gsub(/The shorter durable decision need not duplicate every skill\/design sentence: its positive core is Dely.s design-outcome and approval boundary, user\/project\/harness selection, Plan Mode.s native constraints and question\/plan\/artifact\/transition surfaces, compatible-skill refinement under normal precedence, no Dely selection or composition, and no approval bypass\./, \
+        "The shorter durable decision leaves the design-method capability boundary intentionally unspecified here too; another artifact owns it.")
+    }
+    { print }
+  ' "$decisions" >"$scratch/neutral-decision-boundary.md"
+  assert_decision_mutated "$scratch/neutral-decision-boundary.md" \
+    "true-absence neutral fixture"
+  expect_check_fail check_decision_section_core "$scratch/neutral-decision-boundary.md" \
+    "active durable Decision capability paragraph replaced by neutral unspecified-boundary prose in both live formulations while historical tokens survive elsewhere in the file" \
+    "$scratch/out-neutral-decision-boundary"
+fi
+
+# Fixture 2j: a real degraded copy of the active decisions.md with only the
+# full capability paragraph removed — the compact scoped re-review
+# clarification survives byte-identical. This is the current-prose variant
+# the positive core must accept: the shorter clarification alone already
+# states the minimum live boundary, so this owner must PASS.
 if [ -f "$decisions" ]; then
   awk -v RS='' -v ORS='\n\n' '
     /Dely owns only the design outcome and approval boundary/ {
@@ -785,10 +839,84 @@ if [ -f "$decisions" ]; then
         "The design-method capability boundary is intentionally unspecified here; another artifact owns it.")
     }
     { print }
-  ' "$decisions" >"$scratch/neutral-decision-boundary.md"
-  expect_check_fail check_decision_section_core "$scratch/neutral-decision-boundary.md" \
-    "active durable Decision capability paragraph replaced by neutral unspecified-boundary prose while historical tokens survive elsewhere in the file" \
-    "$scratch/out-neutral-decision-boundary"
+  ' "$decisions" >"$scratch/clarification-only-decision.md"
+  assert_decision_mutated "$scratch/clarification-only-decision.md" \
+    "clarification-only positive owner"
+  if ! check_decision_section_core "$scratch/clarification-only-decision.md" \
+      >"$scratch/out-clarification-only-decision" 2>&1; then
+    fail "clarification-only decision (compact positive core alone, full paragraph removed) should pass but did not"
+    cat "$scratch/out-clarification-only-decision" >&2
+  fi
+fi
+
+# Fixture 2k: the Plan-Mode-constraints coupling removed from BOTH live
+# formulations — "within those constraints" from the full paragraph and
+# "native constraints" from the compact clarification — while every other
+# claim, including select/activate and refinement, survives untouched. The
+# direct owner checker, not a later self-fixture no-op, must name this.
+if [ -f "$decisions" ]; then
+  awk -v RS='' -v ORS='\n\n' '
+    /Dely owns only the design outcome and approval boundary/ {
+      gsub(/\n/, " ")
+      gsub(/within those constraints/, "without any stated constraint")
+    }
+    /Clarified after the scoped design-boundary re-review/ {
+      gsub(/\n/, " ")
+      gsub(/Plan Mode.s native constraints and/, "Plan Mode.s")
+    }
+    { print }
+  ' "$decisions" >"$scratch/constraints-removed-decision.md"
+  assert_decision_mutated "$scratch/constraints-removed-decision.md" \
+    "constraints removed from both formulations"
+  expect_check_fail check_decision_section_core "$scratch/constraints-removed-decision.md" \
+    "Plan-Mode-constraints coupling removed from both the full paragraph and the compact clarification" \
+    "$scratch/out-constraints-removed-decision"
+fi
+
+# Fixture 2l: the emulation/composition claim removed from BOTH live
+# formulations — "emulate, or compose" from the full paragraph, "composition"
+# from the compact clarification — while the no-select/no-activate claim
+# survives untouched in each.
+if [ -f "$decisions" ]; then
+  awk -v RS='' -v ORS='\n\n' '
+    /Dely owns only the design outcome and approval boundary/ {
+      gsub(/\n/, " ")
+      gsub(/select, activate, emulate, or compose them/, "select, activate them")
+    }
+    /Clarified after the scoped design-boundary re-review/ {
+      gsub(/\n/, " ")
+      gsub(/no Dely selection or composition/, "no Dely selection")
+    }
+    { print }
+  ' "$decisions" >"$scratch/emulate-compose-removed-decision.md"
+  assert_decision_mutated "$scratch/emulate-compose-removed-decision.md" \
+    "emulation/composition removed from both formulations"
+  expect_check_fail check_decision_section_core "$scratch/emulate-compose-removed-decision.md" \
+    "no-emulation/no-composition claim removed from both the full paragraph and the compact clarification" \
+    "$scratch/out-emulate-compose-removed-decision"
+fi
+
+# Fixture 2m: the approval-bypass protection removed from BOTH live
+# formulations — "neither can bypass approval" from the full paragraph, "no
+# approval bypass" from the compact clarification — while every other claim
+# survives untouched in each.
+if [ -f "$decisions" ]; then
+  awk -v RS='' -v ORS='\n\n' '
+    /Dely owns only the design outcome and approval boundary/ {
+      gsub(/\n/, " ")
+      gsub(/, and neither can bypass approval/, ", and approval handling is unspecified")
+    }
+    /Clarified after the scoped design-boundary re-review/ {
+      gsub(/\n/, " ")
+      gsub(/, and no approval bypass\./, ", with approval handling unspecified.")
+    }
+    { print }
+  ' "$decisions" >"$scratch/approval-bypass-removed-decision.md"
+  assert_decision_mutated "$scratch/approval-bypass-removed-decision.md" \
+    "approval-bypass protection removed from both formulations"
+  expect_check_fail check_decision_section_core "$scratch/approval-bypass-removed-decision.md" \
+    "no-approval-bypass claim removed from both the full paragraph and the compact clarification" \
+    "$scratch/out-approval-bypass-removed-decision"
 fi
 
 # Fixture 2g: a real degraded copy of the approved design — everything else

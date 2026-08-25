@@ -2783,15 +2783,40 @@ present to reject. The fix is `check_design_boundary_core`, a shared positive
 core factored out of the prior skill/design checker and run against all three
 extracted sections: it requires the design-outcome/approval-boundary claim,
 the user/project/harness selection claim, Plan Mode's named surfaces
-(question/plan, artifact representation, mode transitions), refinement under
-normal instruction/tool precedence, and the no-select/no-activate claim, in
-addition to the existing rejects. `check_design_boundary` (full) layers two
-further clauses — the universal-interview-or-planning-method disclaimer and
-the material-scope-change requirement — that the shorter durable decision is
-not required to restate; the skill and approved design still run through the
-full checker. The load-bearing fixture is a real copy of the current
-`docs/decisions.md` with only its active capability paragraph replaced by the
-neutral prose above and every other paragraph, including its own historical
-tokens elsewhere in the file, left byte-identical — this is the fixture that
-must turn the focused script red under the reject-only path and green again
-once the decision path is routed through the positive core.
+(question/plan, artifact representation, mode transitions), that compatible-skill
+refinement stays within Plan Mode's constraints, refinement under normal
+instruction/tool precedence, the no-select/no-activate claim, that Dely neither
+emulates nor composes either mechanism, and that neither mechanism can bypass
+approval, in addition to the existing rejects. `check_design_boundary` (full)
+layers two further clauses — the universal-interview-or-planning-method
+disclaimer and the material-scope-change requirement — that the shorter
+durable decision is not required to restate; the skill and approved design
+still run through the full checker.
+
+A first version of this core checked only eight of these claims and matched
+just one prose form, so it rejected the durable decision's own compact
+"Clarified after the scoped design-boundary re-review" formulation of the same
+core — a false positive against a still-correct active owner — while three
+required claims (constraints-scoped refinement, no-emulation/composition, no
+approval bypass) went unchecked entirely against every owner. Each check now
+uses one small alternation covering the decision's two coexisting live
+formulations (the full capability paragraph and the compact clarification),
+plus, where the skill or approved design phrase the same claim differently in
+their own already-approved prose, that literal existing phrasing (for example
+the approved design's "approval invariant remains authoritative in every
+harness and mode" for the no-bypass claim). The neutral-decision fixture was
+also invalid in that first version: it replaced only the original capability
+paragraph and left the compact clarification's positive core live, so the
+"true absence" case it claimed to prove was actually the accepted
+current-prose-variant case. The load-bearing fixture is now a real copy of
+the current `docs/decisions.md` with the active capability paragraph replaced
+by neutral prose in *both* live formulations and every other paragraph,
+including its own historical tokens elsewhere in the file, left byte-identical
+— this is the fixture that must turn the focused script red under the
+reject-only path and green again once the decision path is routed through the
+complete positive core. Four further complete-copy fixtures prove the core is
+discriminating rather than merely present: the compact clarification alone
+(full paragraph removed) must pass, and removing the constraints-scoped
+refinement, no-emulation/composition, or no-approval-bypass claim from both
+live formulations must each fail the direct owner check for its own
+diagnostic.
