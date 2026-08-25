@@ -370,7 +370,7 @@ check_design_boundary_core() {
   check_design_boundary_rejects "$file" || tmp=1
   flat=$(tr '\n' ' ' <"$file")
 
-  if ! printf '%s' "$flat" | grep -Ei 'design.outcome and approval boundary' >/dev/null; then
+  if ! printf '%s' "$flat" | grep -Ei 'design[- ]outcome and approval boundary' >/dev/null; then
     diag "does not say Dely owns the design outcome and approval boundary"
     tmp=1
   fi
@@ -390,12 +390,8 @@ check_design_boundary_core() {
     diag "Plan Mode's mode transitions are not named"
     tmp=1
   fi
-  if ! printf '%s' "$flat" | grep -Ei 'within (those|its) constraints|native constraints' >/dev/null; then
-    diag "compatible-skill refinement is not said to stay within Plan Mode's constraints"
-    tmp=1
-  fi
-  if ! printf '%s' "$flat" | grep -Ei 'refine (exploration and )?(design )?methodology|compatible-skill refinement' >/dev/null; then
-    diag "compatible design skills are not said to refine methodology"
+  if ! printf '%s' "$flat" | grep -Ei 'refine (exploration and design )?methodology within (those|its) constraints|native constraints and question/plan/artifact/transition surfaces, compatible-skill refinement under normal precedence' >/dev/null; then
+    diag "compatible-skill refinement is not clause-bound to staying within Plan Mode's constraints"
     tmp=1
   fi
   if ! printf '%s' "$flat" | grep -Ei 'instruction and tool precedence|under normal precedence' >/dev/null; then
@@ -406,11 +402,11 @@ check_design_boundary_core() {
     diag "does not say Dely does not select or activate either mechanism"
     tmp=1
   fi
-  if ! printf '%s' "$flat" | grep -Ei 'emulate,? or compose|no Dely selection or composition' >/dev/null; then
+  if ! printf '%s' "$flat" | grep -Ei 'does not select,? activate,?( configure,?)? emulate,? or compose (either mechanism|them)|no Dely selection or composition' >/dev/null; then
     diag "does not say Dely neither emulates nor composes the mechanisms"
     tmp=1
   fi
-  if ! printf '%s' "$flat" | grep -Ei "(cannot|can not|neither|does not|no) [a-zA-Z' ]{0,25}bypass[a-zA-Z' ]{0,25}approval|no approval bypass|approval invariant remains authoritative" >/dev/null; then
+  if ! printf '%s' "$flat" | grep -Ei 'neither one owns or can bypass the approval invariant|approval invariant remains authoritative in every harness and mode|neither can bypass approval|no approval bypass' >/dev/null; then
     diag "does not say neither mechanism can bypass approval"
     tmp=1
   fi
@@ -917,6 +913,101 @@ if [ -f "$decisions" ]; then
   expect_check_fail check_decision_section_core "$scratch/approval-bypass-removed-decision.md" \
     "no-approval-bypass claim removed from both the full paragraph and the compact clarification" \
     "$scratch/out-approval-bypass-removed-decision"
+fi
+
+# Fixture 2n: compatible-skill refinement reversed to occur OUTSIDE Plan
+# Mode's constraints in BOTH live formulations, while every other claim
+# (select/activate, emulate/compose, approval bypass) survives untouched in
+# each. This is a reverse-semantic owner, not an absent-feature one: the
+# expected nouns ("constraints") are still present, only the relationship is
+# flipped. A prior remediation's disconnected keyword checks accepted this.
+if [ -f "$decisions" ]; then
+  awk -v RS='' -v ORS='\n\n' '
+    /Dely owns only the design outcome and approval boundary/ {
+      gsub(/\n/, " ")
+      gsub(/within those constraints/, "outside those constraints")
+    }
+    /Clarified after the scoped design-boundary re-review/ {
+      gsub(/\n/, " ")
+      gsub(/surfaces, compatible-skill refinement under normal precedence/, \
+        "surfaces, but compatible-skill refinement occurs outside those constraints, under normal precedence")
+    }
+    { print }
+  ' "$decisions" >"$scratch/constraints-reversed-decision.md"
+  assert_decision_mutated "$scratch/constraints-reversed-decision.md" \
+    "constraints coupling reversed in both formulations"
+  expect_check_fail check_decision_section_core "$scratch/constraints-reversed-decision.md" \
+    "compatible-skill refinement said to occur outside Plan Mode's constraints in both the full paragraph and the compact clarification" \
+    "$scratch/out-constraints-reversed-decision"
+fi
+
+# Fixture 2o: the no-emulation/no-composition claim reversed to permit
+# emulation and composition in BOTH live formulations, while the separate
+# no-select/no-activate claim and every other claim survive untouched in
+# each.
+if [ -f "$decisions" ]; then
+  awk -v RS='' -v ORS='\n\n' '
+    /Dely owns only the design outcome and approval boundary/ {
+      gsub(/\n/, " ")
+      gsub(/Dely does not select, activate, emulate, or compose them/, \
+        "Dely does not select, activate, or configure either mechanism, but Dely may emulate or compose them")
+    }
+    /Clarified after the scoped design-boundary re-review/ {
+      gsub(/\n/, " ")
+      gsub(/no Dely selection or composition/, "Dely composition is permitted")
+    }
+    { print }
+  ' "$decisions" >"$scratch/emulation-reversed-decision.md"
+  assert_decision_mutated "$scratch/emulation-reversed-decision.md" \
+    "emulation/composition permission reversed in both formulations"
+  expect_check_fail check_decision_section_core "$scratch/emulation-reversed-decision.md" \
+    "Dely said to permit emulation and composition in both the full paragraph and the compact clarification" \
+    "$scratch/out-emulation-reversed-decision"
+fi
+
+# Fixture 2p: the no-approval-bypass claim reversed to permit bypass in the
+# full formulation and left unspecified in the compact clarification, while
+# every other claim survives untouched in each.
+if [ -f "$decisions" ]; then
+  awk -v RS='' -v ORS='\n\n' '
+    /Dely owns only the design outcome and approval boundary/ {
+      gsub(/\n/, " ")
+      gsub(/, and neither can bypass approval\./, ", and neither rule prevents bypassing approval.")
+    }
+    /Clarified after the scoped design-boundary re-review/ {
+      gsub(/\n/, " ")
+      gsub(/, and no approval bypass\./, ", and approval bypass is unspecified.")
+    }
+    { print }
+  ' "$decisions" >"$scratch/bypass-reversed-decision.md"
+  assert_decision_mutated "$scratch/bypass-reversed-decision.md" \
+    "approval bypass permitted or left unspecified in both formulations"
+  expect_check_fail check_decision_section_core "$scratch/bypass-reversed-decision.md" \
+    "approval bypass said to be permitted in the full paragraph and left unspecified in the compact clarification" \
+    "$scratch/out-bypass-reversed-decision"
+fi
+
+# Fixture 2q: the design/outcome separator replaced by the meaningless token
+# `designXoutcome` in BOTH live formulations. A prior wildcard `.` between
+# "design" and "outcome" accepted any character here; the approved owners
+# use only a space or a hyphen.
+if [ -f "$decisions" ]; then
+  awk -v RS='' -v ORS='\n\n' '
+    /Dely owns only the design outcome and approval boundary/ {
+      gsub(/\n/, " ")
+      gsub(/design outcome and approval boundary/, "designXoutcome and approval boundary")
+    }
+    /Clarified after the scoped design-boundary re-review/ {
+      gsub(/\n/, " ")
+      gsub(/design-outcome and approval boundary/, "designXoutcome and approval boundary")
+    }
+    { print }
+  ' "$decisions" >"$scratch/wildcard-probe-decision.md"
+  assert_decision_mutated "$scratch/wildcard-probe-decision.md" \
+    "design/outcome separator replaced by X in both formulations"
+  expect_check_fail check_decision_section_core "$scratch/wildcard-probe-decision.md" \
+    "design outcome separator replaced by the meaningless token designXoutcome in both the full paragraph and the compact clarification" \
+    "$scratch/out-wildcard-probe-decision"
 fi
 
 # Fixture 2g: a real degraded copy of the approved design — everything else

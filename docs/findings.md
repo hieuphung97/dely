@@ -2784,10 +2784,16 @@ core factored out of the prior skill/design checker and run against all three
 extracted sections: it requires the design-outcome/approval-boundary claim,
 the user/project/harness selection claim, Plan Mode's named surfaces
 (question/plan, artifact representation, mode transitions), that compatible-skill
-refinement stays within Plan Mode's constraints, refinement under normal
-instruction/tool precedence, the no-select/no-activate claim, that Dely neither
-emulates nor composes either mechanism, and that neither mechanism can bypass
-approval, in addition to the existing rejects. `check_design_boundary` (full)
+refinement stays bound to Plan Mode's constraints by one clause-level
+alternative shared with the affirmative claim itself (not two independent
+keyword checks that a reversed relationship can each satisfy on its own),
+refinement under normal instruction/tool precedence, the no-select/no-activate
+claim, that Dely does not emulate or compose either mechanism by one
+clause-level alternative bound to the same no-select/no-activate prefix (not a
+bare "emulate ... or compose" token pair), and that neither mechanism can
+bypass approval by one of the four literal approved no-bypass sentences (not a
+broad negation-window pattern a differently-worded permissive sentence can
+still satisfy), in addition to the existing rejects. `check_design_boundary` (full)
 layers two further clauses — the universal-interview-or-planning-method
 disclaimer and the material-scope-change requirement — that the shorter
 durable decision is not required to restate; the skill and approved design
@@ -2820,3 +2826,46 @@ discriminating rather than merely present: the compact clarification alone
 refinement, no-emulation/composition, or no-approval-bypass claim from both
 live formulations must each fail the direct owner check for its own
 diagnostic.
+
+A same-reviewer re-review of that remediation
+(`b1fc0399a58d4d3940e7c3d0d598779ab2fac0f1`) found the eight-claims-pass
+result had not actually closed the gap: three of the required checks still
+matched disconnected tokens rather than the affirmative clause, so three
+complete-copy decision owners that flatly reversed the claimed relationship —
+compatible-skill refinement said to occur *outside* Plan Mode's constraints,
+Dely said to *permit* emulation and composition, and approval bypass said to
+be *permitted* or left unspecified, each with the expected nouns still present
+in both live formulations — all returned `owner_core_status=0`. A fourth,
+unrelated defect shared the same root cause: the design-outcome check used a
+wildcard `.` between "design" and "outcome", so replacing the separator with
+the meaningless token `designXoutcome` in both live formulations also passed.
+The fix binds each of these four checks to the exact approved clause-level
+alternatives rather than independent keyword presence: the constraints check
+now requires the literal "refine ... methodology within ... constraints"
+phrase or the compact clarification's literal "native constraints and
+question/plan/artifact/transition surfaces, compatible-skill refinement under
+normal precedence" phrase, as one alternation; the emulate/compose check now
+requires the full negative "does not select, activate, ... emulate, or
+compose (either mechanism|them)" phrase or the compact "no Dely selection or
+composition" phrase, not a bare "emulate ... or compose" substring; the
+approval-bypass check now requires one of the four exact approved sentences
+(the skill's "neither one owns or can bypass the approval invariant", the
+design's "approval invariant remains authoritative in every harness and
+mode", the full decision's "neither can bypass approval", or the compact
+clarification's "no approval bypass"), not a broad negation-window pattern; and
+the design-outcome check now requires a space or a hyphen, `design[- ]outcome`,
+not any character. Four further complete-copy fixtures — the same three
+reversed-relationship owners and the wildcard probe, reproduced beside
+fixtures 2i–2m — prove each diagnostic fires on the reversed or corrupted
+owner while the shipped skill, approved design, full decision, and
+compact-only decision all still pass.
+
+This is a clause-level guarantee, not a semantic one: the checker matches the
+four current approved owner formulations and the four named reverse-semantic
+counterexamples verbatim (modulo the one documented space/hyphen variant). It
+protects against a reversed relationship expressed in the owners' own existing
+words, not against an arbitrary future paraphrase that expresses the same
+reversal in different wording; a differently-worded correct owner would need
+its own literal alternative added to the same alternation, the same way the
+compact clarification's wording was added earlier. That limit is deliberate —
+the fix is four literal alternatives, not a parser or a synonym catalogue.
