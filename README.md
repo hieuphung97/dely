@@ -73,32 +73,40 @@ codex plugin marketplace add https://github.com/hieuphung97/dely.git
 codex plugin add dely@dely
 
 codex plugin list                  # verify it is installed
-codex plugin marketplace upgrade   # refresh the marketplace snapshot only
-codex plugin add dely@dely         # reinstall from the refreshed snapshot
+codex plugin marketplace upgrade   # update: see below
 codex plugin remove dely@dely      # uninstall
 ```
 
 `codex plugin marketplace add --ref <ref>` pins the marketplace to an
-explicit Git ref instead of the default branch. There is no
-`codex plugin update`: `codex plugin marketplace upgrade` only refreshes the
-marketplace's own Git snapshot, it does not by itself change an already
-installed plugin's cached copy. Re-run `codex plugin add` afterward to
-install from the refreshed snapshot. `codex plugin install` does not exist on
-the checked CLI (`codex plugin install --help` exits non-zero with
-"unrecognized subcommand 'install'"); do not use it.
+explicit Git ref instead of the default branch — use a tag such as
+`v0.13.0` (once that release is tagged) or an exact full commit SHA for an
+immutable pin; `main` is a mutable branch, not a pin. There is no
+`codex plugin update`: `codex plugin marketplace upgrade` is the actual
+update command. On the checked CLI, when the marketplace's Git root has
+advanced, that command refreshes both the marketplace snapshot and the
+already-installed plugin's cache, so a following `codex plugin add` is not
+required to pick up the change. This is a separate concern from the
+self-update boundary above: a delivery already running keeps the plugin
+version that was frozen at its start regardless of any refresh, and a
+refreshed cache is only picked up by the next session. `codex plugin
+install` does not exist on the checked CLI (`codex plugin install --help`
+exits non-zero with "unrecognized subcommand 'install'"); do not use it.
 
 ### Grok Build
 
 ```bash
 grok plugin install hieuphung97/dely
-# grok plugin install takes a source (git URL, GitHub shorthand, or local
-# path), not a marketplace selector. Append @ref (e.g. hieuphung97/dely@main)
-# to pin an explicit ref instead of tracking the default branch.
 
 grok plugin list                   # verify it is installed
 grok plugin update dely            # update
 grok plugin uninstall dely         # uninstall
 ```
+
+`grok plugin install` takes a source (git URL, GitHub shorthand, or local
+path), not a marketplace selector, and tracks the default branch unless you
+append `@ref`. For an immutable pin, use a tag such as
+`hieuphung97/dely@v0.13.0` (once that release is tagged) or an exact full
+commit SHA — a branch name such as `@main` is still mutable, not a pin.
 
 `grok plugin install` refuses a local directory without `--trust`. Whether a
 git-remote install prompts the same way is untested; if the prompt appears,
@@ -151,9 +159,10 @@ Four steps, and nothing more:
   You edited the source, not an installed copy. Bump the version and
   reinstall/update in the harness (see Cache refresh boundary above).
 - **Codex still behaves the same after `codex plugin marketplace upgrade`.**
-  That command only refreshes the marketplace's Git snapshot; it does not
-  change an already-installed plugin. Reinstall with `codex plugin add
-  dely@dely` afterward.
+  That command only refreshes the installed cache when the marketplace's Git
+  root has actually advanced — confirm the remote has new commits. A
+  delivery already running mid-session keeps the plugin version frozen at
+  its start regardless; only a new session picks up a refreshed cache.
 - **`AGENTS.md` pins don't seem to apply in Claude Code.** Confirm
   `CLAUDE.md` contains `@AGENTS.md`; Claude Code does not read `AGENTS.md`
   directly.
