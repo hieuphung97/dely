@@ -2462,7 +2462,13 @@ is the post-release smoke above.
 
 ---
 
-## Open
+## Superseded evidence-design answers (historical)
+
+These three answers are pre-0.11.0 evidence-design conclusions, superseded by
+the 2026-08-25 automation-first decision above, which removes the evidence
+journal, doctor, hook wiring, adapters, tests, and present-tense documentation
+without compatibility stubs. Retained here as evidence of what was answered
+and why, not as current product guidance.
 
 ### Answered 2026-08-20 — hooks under bypass, and the exit code
 
@@ -2522,6 +2528,8 @@ the repository died of having no reader, and committing it would add noise to
 every run and break the clean-tree assertion every handoff depends on. The
 third way is a journal with a *program* reader, and the reader is what makes it
 survive. Not yet written.
+
+## Open
 
 ### Does Grok discover project-level `.agents/skills/`
 
