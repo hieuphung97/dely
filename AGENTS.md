@@ -42,9 +42,9 @@ Coordinator: Orca
 
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
-| `control` | Claude Code | `opus` | `high` |
-| `implement` | Grok Build | `grok-4.6` | `medium` |
-| `review` | Grok Build | `grok-4.6` | `xhigh` |
+| `control` | Claude Code | `opus[1m]` | `high` |
+| `implement` | Claude Code | `sonnet` | `medium` |
+| `review` | Codex CLI | `gpt-5.6-sol` | `high` |
 | `release` | Grok Build | `grok-4.6` | `medium` |
 <!-- dely:end -->
 

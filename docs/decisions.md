@@ -3,11 +3,121 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-08-22.
+Last updated 2026-08-25.
 
 ---
 
 ## Settled
+
+### 2026-08-25 — Dely is an automation-first thin control protocol
+
+#### Context
+
+The existing four-worker workflow duplicates state and evidence already owned by
+Orca, Git, CI, and the forge. It also asks a user to resolve details that an active
+design method can resolve, keeps universal journal and doctor rails, configures a
+coordinator that has become mandatory, and dispatches an LLM for mechanical
+release work. The result is more ceremony and more failure surfaces than the
+product needs.
+
+The owner approved the replacement contract in
+`docs/_plans/2026-08-24-automation-first-dely-design.md`. Before removal of the
+universal evidence rails, one non-mutating Orca probe on each supported harness
+recovered the exact passing and failing marker commands, their output and
+outcomes from the intended dispatch after worker release. Claude Code, Codex CLI,
+and Grok Build all passed, so no harness-specific adapter is justified.
+
+#### Decision
+
+Dely accepts a request that may still be vague, establishes an explicitly
+approved design contract before candidate mutation, then automates sequential
+implementation, independent review, exact-HEAD gates, and pull-request
+preparation. The normal human gates are design approval and merge or publication.
+
+Dely owns only the approval invariant, task boundaries, role independence,
+bounded remediation, exception routing, and exact-HEAD closure. The active skill
+or native Plan Mode owns the design method and question UX; neither can bypass
+approval. Orca is the required execution plane. Git owns candidate state, Orca
+owns dispatch evidence, and CI plus the forge own release state. Dely does not
+duplicate any of those stores.
+
+Work has three shapes:
+
+- **Spike** investigates and recommends without starting a delivery run.
+- **Bounded** uses the smallest approved contract and one independent whole-change
+  review.
+- **Architectural** records a durable decision and task plan, gives independently
+  testable and reviewable tasks fresh implementers and task reviews, then uses a
+  different fresh integration reviewer.
+
+Implementation is sequential in the current checkout. Same-shaped mechanical
+work is batched. Reviewers are fresh by role, do not implement, and do not edit the
+candidate. One in-contract remediation returns to the original implementer and
+the reviewer that raised it; another non-accepting result is
+`REPLAN_OR_SPLIT`.
+
+`dely:setup` is optional deployment preference only. Its managed block has exactly
+`implement` and `review`; Orca, control, release, Plan Mode, and design-skill
+selection are not configurable fields. Values are discovered from the live
+harness surface, and defaults are preferences rather than reproducible pins.
+
+Release is performed by Control without an LLM worker. It binds local gates, the
+applicable final review, CI, and the draft pull request to one exact HEAD, and
+never merges or force-pushes. Repository-specific closure commands remain in
+`AGENTS.md`.
+
+The evidence journal, doctor, hook wiring, Grok adapter, their tests, and their
+present-tense documentation are removed without compatibility stubs. Dispatch
+commands, outputs, and outcomes are read from Orca; durable candidate and release
+facts are read from Git, CI, and the forge. `input_accepted` remains a transport
+receipt: after 90 seconds without progress, Control reads the TUI and sends Enter
+exactly once only if the prompt is still pending.
+
+#### Alternatives considered
+
+- Make Dely a Superpowers composition kernel. Rejected because it would own skill
+  selection and duplicate executors, worktrees, review routing, and branch
+  completion. Compatible Superpowers methods remain independently invocable.
+- Preserve optional coordinators, direct dispatch, or headless fallback. Rejected
+  because Orca is now a required capability and a fallback would be a second
+  execution architecture.
+- Keep journal and doctor as defense in depth. Rejected because all three native
+  probes passed and the rails duplicate Orca while adding hooks, adapters, parsers,
+  setup, and failure modes.
+- Always create a fresh implementer for every edit or every remediation. Rejected
+  because freshness follows an independently testable and reviewable task;
+  remediation benefits from the original implementer's local context.
+- Always run task review plus integration review. Rejected because Bounded work
+  needs only one whole-change review; duplicate review adds latency without a new
+  boundary.
+- Dispatch a release worker. Rejected because release is deterministic state
+  convergence and gains nothing from another LLM handoff.
+
+#### Consequences
+
+The migration is breaking and ships no dual parser, deprecated field, fallback,
+adapter, or compatibility binary. Projects with managed blocks must rewrite them
+to two rows. Orca must be available for delivery execution. A missing capability,
+evidence item, review disposition, gate, or release state cannot produce a
+completion claim.
+
+The skill becomes shorter and more portable, but Orca is a deliberate hard
+dependency. Static contract tests can reject present-but-wrong instruction shapes;
+they cannot prove that every model obeys prose. Candidate review and the first
+post-install delivery are the forward behavioral checks.
+
+#### Non-goals
+
+No parallel Dely workers, Dely-created worktrees, in-harness subagents, generic
+orchestrator interface, model catalogue, skill catalogue, task ledger, evidence
+schema, retry engine, automatic merge, or self-modifying instructions.
+
+#### Deferred
+
+A second orchestrator abstraction is deferred until a second implementation has
+completed a real Dely delivery. A harness-specific evidence adapter is deferred
+until a supported harness fails the native Orca evidence contract. Either trigger
+returns the design to the owner rather than activating dormant code.
 
 ### The problem is the identifier and evidence path, not model judgement
 
