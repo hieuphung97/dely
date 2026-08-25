@@ -9,6 +9,130 @@ Last updated 2026-08-25.
 
 ## Settled
 
+### 2026-08-25 — Dely ships a verifiable community-ready open-source surface
+
+#### Context
+
+Dely was publicly readable and its manifests and README named the MIT license,
+but the repository did not contain the license grant itself. GitHub therefore
+reported no detected license. The repository's community profile was 28%: it
+found the README but no contribution guide, code of conduct, issue template,
+pull-request template, or license file.
+
+The three documented plugin-install commands matched the installed Claude Code,
+Codex CLI, and Grok Build command surfaces, and both available plugin validators
+accepted the package. That proved package shape, not self-service onboarding.
+Orca was mandatory with no fallback, yet the README did not tell a new user how
+to obtain or preflight it, verify an installation, update or uninstall Dely, or
+recover from common failures.
+
+Repository contracts passed locally, but no CI workflow ran them for pull
+requests. The default branch had neither protection nor a ruleset, private
+vulnerability reporting was disabled, and every merged pull request so far came
+from the maintainer. `AGENTS.md` was precise guidance for coding agents, not a
+substitute for a human contribution path.
+
+#### Decision
+
+This decision amends the earlier lean-package decision only where that decision
+limited the shipped surface and fixed the package version. Its thin-protocol,
+state-ownership, testing, and maintenance-log decisions remain in force.
+
+Dely's next public package version is `0.13.0` in both versioned manifests. The
+repository carries the canonical MIT license text with copyright `2026 Hieu
+Phung`; a manifest label or a one-word README declaration is not the license
+artifact.
+
+The README owns the complete user path: supported prerequisites and environment,
+Orca installation and preflight, installation in each supported harness, one
+ordinary-use quickstart, post-install verification, update and uninstall
+commands, troubleshooting, and the versions against which those commands were
+checked. Guidance distinguishes tracking the default branch from an immutable
+release where the harness supports a ref.
+
+The repository carries the smallest GitHub-recognized community surface:
+
+- `CONTRIBUTING.md` explains issue-first public-contract work,
+  fork/branch/pull-request flow, English artifacts, repository gates, decision
+  ownership, version reconciliation, and review expectations. External
+  contributors do not need Dely or Orca; maintainers own this repository's
+  delivery protocol.
+- `CODE_OF_CONDUCT.md` adopts Contributor Covenant 2.1 and names
+  `contact@hieuphung97.com` for enforcement reports.
+- `SECURITY.md` supports the latest release, directs vulnerabilities to GitHub
+  private vulnerability reporting, names the same email as a fallback, and
+  forbids public vulnerability issues.
+- Structured bug and feature issue forms request reproducible, decision-useful
+  evidence. One pull-request template asks for scope, verification, contract and
+  documentation impact, without copying Dely's internal handoff format.
+
+One GitHub Actions workflow runs the repository closure gates on pull requests
+and the default branch. Its unique required job is `contracts`. The structural
+contract test checks the community artifacts and the CI entry point with one
+fixture that demonstrates an incorrect entry point is rejected; it does not grow
+back into an English prose interpreter.
+
+After the workflow has reported `contracts` successfully, the repository enables
+an active default-branch ruleset that requires a pull request, the `contracts`
+status check, and resolved conversations, and rejects deletion and
+non-fast-forward updates. It requires zero approving reviews so a solo
+maintainer is not locked out of their own pull request. Private vulnerability
+reporting is enabled at the same release boundary. Both settings are verified
+through GitHub's API because Git cannot own forge configuration.
+
+#### Alternatives considered
+
+- Put all community guidance in the README. Rejected because GitHub would not
+  surface contribution, conduct, security, issue, and pull-request guidance at
+  the interactions where contributors need it, and a README license label still
+  would not ship the canonical grant.
+- Add a complete governance, ownership, support, funding, roadmap, and changelog
+  suite. Rejected because one maintainer and GitHub Releases do not yet justify
+  those extra state owners.
+- Require one approving review immediately. Rejected because the sole maintainer
+  cannot approve their own pull request; CI plus an explicit pull-request path is
+  the enforceable boundary until another maintainer exists.
+- Leave repository checks local. Rejected because external contributors need the
+  same deterministic result without reproducing maintainer machine state.
+
+#### Consequences
+
+The installed plugin copy becomes slightly larger because license and community
+files travel with the repository. That cost is accepted: the files define the
+rights and collaboration contract of the package being copied.
+
+A new user gets one route from prerequisites to ordinary use, while an external
+contributor can submit a normal pull request without owning the Dely/Orca control
+plane. Pull requests receive the same structural check before merge. The solo
+maintainer retains the ability to merge an accepted, green pull request without a
+fictional second approver.
+
+Rulesets and private vulnerability reporting remain forge state rather than Git
+artifacts. Their API verification is therefore required release evidence. If the
+repository becomes private, GitHub plan limits and Actions billing must be
+re-evaluated before relying on the same deployment.
+
+Compatibility evidence does not modify live harness caches during a delivery.
+Where a harness does not expose a safe isolated profile, validation is limited to
+public remote access, manifest validation, and the verified command surface, and
+that limit is stated rather than described as a clean-install smoke.
+
+#### Non-goals
+
+No CLA or DCO, `CODEOWNERS`, mandatory reviewer, governance board, support forum,
+funding file, public roadmap, standalone changelog, documentation site,
+localization, paid GitHub feature, code-scanning rollout, or automated mutation
+of a user's harness configuration. The delivery and setup skill protocols do not
+change.
+
+#### Deferred
+
+Require an approving review when a second active maintainer can provide one.
+Add a dedicated support channel when support traffic outgrows issues. Add a
+governance or ownership document when decision authority extends beyond one
+maintainer. Automate clean-profile installation only when every supported harness
+offers a disposable configuration boundary that does not touch live caches.
+
 ### 2026-08-25 — Dely is a lean automation-first plugin with an opt-in machine-local maintenance log
 
 #### Context
