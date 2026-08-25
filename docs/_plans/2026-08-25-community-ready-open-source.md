@@ -2,7 +2,7 @@
 
 Decision record: `docs/decisions.md`
 
-**Baseline:**
+**Baseline:** `0a04ad5f0c59fef1261e987457f6d05261ed850a`
 
 ## Goal
 
