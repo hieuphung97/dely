@@ -56,6 +56,15 @@ candidate. One in-contract remediation returns to the original implementer and
 the reviewer that raised it; another non-accepting result is
 `REPLAN_OR_SPLIT`.
 
+**Clarified after the final exact-HEAD review.** Reviewer role dispositions
+remain `ACCEPT`, `CHANGES_REQUESTED`, and `BLOCKED`, as the approved design
+states. `REMEDIATE_ONCE` and `REPLAN_OR_SPLIT` are Control routing decisions,
+not values a reviewer returns: the first `CHANGES_REQUESTED` may route to the
+single original-party remediation, while a second non-accept routes to
+`REPLAN_OR_SPLIT`. `BLOCKED` preserves the candidate and returns the unresolved
+dependency or authority question to Control; it is also distinct from a worker
+process failure.
+
 `dely:setup` is optional deployment preference only. Its managed block has exactly
 `implement` and `review`; Orca, control, release, Plan Mode, and design-skill
 selection are not configurable fields. Values are discovered from the live
