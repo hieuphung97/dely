@@ -72,6 +72,49 @@ check_shapes() {
   return $tmp
 }
 
+# --- frontmatter discovery routing --------------------------------------------
+
+# Prints the YAML frontmatter's description value (single logical line; the
+# repository's frontmatter is not multi-line folded).
+frontmatter_description() {
+  awk '
+    NR == 1 && $0 == "---" { infm = 1; next }
+    infm && $0 == "---" { exit }
+    infm && /^description:[[:space:]]*/ {
+      sub(/^description:[[:space:]]*/, "")
+      print
+    }
+  ' "$1"
+}
+
+check_frontmatter_routing() {
+  local file=$1
+  local desc
+  local tmp=0
+
+  if [ ! -f "$file" ]; then
+    diag "missing skill: $file"
+    return 1
+  fi
+
+  desc=$(frontmatter_description "$file")
+  if [ -z "$desc" ]; then
+    diag "no frontmatter description found"
+    return 1
+  fi
+
+  if printf '%s\n' "$desc" | grep -Ei 'only for architectural|architectural.only|never use for bounded|not for bounded|forbid(s)? bounded' >/dev/null; then
+    diag "frontmatter restricts discovery to Architectural work or forbids Bounded work"
+    tmp=1
+  fi
+  if printf '%s\n' "$desc" | grep -Ei 'not for a one-line fix|excludes? .*one-line' >/dev/null; then
+    diag "frontmatter excludes small one-line Bounded fixes from discovery"
+    tmp=1
+  fi
+
+  return $tmp
+}
+
 # --- Orca mandatory, no headless fallback -------------------------------------
 
 check_orca_mandatory() {
@@ -251,6 +294,7 @@ run_all_checks() {
   local tmp=0
   check_approval_invariant "$file" || tmp=1
   check_shapes "$file" || tmp=1
+  check_frontmatter_routing "$file" || tmp=1
   check_orca_mandatory "$file" || tmp=1
   check_freshness_review "$file" || tmp=1
   check_remediation "$file" || tmp=1
@@ -315,6 +359,18 @@ EOF
 expect_check_fail check_shapes "$scratch/no-shapes.md" \
   "renamed workflow with no Spike/Bounded/Architectural routing" \
   "$scratch/out-no-shapes"
+
+# Fixture 2b: a complete-looking skill — full Spike/Bounded/Architectural body
+# intact — whose frontmatter description alone forbids discovery on Bounded
+# work. The body-only checks above cannot see this; only a frontmatter check
+# can.
+if [ -f "$skill" ]; then
+  sed 's/^description:.*/description: Deliver a change through design, implementation and review. Only for Architectural changes; never use for Bounded changes, even a one-line fix./' \
+    "$skill" >"$scratch/contradictory-frontmatter.md"
+  expect_check_fail check_frontmatter_routing "$scratch/contradictory-frontmatter.md" \
+    "complete-looking skill whose frontmatter forbids Bounded work" \
+    "$scratch/out-contradictory-frontmatter"
+fi
 
 # Fixture 3: says Orca is preferred but keeps a headless fallback.
 cat >"$scratch/headless.md" <<'EOF'

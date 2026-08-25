@@ -1,6 +1,6 @@
 ---
 name: delivery
-description: Deliver a change through an approved design contract, sequential implementation, independent review and exact-HEAD release. Use when a change needs a decision record, when a plan spans more than one behaviour, or when review must not be done by whoever implemented it. Not for a one-line fix with an obvious test.
+description: Deliver a change through an approved design contract, sequential implementation, independent review and exact-HEAD release. Use for any Bounded or Architectural change — including a small, one-line behavioral fix, which is the canonical Bounded case — so it gets design approval and independent review. Not for a Spike, which investigates and recommends without starting a delivery run.
 ---
 
 # Delivery
@@ -29,8 +29,12 @@ task boundaries, exception handling, dispatch supervision, and release. It
 does not implement or review the candidate.
 
 Control does not prescribe question count, order, format, or skill-selection
-precedence. The active design method — a design skill already active in the
-harness, or native Plan Mode — owns how to explore, ask, compare, and present.
+precedence. Design ownership is split: the active design skill already
+active in the harness owns how to explore, ask, compare, and present. Native
+Plan Mode independently owns tool gating and plan-approval UX. The two may be
+used together, and Dely selects, configures, emulates, or silently activates
+neither one.
+
 Neither one owns or can bypass the approval invariant: before candidate
 mutation, Control must obtain explicit human approval of a design contract.
 Plan Mode is defense in depth, not proof that requirements are clear or that
@@ -115,9 +119,9 @@ is no direct dispatch and no headless fallback of any kind.
 ### Launching a worker
 
 Write the prompt to a file. Never inline it in a shell argument: prompts carry
-backticks, quotes and newlines, and a shell argument mangles them. Load the
-selected coordinator's native skill and use it to launch a real interactive
-harness TUI for the phase, with the model and effort pinned from `AGENTS.md`.
+backticks, quotes and newlines, and a shell argument mangles them. Load
+Orca's native skill and use it to launch a real interactive harness TUI for
+the phase, with the model and effort pinned from `AGENTS.md`.
 A visible shell running a headless harness is not a TUI, and this skill has no
 compatibility matrix around one.
 
@@ -126,8 +130,8 @@ default is an unpinned environment: it lives in the harness's own config, it
 changes without announcing itself, and the dispatch that relies on it looks
 identical to one that pinned the same value deliberately.
 
-Keep waiting blocking. A worker is observed through the coordinator until it
-completes or its timeout fires. Do not add a relay, poll, or state machine to
+Keep waiting blocking. A worker is observed through Orca until it completes
+or its timeout fires. Do not add a relay, poll, or state machine to
 manufacture completion.
 
 **`input_accepted` is not submission.** It is a transport receipt, not proof
@@ -158,10 +162,10 @@ scope. This is an exception, not a phase or mandatory round trip.
 Stop and ask the human when: a result maps to no route or more than one; the
 worker **failed** rather than returned a stop status — a non-zero exit with no
 result, an exhausted quota, an authentication error — which is not `BLOCKED`
-and must not be treated as one; the selected coordinator is unavailable; an
-action needs authority policy reserves to the human; or the same worker fails
-twice on the same input. Say what you know, what you tried, and what the
-options are. Do not pick one.
+and must not be treated as one; Orca is unavailable or a required capability
+is absent; an action needs authority policy reserves to the human; or the
+same worker fails twice on the same input. Say what you know, what you tried,
+and what the options are. Do not pick one.
 
 ## Implementation
 

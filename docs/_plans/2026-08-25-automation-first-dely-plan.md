@@ -110,10 +110,15 @@ that still looks implemented but is rejected.
 `tests/plan-template-shape.sh`; delete the replaced dispatch test only after the
 new test exists.
 
-**Focused verification.** Before skill mutation, run each test directly and
-record its non-zero result for the intended old-contract reason. A syntax error,
-missing fixture dependency, or failure caused only by a renamed heading is not a
-valid RED observation.
+**Focused verification.** Before skill mutation, run `tests/delivery-contract.sh`
+and `tests/managed-block-contract.sh` directly against the pre-migration skills
+and record their non-zero result for the intended old-contract reason. A syntax
+error, missing fixture dependency, or failure caused only by a renamed heading is
+not a valid RED observation. `tests/plan-template-shape.sh` carries no new
+automation-first-specific requirement in this task — the template does not change
+here — so it is truthfully observed green (`0`) at this point; it gains a real
+counterexample, and is observed RED for it, only once task 2 adds the
+execution-envelope requirement to the template.
 
 **Document impact.** None yet; these are the discriminating instruments for the
 next tasks.
@@ -137,11 +142,22 @@ emulate their executor, subagents, worktrees, review, or branch completion.
 `skills/delivery/templates/decision-record.md`,
 `skills/delivery/templates/plan.md`, `AGENTS.md`.
 
-**Focused verification.** Run the three RED tests after each owning skill is
-rewritten; they must turn green without weakening their negative fixtures. Run
-the bundled Codex skill validator on both skill directories if it accepts this
-plugin layout; otherwise record the validator's exact incompatibility and verify
-frontmatter directly.
+**Focused verification.** Run `tests/delivery-contract.sh` and
+`tests/managed-block-contract.sh` after each owning skill is rewritten; they must
+turn green without weakening their negative fixtures. `templates/plan.md` gains
+an execution-envelope section here (protected dirty paths, branch/base/remote/PR
+target, resolved phase pins, mutation/release authority); `tests/plan-template-shape.sh`
+must be strengthened to require it and observed RED against the template as it
+stood before this task's fix, then green after. Run the bundled Codex skill
+validator on both skill directories if it accepts this plugin layout; otherwise
+record the validator's exact incompatibility and verify frontmatter directly.
+Observed both implementation and remediation: `python3 -c "import yaml"` raises
+`ModuleNotFoundError: No module named 'yaml'` in this environment, so the
+Codex validator cannot start; no dependency was added to work around it.
+`claude --plugin-dir . plugin details dely` was used instead — it accepted the
+plugin layout, reported both skills with 0 hooks, and confirmed manifest
+version `0.11.0` — and both skill frontmatters were checked directly (name
+syntax/length, description syntax/length, allowed keys).
 
 **Document impact.** `AGENTS.md` must describe the new source of truth, two-row
 managed block, frozen self-update boundary, native Orca TUI requirement, and the
@@ -205,15 +221,15 @@ ledger or retain test history in the decision record.
 
 | Requirement | Instrument | Counterexample | Observed red |
 | --- | --- | --- | --- |
-| Candidate mutation requires an approved design contract; active design skills and Plan Mode do not own or bypass that invariant | `bash tests/delivery-contract.sh` | A complete-looking flow lets Plan Mode approval or a brainstorming result start edits without explicit contract approval | Fill during implementation |
-| Spike, Bounded, and Architectural work have different artifact and review depth | `bash tests/delivery-contract.sh` and `bash tests/plan-template-shape.sh` | A renamed four-phase workflow sends every request through the same decision, plan, task review, and integration review | Fill during implementation |
-| Orca is mandatory, preflighted, and has no direct or headless fallback; submission recovery reads the TUI before one Enter | `bash tests/delivery-contract.sh` | The skill says Orca is preferred but retains a headless fallback, or sends Enter immediately or repeatedly | Fill during implementation |
-| Setup manages only discovered implement/review preferences and treats defaults as preferences | `bash tests/managed-block-contract.sh` | A well-formed block still contains Coordinator, control, or release, or presents a bundled model catalogue | Fill during implementation |
-| Freshness follows independently testable/reviewable tasks; review is adaptive and independent | `bash tests/delivery-contract.sh` | Every file gets a fresh implementer, Bounded work gets duplicate review, or a reviewer is allowed to edit | Fill during implementation |
-| One remediation returns to the original implementer and original reviewer, then stops at `REPLAN_OR_SPLIT` | `bash tests/delivery-contract.sh` | Remediation starts a fresh implementer or reviewer, or loops until green | Fill during implementation |
-| Native Orca evidence replaces universal rails on all three supported harnesses | probe record in `docs/harness-surface.md`; absence check in closure gates | Documentation claims native evidence while any journal binary, doctor, hook wiring, Grok adapter, or compatibility stub still ships | Claude Code, Codex CLI, and Grok Build probes passed before planning; fill repository RED during implementation |
-| Release binds gates, final review, CI, and draft PR to exact HEAD without an LLM release worker or merge | `bash tests/delivery-contract.sh` | A release worker may edit after review, or completion can be claimed with one missing state or a changed HEAD | Fill during implementation |
-| Protected dirty paths and commit ownership remain explicit | review of `git diff --name-status <baseline>...HEAD` plus `git status --short` | The candidate stages a path outside Allowed scope or silently overwrites a protected baseline change | Fill during implementation |
+| Candidate mutation requires an approved design contract; active design skills and Plan Mode do not own or bypass that invariant | `bash tests/delivery-contract.sh` | A complete-looking flow lets Plan Mode approval or a brainstorming result start edits without explicit contract approval | Task 1: run against the pre-migration `skills/delivery/SKILL.md` (commit `1339715`), `check_approval_invariant` failed with "no explicit approval invariant before candidate mutation" and "does not name Plan Mode as unable to bypass approval" — the old skill named phases but never an approval gate or Plan Mode at all. Remediation added a dedicated `check_frontmatter_routing`/bypass fixture (a Plan Mode text that "can bypass" Dely's own approval) and confirmed it is rejected. |
+| Spike, Bounded, and Architectural work have different artifact and review depth | `bash tests/delivery-contract.sh` and `bash tests/plan-template-shape.sh` | A renamed four-phase workflow sends every request through the same decision, plan, task review, and integration review | Task 1: against the pre-migration skill, `check_shapes` failed — no Spike, Bounded, or Architectural word at all, only Routine/Planned/Critical. The bundled negative fixture (a renamed `design -> implement -> review -> release` flow with one review depth for everything) is rejected by the shipped check. |
+| Orca is mandatory, preflighted, and has no direct or headless fallback; submission recovery reads the TUI before one Enter | `bash tests/delivery-contract.sh` | The skill says Orca is preferred but retains a headless fallback, or sends Enter immediately or repeatedly | Task 1: against the pre-migration skill, `check_orca_mandatory` failed with "still permits a headless fallback" — the old skill's own text read "A direct headless harness call is a fallback only when no coordinator is selected." The bundled fixture reproducing that exact sentence is rejected by the shipped check, and the repeated-Enter fixture is rejected by `check_launch_wait`. |
+| Setup manages only discovered implement/review preferences and treats defaults as preferences | `bash tests/managed-block-contract.sh` | A well-formed block still contains Coordinator, control, or release, or presents a bundled model catalogue | Task 1: against the pre-migration setup skill, `check_two_rows` and `check_no_coordinator_control_release_fields` both failed — the old template carried `control`, `release`, and a `Coordinator:` line, and stated none of the new preference language. Remediation's `check_table_shape` was additionally proven to catch what the original two checks missed: replaying the reviewer's counterexample (an `implement` row with empty Harness/Model/Effort cells, plus an extra `investigate` phase row) through the pre-remediation `check_two_rows` passes it — reproduced directly by sourcing that commit's function and running it against the fixture — while the strengthened `check_table_shape` rejects it. |
+| Freshness follows independently testable/reviewable tasks; review is adaptive and independent | `bash tests/delivery-contract.sh` | Every file gets a fresh implementer, Bounded work gets duplicate review, or a reviewer is allowed to edit | Task 1: against the pre-migration skill, `check_freshness_review` failed — no "fresh implementer," "batched," or "adaptive" language; review was a fixed four-phase sequence. The bundled fixture (fresh implementer per file, fixed task-plus-integration review for all shapes) is rejected. |
+| One remediation returns to the original implementer and original reviewer, then stops at `REPLAN_OR_SPLIT` | `bash tests/delivery-contract.sh` | Remediation starts a fresh implementer or reviewer, or loops until green | Task 1: against the pre-migration skill, `check_remediation` failed with "remediation still routes to a fresh implementation session instead of the original implementer" — the old skill's routing table sent `REMEDIATE_ONCE` to "a fresh implementation session," a present-but-wrong implementation this row exists to catch. The bundled fixture reproducing that loop is rejected by the shipped check. |
+| Native Orca evidence replaces universal rails on all three supported harnesses | probe record in `docs/harness-surface.md`; absence check in closure gates | Documentation claims native evidence while any journal binary, doctor, hook wiring, Grok adapter, or compatibility stub still ships | Orca Run `run_51da9fff2301`: Claude Code (`task_ca819e990524`), Codex CLI (`task_5e925cc48391`), and Grok Build (`task_7604a1cf6b98`) each ran a passing and a failing marker command; all three pass markers exited 0 with their marker visible, all three fail markers exited 23 with their marker still visible, and the dispatch transcript was readable after release for all three (Grok's low-level release call returned `retained`/`no_owned_resource` while its transcript stayed readable immediately after — recorded as a time-bounded adapter detail, not a guarantee). Full table in `docs/harness-surface.md`, "Three-harness native evidence probe (2026-08-25)"; narrative in §36, `docs/findings.md`. The six `test ! -e` absence gates in `AGENTS.md` are green on the shipped candidate, confirming no journal, doctor, hook, or adapter file remains. |
+| Release binds gates, final review, CI, and draft PR to exact HEAD without an LLM release worker or merge | `bash tests/delivery-contract.sh` | A release worker may edit after review, or completion can be claimed with one missing state or a changed HEAD | Task 1: against the pre-migration skill, `check_release` failed on all three sub-checks — no "no LLM worker," no "exact HEAD," no "draft pull request" language; release was one of four dispatched phases with its own model/effort row. The bundled fixture (a dispatched fresh release worker with no exact-HEAD or draft-PR binding) is rejected. |
+| Protected dirty paths and commit ownership remain explicit | review of `git diff --name-status <baseline>...HEAD` plus `git status --short` | The candidate stages a path outside Allowed scope or silently overwrites a protected baseline change | No automated instrument exists for this row; a human reads the diff. Verified by inspection at both the original implementation commit (`b0fc078`, parent `1339715`, clean tree, all 22 changed paths inside Allowed scope) and this remediation commit (parent `b0fc078`, clean tree at start, no forbidden-scope path touched). |
 
 **Cannot be observed:** Static shell fixtures prove the shipped instruction shape,
 not that every future model obeys it. The Orca probes prove evidence retrieval for

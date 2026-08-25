@@ -2681,6 +2681,15 @@ was the target. `bin/delivery-doctor`, `bin/delivery-evidence`,
 three tests were removed in the same change that landed this entry, with no
 compatibility stub.
 
+The exact commands, captured marker output, and per-harness pass/fail
+outcomes, plus the post-release readability result for each harness —
+including that Grok's low-level release call returned `retained` with
+`no_owned_resource` while its transcript stayed readable immediately after —
+are recorded as a compact table in `docs/harness-surface.md`, "Three-harness
+native evidence probe (2026-08-25)", Orca Run `run_51da9fff2301`. That detail
+is a time-bounded observation of one adapter response, not a portable
+guarantee about Grok's retention window.
+
 This does not retire the underlying lesson from §2 and §3: identifiers and
 evidence still fail where they cross a boundary. What changed is which
 program is trusted to hold the boundary — Orca's dispatch record now, this

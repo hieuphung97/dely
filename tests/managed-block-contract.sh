@@ -70,6 +70,76 @@ check_two_rows() {
   return $tmp
 }
 
+# Minimally parses the fenced managed table's data rows (skipping the header
+# and the `---` separator row) and requires exactly two rows, exactly four
+# cells each, no empty cell, and the row set exactly {implement, review} with
+# no duplicate or extra phase. A word-presence check cannot catch a
+# malformed table that still contains the right words.
+check_table_shape() {
+  local file=$1
+  local block
+
+  if [ ! -f "$file" ]; then
+    diag "missing skill: $file"
+    return 1
+  fi
+
+  block=$(managed_block_template "$file")
+  if [ -z "$block" ]; then
+    diag "$file has no What to write section"
+    return 1
+  fi
+
+  printf '%s\n' "$block" | awk '
+    function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+    function is_sep(s,    t) { t = s; gsub(/[|:[:space:]-]/, "", t); return (t == "") }
+    /^\|/ {
+      if (!header_seen) { header_seen = 1; next }
+      if (is_sep($0)) { next }
+      n = split($0, a, "|")
+      ncells = n - 2
+      empty_here = 0
+      for (i = 2; i < n; i++) {
+        c = trim(a[i])
+        if (c == "") empty_here = 1
+      }
+      if (ncells != 4) {
+        print "FAIL: table row has " ncells " cell(s), expected 4: " $0 > "/dev/stderr"
+        bad = 1
+      }
+      if (empty_here) {
+        print "FAIL: table row has an empty required cell: " $0 > "/dev/stderr"
+        bad = 1
+      }
+      phase = trim(a[2])
+      gsub(/`/, "", phase)
+      rows++
+      count[phase]++
+    }
+    END {
+      if (rows != 2) {
+        print "FAIL: table has " rows " data row(s), expected exactly 2" > "/dev/stderr"
+        bad = 1
+      }
+      if (count["implement"] != 1) {
+        print "FAIL: expected exactly one implement row, found " (count["implement"] + 0) > "/dev/stderr"
+        bad = 1
+      }
+      if (count["review"] != 1) {
+        print "FAIL: expected exactly one review row, found " (count["review"] + 0) > "/dev/stderr"
+        bad = 1
+      }
+      for (p in count) {
+        if (p != "implement" && p != "review") {
+          print "FAIL: unexpected extra or duplicate phase row: " p > "/dev/stderr"
+          bad = 1
+        }
+      }
+      exit (bad ? 1 : 0)
+    }
+  '
+}
+
 check_no_coordinator_control_release_fields() {
   local file=$1
   local tmp=0
@@ -117,6 +187,7 @@ run_all_checks() {
   local file=$1
   local tmp=0
   check_two_rows "$file" || tmp=1
+  check_table_shape "$file" || tmp=1
   check_no_coordinator_control_release_fields "$file" || tmp=1
   return $tmp
 }
@@ -194,6 +265,32 @@ EOF
 expect_check_fail check_no_coordinator_control_release_fields "$scratch/catalogue.md" \
   "bundled model catalogue instead of live discovery and preference language" \
   "$scratch/out-catalogue"
+
+# Fixture 3: names implement and review with no Coordinator/control/release —
+# passing word-presence checks — but the table itself is malformed: the
+# implement row has empty Harness/Model/Effort cells, and an extra
+# `investigate` phase row is present. Only real table parsing catches this.
+cat >"$scratch/malformed-table.md" <<'EOF'
+## What to write
+
+```markdown
+<!-- dely:begin -->
+## Dely
+
+Bounded or Architectural work invokes `dely:delivery`; Spike starts no
+delivery run.
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| `implement` | | | |
+| `review` | Codex | `gpt-5.6-sol` | `medium` |
+| `investigate` | Claude Code | `sonnet` | `medium` |
+<!-- dely:end -->
+```
+EOF
+expect_check_fail check_table_shape "$scratch/malformed-table.md" \
+  "implement row with empty cells plus an extra investigate phase row" \
+  "$scratch/out-malformed-table"
 
 if [ "$failures" -ne 0 ]; then
   printf '%s\n' "managed-block-contract: ${failures} failure(s)" >&2

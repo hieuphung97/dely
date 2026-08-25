@@ -35,6 +35,21 @@ assumed.
 Paths a reader might expect to be included, with why they are not. Name anything
 whose filename suggests relevance but whose contents do not.
 
+## Execution envelope
+
+Protected dirty paths: pre-existing uncommitted changes this plan must not stage,
+overwrite, stash, or reset — name them, or say the tree was clean at baseline.
+
+Branch, base, remote, and pull-request target: the feature branch this plan
+commits to, the branch and remote it targets, and where its pull request goes.
+
+Resolved phase pins: the harness, model, and effort each dispatched role runs
+under, taken from `AGENTS.md` — not a default left implicit.
+
+Authority: this plan may branch, commit only its own owned paths, run gates,
+push the named branch, and open or update the named pull request. It may not
+merge, force-push, stash, reset, clean, or edit anything outside owned scope.
+
 ## Tasks
 
 ### 1. <behaviour, not activity>
