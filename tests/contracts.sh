@@ -97,4 +97,38 @@ for col in Requirement Instrument Counterexample "Observed red"; do
   fi
 done
 
+# Community collaboration contract: the six community artifacts must exist,
+# and both issue forms must be present, parseable YAML with the top-level
+# keys GitHub requires to render an issue form (name, description, body).
+for f in CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md \
+         .github/ISSUE_TEMPLATE/bug_report.yml \
+         .github/ISSUE_TEMPLATE/feature_request.yml \
+         .github/pull_request_template.md; do
+  if [ ! -f "$root/$f" ]; then
+    fail_with "missing required community artifact: $f"
+  fi
+done
+
+for f in .github/ISSUE_TEMPLATE/bug_report.yml .github/ISSUE_TEMPLATE/feature_request.yml; do
+  path="$root/$f"
+  [ -f "$path" ] || continue
+  missing="$(ruby -ryaml -e '
+    begin
+      d = YAML.safe_load(File.read(ARGV[0]))
+    rescue => e
+      puts "parse-error(#{e.message})"
+      exit
+    end
+    unless d.is_a?(Hash)
+      puts "not-a-mapping"
+      exit
+    end
+    m = %w[name description body].reject { |k| d.key?(k) }
+    puts m.join(",") unless m.empty?
+  ' "$path")"
+  if [ -n "$missing" ]; then
+    fail_with "$f is not a valid GitHub issue form: missing/invalid $missing"
+  fi
+done
+
 exit "$fail"
