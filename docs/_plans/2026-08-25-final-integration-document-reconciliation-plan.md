@@ -74,11 +74,11 @@ active `AGENTS.md` policy; retain the still-valid per-harness capability facts.
 `docs/findings.md`.
 
 **Focused verification.** From the repository root, run
-`rg -n 'historical deployment observation|superseded by.*no phase-implied sandbox' docs/harness-surface.md`
-and
+`rg -n 'Historical deployment observation' docs/harness-surface.md`,
+`rg -n 'no phase-implied sandbox' docs/harness-surface.md`, and
 `if rg -n "This repository's current review dispatch stays" docs/harness-surface.md; then exit 1; fi`.
-The first command fails if the historical/superseded boundary is absent; the second
-fails if the obsolete deployment is still asserted as current.
+The first two commands fail if either half of the historical/current boundary is
+absent; the last fails if the obsolete deployment is still asserted as current.
 
 **Document impact.** `docs/findings.md` records the distinction between a harness
 capability observation and a repository deployment decision.
