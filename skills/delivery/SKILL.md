@@ -286,12 +286,20 @@ Dely never merges, force-pushes, or publishes outside the approved target and
 authority. If project policy cannot publish work in progress, Dely delays the
 push and pull request until the applicable review accepts.
 
-### Delivery log
+### Maintenance log
 
-The project owns the file; `AGENTS.md` names its path. This skill owns the
-shape: one row per accepted plan, five columns — the plan, its pull request,
-implementation rounds, review dispositions in order, and one clause naming
-the drift cause. Record only what closure already knows.
+Maintenance logging is machine-local and opt-in at `~/.dely/log`. Dely never
+creates the directory or file: a missing path is skipped silently, and
+deleting the file opts out. Only after a delivery is accepted and all
+required checks are green does Control append exactly one physical line;
+aborted or incomplete deliveries are not recorded. The line carries an
+ISO-8601 UTC timestamp and labelled fields for the Git-root basename, plan,
+pull request or `none`, implementation-round count, ordered review
+dispositions, and one short drift-cause sentence. Tabs separate fields;
+embedded tabs and newlines become spaces. Dely never reads this file for
+routing, recovery, or runtime decisions, and its text layout is not a public
+parsing schema. An append failure produces a visible warning but does not
+invalidate or block an otherwise accepted release.
 
 ## Evidence
 

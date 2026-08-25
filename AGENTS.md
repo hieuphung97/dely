@@ -6,12 +6,9 @@ automation-first control protocol for Claude Code, Codex CLI, and Grok Build.
 ## Source of truth
 
 - The workflow contract is `skills/delivery/SKILL.md`.
-- The approved design is
-  `docs/_plans/2026-08-24-automation-first-dely-design.md`.
-- Observations and corrections are recorded in `docs/findings.md`.
 - Settled, open, and rejected decisions are recorded in `docs/decisions.md`.
-- Verified harness capabilities are recorded in `docs/harness-surface.md`.
-- Installation and wiring instructions are in `README.md`.
+- Installation and onboarding instructions are in `README.md`.
+- Structural contract checks live in `tests/contracts.sh`.
 
 Repository artifacts are written in English.
 
@@ -22,7 +19,8 @@ Repository artifacts are written in English.
   investigation only and starts no delivery run.
 - Durable decisions live in `docs/decisions.md`; transient plans live in
   `docs/_plans/`.
-- The delivery log is `docs/delivery-log.md`.
+- Maintenance logging is machine-local and opt-in at `~/.dely/log`; no
+  project-owned log file is tracked.
 - A self-update runs its release phase through the frozen installed plugin
   version, because Control is already using it when the plan starts.
   Candidate changes in this checkout take effect for the next delivery, not
@@ -70,7 +68,7 @@ git diff --check
 ```
 
 ```bash
-bash -n git-hooks/pre-push tests/delivery-contract.sh tests/managed-block-contract.sh tests/plan-template-shape.sh
+bash -n tests/contracts.sh
 ```
 
 ```bash
@@ -78,18 +76,20 @@ jq -e . .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin
 ```
 
 ```bash
-bash tests/delivery-contract.sh
+bash tests/contracts.sh
 ```
 
 ```bash
-bash tests/managed-block-contract.sh
+test "$(wc -l < tests/contracts.sh)" -le 250
 ```
 
 ```bash
-bash tests/plan-template-shape.sh
-```
-
-```bash
+test ! -e git-hooks/pre-push
+test ! -e docs/delivery-log.md
+test ! -e docs/findings.md
+test ! -e docs/harness-surface.md
+test ! -e docs/options.md
+test ! -e docs/_plans/2026-08-24-automation-first-dely-design.md
 test ! -e bin/delivery-doctor
 test ! -e bin/delivery-evidence
 test ! -e hooks/hooks.json
