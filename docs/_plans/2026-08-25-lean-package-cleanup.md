@@ -2,7 +2,7 @@
 
 Decision record: `docs/decisions.md#2026-08-25--dely-is-a-lean-automation-first-plugin-with-an-opt-in-machine-local-maintenance-log`
 
-**Baseline:**
+**Baseline:** `fdf7ca2193768d576aed7fb6edc211d8fe2dcfb3`
 
 ## Goal
 
