@@ -1,25 +1,35 @@
 ---
 name: setup
-description: Configure a project's AGENTS.md with one managed Dely block — coordinator and per-phase harness, model and effort. Use at the start of a Control Session, when the project has no managed block, or when those pins need rewriting from the installed harnesses. Not for installing plugins, trusting hooks, or delivering a change; that is delivery.
+description: Configure a project's AGENTS.md with one managed Dely block — per-phase harness, model and effort for implement and review, discovered from the live harness surface. Use at the start of a Control Session, when the project has no managed block, or when those pins need rewriting from the installed harnesses. Not for installing plugins, trusting hooks, or delivering a change; that is delivery.
 ---
 
 # Setup
 
-Write exactly one managed block into the project's `AGENTS.md`. Discover models
-and effort from the installed harnesses. Do not store a catalogue. Do not
-install, trust or enumerate anything.
+Write exactly one managed block into the project's `AGENTS.md`. Discover
+models and effort from the installed harnesses. Do not store a catalogue. Do
+not install, trust, or enumerate anything.
 
 Read `AGENTS.md` first. Replace only the region between this skill's own
-markers. Prose outside the block is not read, merged, moved or deleted.
+markers. Prose outside the block is not read, merged, moved, or deleted.
+
+## Two rows only
+
+The managed block configures deployment preferences for `implement` and
+`review` — nothing else. There is no coordinator or orchestrator field,
+because Orca is the constant, required execution plane. There is no control
+row, because the current interactive session already exists and is never
+dispatched. There is no release row, because release has no LLM worker. There
+is no Plan Mode field and no design-skill field: the active design method is
+a property of the harness and session, not a Dely setting.
 
 ## Two paths
 
-**Quick.** Use the current harness for every phase. Use that harness's defaults
-for model and effort, written as the literal `default`.
+**Quick.** Use the current harness for both `implement` and `review`. Use
+that harness's defaults for model and effort, written as the literal
+`default`.
 
-**Customize.** For each of `control`, `implement`, `review` and `release`,
-offer the discovered harnesses, models and effort levels and write what the
-human chooses.
+**Customize.** For each of `implement` and `review`, offer the discovered
+harnesses, models and effort levels and write what the human chooses.
 
 Ask which path. Do not start writing until that is answered.
 
@@ -31,21 +41,18 @@ Exactly one block, and nothing else:
 <!-- dely:begin -->
 ## Dely
 
-Planned or Critical work must invoke `dely:delivery`.
-
-Coordinator: <name or none>
+Bounded or Architectural work invokes `dely:delivery`; Spike starts no
+delivery run.
 
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
-| `control` | … | … | … |
 | `implement` | … | … | … |
 | `review` | … | … | … |
-| `release` | … | … | … |
 <!-- dely:end -->
 ```
 
-If the markers already exist, replace the region between them. If they do not,
-append the block. Touch nothing else.
+If the markers already exist, replace the region between them. If they do
+not, append the block. Touch nothing else.
 
 ## Discovery
 
@@ -71,13 +78,17 @@ A harness that is not installed is omitted from the offer, not an error.
 
 ## Pinning
 
-Where a managed block exists, pin its Harness, Model and Effort on every
-dispatch. The literal `default` in Model or Effort means the harness default
-is wanted: omit that flag. That is not the same as an unset cell.
+Where a managed block exists, pin its Harness, Model and Effort for
+`implement` and `review` on every dispatch. The literal `default` in Model or
+Effort means the harness default is wanted: omit that flag. That is not the
+same as an unset cell — defaults are a deployment preference, not a
+reproducible pin, and the execution envelope records the configured value and,
+where the harness exposes it, the actual observed model and effort.
 
-Where `AGENTS.md` carries no managed block, `delivery` runs on the current
-harness with harness defaults and omits the model and effort flags. Setup is
-a convenience over that fallback, not a precondition for it.
+Where `AGENTS.md` carries no managed block, `delivery` runs `implement` and
+`review` on the current harness with harness defaults and omits the model and
+effort flags. Setup is a convenience over that fallback, not a precondition
+for it.
 
 ## When a choice cannot be offered
 
@@ -87,19 +98,9 @@ nothing — and report the choice that was not offered, naming what was
 available and how to set it; do not write that report into the managed
 block.
 
-For the coordinator: if none exists and setup cannot ask, write `none`
-and report that a coordinator was available and was not offered, naming
-it and how to set it.
-
-For the `CLAUDE.md` import: if the current harness is Claude Code, the
-import is absent, and setup cannot ask, write nothing and report the
-offer that was not made.
-
-## Coordinator
-
-Keep an existing selection. Where none exists, offer Orca only if it is
-actually available; otherwise write `none`. Do not install a coordinator. Do
-not invent an adapter.
+For the `CLAUDE.md` import: if the current harness is Claude Code, the import
+is absent, and setup cannot ask, write nothing and report the offer that was
+not made.
 
 ## Refusals
 
@@ -132,8 +133,8 @@ expand the import at all.
 ## What setup will not do
 
 No plugin or skill install. No hook trust. No writes to `~/.claude`,
-`~/.codex` or `~/.grok`. No coordinator installation. No enumeration or
-invocation of project-owned workflow plugins. No `Skills` column. No
-dependency resolver.
+`~/.codex` or `~/.grok`. No coordinator installation or field. No control or
+release row. No enumeration or invocation of project-owned workflow plugins.
+No model catalogue.
 
 Print verified install guidance only when the human explicitly asks for it.

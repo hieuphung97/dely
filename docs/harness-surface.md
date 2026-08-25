@@ -481,6 +481,13 @@ Build. No read-only monitor covering all three was found.
 
 ## Role capability matrix
 
+**Historical as of 2026-08-25.** The evidence-journal and `delivery-doctor`
+references below describe the rails that motivated and were retired by the
+three-harness Orca evidence probe recorded in `docs/decisions.md`,
+"2026-08-25 — Dely is an automation-first thin control protocol". Dispatch
+evidence is now read from Orca, not journaled by this package; the sandbox and
+identifier-injection observations remain current.
+
 Roles are meant to be swappable: any harness as control session, any as worker.
 The invocations are already symmetric, and all three resume a session by id, so
 most of a swap is free. Three things are not, and they are recorded here so a

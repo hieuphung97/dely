@@ -1,263 +1,194 @@
 ---
 name: delivery
-description: Deliver a change through design, implementation, independent review and closure. Use when a change needs a decision record, when a plan spans more than one behaviour, or when review must not be done by whoever implemented it. Not for a one-line fix with an obvious test.
+description: Deliver a change through an approved design contract, sequential implementation, independent review and exact-HEAD release. Use when a change needs a decision record, when a plan spans more than one behaviour, or when review must not be done by whoever implemented it. Not for a one-line fix with an obvious test.
 ---
 
 # Delivery
 
-Every rule here exists because a delivery lost a round without it, across 41
-recorded plans. Nothing is here for symmetry. If a rule stops earning its place,
-delete it.
+Dely accepts a request that may still be vague, brings it to an approved
+design contract, then automates sequential implementation, independent
+review, and pull-request preparation. It is a thin control protocol, not an
+orchestrator, SDLC framework, or second source of Git state.
 
 Read `AGENTS.md` in the repository for this project's gate commands, artifact
-paths, and default branch. This skill never names them.
+paths, default branch, and per-phase harness/model/effort pins. This skill
+never names them.
 
-## Classify first
+## Two human gates
 
-**Routine** — expected behaviour is already unambiguous in current documentation,
-tests, or a reproducible defect; no new decision; no schema, API, permission or
-dependency change; one owner; a focused test can prove it; one session finishes it.
-Fix it. No decision record, no plan.
+1. Approve the design contract before candidate mutation.
+2. Merge or publish after Dely has prepared the reviewed pull request.
 
-**Planned** — anything that adds or changes behaviour, presents real alternatives,
-spans owners, risks removing behaviour, or lacks a clear acceptance strategy.
+Dely pauses outside those gates only for a scope or architecture change, a
+destructive action, new authority, replan, or an unavailable required runtime.
 
-**Critical** — irreversible data work, migrations, auth, permissions, secrets,
-security boundaries, concurrency, production availability. Critical does not
-authorise a bigger plan. Decompose it into Planned units and apply stronger review
-only at the actual risk boundary.
+## The control session
 
-## Phases
+The current interactive session is Control. It owns the approval invariant,
+task boundaries, exception handling, dispatch supervision, and release. It
+does not implement or review the candidate.
 
-`design` → `implement` → `review` → `release`. Each runs in its own session. The
-session that designed a change keeps the decisions and receives handoffs; it does
-not implement, and it does not replace review.
+Control does not prescribe question count, order, format, or skill-selection
+precedence. The active design method — a design skill already active in the
+harness, or native Plan Mode — owns how to explore, ask, compare, and present.
+Neither one owns or can bypass the approval invariant: before candidate
+mutation, Control must obtain explicit human approval of a design contract.
+Plan Mode is defense in depth, not proof that requirements are clear or that
+no mutation is possible.
 
-Routing is short enough to state plainly. Implementation returning `DONE` goes to
-review. Implementation returning `BLOCKED` or `NEEDS_REPLAN` goes back to design.
-Review returning `ACCEPT` goes to release. `REMEDIATE_ONCE` goes to a fresh
-implementation session, then back to the same reviewer. `REPLAN_OR_SPLIT` goes to
-design. Release goes back to design for the next unit.
+Control surfaces unresolved uncertainty that could materially change intent,
+acceptance, authority, public contract, architecture, or consequential risk.
+The active design method may resolve other details from repository evidence
+and convention, but material assumptions must be explicit.
 
-A worker selects the phase it was sent to and does only that phase.
+## Shape: Spike, Bounded, Architectural
 
-## The control session drives
+Use the smallest contract that safely holds the change. Risk may promote an
+otherwise small change; diff size never demotes data-loss, security,
+permission, or public-compatibility risk.
 
-One interactive session holds the approved contract and runs the rest. The human
-talks to it, steers it, and is interrupted only when it cannot decide.
+| Shape | Use | Artifact | Review |
+| --- | --- | --- | --- |
+| Spike | Investigation only; no candidate is delivered | Approved probe and recommendation; no delivery run | none |
+| Bounded | Small change, clear behaviour and ownership | Approved in-chat design and short execution envelope | one whole-change review |
+| Architectural | Multiple behaviours, public-contract change, architecture decision, or promoted risk | Approved decision record, task plan, execution envelope | task review per task, then one integration review |
 
-It does not implement, and it does not review. It launches workers, reads their
-results, and routes.
+An approved design contract states intent and success criteria; scope and
+authority; affected public contract or architecture; consequential risks and
+material assumptions; and a plausible counterexample or failure mode that
+distinguishes correct behaviour from a present-but-wrong implementation. If no
+executable instrument can discriminate the requirement, the contract names the
+manual inspection and its limit.
+
+Architectural work uses `templates/decision-record.md` (durable) and
+`templates/plan.md` (transient, deleted at closure). Commit both before
+implementation begins — that commit is the review baseline.
+
+### Acceptance
+
+One table: each requirement, the instrument that proves it, the plausible
+wrong implementation that instrument rejects, and where that rejection was
+observed.
+
+**An acceptance row is invalid until you have settled that its instrument
+discriminates.** A row whose instrument passes both before and after the
+change proves nothing and will be found at review. Baseline-red is
+insufficient by itself: an instrument observed red only because the feature
+is absent says nothing about whether it can catch an implementation that is
+present, runs, returns a pass, and is wrong.
+
+Each row names a plausible wrong implementation its instrument rejects — one
+that exists, runs, and returns a pass. "The feature is absent" does not
+satisfy Counterexample. Where no counterexample exists, the row says so and
+says a human reads the diff.
+
+Record what the available instruments cannot observe. Prefer the simplest
+instrument that proves the contract.
+
+## Execution envelope
+
+Before mutation, Control resolves deployment preferences against the live
+harness surface, starts Orca and verifies its required capabilities, records
+the dirty baseline and exact-path ownership, and creates a feature branch when
+starting on the default branch.
+
+The envelope freezes owned scope and paths; protected pre-existing dirty
+paths; acceptance criteria, counterexample, and focused instruments; branch,
+base, remote, and pull-request target; resolved harness, model, and effort for
+dispatched roles; and authority to branch, commit owned paths, run gates,
+push, and open or update a pull request. It never authorises merge,
+force-push, stash, reset, cleanup, or an edit outside owned scope.
+
+Dely stages and commits only contract-owned paths. It never stashes, resets,
+cleans, or silently absorbs the user's existing changes. If a path carries
+protected baseline changes and Dely must also modify it, Control pauses
+rather than combining ownership.
+
+## Orca is mandatory
+
+Orca is the required execution plane. It launches and supervises fresh native
+harness TUIs with the resolved harness, model, and effort. `dely:delivery`
+starts and preflights Orca before execution. It stops only when the CLI is
+missing, the runtime cannot start, or a required capability is absent — there
+is no direct dispatch and no headless fallback of any kind.
 
 ### Launching a worker
 
 Write the prompt to a file. Never inline it in a shell argument: prompts carry
-backticks, quotes and newlines, and a shell argument mangles them. Keep that
-file for transport safety wherever the launch path accepts file input.
+backticks, quotes and newlines, and a shell argument mangles them. Load the
+selected coordinator's native skill and use it to launch a real interactive
+harness TUI for the phase, with the model and effort pinned from `AGENTS.md`.
+A visible shell running a headless harness is not a TUI, and this skill has no
+compatibility matrix around one.
 
-If `AGENTS.md` selects a coordinator, load that coordinator's native skill and
-use it to launch a real interactive harness TUI for the phase. Pin the selected
-model and effort. The coordinator carries the prompt, questions and completion.
-A visible shell running a headless harness is not a TUI.
-
-A direct headless harness call is a fallback only when no coordinator is
-selected, or when the selected coordinator is unavailable and the human accepts
-the loss of its capabilities. Do not invent a wrapper, adapter, polling loop or
-compatibility matrix around that fallback.
-
-Any harness can be the control session and any can be a worker. The role is a
-choice per phase, not a property of a tool.
-
-```bash
-# Fallback only — not the primary path when a coordinator is selected
-claude -p --permission-mode bypassPermissions --model <id> --effort <level> < prompt.md > result.md
-codex exec -m <id> -c model_reasoning_effort="<level>" -o result.md < prompt.md
-grok --prompt-file prompt.md -m <id> --reasoning-effort <level> --always-approve --output-format json > result.json
-```
-
-Check flags against `--help` before relying on them. These CLIs drift between
-releases, and an unknown flag fails the whole invocation rather than being ignored.
-
-**Name the model and the effort on every dispatch.** A worker left on a harness
-default is an unpinned environment, and that is the second-largest recorded cause of
-lost rounds. The default is also invisible: it lives in the harness's own config, it
+**Name the model and effort on every dispatch.** A worker left on a harness
+default is an unpinned environment: it lives in the harness's own config, it
 changes without announcing itself, and the dispatch that relies on it looks
-identical to one that pinned the same value deliberately. Which model to use is the
-human's choice and belongs in `AGENTS.md` per phase; naming it on the command line
-is not that choice, it is the record of it.
+identical to one that pinned the same value deliberately.
 
-**Give the call a timeout with headroom, and make truncation visible.** Measure
-before trusting a default — one real implement dispatch took 9m49s against a
-ten-minute tool default. It finished, and a slightly larger task would not have. A
-worker killed at a timeout can leave a handoff already on disk that looks complete,
-so the handoff ends with its terminal line and a missing terminal line is a failed
-worker rather than a stop status.
+Keep waiting blocking. A worker is observed through the coordinator until it
+completes or its timeout fires. Do not add a relay, poll, or state machine to
+manufacture completion.
 
-**The prompt and the result both live outside the repository.** Ownership gates and
-diffs count untracked files as part of the candidate, so a result file written into
-the working tree becomes an unowned change that a reviewer sees and a gate may
-refuse. Use the session's scratch directory.
-
-**Review is independent by role, not by a phase-implied sandbox.** The reviewer
-starts fresh, reviews and reports, and does not implement or edit the candidate.
-Ordinary project permissions keep gates, native Internet access, result writes and
-coordinator completion available. `AGENTS.md` may pin a sandbox for a concrete
-risk; assigning a harness to review is not such a risk by itself. If a reviewer
-edits the candidate, that review is invalid and Control escalates.
-
-Internet research uses the harness's native web or search tool and cites the
-source. Shell network follows ordinary project permissions; do not disable it
-merely because the phase is review.
-
-Keep waiting blocking. A coordinator-selected worker is observed through that
-coordinator until it completes or the timeout fires. A headless fallback is a
-blocking process plus a timeout with headroom: the process exits on its own, so
-polling would be a state machine. Do not add a relay to manufacture completion.
-
-**`input_accepted` is not submission.** After a coordinator-selected dispatch,
-`input_accepted` is a transport receipt, not proof that the harness submitted
-the prompt. Allow 90 seconds for a dispatch heartbeat or visible agent
-progress. If neither appears, read the worker TUI. Only when that read shows
-the task still pending in the input box does Control send Enter, exactly once,
-then return to the normal blocking wait.
+**`input_accepted` is not submission.** It is a transport receipt, not proof
+that the harness submitted the prompt. Allow 90 seconds for a dispatch
+heartbeat or visible agent progress. If neither appears, read the worker TUI.
+Only when that read shows the task still pending in the input box does
+Control send Enter, exactly once, then return to the normal blocking wait.
 
 Do not send Enter when the worker is already reasoning, using a tool, asking a
 question or reporting completion. Do not infer submission from a rendered copy
-of the prompt alone. A second missing signal is a liveness problem to inspect,
-not permission to keep pressing Enter. This bounded recovery adds no wrapper,
-polling loop, relay, background process or harness-specific adapter.
+of the prompt alone. A second missing signal is a liveness problem to
+inspect, not permission to keep pressing Enter.
 
-**Capture the worker's session id from its output and put it in the handoff.** It is
-how the human opens that session to inspect or steer it, and a harness need not list
-a dispatched session in its own picker: Codex filters its picker to interactive
-sessions, so a session started by `codex exec` is reachable only by id. It is
-persisted and resumable either way.
+Capture the worker's session id from its output and put it in the handoff: it
+is how the human opens that session to inspect or steer it, and a harness need
+not list a dispatched session in its own picker.
 
-**Watch through the coordinator when one is selected.** Its task, dispatch and
-terminal are the live view. For a headless fallback, the redirected log file is
-the live view — model and sandbox in the header, then each command with its
-output and duration. Tell the human that path when a fallback dispatch starts.
+### Investigation
 
-### Model and effort per phase
-
-Phases differ in what they buy. Control and review buy judgement. Implement buys
-throughput against a task that is already specified. Release is mechanical.
-
-| Phase | Capability | Effort |
-| --- | --- | --- |
-| control | strongest available | high |
-| implement | best coding model | medium |
-| review | strongest available | medium to high |
-| release | modest | low |
-
-Concrete model names belong in `AGENTS.md`. They are environment facts, they differ
-per harness, and they change. This table is the reason behind a choice and not the
-choice itself — which is why it can live here while the names cannot.
+When a blocker can be expressed as a concrete independent diagnostic question,
+Control may dispatch one read-only investigation, inheriting the `implement`
+deployment preference. It may reproduce, inspect, and report a diagnosis
+packet, but it does not edit the candidate, commit, launch workers, or expand
+scope. This is an exception, not a phase or mandatory round trip.
 
 ### Escalate rather than guess
 
-Stop and ask the human when:
+Stop and ask the human when: a result maps to no route or more than one; the
+worker **failed** rather than returned a stop status — a non-zero exit with no
+result, an exhausted quota, an authentication error — which is not `BLOCKED`
+and must not be treated as one; the selected coordinator is unavailable; an
+action needs authority policy reserves to the human; or the same worker fails
+twice on the same input. Say what you know, what you tried, and what the
+options are. Do not pick one.
 
-- a result maps to no route, or to more than one
-- the worker **failed** rather than returned a stop status — a non-zero exit with no
-  result file, an exhausted quota, an authentication error. A failed worker is not
-  a `BLOCKED` worker, and treating one as the other loses the work
-- the selected coordinator is unavailable, before any headless fallback
-- an action needs authorization that policy reserves to the human
-- the same worker fails twice on the same input
+## Implementation
 
-Say what you know, what you tried, and what the options are. Do not pick one.
+Control creates a separate task only when that unit has its own test cycle
+and a reviewer could accept it while rejecting its neighbor. Same-shaped
+mechanical changes are batched. Tightly coupled work stays one task and one
+implementer. Each independent task gets a fresh implementer TUI.
 
-## design
+An implementer reads the decision record, the plan, and the baseline — not
+the design session's transcript. It owns only its task, runs a focused
+acceptance instrument, and creates one task-scoped commit. For behaviour with
+a deterministic executable test it uses TDD; the portable invariant is
+smaller: observe a discriminating failure for the intended reason before
+changing behaviour. A shell probe, parser fixture, or diff inspection may be
+the correct instrument for configuration, documentation, generated files, or
+environment-bound integration.
 
-Inspect the code before asking anything. Ask one question at a time, with options,
-your reasoning, and a recommendation.
+The counterexample named in each acceptance row is observed red and cited.
+That observation is not the behaviour's own absence: one is the feature
+absent, the other is an implementation that is present, runs, returns a pass,
+and is wrong.
 
-Produce two artifacts and nothing else:
-
-A **decision record** — dated, durable. Problem, current behaviour with evidence,
-the accepted contract, alternatives and why they lost, non-goals, acceptance
-strategy, rollout and rollback. It never tracks task status and never accumulates
-test history. See `templates/decision-record.md`.
-
-A **plan** — transient, deleted at closure. Three to five tightly related tasks,
-one coherent contract, one acceptance table. See `templates/plan.md`.
-
-Commit both before implementation begins. That commit is the review baseline.
-
-### Plan sizing
-
-One plan is what one implementation session can finish, verify, and hand back as
-one complete diff. File count is not the limit.
-
-Split before starting when the plan holds independent owners, needs an intermediate
-checkpoint, or cannot be reviewed as one behaviourally coherent unit.
-
-This is the single strongest lever in the record. One plan holding a shared
-primitive and its eighty call sites failed three times, each round discarding the
-last. Split in two, both halves were accepted, one on the first round.
-
-### Allowed scope
-
-List what may change. Scope always carries, without being named:
-
-- the colocated test of any allowed source file
-- any registry or inventory test that enumerates what the plan adds
-- any document that owns an allowed path
-
-A file the plan's own tasks require is inside scope, not a stop. Three plans lost a
-round to that omission before this was written down.
-
-### Acceptance
-
-One table: each requirement, the instrument that proves it, the plausible wrong
-implementation that instrument rejects, and where that rejection was observed.
-
-**An acceptance row is invalid until you have settled that its instrument
-discriminates.** A row whose instrument passes both before and after the change
-proves nothing and will be found at review. This is the largest single cause of
-lost rounds in the record — nine plans. Baseline-red is insufficient: the ninth
-was an instrument observed red at baseline for the right reason, and still
-unable to tell a doctor that reads the whole file from one bounded by the
-markers.
-
-Each row names a plausible wrong implementation its instrument rejects — one
-that exists, runs, and returns a pass. "The feature is absent" does not satisfy
-Counterexample. Where no counterexample exists, the row says so and says a
-human reads the diff.
-
-Record what the available instruments cannot observe. A green suite that never
-exercises a surface is not evidence about that surface.
-
-Prefer the simplest instrument that proves the contract. Browser automation,
-performance thresholds and retained evidence packages need a stated risk; they are
-not default ceremony.
-
-## implement
-
-Read the decision record, the plan, and the baseline. Do not read the design
-session's transcript.
-
-For each behaviour: find its owning test, observe a real failure for the intended
-reason, make the smallest change, run focused verification. Keep unrelated findings
-out.
-
-The counterexample named in each acceptance row is observed red and cited — the
-journal record, or the pasted summary line where the harness journals nothing.
-That observation is not the behaviour's own failure: one is the feature absent,
-the other is an implementation that is present, runs, returns a pass, and is
-wrong.
-
-For replacement work, enumerate every accepted behaviour that could be lost and map
-each to an owning test. That mapping belongs in the plan's one acceptance table,
-not in a second document.
-
-Implement the whole plan before handing back. Stop and return `BLOCKED` or
-`NEEDS_REPLAN` instead of producing a partial solution when the record contradicts
-the code, the contract is ambiguous, work outside the plan becomes necessary, an
-existing test disproves an assumption, or the plan no longer fits one session.
-
-A plan needing continuation is a decomposition failure, not normal delivery.
+Implement the whole task before handing back. Stop and return `BLOCKED` or
+`NEEDS_REPLAN` instead of a partial solution when the record contradicts the
+code, the contract is ambiguous, work outside the task becomes necessary, an
+existing test disproves an assumption, or the task no longer fits one
+session. A task needing continuation is a decomposition failure.
 
 ### Handoff
 
@@ -275,117 +206,108 @@ Git state:
 END OF HANDOFF
 ```
 
-`END OF HANDOFF` is the last line and it is load-bearing. It is the only thing that
-distinguishes a handoff from a handoff that was cut off mid-write.
+`END OF HANDOFF` is the last line and load-bearing: the only thing that
+distinguishes a handoff from one cut off mid-write. Under `Verification`, cite
+the dispatch-bound command, output, and outcome that Orca recovers for that
+task — the transcript or terminal it selects, and any cursor mechanics, are
+Orca's concern, not this skill's. Do not transcribe output by hand. Where
+Orca cannot recover a dispatch item, treat the worker's own account as the
+thing under check rather than as the check, and say so.
 
-Under `Verification`, cite the recorded evidence for each gate — the command and
-where its output is recorded. Do not transcribe output. If the harness records
-nothing, say so and paste the summary line.
+## Review
 
-**Gate evidence is journaled wherever the hooks are wired, and the wiring differs
-per harness.** Claude Code and Codex load them from this plugin. Grok discovers the
-plugin, reports that it has hooks, and dispatches none of them — verified in its own
-debug log, where the only hook sources it executed were `~/.grok/hooks/*.json` and
-`~/.claude/settings.json` while every plugin-bundled hook was discovered and skipped.
-So Grok needs the same three events registered under `~/.grok/hooks/`, with absolute
-paths, and then it journals like the others.
+Review independence is role independence: a fresh session that did not
+implement and does not edit the candidate. It gets the decision record (or
+Bounded design), the baseline, the diff, and the dispatch evidence — not the
+implementer's reasoning. The phase adds no sandbox by default; `AGENTS.md` may
+pin one for a concrete risk.
 
-Run `delivery-doctor` before trusting any of this. A harness that reports a plugin as
-loaded is not a harness that runs it, and that gap has now cost this project a false
-conclusion twice.
-
-Where a harness genuinely cannot journal, say the evidence is the worker's own
-account and treat it as the thing under check rather than as the check. A fabricated
-summary line has already been observed in exactly that position.
-
-Be exact about what the journal proves. It holds the command and the output
-verbatim, and whether the call succeeded. A passing command's exit code is implied
-by that and is not stored in a field, so cite the journal for output and the
-command's own echoed status for an exit code. Claiming a tool-captured exit code for
-a gate that passed overstates the evidence, and a review has already caught that.
-
-**Never background a gate.** A backgrounded call returns as soon as it is handed off,
-so the journal records it as finished in a few hundred milliseconds with no output at
-all. That is indistinguishable from a gate that passed silently, which makes it worse
-than no record. Observed: `sleep 900 && echo …` journaled at 414ms with empty stdout
-and a `backgroundTaskId`. Gates run in the foreground and the wait is the point.
-
-## review
-
-Start fresh. Review and report; do not implement or edit the candidate. You get
-the decision record, the plan, the baseline, the diff, and the evidence. You do
-not get the implementer's reasoning. The phase adds no sandbox by default.
+Review depth is adaptive: Bounded work gets one independent whole-change
+review. Each Architectural task gets an independent task review. After all
+tasks are accepted, a different fresh reviewer performs one integration
+review of task interactions, complete-contract coverage, deferred findings,
+candidate identity, and release readiness. Only that final review is
+release-binding for Architectural work; Bounded work has no earlier task
+review and no duplicate integration review.
 
 **Reproduce, do not accept.** Run the gates yourself. A claim you did not
-reproduce is not evidence. Re-review has caught defects by making a test red itself
-after accepting the implementer's word would have passed them.
+reproduce is not evidence.
 
-Requirements and behaviour before style.
+Classify findings: **Blocking** — contract failure, regression, data or
+security risk. **Important** — missing required behaviour, test, or
+reconciliation. **Minor** — useful, does not block. **Out of scope** —
+recorded, not absorbed.
 
-Classify findings: **Blocking** — contract failure, regression, data or security
-risk. **Important** — missing required behaviour, test, or reconciliation.
-**Minor** — useful, does not block. **Out of scope** — recorded, not absorbed.
-
-Return exactly one disposition: `ACCEPT`, `REMEDIATE_ONCE`, or `REPLAN_OR_SPLIT`.
-Do not use implementation stop statuses. A contradiction you cannot resolve is
-`REPLAN_OR_SPLIT`.
-
-Do not open remediation over wording when deterministic checks already prove the
-contract.
+Return exactly one disposition: `ACCEPT`, `REMEDIATE_ONCE`, or
+`REPLAN_OR_SPLIT`. A contradiction you cannot resolve is `REPLAN_OR_SPLIT`.
+Do not open remediation over wording when deterministic checks already prove
+the contract.
 
 ### Remediation
 
-One pass. The implementer fixes only the accepted findings, reruns the affected
-checks and all closure gates, and returns to the same reviewer.
+One pass. For an in-contract finding, the **original implementer** verifies
+it, fixes the root cause, reruns the affected instruments and closure gates,
+and writes a separate remediation commit. The **reviewer that raised the
+finding** checks its reproduction and the fix-only diff. If that scoped
+re-review does not accept, Control returns `REPLAN_OR_SPLIT` — it does not
+start another repair loop. A fresh replacement reviewer is used only when the
+original reviewer is unavailable or contested, and for the Architectural
+integration review.
 
-A second new architecture or contract finding means the unit is wrong. It does not
-authorise a third attempt.
+## Release
 
-## release
+Control performs release with native Git and forge tools; release dispatches
+no LLM worker and makes no post-review candidate edit.
 
-Commit the implementation. Reconcile the documents that own changed paths. Delete
-the plan, having moved anything durable into the decision record or those
-documents. Run the closure gates. Append one row to the project's delivery log.
+1. Complete implementation and, for Architectural work, its task reviews.
+2. Reconcile owning documentation and commit the complete candidate.
+3. Run the focused instruments and project closure gates on exact HEAD.
+4. Push the feature branch and create or update a draft pull request.
+5. Run the applicable final review while remote CI runs on that same HEAD.
+6. Require both that review's `ACCEPT` and required checks green.
+7. Mark the pull request ready and report it for human merge.
 
-Then prepare the pull request. Merging is the product owner's act.
+Any candidate mutation after the applicable final review invalidates that
+verdict; Control reruns the affected gates and review on the new exact HEAD.
+Dely never merges, force-pushes, or publishes outside the approved target and
+authority. If project policy cannot publish work in progress, Dely delays the
+push and pull request until the applicable review accepts.
 
 ### Delivery log
 
-The project owns the file; `AGENTS.md` names its path. This skill owns the shape.
+The project owns the file; `AGENTS.md` names its path. This skill owns the
+shape: one row per accepted plan, five columns — the plan, its pull request,
+implementation rounds, review dispositions in order, and one clause naming
+the drift cause. Record only what closure already knows.
 
-One row per accepted plan, five columns: the plan, its pull request, how many
-implementation rounds it took to reach `DONE`, the review dispositions in order,
-and one clause naming the drift cause.
+## Evidence
 
-Record only what closure already knows. Do not add a column that restates a human
-choice or a value Git already holds.
+Evidence is a property of a dispatch, not a skill-owned journal. Control asks
+Orca for the dispatch-bound command, output, and outcome; durable candidate
+and release facts come from Git, CI, and the pull-request state. This skill
+duplicates none of those stores.
 
-The drift cause column is the reason the log exists. Write it long enough that a
-later plan can prove a recurrence. Anything discovered during the plan that the
-plan file was the only home for goes here, because the plan is deleted.
+## Failure and recovery
 
-### Changing this skill
+Recovery uses Orca records, Git, CI, and pull-request state — never inferred
+from an ambiguous, missing, or merely transport-level outcome.
 
-**Only when the same failure recurs.** One incident is not policy. Two of seven
-recorded corrections were made under this rule, each after a third occurrence, and
-that is why this file is short.
+| Failure | Disposition |
+| --- | --- |
+| In-contract implementation defect | Original implementer remediates |
+| Scoped remediation re-review does not accept | `REPLAN_OR_SPLIT` |
+| Scope or architecture must change | Return to the design gate |
+| New authority or destructive action is required | Ask the human |
+| Orca or a required capability is unavailable | Stop; no headless fallback |
+| Harness fails or evidence is insufficient | Preserve the candidate, report the native outcome and role disposition |
+| Idempotent release step is interrupted | Verify Git and pull-request state, then resume |
 
-Before adding a rule, check whether a mechanism can enforce the fact instead. A
-rule asking a worker to be careful with a value is weaker than a program that
-supplies the value.
+## Changing this skill
 
-## What the harness supplies
-
-Where hooks are installed, repository identifiers arrive resolved at session start
-and gate results are recorded as they run. Then:
-
-- Cite identifiers from the injected context. Never restate a SHA, branch or
-  baseline from memory.
-- A value marked stale is stale. Fetch before using it as a baseline.
-- Cite recorded evidence rather than retyping output.
-
-Where they are not installed, resolve identifiers with a command in the same turn
-you use them, and paste summary lines verbatim.
+Only when the same failure recurs under the current contract — one incident
+is not policy. Before adding a rule, check whether a mechanism can enforce
+the fact instead. A human decides whether to promote a proposal; this skill
+never mutates itself, `AGENTS.md`, or project instructions from telemetry.
 
 ## Language
 

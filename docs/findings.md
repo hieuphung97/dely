@@ -2654,3 +2654,34 @@ three valid commands whose targets all existed.
 re-trust after every update; it now says re-trust only after a hook file
 changes. This `0.9.1` install used `ON_INSTALL` and a fresh Codex TUI ran both
 hooks without an extra manual trust step. That last step is not generalised.
+
+---
+
+## 36. The three-harness Orca evidence probe that retired the journal and doctor
+
+Recorded 2026-08-25, preceding "2026-08-25 — Dely is an automation-first thin
+control protocol" in `docs/decisions.md`.
+
+The automation-first design conditioned removal of the evidence journal and
+`delivery-doctor` on one non-mutating Orca capability probe per supported
+harness: a dispatch running a deterministic passing marker command and a
+deterministic failing one, with the resulting command, output, and outcome
+recovered by Control from Orca's own dispatch record — not this package's
+hooks — after the worker was released.
+
+Claude Code, Codex CLI, and Grok Build each passed: the dispatch-bound
+command, its verbatim output, and its pass/fail outcome were all recoverable
+through Orca after release, for both the passing and the failing marker. No
+harness needed its own evidence adapter, so the universal rail these findings
+spent §7 through §30 hardening was retired outright rather than kept as
+defense in depth — the redundant mechanism, not the discipline it encoded,
+was the target. `bin/delivery-doctor`, `bin/delivery-evidence`,
+`hooks/hooks.json`, `hooks/post-tool-journal.sh`,
+`hooks/session-start-context.sh`, `hooks/grok-hooks.json.template`, and their
+three tests were removed in the same change that landed this entry, with no
+compatibility stub.
+
+This does not retire the underlying lesson from §2 and §3: identifiers and
+evidence still fail where they cross a boundary. What changed is which
+program is trusted to hold the boundary — Orca's dispatch record now, this
+package's own hooks before.

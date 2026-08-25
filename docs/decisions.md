@@ -371,6 +371,13 @@ phase boundary commits and pushes, so only the candidate diff is ever at risk.
 
 ### Roles are a choice per phase, not a property of a tool
 
+**Partly superseded 2026-08-25.** The evidence-journal references below are
+historical: dispatch evidence now comes from Orca, not a per-harness journal
+payload, and release is no longer a dispatched worker role — see
+"2026-08-25 — Dely is an automation-first thin control protocol". The
+role-swap and identifier-injection reasoning for control and review still
+holds.
+
 Claude Code is the control session for the pilot. Any harness must be able to take
 any role later — Codex as control, Claude Code as reviewer, Grok as implement and
 release worker.
@@ -1565,6 +1572,11 @@ behind a rule they were asked to follow.
 
 ### 2026-08-21 — Project configuration is a managed block in `AGENTS.md`, written by a second core skill `dely:setup`
 
+**Superseded in shape 2026-08-25.** The managed block now has exactly two
+phase rows, `implement` and `review`, and no `Coordinator` line — see
+"2026-08-25 — Dely is an automation-first thin control protocol". The
+skill-ownership and discovery reasoning below still holds.
+
 #### Context
 
 `dely` ships one skill. `delivery` reads the consuming project's `AGENTS.md` for
@@ -1953,6 +1965,12 @@ session that wrote the rule, so it is the least likely plan ever to violate it.
 Triggered by the first subsequent plan that copies the four-column template.
 
 ### 2026-08-21 — Setup states the coordinator choice it could not offer, and the skill keeps the name `setup`
+
+**Superseded in shape 2026-08-25.** Orca became the constant, required
+execution plane, so the managed block no longer carries a `Coordinator`
+field at all — see "2026-08-25 — Dely is an automation-first thin control
+protocol". The non-offerable-choice reasoning below still applies to the
+`CLAUDE.md` import.
 
 #### Context
 

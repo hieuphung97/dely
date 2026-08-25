@@ -1,9 +1,9 @@
 {
   "name": "dely",
-  "version": "0.10.0",
-  "description": "A cross-harness delivery workflow for coding agents.",
+  "version": "0.11.0",
+  "description": "An automation-first, Orca-supervised delivery protocol for coding agents.",
   "license": "MIT",
-  "keywords": ["delivery", "workflow", "review", "hooks", "evidence"],
+  "keywords": ["delivery", "workflow", "review", "orca", "automation"],
   "author": {
     "name": "Hieu Phung",
     "url": "https://github.com/hieuphung97"
