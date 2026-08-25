@@ -2723,3 +2723,50 @@ active `## Review` section's return sentence and a taxonomy checker to the
 active `AGENTS.md` focused-instrument paragraph, each with a real degraded
 fixture derived from the shipped file rather than a synthetic one, so a
 whole-file token search can no longer pass while the owning sentence is wrong.
+
+---
+
+## 38. The strict design/Plan Mode split was itself wrong, and the old check could not see either error
+
+A final integration review at `04a83c704070574bf3dad554bda16dd3b3637673` found
+a real cross-file contradiction: the shipped skill's Control section said
+"Design ownership is split" — the active design skill owns exploration,
+questions, and presentation, while native Plan Mode independently owns only
+tool gating and plan-approval UX — but the corrected decision record and
+approved design already stated a different boundary. Primary-source research
+into how native Plan Modes actually behave then showed the reviewer's first
+suggested repair, a strict split along the same seam, was also wrong: a native
+Plan Mode does not confine itself to gating and approval chrome, it also
+prescribes parts of the design method itself — its own question and plan
+surfaces, artifact representation, and mode transitions. A strict split cannot
+describe a mechanism that already crosses the line the split assumes.
+
+The old contract check stayed green through both the contradiction and the
+first wrong repair because it checked only that Plan Mode cannot bypass Dely's
+approval invariant — an orthogonal claim. It never inspected which surface
+(the skill, or Plan Mode) claims ownership of which capability, so a
+complete-looking "split" paragraph and a complete-looking "exclusive design
+method" paragraph both read as satisfying every token the check looked for.
+
+The standing rule is a capability boundary, not a split: Dely owns only the
+design outcome and the approval boundary, never a universal interview or
+planning method. The user, project, and harness determine which design skills
+and native modes are active. Native Plan Mode governs its own enforced action
+constraints, question and plan surfaces, artifact representation, and mode
+transitions; a compatible active design skill may refine exploration and
+design methodology within those constraints. Normal harness instruction and
+tool precedence governs when more than one is active. One explicit approval
+covers the same design scope; a material scope change requires renewed
+approval. Dely itself does not select, activate, configure, emulate, or
+compose either mechanism, and neither one can bypass the approval invariant.
+
+`tests/delivery-contract.sh` now carries `check_design_boundary`, scoped to
+the shipped skill, and a lighter `check_design_boundary_rejects` run against
+the active `docs/decisions.md` paragraph — both reject the literal "Design
+ownership is split" phrasing and the pattern where a skill or Plan Mode is
+said to independently own only gating/approval UX, or to own the whole design
+method outright. The degraded fixture is a real copy of the shipped
+`docs/decisions.md` paragraph with only its capability-boundary sentence
+replaced by an exclusive-ownership claim — everything else, including every
+other required phrase, stays byte-identical to the current file — so
+whole-file token presence cannot satisfy the check the way it did before.

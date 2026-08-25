@@ -29,11 +29,17 @@ task boundaries, exception handling, dispatch supervision, and release. It
 does not implement or review the candidate.
 
 Control does not prescribe question count, order, format, or skill-selection
-precedence. Design ownership is split: the active design skill already
-active in the harness owns how to explore, ask, compare, and present. Native
-Plan Mode independently owns tool gating and plan-approval UX. The two may be
-used together, and Dely selects, configures, emulates, or silently activates
-neither one.
+precedence. Dely owns the design outcome and approval boundary, not a
+universal interview or planning method. The user, project, and harness
+determine which design skills and native modes are active.
+
+Native Plan Mode governs its enforced action constraints, question and plan
+surfaces, artifact representation, and mode transitions. Compatible active
+design skills may refine exploration and design methodology within those
+constraints. When more than one applies, normal harness instruction and tool
+precedence governs. One explicit approval satisfies Dely's boundary for the
+same design scope; a material scope change requires renewed approval. Dely
+does not select, activate, configure, emulate, or compose either mechanism.
 
 Neither one owns or can bypass the approval invariant: before candidate
 mutation, Control must obtain explicit human approval of a design contract.

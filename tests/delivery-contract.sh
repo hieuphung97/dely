@@ -12,6 +12,7 @@ set -u
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 skill="$root/skills/delivery/SKILL.md"
 agents="$root/AGENTS.md"
+decisions="$root/docs/decisions.md"
 
 failures=0
 fail() {
@@ -277,6 +278,102 @@ check_active_taxonomy() {
   return $tmp
 }
 
+# --- design-skill / Plan Mode capability boundary -----------------------------
+
+# Whole-file flatten. The boundary language spans several paragraphs in both
+# the skill and the decision record, so a single-paragraph extractor would
+# miss half the required phrases; the reject phrases below are specific
+# enough that whole-file scope does not create false positives.
+# Reject-only core: the boundary must never collapse into a strict split or an
+# exclusive-ownership claim, wherever the language appears (skill or decision
+# record). Positive phrase requirements are layered on top only for the
+# artifact whose prose this unit owns (the skill); the decision record is
+# already the corrected baseline and is checked against the reject shapes
+# only, via the same fixtures.
+check_design_boundary_rejects() {
+  local file=$1
+  local flat
+  local tmp=0
+
+  if [ ! -f "$file" ]; then
+    diag "missing file: $file"
+    return 1
+  fi
+  flat=$(tr '\n' ' ' <"$file")
+
+  if printf '%s' "$flat" | grep -Fqi 'design ownership is split'; then
+    diag "still states design ownership is split between a skill and Plan Mode"
+    tmp=1
+  fi
+  if printf '%s' "$flat" | grep -Ei 'owns how to explore, ask, compare, and present' >/dev/null && \
+     printf '%s' "$flat" | grep -Ei 'independently owns tool gating and plan-approval' >/dev/null; then
+    diag "a skill exclusively owns exploration/questions/design while Plan Mode independently owns only gating/approval UX"
+    tmp=1
+  fi
+  if printf '%s' "$flat" | grep -Ei '(active (design )?skill|Plan Mode)[^.]{0,80}owns (the )?(whole |entire )?design method' >/dev/null; then
+    diag "a decision claims the active skill or Plan Mode owns the whole design method"
+    tmp=1
+  fi
+
+  return $tmp
+}
+
+check_design_boundary() {
+  local file=$1
+  local flat
+  local tmp=0
+
+  if [ ! -f "$file" ]; then
+    diag "missing file: $file"
+    return 1
+  fi
+  check_design_boundary_rejects "$file" || tmp=1
+  flat=$(tr '\n' ' ' <"$file")
+
+  if ! printf '%s' "$flat" | grep -Ei 'design outcome and approval boundary' >/dev/null; then
+    diag "does not say Dely owns the design outcome and approval boundary"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -Ei 'universal interview or planning method' >/dev/null; then
+    diag "does not disclaim a universal interview or planning method"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -Ei 'user, project, and harness' >/dev/null; then
+    diag "does not say the user, project, and harness determine active design skills and native modes"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -Ei 'question and plan surfaces' >/dev/null; then
+    diag "Plan Mode's question and plan surfaces are not named"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -Ei 'artifact representation' >/dev/null; then
+    diag "Plan Mode's artifact representation is not named"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -Ei 'mode transitions' >/dev/null; then
+    diag "Plan Mode's mode transitions are not named"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -Ei 'refine (exploration and )?(design )?methodology' >/dev/null; then
+    diag "compatible design skills are not said to refine methodology within Plan Mode's constraints"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -Ei 'instruction and tool precedence' >/dev/null; then
+    diag "does not defer overlap to normal harness instruction and tool precedence"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -Ei 'material scope change' >/dev/null; then
+    diag "does not require renewed approval for a material scope change"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -Ei 'does not select, activate' >/dev/null; then
+    diag "does not say Dely does not select or activate either mechanism"
+    tmp=1
+  fi
+
+  return $tmp
+}
+
 # --- native (non-journal) evidence --------------------------------------------
 
 check_native_evidence() {
@@ -391,6 +488,7 @@ run_all_checks() {
   local file=$1
   local tmp=0
   check_approval_invariant "$file" || tmp=1
+  check_design_boundary "$file" || tmp=1
   check_shapes "$file" || tmp=1
   check_frontmatter_routing "$file" || tmp=1
   check_orca_mandatory "$file" || tmp=1
@@ -423,6 +521,17 @@ else
     cat "$agents_out" >&2
   fi
   rm -f "$agents_out"
+fi
+
+if [ ! -f "$decisions" ]; then
+  fail "docs/decisions.md is absent"
+else
+  decisions_out=$(mktemp "${TMPDIR:-/tmp}/delivery-contract-decisions.XXXXXX")
+  if ! check_design_boundary_rejects "$decisions" >"$decisions_out" 2>&1; then
+    fail "active docs/decisions.md failed the design-boundary check"
+    cat "$decisions_out" >&2
+  fi
+  rm -f "$decisions_out"
 fi
 
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/delivery-contract.XXXXXX")
@@ -515,6 +624,47 @@ if [ -f "$agents" ]; then
   expect_check_fail check_active_taxonomy "$scratch/degraded-agents-taxonomy.md" \
     "active focused-instrument rule attached to nonexistent Planned work" \
     "$scratch/out-degraded-agents-taxonomy"
+fi
+
+# Fixture 2e: a complete-looking Control section that states every required
+# boundary phrase but still splits ownership — the exact present-but-wrong
+# shape a whole-file grep for the positive phrases alone would miss.
+cat >"$scratch/split-boundary.md" <<'EOF'
+## Control
+
+Dely owns the design outcome and approval boundary, not a universal interview
+or planning method. The user, project, and harness determine which design
+skills and native modes are active.
+
+Design ownership is split: the active design skill owns how to explore, ask,
+compare, and present. Native Plan Mode independently owns tool gating and
+plan-approval UX, including question and plan surfaces, artifact
+representation, and mode transitions. Skills refine design methodology using
+normal harness instruction and tool precedence. A material scope change
+requires renewed approval. Dely does not select, activate, configure,
+emulate, or compose either mechanism.
+EOF
+expect_check_fail check_design_boundary "$scratch/split-boundary.md" \
+  "complete-looking boundary language that still splits exploration/design from gating/approval" \
+  "$scratch/out-split-boundary"
+
+# Fixture 2f: a real degraded copy of the active decisions.md — everything
+# else intact — with the capability-boundary sentence replaced by an
+# exclusive-ownership claim. Whole-file token presence (the surrounding
+# approval/precedence language) still passes; only the scoped reject regex
+# catches it.
+if [ -f "$decisions" ]; then
+  awk -v RS='' -v ORS='\n\n' '
+    /design outcome and approval boundary/ {
+      gsub(/\n/, " ")
+      gsub(/compatible active design skills may refine methodology within those constraints\./, \
+        "the active design skill owns the whole design method.")
+    }
+    { print }
+  ' "$decisions" >"$scratch/degraded-decision-boundary.md"
+  expect_check_fail check_design_boundary_rejects "$scratch/degraded-decision-boundary.md" \
+    "degraded decision record claiming the active skill owns the whole design method" \
+    "$scratch/out-degraded-decision-boundary"
 fi
 
 # Fixture 3: says Orca is preferred but keeps a headless fallback.
