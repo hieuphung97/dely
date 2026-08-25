@@ -5,7 +5,6 @@
 | Status | Approved design contract. Implementation authorized 2026-08-25. |
 | Date | 2026-08-25 |
 | Product | `dely` |
-| Supersedes | `2026-08-23-composition-kernel-design.md`, `2026-08-23-sequential-identity-design.md`, and `2026-08-23-design-continuity.md` as design direction |
 
 This is a design contract, not an implementation plan or durable decision record.
 The owner approved this artifact and authorized implementation on 2026-08-25.
