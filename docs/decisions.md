@@ -70,6 +70,17 @@ single original-party remediation, while a second non-accept routes to
 dependency or authority question to Control; it is also distinct from a worker
 process failure.
 
+**Clarified after the scoped design-boundary re-review.** A focused instrument
+that claims the portable skill, approved design, and durable decision describe
+one capability boundary must positively assert the minimum live boundary in
+each active owner as well as reject forbidden ownership shapes. A reject-only
+check is insufficient because it accepts an active decision that omits the
+boundary entirely. The shorter durable decision need not duplicate every
+skill/design sentence: its positive core is Dely's design-outcome and approval
+boundary, user/project/harness selection, Plan Mode's native constraints and
+question/plan/artifact/transition surfaces, compatible-skill refinement under
+normal precedence, no Dely selection or composition, and no approval bypass.
+
 `dely:setup` is optional deployment preference only. Its managed block has exactly
 `implement` and `review`; Orca, control, release, Plan Mode, and design-skill
 selection are not configurable fields. Values are discovered from the live
