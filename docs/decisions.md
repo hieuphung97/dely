@@ -145,6 +145,16 @@ dependency. Static contract tests can reject present-but-wrong instruction shape
 they cannot prove that every model obeys prose. Candidate review and the first
 post-install delivery are the forward behavioral checks.
 
+**Clarified after the remaining final-integration findings.** A supported
+present-tense surface may refer only to a component that still ships. Removed
+rails may remain in dated history, but current guidance must not tell a reader to
+use them. The harness capability record likewise distinguishes a stable harness
+capability, a dated deployment observation, and this project's current policy: a
+past Codex review dispatched with `--sandbox read-only` stays useful history, but
+it cannot remain labelled as the current deployment after `AGENTS.md` removes a
+phase-implied sandbox. These are documentation reconciliations, not reasons to
+restore the journal, add a sandbox mechanism, or build a prose parser.
+
 #### Non-goals
 
 No parallel Dely workers, Dely-created worktrees, in-harness subagents, generic
