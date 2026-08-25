@@ -19,8 +19,25 @@ skill="$root/skills/delivery/SKILL.md"
 claude_version="$(jq -r .version "$claude_manifest" 2>/dev/null)"
 codex_version="$(jq -r .version "$codex_manifest" 2>/dev/null)"
 
-if [ "$claude_version" != "0.12.0" ] || [ "$codex_version" != "0.12.0" ]; then
-  fail_with "manifest versions must both be 0.12.0 (claude=$claude_version codex=$codex_version)"
+if [ "$claude_version" != "0.13.0" ] || [ "$codex_version" != "0.13.0" ]; then
+  fail_with "manifest versions must both be 0.13.0 (claude=$claude_version codex=$codex_version)"
+fi
+
+# Canonical MIT text (github.com/licenses/mit) with [year] -> 2026 and
+# [fullname] -> Hieu Phung, whitespace-normalized. A present LICENSE that only
+# names the license by word (e.g. "MIT") is not the grant itself.
+expected_license='MIT License Copyright (c) 2026 Hieu Phung Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.'
+
+license_file="$root/LICENSE"
+if [ ! -f "$license_file" ]; then
+  fail_with "missing LICENSE"
+else
+  actual_license="$(tr '\n' ' ' < "$license_file" | tr -s ' ')"
+  actual_license="${actual_license# }"
+  actual_license="${actual_license% }"
+  if [ "$actual_license" != "$expected_license" ]; then
+    fail_with "LICENSE is not the canonical MIT text for 2026 Hieu Phung"
+  fi
 fi
 
 # The whole maintenance-log section is matched verbatim (whitespace-normalized)
