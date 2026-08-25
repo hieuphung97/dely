@@ -133,8 +133,9 @@ the verified Claude, Codex, and Grok install, update, and uninstall surfaces;
 distinguish default-branch tracking from a ref where supported. State the
 clean-profile limitation from the decision instead of claiming an install that
 was not isolated. Bump only the two versioned manifests and their structural
-test. Add fixtures proving a one-word `LICENSE` and a plausible but unsupported
-`codex plugin install` README command are rejected.
+test. Use the canonical-license comparison to reject a one-word `LICENSE`; use
+the live Codex command surface, not a prose grep, to reject the plausible but
+unsupported `codex plugin install` README command.
 
 **Files.** `LICENSE`, `README.md`, `.claude-plugin/plugin.json`,
 `.codex-plugin/plugin.json`, `tests/contracts.sh`, and this plan's Observed-red
@@ -220,7 +221,7 @@ decision owns why forge state is verified rather than represented in Git.
 | --- | --- | --- | --- |
 | GitHub-recognized community policies and forms | `bash tests/contracts.sh`, Ruby YAML parse, and post-merge community profile | A valid issue form has `name` and `body` but no `description`, so GitHub will not recognize it | |
 | Canonical MIT grant and synchronized 0.13.0 manifests | Canonical-license `diff`, `jq`, and GitHub license detection on the pushed ref | `LICENSE` exists but contains only the word `MIT` | |
-| Verified self-service README path | Contract fixtures, harness `--help` surfaces, both validators, and remote-ref probe | README uses plausible `codex plugin install`, which the current CLI does not expose | |
+| Verified self-service README path | Harness `--help` surfaces, both validators, and remote-ref probe | README uses plausible `codex plugin install`; `codex plugin install --help` exits non-zero because the current CLI does not expose it | |
 | One exact CI entry point and green exact-HEAD check | Workflow parse, fixture contract test, local gates, and pull-request check run | Workflow exists but calls `bash tests/missing.sh` | |
 | Solo-maintainer-safe protected branch | GitHub ruleset API assertion | Ruleset exists but requires one approval or omits `contracts` | |
 | Private vulnerability intake | GitHub private-vulnerability-reporting API assertion | `SECURITY.md` names private reporting while the forge setting remains disabled | |
