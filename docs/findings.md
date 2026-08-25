@@ -2766,6 +2766,76 @@ covers the same design scope; a material scope change requires renewed
 approval. Dely itself does not select, activate, configure, emulate, or
 compose either mechanism, and neither one can bypass the approval invariant.
 
+## 39. The active pre-push hook told readers to pair it with the journal it no longer ships
+
+The final integration review at `7e13c0c1f9fb64cc6696d044f63726f29575f463`
+found `git-hooks/pre-push` still present-but-wrong: at line 15, past its own
+accident-and-drift limitation statement, it told an installer to "pair it with
+the PostToolUse journal, which records the command either way." The
+automation-first decision removed the journal, its hook wiring, its adapters,
+its tests, and every present-tense reference to it without a compatibility
+stub, and `README.md` already says no journal or hook adapter ships. The hook
+itself is still a supported, installed product surface, so this was live
+guidance pointing an installer at a component exact HEAD deliberately deleted.
+
+The correction deletes the two-line sentence and keeps the rest of the
+limitation text intact: `--no-verify` still skips the hook, and an
+unrestricted agent could still edit or unset it, so the hook remains a guard
+against accident and drift, not against a determined agent. No runtime
+mechanism replaces the deleted sentence, because there is nothing left to pair
+the hook with; a compatibility stub or a re-added reference would contradict
+the same removal this correction is closing. No permanent prose parser is
+added either — the fix is a one-time deletion of two lines that were always
+wrong after the journal's removal, not a recurring shape a future edit could
+reintroduce in a way worth watching mechanically.
+
+The focused instrument is `if rg -n 'PostToolUse journal|post-tool-journal\.sh'
+git-hooks/pre-push; then exit 1; fi`. It proves only that those two literal
+strings are absent from this one file today. It cannot prove that no other
+document still recommends the journal, that a future edit will not
+reintroduce a differently worded pairing instruction, or that the hook's
+remaining prose is otherwise accurate; a human reviewer reading the complete
+diff carries that boundary.
+
+## 40. The capability record kept a superseded sandbox deployment as current policy
+
+The same review found `docs/harness-surface.md` asserting, at its former line
+529, that "the sandbox and identifier-injection observations remain current,"
+and then, at its former lines 579-580, that "this repository's current review
+dispatch stays Codex `--sandbox read-only` until a separately observed role
+swap." Current `AGENTS.md` already states the opposite and more recent policy:
+this project adds no phase-implied sandbox, so native Internet access, closure
+gates, result writes, and coordinator completion stay available to the review
+role. The 2026-08-20 Codex `--sandbox read-only` observation was a real,
+correctly dated measurement of that harness's documented and locally observed
+sandbox behaviour; the error was presenting it as this repository's ongoing
+deployment choice rather than as a superseded historical one.
+
+The correction keeps the per-harness capability facts — what each harness's
+sandbox flag documents and was locally observed to do — because those facts
+did not change and remain useful to a future role swap. It narrows the
+blanket "remain current" claim to the identifier-injection observation alone,
+and it recasts the former deployment sentence as a dated "Historical
+deployment observation (dated 2026-08-20)" that names `AGENTS.md`'s current
+no-phase-implied-sandbox policy as its supersession. No runtime mechanism is
+added: this file only records observations and policy pointers, and the
+running policy itself already lives in `AGENTS.md`, so duplicating an
+enforcement rail here would create a second source of truth to keep in sync.
+No permanent prose parser is added either, for the same reason as above — the
+distinction between a dated observation and a current deployment is a
+one-time rewording, not a recurring shape.
+
+The focused instruments are `rg -n 'Historical deployment observation'
+docs/harness-surface.md`, `rg -n 'no phase-implied sandbox'
+docs/harness-surface.md`, and `if rg -n "This repository's current review
+dispatch stays" docs/harness-surface.md; then exit 1; fi`. Together they prove
+only that this exact historical/current boundary phrasing is present and the
+one named obsolete sentence is absent from this one file today. They cannot
+prove that every other paragraph in the file is consistent with `AGENTS.md`,
+that a future edit will not reintroduce a stale deployment claim in different
+words, or that the per-harness capability facts themselves are still accurate;
+a human reviewer reading the complete diff carries that boundary.
+
 `tests/delivery-contract.sh` extracts the active owning section of each of the
 three owners — the skill's `## The control session`, the approved design's
 `### Design methods and Plan Mode`, and the durable decision's `#### Decision`

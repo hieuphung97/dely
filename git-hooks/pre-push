@@ -12,8 +12,7 @@
 #
 # What it cannot do: `--no-verify` skips it, and an unrestricted agent could
 # edit or unset it. This is a guard against accident and drift, not against a
-# determined agent. Pair it with the PostToolUse journal, which records the
-# command either way.
+# determined agent.
 #
 # stdin lines are: <local ref> <local sha> <remote ref> <remote sha>
 

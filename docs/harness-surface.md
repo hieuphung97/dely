@@ -525,8 +525,11 @@ automation-first thin control protocol", for the decision it supports.
 references below describe the rails that motivated and were retired by the
 three-harness Orca evidence probe recorded above and in `docs/decisions.md`,
 "2026-08-25 — Dely is an automation-first thin control protocol". Dispatch
-evidence is now read from Orca, not journaled by this package; the sandbox and
-identifier-injection observations remain current.
+evidence is now read from Orca, not journaled by this package; the
+identifier-injection observations remain current. The per-harness sandbox
+capability facts below remain valid documented behaviour, but the sandbox
+deployment choice recorded further below is a historical observation, not a
+current policy.
 
 Roles are meant to be swappable: any harness as control session, any as worker.
 The invocations are already symmetric, and all three resume a session by id, so
@@ -573,10 +576,11 @@ commands and, locally observed, also blocks gate cache writes. Grok
 `read-only` keeps `~/.grok/` writable and does not enforce child-network
 restriction on macOS. Hosted or in-process web tools are documented as
 independent of command network on all three; that is not a claim that this
-install's web tool is enabled. This repository's current review dispatch stays
-Codex `--sandbox read-only` until a separately observed role swap. The stale
-Claude Code cell is recorded in `findings.md` §29 rather than silently
-rewritten.
+install's web tool is enabled. **Historical deployment observation (dated
+2026-08-20):** this repository's review dispatch was Codex `--sandbox
+read-only`. That deployment is superseded by the current project policy of
+no phase-implied sandbox, recorded in `AGENTS.md`. The stale Claude Code cell
+is recorded in `findings.md` §29 rather than silently rewritten.
 
 ### What this means for a role swap today
 
