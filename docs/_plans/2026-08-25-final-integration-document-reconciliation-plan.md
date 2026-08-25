@@ -19,6 +19,7 @@ parser, sandbox policy, compatibility rail, or broader historical cleanup.
 git-hooks/pre-push
 docs/harness-surface.md
 docs/findings.md
+docs/_plans/2026-08-25-final-integration-document-reconciliation-plan.md
 ```
 
 The owning durable decision is amended in the baseline commit. No colocated source
@@ -92,12 +93,14 @@ claiming that arbitrary future wording is mechanically understood.
 absence/presence checks and human diff review rather than adding a parser or a
 test coupled to explanatory prose.
 
-**Files.** The three allowed paths only. The baseline decision and transient plan
-are outside the implementation diff; release owns its log row and plan deletion.
+**Files.** The three owner paths plus this transient plan, whose `Observed red`
+cells the implementer fills. The baseline decision is outside the implementation
+diff; release owns its log row and plan deletion.
 
 **Focused verification.** Compare the candidate to this plan's baseline with
 `git diff --name-only <baseline>..HEAD`; before release closure it must list only
-`docs/findings.md`, `docs/harness-surface.md`, and `git-hooks/pre-push`.
+this plan, `docs/findings.md`, `docs/harness-surface.md`, and
+`git-hooks/pre-push`.
 
 **Document impact.** No further owning document is changed. `README.md` already
 states that no journal or hook adapter ships, and `AGENTS.md` already states the
