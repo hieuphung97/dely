@@ -2728,12 +2728,18 @@ whole-file token search can no longer pass while the owning sentence is wrong.
 
 ## 38. The strict design/Plan Mode split was itself wrong, and the old check could not see either error
 
-A final integration review at `04a83c704070574bf3dad554bda16dd3b3637673` found
-a real cross-file contradiction: the shipped skill's Control section said
-"Design ownership is split" — the active design skill owns exploration,
-questions, and presentation, while native Plan Mode independently owns only
-tool gating and plan-approval UX — but the corrected decision record and
-approved design already stated a different boundary. Primary-source research
+A final integration review at `7e13c0c1f9fb64cc6696d044f63726f29575f463` found
+a real cross-file contradiction: at that HEAD, the shipped skill's Control
+section and the approved design both said "Design ownership is split" — the
+active design skill owns exploration, questions, and presentation, while
+native Plan Mode independently owns only tool gating and plan-approval UX —
+but the durable decision record already used a different formulation, that
+the active skill or native Plan Mode owns the whole design method. The
+owner-approved design correction was commit
+`04a83c704070574bf3dad554bda16dd3b3637673`, which corrected the approved
+design and durable decision to the capability boundary below; commit
+`692998cc245a9e8034a94065059a9884fa40501e` then aligned the skill to match.
+Primary-source research
 into how native Plan Modes actually behave then showed the reviewer's first
 suggested repair, a strict split along the same seam, was also wrong: a native
 Plan Mode does not confine itself to gating and approval chrome, it also

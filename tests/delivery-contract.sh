@@ -4,15 +4,20 @@
 # mandatory Orca with no headless fallback, task-sized freshness with
 # adaptive review, original-party bounded remediation, native (non-journal)
 # evidence, and exact-HEAD no-worker release — and the proven
-# input_accepted/90-second/TUI-read/one-Enter recovery. Fixture copies run
-# through the same checks; a negative fixture that passes is a test failure.
-# Does not require claude, codex, grok or orca.
+# input_accepted/90-second/TUI-read/one-Enter recovery. The design-skill /
+# Plan Mode capability boundary is checked on the active owning section of
+# each of its three owners — the skill, the approved design, and the durable
+# decision — not the whole file, so a regression cannot hide behind matching
+# tokens elsewhere. Fixture copies run through the same checks; a negative
+# fixture that passes is a test failure. Does not require claude, codex, grok
+# or orca.
 set -u
 
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 skill="$root/skills/delivery/SKILL.md"
 agents="$root/AGENTS.md"
 decisions="$root/docs/decisions.md"
+design="$root/docs/_plans/2026-08-24-automation-first-dely-design.md"
 
 failures=0
 fail() {
@@ -280,16 +285,46 @@ check_active_taxonomy() {
 
 # --- design-skill / Plan Mode capability boundary -----------------------------
 
-# Whole-file flatten. The boundary language spans several paragraphs in both
-# the skill and the decision record, so a single-paragraph extractor would
-# miss half the required phrases; the reject phrases below are specific
-# enough that whole-file scope does not create false positives.
+# Extracts the skill's active "## The control session" section (through the
+# next "## " heading). Historical prose outside this section (e.g. an old
+# HTML comment) must not be able to satisfy the contract on its behalf.
+control_section() {
+  awk '
+    /^## The control session$/ { p = 1; next }
+    p && /^## / { exit }
+    p { print }
+  ' "$1"
+}
+
+# Extracts the approved design's active "### Design methods and Plan Mode"
+# section (through the next "## " or "### " heading).
+design_methods_section() {
+  awk '
+    /^### Design methods and Plan Mode$/ { p = 1; next }
+    p && /^#{2,3} / { exit }
+    p { print }
+  ' "$1"
+}
+
+# Extracts only the "#### Decision" subsection of the active "2026-08-25 —
+# Dely is an automation-first thin control protocol" record (through the
+# next "#### " heading), not the whole multi-thousand-line decision history,
+# so an unrelated superseded decision cannot stand in for the active one.
+decision_section() {
+  awk '
+    /^### 2026-08-25 — Dely is an automation-first thin control protocol$/ { p = 1; next }
+    p && /^### / { exit }
+    p { print }
+  ' "$1" | awk '
+    /^#### Decision$/ { p = 1; next }
+    p && /^#### / { exit }
+    p { print }
+  '
+}
+
 # Reject-only core: the boundary must never collapse into a strict split or an
-# exclusive-ownership claim, wherever the language appears (skill or decision
-# record). Positive phrase requirements are layered on top only for the
-# artifact whose prose this unit owns (the skill); the decision record is
-# already the corrected baseline and is checked against the reject shapes
-# only, via the same fixtures.
+# exclusive-ownership claim, wherever the language appears (skill, design, or
+# decision record).
 check_design_boundary_rejects() {
   local file=$1
   local flat
@@ -372,6 +407,34 @@ check_design_boundary() {
   fi
 
   return $tmp
+}
+
+# Runs a boundary checker (full = positive assertions + rejects; reject =
+# rejects only) against one extractor's output, so each owning surface is
+# checked on its own active section rather than the whole file. A regression
+# in one owner must fail even when matching tokens survive elsewhere in that
+# same file (e.g. a historical comment, or another owner's paragraph).
+check_design_boundary_section() {
+  local extractor=$1
+  local src=$2
+  local mode=$3
+  local tmp
+  local rc=0
+
+  tmp=$(mktemp "${TMPDIR:-/tmp}/delivery-contract-section.XXXXXX")
+  "$extractor" "$src" >"$tmp"
+  if [ ! -s "$tmp" ]; then
+    diag "$src has no active $extractor section"
+    rm -f "$tmp"
+    return 1
+  fi
+  if [ "$mode" = "reject" ]; then
+    check_design_boundary_rejects "$tmp" || rc=1
+  else
+    check_design_boundary "$tmp" || rc=1
+  fi
+  rm -f "$tmp"
+  return $rc
 }
 
 # --- native (non-journal) evidence --------------------------------------------
@@ -488,7 +551,7 @@ run_all_checks() {
   local file=$1
   local tmp=0
   check_approval_invariant "$file" || tmp=1
-  check_design_boundary "$file" || tmp=1
+  check_design_boundary_section control_section "$file" full || tmp=1
   check_shapes "$file" || tmp=1
   check_frontmatter_routing "$file" || tmp=1
   check_orca_mandatory "$file" || tmp=1
@@ -523,12 +586,23 @@ else
   rm -f "$agents_out"
 fi
 
+if [ ! -f "$design" ]; then
+  fail "approved design is absent: docs/_plans/2026-08-24-automation-first-dely-design.md"
+else
+  design_out=$(mktemp "${TMPDIR:-/tmp}/delivery-contract-design.XXXXXX")
+  if ! check_design_boundary_section design_methods_section "$design" full >"$design_out" 2>&1; then
+    fail "active approved-design Design methods and Plan Mode section failed the design-boundary check"
+    cat "$design_out" >&2
+  fi
+  rm -f "$design_out"
+fi
+
 if [ ! -f "$decisions" ]; then
   fail "docs/decisions.md is absent"
 else
   decisions_out=$(mktemp "${TMPDIR:-/tmp}/delivery-contract-decisions.XXXXXX")
-  if ! check_design_boundary_rejects "$decisions" >"$decisions_out" 2>&1; then
-    fail "active docs/decisions.md failed the design-boundary check"
+  if ! check_design_boundary_section decision_section "$decisions" reject >"$decisions_out" 2>&1; then
+    fail "active docs/decisions.md Decision subsection failed the design-boundary check"
     cat "$decisions_out" >&2
   fi
   rm -f "$decisions_out"
@@ -648,11 +722,16 @@ expect_check_fail check_design_boundary "$scratch/split-boundary.md" \
   "complete-looking boundary language that still splits exploration/design from gating/approval" \
   "$scratch/out-split-boundary"
 
+# Thin wrappers so expect_check_fail (one checker, one file) can drive the
+# extraction-scoped check for each owning surface.
+check_control_section_full() { check_design_boundary_section control_section "$1" full; }
+check_design_methods_section_full() { check_design_boundary_section design_methods_section "$1" full; }
+check_decision_section_reject() { check_design_boundary_section decision_section "$1" reject; }
+
 # Fixture 2f: a real degraded copy of the active decisions.md — everything
 # else intact — with the capability-boundary sentence replaced by an
-# exclusive-ownership claim. Whole-file token presence (the surrounding
-# approval/precedence language) still passes; only the scoped reject regex
-# catches it.
+# exclusive-ownership claim, exercised through the scoped `#### Decision`
+# extractor rather than a whole-file grep.
 if [ -f "$decisions" ]; then
   awk -v RS='' -v ORS='\n\n' '
     /design outcome and approval boundary/ {
@@ -662,9 +741,57 @@ if [ -f "$decisions" ]; then
     }
     { print }
   ' "$decisions" >"$scratch/degraded-decision-boundary.md"
-  expect_check_fail check_design_boundary_rejects "$scratch/degraded-decision-boundary.md" \
+  expect_check_fail check_decision_section_reject "$scratch/degraded-decision-boundary.md" \
     "degraded decision record claiming the active skill owns the whole design method" \
     "$scratch/out-degraded-decision-boundary"
+fi
+
+# Fixture 2g: a real degraded copy of the approved design — everything else
+# byte-identical — whose active "Design methods and Plan Mode" section is
+# given the explicit strict-split sentences. Reproduces the reviewer
+# counterexample where the design was not an input to the script at all, so
+# whole-file scope never saw it; the new design_methods_section extractor
+# must fail it.
+if [ -f "$design" ]; then
+  awk '
+    /^### Design methods and Plan Mode$/ {
+      print; print "";
+      print "Design ownership is split: the active design skill owns how to explore, ask,"
+      print "compare, and present, and native Plan Mode independently owns tool gating and"
+      print "plan-approval UX."
+      next
+    }
+    { print }
+  ' "$design" >"$scratch/degraded-design-methods.md"
+  expect_check_fail check_design_methods_section_full "$scratch/degraded-design-methods.md" \
+    "approved design's active section reverted to the rejected strict split" \
+    "$scratch/out-degraded-design-methods"
+fi
+
+# Fixture 2h: a real degraded copy of the shipped skill — everything else
+# byte-identical — whose active Control paragraph is reworded to an
+# exclusive-ownership claim that does not match any reject regex verbatim,
+# while the original required positive phrases survive only in a trailing
+# historical HTML comment outside the active section. Whole-file token
+# presence would still find every required phrase and pass; only scoping the
+# check to the extracted "## The control session" section catches it.
+if [ -f "$skill" ]; then
+  awk -v RS='' -v ORS='\n\n' '
+    /Native Plan Mode governs its enforced action constraints/ {
+      $0 = "Design belongs solely to the active design skill. Native Plan Mode supplies only permission gates and approval UI."
+    }
+    { print }
+  ' "$skill" >"$scratch/degraded-control-comment.md"
+  cat >>"$scratch/degraded-control-comment.md" <<'EOF'
+
+<!-- historical: earlier draft said design outcome and approval boundary, universal
+interview or planning method, user, project, and harness, question and plan surfaces,
+artifact representation, mode transitions, refine exploration and design methodology,
+instruction and tool precedence, material scope change, does not select, activate -->
+EOF
+  expect_check_fail check_control_section_full "$scratch/degraded-control-comment.md" \
+    "active Control paragraph paraphrased into exclusive ownership while the required phrases survive only in a historical comment elsewhere in the file" \
+    "$scratch/out-degraded-control-comment"
 fi
 
 # Fixture 3: says Orca is preferred but keeps a headless fallback.
