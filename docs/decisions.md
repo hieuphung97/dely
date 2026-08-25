@@ -34,12 +34,17 @@ approved design contract before candidate mutation, then automates sequential
 implementation, independent review, exact-HEAD gates, and pull-request
 preparation. The normal human gates are design approval and merge or publication.
 
-Dely owns only the approval invariant, task boundaries, role independence,
-bounded remediation, exception routing, and exact-HEAD closure. The active skill
-or native Plan Mode owns the design method and question UX; neither can bypass
-approval. Orca is the required execution plane. Git owns candidate state, Orca
-owns dispatch evidence, and CI plus the forge own release state. Dely does not
-duplicate any of those stores.
+Dely owns only the design outcome and approval boundary, task boundaries, role
+independence, bounded remediation, exception routing, and exact-HEAD closure. The
+user, project, and harness determine which design skills and native modes are
+active. Native Plan Mode governs its enforced action constraints, question and
+plan surfaces, artifact representation, and mode transitions; compatible active
+design skills may refine methodology within those constraints. Normal harness
+instruction and tool precedence governs when more than one applies. Dely does not
+select, activate, emulate, or compose them, and neither can bypass approval. Orca
+is the required execution plane. Git owns candidate state, Orca owns dispatch
+evidence, and CI plus the forge own release state. Dely does not duplicate any of
+those stores.
 
 Work has three shapes:
 

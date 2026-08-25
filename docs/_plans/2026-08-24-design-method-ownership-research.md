@@ -2,9 +2,41 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Research recommendation for owner review. No implementation authority. |
+| Status | Superseded in part by the owner decision recorded on 2026-08-25; retained as research history. |
 | Date | 2026-08-24 |
 | Question | Should Dely prescribe clarification behavior, or defer it to a harness Plan Mode or a user-selected design skill? |
+
+## Superseding correction — 2026-08-25
+
+The outcome-level conclusion below still stands: Dely owns the approved design
+contract and pre-mutation authority boundary rather than a universal questioning
+algorithm. The clean three-layer split, the heading “Plan Mode is not a design
+method,” and the claim that Superpowers Brainstorming and Plan Mode compose
+without overlap are superseded.
+
+Current native Plan Modes also prescribe design method. Codex defines an
+exploration, intent-clarification, and implementation-design conversation through
+a decision-complete plan; Claude Code documents an explore-plan-approve workflow
+with requirements questions; Grok Build feeds design-direction answers into its
+native plan. Superpowers Brainstorming overlaps those concerns and separately
+directs users to invoke it before entering Plan Mode.
+
+The settled boundary is capability-based: native Plan Mode governs its enforced
+constraints, question and plan surfaces, artifact representation, and mode
+transitions; compatible active design skills may refine methodology within those
+constraints. The user, project, harness, and their normal precedence determine
+which mechanisms are active. Dely does not select or compose them, and one
+explicit approval is sufficient when it approves the same design scope.
+
+Primary sources:
+
+- [Codex Plan Mode template](https://github.com/openai/codex/blob/main/codex-rs/collaboration-mode-templates/templates/plan.md)
+- [Claude Code permission modes](https://code.claude.com/docs/en/permission-modes)
+- [Grok Build Plan Mode](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/docs/user-guide/19-plan-mode.md)
+- [Superpowers using-superpowers](https://github.com/obra/superpowers/blob/main/skills/using-superpowers/SKILL.md)
+
+The remainder of this file records the earlier research path and must not be read
+as the current contract where it conflicts with this correction.
 
 ## Executive conclusion
 

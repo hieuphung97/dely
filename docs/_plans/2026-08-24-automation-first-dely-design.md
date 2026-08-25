@@ -58,12 +58,20 @@ conventions, but material assumptions must be explicit.
 
 ### Design methods and Plan Mode
 
-The active design skill owns how to explore, ask questions, compare approaches,
-and present the design. Harness Plan Mode independently owns tool gating and plan
-approval UX. They may be used together.
+Dely owns the design outcome and approval boundary, not a universal interview or
+planning method. The user, project, and harness determine which design skills and
+native modes are active.
 
-Dely does not select, configure, emulate, or silently activate either one. Plan
-Mode is defense in depth, not proof that requirements are clear or that no
+Native Plan Mode governs its enforced action constraints, question and plan
+surfaces, artifact representation, and mode transitions. Compatible active
+design skills may refine exploration and design methodology within those
+constraints. When more than one applies, the harness's normal instruction and
+tool precedence governs. A single explicit approval satisfies Dely's boundary
+when it approves the same design scope; a material scope change requires renewed
+approval.
+
+Dely does not select, activate, configure, emulate, or compose either mechanism.
+Plan Mode is defense in depth, not proof that requirements are clear or that no
 mutation is possible. Dely's approval invariant remains authoritative in every
 harness and mode.
 
