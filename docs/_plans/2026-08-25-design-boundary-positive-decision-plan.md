@@ -1,62 +1,58 @@
-# Durable Decision Positive Boundary Implementation Plan
+# Positive Design Boundary Clause Binding Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
-> `superpowers:executing-plans` to execute the implementation task and
-> `superpowers:test-driven-development` for its RED/GREEN cycle. Dely's Orca
-> phase dispatch remains authoritative; do not create in-harness subagents or
-> worktrees.
+> `superpowers:executing-plans` and `superpowers:test-driven-development` for
+> implementation. Dely's Orca phase dispatch remains authoritative; do not
+> create in-harness subagents or worktrees.
 
-**Goal:** Make the focused contract fail when the active durable decision omits
-the design-skill/Plan Mode capability boundary, without duplicating the fuller
-skill/design wording.
+**Goal:** Make the focused contract reject the four reviewed reverse-semantic
+owners while retaining every approved skill, design, and durable-decision
+formulation.
 
-**Architecture:** Reuse the existing active-section extractors and reject
-checks. Factor the current positive assertions into a minimal shared core plus
-the existing skill/design-only assertions; run the durable Decision subsection
-through the core rather than reject-only mode.
+**Architecture:** Keep the existing active-section extractors, shared core, and
+plain `grep -E` implementation. Replace four permissive token expressions with
+literal clause-level alternatives and add four complete-copy decision fixtures;
+do not add a parser, helper layer, dependency, or synonym catalogue.
 
-**Tech Stack:** POSIX-style Bash, `awk`, `grep`, Git, and the repository's
-existing shell contract tests; no new dependency or framework.
+**Tech Stack:** Bash, `awk`, `grep`, Git, and the existing shell contract tests.
 
 **Spec:** `docs/decisions.md`, “2026-08-25 — Dely is an automation-first thin
-control protocol”, including the scoped re-review clarification.
+control protocol”, including the positive-core semantic clarification.
 
 ## Global Constraints
 
 - Preserve exact candidate history through
-  `2c7eb3e3fbcaf1089297dc12416abfa078c521f9`; do not amend, squash, rebase,
+  `b1fc0399a58d4d3940e7c3d0d598779ab2fac0f1`; do not amend, squash, rebase,
   force-push, reset, stash, or clean.
 - Implementation may modify only `tests/delivery-contract.sh` and
-  `docs/findings.md`; design and decision artifacts are immutable baseline.
-- Use the current checkout, one fresh implementation session, one fresh
-  independent review session, and the frozen release session. No worktree or
-  in-harness subagent.
-- The two known integration findings in `git-hooks/pre-push` and
-  `docs/harness-surface.md` remain separate and forbidden.
-- Keep the checker dependency-free and add no synonym catalogue or prose parser.
+  `docs/findings.md`; this decision and plan commit is the immutable design
+  baseline.
+- Use the current checkout, one fresh implementation session, and one fresh
+  independent review session. No worktree or in-harness subagent.
+- The two separate integration findings in `git-hooks/pre-push` and
+  `docs/harness-surface.md` remain forbidden.
+- Keep `check_design_boundary_core`; add no parser, helper abstraction,
+  dependency, or general paraphrase support.
 
 ---
 
 Decision record: `docs/decisions.md`, “2026-08-25 — Dely is an
 automation-first thin control protocol”
 
-Approved design: `docs/_plans/2026-08-24-automation-first-dely-design.md`,
-“Design methods and Plan Mode”
+Prior review:
+`/tmp/dely-design-boundary-positive-decision-rereview-b1fc039-result.md`
 
-Prior non-accept:
-`/tmp/dely-design-skill-plan-mode-rereview-2c7eb3e-result.md`
-
-**Baseline:** Control resolves the commit carrying the decision amendment and
-this plan immediately before dispatch and supplies that exact SHA to every
-worker; a commit cannot record its own SHA.
+**Baseline:** Control resolves the commit carrying this decision amendment and
+plan immediately before dispatch and supplies that exact SHA to every worker; a
+commit cannot record its own SHA.
 
 ## Goal
 
-Close the one remaining acceptance gap from the scoped re-review: the active
-durable Decision subsection must contain its minimum positive capability
-boundary, not merely avoid three forbidden formulations. The already-correct
-skill, approved design, ownership contract, phase model, and two separate final
-integration findings are out of reach.
+Close the semantic discrimination gap found after the first plan's bounded
+remediation. The checker must reject clauses that use the expected nouns while
+asserting the opposite relationship. The owner prose, workflow behaviour,
+phase/setup/deployment design, and the two separate integration findings are out
+of reach.
 
 ## Allowed scope
 
@@ -69,15 +65,15 @@ docs/findings.md
 tests/delivery-contract.sh
 ```
 
-`tests/delivery-contract.sh` is the existing owning instrument. No registry or
-inventory enumerates this prose contract. `docs/findings.md` owns the observed
-checker history and its current description must match the final instrument.
+The existing shell script is the colocated owner of this prose contract. No
+registry or inventory enumerates these clauses.
 
 ## Forbidden scope
 
 - `skills/delivery/SKILL.md` and
-  `docs/_plans/2026-08-24-automation-first-dely-design.md`: both active
-  boundaries are already correct and positively checked.
+  `docs/_plans/2026-08-24-automation-first-dely-design.md`: their approved prose
+  stays byte-identical; fixtures may copy and mutate it only outside the
+  repository.
 - `git-hooks/pre-push` and `docs/harness-surface.md`: separate final-integration
   findings with separate owner decisions.
 - Setup, manifests, README, harness configuration, installed plugin caches,
@@ -89,116 +85,127 @@ checker history and its current description must match the final instrument.
   before dispatch.
 - **Branch/base/PR:** `automation-first-dely` against `origin/main`, draft PR
   `https://github.com/hieuphung97/dely/pull/15`.
-- **Pins:** implementation uses Claude Code `sonnet` at `medium`; review uses a
-  fresh Codex CLI `gpt-5.6-sol` at `high`; release uses Grok Build `grok-4.6`
-  at `medium` under the frozen installed self-update contract.
+- **Pins:** implementation uses Claude Code `sonnet` at `medium`; review uses
+  Codex CLI `gpt-5.6-sol` at `high`. This self-update retains the frozen
+  installed release contract after review accepts.
 - Workers may commit only their phase-owned paths. Release may push the named
   branch but may not merge or force-push.
 
 ## Tasks
 
-### 1. Require a positive core in the active durable Decision subsection
+### 1. Reject the four reverse-semantic owners
 
-**Behaviour.** The focused script rejects a complete current repository copy
-whose active durable Decision replaces its capability paragraph with neutral
-prose, even when harmless matching tokens remain outside that active subsection.
-The untouched skill, approved design, and durable decision remain green.
+**Behaviour.** The focused script rejects complete current decision copies that
+say refinement occurs outside Plan Mode constraints, permit Dely to
+emulate/compose, permit approval bypass, or replace `design-outcome` with
+`designXoutcome`. The real skill, approved design, full durable decision, and
+compact-only durable decision all pass.
 
-**Direction.** First add a complete-copy decision fixture which replaces the
-active capability paragraph with: “The design-method capability boundary is
-intentionally unspecified here; another artifact owns it.” Keep the fixture's
-historical tokens outside `decision_section` so whole-file presence cannot help.
-Run the script and observe `expect_check_fail` report that this negative fixture
-passed. Then extract the smallest positive core already common to the three
-owners into one checker that also invokes the existing rejects. Keep the current
-full skill/design checker as core plus its stricter, owner-specific assertions;
-change the durable decision path and fixture wrapper from reject-only to core.
+**Direction.** First add four complete-copy fixtures beside fixtures 2i–2m. Each
+must mutate both live durable-decision formulations where both exist, call
+`assert_decision_mutated`, and fail through `expect_check_fail` only after the
+checker is corrected. Observe the current checker accepting each direct owner
+before changing it.
 
-The durable core must require these executed claims, allowing the current prose
-variants rather than a synonym catalogue:
+Then change only these four positive-core expressions:
 
-- Dely owns the design outcome and approval boundary;
-- user, project, and harness determine active skills/modes;
-- Plan Mode names question/plan surfaces, artifact representation, and mode
-  transitions under its constraints;
-- compatible active skills refine methodology under normal instruction/tool
-  precedence;
-- Dely does not select or activate and does not emulate or compose; and
-- neither mechanism bypasses approval.
+```text
+design[- ]outcome and approval boundary
 
-Update finding 38's final paragraph to describe all three active-section
-extractors, positive core, fuller skill/design assertions, and the neutral
-decision fixture. Preserve its chronology and general lesson.
+refine (exploration and design )?methodology within (those|its) constraints
+|native constraints and question/plan/artifact/transition surfaces,
+ compatible-skill refinement under normal precedence
+
+does not select,? activate,?( configure,?)? emulate,? or compose
+ (either mechanism|them)
+|no Dely selection or composition
+
+neither one owns or can bypass the approval invariant
+|approval invariant remains authoritative in every harness and mode
+|neither can bypass approval
+|no approval bypass
+```
+
+Keep the separate no-select/no-activate and precedence assertions. Whitespace
+may be represented with normal ERE spaces after the section has been flattened;
+do not broaden the alternatives beyond the four approved owners.
+
+Update finding 38 so it says the core matches approved clauses and the four
+reverse-semantic fixtures, not that disconnected keyword checks enforce those
+relationships.
 
 **Files.** Modify `tests/delivery-contract.sh` and `docs/findings.md` only.
 
-**Interfaces.** Consume `control_section`, `design_methods_section`,
-`decision_section`, `check_design_boundary_rejects`, and
-`check_design_boundary_section`. Produce one small positive-core checker used by
-all three active owners; retain the full checker for skill/design-only clauses.
+**Interfaces.** Consume `decision_section`, `assert_decision_mutated`,
+`expect_check_fail`, and `check_design_boundary_core`. Preserve their names and
+call shape; produce no new shared helper.
 
-- [ ] Add the complete-copy neutral-decision fixture using the existing
-      decision wrapper.
-- [ ] Run `bash tests/delivery-contract.sh`; expect non-zero with a diagnostic
-      that the negative neutral-decision fixture passed, not a syntax failure.
-- [ ] Add the shared core and route the decision path/wrapper through it.
+- [ ] Add the four complete-copy mutations and invoke the direct decision-core
+      checker for each.
+- [ ] Run each mutated copy against the unchanged core; record four status-zero
+      outcomes as RED evidence because the wrong owners are accepted.
+- [ ] Replace only the four permissive expressions above.
 - [ ] Run `bash tests/delivery-contract.sh`; expect `delivery-contract: ok`.
-- [ ] Reproduce outside the repository that removing the decision boundary now
-      fails for missing positive capabilities while the untouched copy passes.
-- [ ] Reconcile finding 38, run every closure gate, inspect the fix-only diff,
-      and create one implementation commit without pushing.
+- [ ] Re-run the four direct owner checks; expect non-zero with the matching
+      diagnostic, while the three real owners and compact-only decision pass.
+- [ ] Reconcile finding 38, run every closure gate, inspect the baseline-only
+      diff, and create one implementation commit without pushing.
 
-**Focused verification.** `bash tests/delivery-contract.sh`. RED is the named
-negative fixture being accepted; GREEN is `delivery-contract: ok`, with an
-out-of-repository neutral-decision copy rejected for missing positive claims.
+**Focused verification.** `bash tests/delivery-contract.sh`. Before the regex
+change, the four executable reverse-semantic owners return success; after it,
+their in-script negative fixtures are rejected and the script prints
+`delivery-contract: ok`.
 
-**Document impact.** `docs/findings.md` must stop describing the decision owner
-as reject-only and record why positive owner assertions are required.
+**Document impact.** `docs/findings.md` owns the checker's observed history and
+must describe its actual clause-level limit.
 
-### 2. Independently review the complete positive-owner contract
+### 2. Independently review the clause-level contract
 
-**Behaviour.** A fresh reviewer proves all three active owners reject their
-named complete-copy regressions and that no unrelated behavior or path changed.
+**Behaviour.** A fresh reviewer proves that the four reviewed counterexamples
+are rejected, all approved owner formulations remain accepted, and no unrelated
+path or behaviour changed.
 
-**Direction.** Review the full candidate from the new design baseline, not only
-the last function. Reproduce: strict split in approved design, sole skill
-ownership with historical tokens elsewhere, and neutral/absent durable decision
-boundary. Run all closure gates. Do not edit the candidate.
+**Direction.** Review the whole candidate from the new design baseline. Rebuild
+the four complete-copy counterexamples outside the repository instead of merely
+trusting the fixtures. Run the focused script and every closure gate. Review and
+report only; do not edit the candidate.
 
 **Files.** Read-only review of the baseline-to-candidate diff and owning
 artifacts; result outside the repository.
 
 **Interfaces.** Consume Task 1's exact commit and counterexamples. Produce one
-role disposition and exact-HEAD evidence for release.
+role disposition and exact-HEAD evidence for Control.
 
 - [ ] Verify exact candidate HEAD and clean tree.
-- [ ] Run the three complete-copy counterexamples outside the repository.
-- [ ] Run all closure gates and inspect finding 38 against Git history.
+- [ ] Reproduce all four reverse-semantic complete-copy counterexamples.
+- [ ] Verify the shipped skill, approved design, full decision, and compact-only
+      decision pass their direct owner checks.
+- [ ] Run all closure gates and inspect finding 38 against the implementation.
 - [ ] Return exactly one disposition without editing the candidate.
 
-**Focused verification.** All three degraded copies exit non-zero for their
-own active owner; the untouched repository prints `delivery-contract: ok`.
+**Focused verification.** Each degraded copy exits non-zero for its named
+diagnostic; the untouched repository prints `delivery-contract: ok`.
 
 **Document impact.** None; review is read-only.
 
-### 3. Close the accepted bounded replan
+### 3. Close only the accepted replan
 
 **Behaviour.** Release records the accepted unit, removes both transient plans,
-runs gates on one exact HEAD, pushes normally to PR #15, and leaves the PR draft
-because the two known integration findings remain.
+runs gates on one exact HEAD, and updates the draft pull request without merging
+or force-pushing.
 
-**Direction.** Only after review accepts, append one five-column delivery-log
-row covering this replan and the prior failed unit's actual review sequence.
-Delete this plan and
-`docs/_plans/2026-08-25-design-skill-plan-mode-boundary-plan.md`; preserve the
-durable decision and finding. Run all gates, commit only closure paths, push the
-exact branch normally, and verify local/upstream/remote/PR identity. Do not claim
-whole-PR acceptance or passing CI.
+**Direction.** Only after review accepts, append one five-column delivery-log row
+covering the failed prior unit and this replan's actual rounds. Delete this plan
+and `docs/_plans/2026-08-25-design-skill-plan-mode-boundary-plan.md`; preserve the
+durable decision and finding. Follow the frozen installed self-update release
+contract, run every gate, commit only closure paths, push normally, and verify
+local/upstream/remote/PR identity. Do not claim whole-PR acceptance or passing CI
+without current forge evidence.
 
 **Files.** Modify `docs/delivery-log.md`; delete the two named transient plans.
 
 **Interfaces.** Consume Task 2's `ACCEPT` and exact candidate HEAD. Produce the
-closure commit and pushed exact-HEAD evidence.
+closure commit and exact-HEAD release evidence.
 
 - [ ] Append the five-column delivery-log row from observed facts only.
 - [ ] Delete exactly the two transient plans.
@@ -216,34 +223,35 @@ the local release HEAD.
 
 | Requirement | Instrument | Counterexample | Observed red |
 | --- | --- | --- | --- |
-| Every active owner contains the minimum capability boundary | `bash tests/delivery-contract.sh`, with the durable Decision routed through the shared positive core | A complete current copy replaces only the active durable capability paragraph with neutral “boundary unspecified” prose while matching historical tokens remain outside the extracted subsection | Scoped re-review at `2c7eb3e` proved this complete copy incorrectly printed `delivery-contract: ok`; Task 1 must add it as an in-script fixture and observe that fixture turn the script red before changing the checker |
-| Owner-specific regressions remain rejected | The same focused script plus three out-of-repository complete-copy runs | Approved design gains the strict split; skill gives sole ownership to the skill with positives only in historical text; durable decision omits its boundary | Review at `2c7eb3e` proved the first two are rejected and the third is accepted; Task 1 changes only the third result, then Task 2 reproduces all three |
-| The checker remains minimal and its finding is accurate | `git diff --check <baseline>..HEAD`, reviewer inspection, and finding 38 against Git history | A new synonym catalogue/parser is added, or finding 38 still describes the decision check as reject-only | No semantic oracle can prove prose minimality; reviewer reads the complete fix-only diff and exact historical commits |
-| Existing automation-first behavior remains intact | All focused scripts and every closure gate in `AGENTS.md` | The fix weakens an existing fixture, changes phase/setup/deployment behavior, or touches either separate integration finding | Current gates are green at the design baseline; implementation must preserve them while the new fixture turns RED then GREEN |
+| Constraints and refinement remain affirmatively coupled | `bash tests/delivery-contract.sh` plus a direct decision-core check over a complete copy | Both live decision formulations retain the expected nouns but say compatible-skill refinement occurs **outside** Plan Mode constraints | Independent re-review of `b1fc0399a58d4d3940e7c3d0d598779ab2fac0f1` returned `owner_core_status=0`; report path above |
+| Emulation and composition remain explicitly prohibited | The same focused script and direct complete-copy check | Both live formulations say Dely **may emulate or compose** and that composition is permitted | The same re-review returned `owner_core_status=0` |
+| Approval bypass remains explicitly prohibited | The same focused script and direct complete-copy check | The full formulation says neither rule prevents bypassing approval and the compact form leaves approval unspecified | The same re-review returned `owner_core_status=0` |
+| `design outcome` permits only the approved space/hyphen spelling | The same focused script and direct complete-copy check | Both live formulations replace the separator with `X`, producing `designXoutcome` | The same re-review returned `owner_core_status=0` |
+| Approved owner variants remain accepted | Direct section checks for the shipped skill, approved design, full decision, and compact-only decision | A checker that recognizes only the full durable paragraph rejects the compact approved clarification | The prior remediation's compact-only direct check returned `owner_core_status=0`; Task 1 must preserve it after tightening |
+| Scope stays minimal and finding 38 stays accurate | `git diff --check <baseline>..HEAD`, reviewer diff inspection, and finding 38 against the final checker | A parser/helper/synonym catalogue is added, or finding 38 still claims token presence proves semantic relationships | No deterministic instrument can prove prose minimality; the reviewer reads the complete diff and finding |
 
-**Cannot be observed:** static phrase checks cannot prove future model behavior or
-all semantically equivalent prose. They deliberately protect the named active
-owner claims and counterexamples, not arbitrary paraphrases.
+**Cannot be observed:** literal clause checks do not interpret arbitrary future
+paraphrases or prove model behaviour. They protect the four current approved
+owner formulations and named reverse-semantic counterexamples only.
 
 ## Stop conditions
 
-- The durable decision cannot express the positive core without changing the
-  approved capability contract.
-- The neutral-decision fixture is not red for the named accepted-negative reason,
-  or remains green after the checker change.
+- An approved owner cannot pass without broadening beyond its existing clause.
+- A reverse-semantic fixture does not change the extracted `decision_section` or
+  fails for a diagnostic unrelated to its mutation.
 - A required edit falls outside implementation scope or overlaps new user work.
 - Orca or a required pinned harness/model/effort is unavailable.
-- Independent review does not accept; this new unit gets its own one-pass
-  remediation allowance, but another non-accept after that returns to design.
+- Independent review does not accept; this new unit receives one in-contract
+  remediation allowance, then returns to design on another non-accept.
 
 ## Closure gates
 
 Run every command in the active `AGENTS.md` “Closure gates” section from
-`/Users/hieuphung/Projects/dely`. The focused behavior instrument is:
+`/Users/hieuphung/Projects/dely`. The focused behaviour instrument is:
 
 ```bash
 bash tests/delivery-contract.sh
 ```
 
-The load-bearing counterexample is the complete-copy active durable Decision
-with neutral/absent boundary prose and harmless historical tokens elsewhere.
+The load-bearing counterexamples are the four complete-copy reverse-semantic
+decision owners named in the acceptance table.

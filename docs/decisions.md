@@ -81,6 +81,15 @@ boundary, user/project/harness selection, Plan Mode's native constraints and
 question/plan/artifact/transition surfaces, compatible-skill refinement under
 normal precedence, no Dely selection or composition, and no approval bypass.
 
+**Clarified after the positive-core semantic re-review.** A prose instrument
+that claims to enforce those relationships must match the existing approved
+affirmative clauses, not disconnected tokens. Constraints and refinement stay
+in one approved clause alternative; emulation/composition and approval bypass
+stay under their approved negative clauses. Punctuation is literal unless the
+approved owners use an explicit space-or-hyphen variant. This deliberately
+protects only the current owner formulations and named reverse-semantic
+counterexamples; it is not a general natural-language parser.
+
 `dely:setup` is optional deployment preference only. Its managed block has exactly
 `implement` and `review`; Orca, control, release, Plan Mode, and design-skill
 selection are not configurable fields. Values are discovered from the live
@@ -115,6 +124,11 @@ exactly once only if the prompt is still pending.
 - Always run task review plus integration review. Rejected because Bounded work
   needs only one whole-change review; duplicate review adds latency without a new
   boundary.
+- Treat keyword presence as proof of the positive capability boundary, or add a
+  prose parser. The first accepts clauses that assert the opposite relationship;
+  the second invents a second interpretation system for four approved clauses.
+  Rejected in favour of literal clause-level alternatives and complete-copy
+  reverse-semantic fixtures.
 - Dispatch a release worker. Rejected because release is deterministic state
   convergence and gains nothing from another LLM handoff.
 
