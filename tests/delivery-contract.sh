@@ -353,7 +353,12 @@ check_design_boundary_rejects() {
   return $tmp
 }
 
-check_design_boundary() {
+# Positive core shared by all three active owners (skill, approved design,
+# durable decision): who owns the design outcome and approval boundary, who
+# selects skills/modes, what Plan Mode names, and that refinement routes
+# through normal precedence — without forcing the shorter durable decision to
+# also carry the fuller skill/design-only clauses below.
+check_design_boundary_core() {
   local file=$1
   local flat
   local tmp=0
@@ -367,10 +372,6 @@ check_design_boundary() {
 
   if ! printf '%s' "$flat" | grep -Ei 'design outcome and approval boundary' >/dev/null; then
     diag "does not say Dely owns the design outcome and approval boundary"
-    tmp=1
-  fi
-  if ! printf '%s' "$flat" | grep -Ei 'universal interview or planning method' >/dev/null; then
-    diag "does not disclaim a universal interview or planning method"
     tmp=1
   fi
   if ! printf '%s' "$flat" | grep -Ei 'user, project, and harness' >/dev/null; then
@@ -397,12 +398,35 @@ check_design_boundary() {
     diag "does not defer overlap to normal harness instruction and tool precedence"
     tmp=1
   fi
-  if ! printf '%s' "$flat" | grep -Ei 'material scope change' >/dev/null; then
-    diag "does not require renewed approval for a material scope change"
-    tmp=1
-  fi
   if ! printf '%s' "$flat" | grep -Ei 'does not select, activate' >/dev/null; then
     diag "does not say Dely does not select or activate either mechanism"
+    tmp=1
+  fi
+
+  return $tmp
+}
+
+# Full checker for the skill and approved design: the shared positive core
+# plus their stricter, owner-specific clauses. The shorter durable decision
+# is not required to carry these two.
+check_design_boundary() {
+  local file=$1
+  local flat
+  local tmp=0
+
+  if [ ! -f "$file" ]; then
+    diag "missing file: $file"
+    return 1
+  fi
+  check_design_boundary_core "$file" || tmp=1
+  flat=$(tr '\n' ' ' <"$file")
+
+  if ! printf '%s' "$flat" | grep -Ei 'universal interview or planning method' >/dev/null; then
+    diag "does not disclaim a universal interview or planning method"
+    tmp=1
+  fi
+  if ! printf '%s' "$flat" | grep -Ei 'material scope change' >/dev/null; then
+    diag "does not require renewed approval for a material scope change"
     tmp=1
   fi
 
@@ -428,8 +452,8 @@ check_design_boundary_section() {
     rm -f "$tmp"
     return 1
   fi
-  if [ "$mode" = "reject" ]; then
-    check_design_boundary_rejects "$tmp" || rc=1
+  if [ "$mode" = "core" ]; then
+    check_design_boundary_core "$tmp" || rc=1
   else
     check_design_boundary "$tmp" || rc=1
   fi
@@ -601,7 +625,7 @@ if [ ! -f "$decisions" ]; then
   fail "docs/decisions.md is absent"
 else
   decisions_out=$(mktemp "${TMPDIR:-/tmp}/delivery-contract-decisions.XXXXXX")
-  if ! check_design_boundary_section decision_section "$decisions" reject >"$decisions_out" 2>&1; then
+  if ! check_design_boundary_section decision_section "$decisions" core >"$decisions_out" 2>&1; then
     fail "active docs/decisions.md Decision subsection failed the design-boundary check"
     cat "$decisions_out" >&2
   fi
@@ -726,7 +750,7 @@ expect_check_fail check_design_boundary "$scratch/split-boundary.md" \
 # extraction-scoped check for each owning surface.
 check_control_section_full() { check_design_boundary_section control_section "$1" full; }
 check_design_methods_section_full() { check_design_boundary_section design_methods_section "$1" full; }
-check_decision_section_reject() { check_design_boundary_section decision_section "$1" reject; }
+check_decision_section_core() { check_design_boundary_section decision_section "$1" core; }
 
 # Fixture 2f: a real degraded copy of the active decisions.md — everything
 # else intact — with the capability-boundary sentence replaced by an
@@ -741,9 +765,30 @@ if [ -f "$decisions" ]; then
     }
     { print }
   ' "$decisions" >"$scratch/degraded-decision-boundary.md"
-  expect_check_fail check_decision_section_reject "$scratch/degraded-decision-boundary.md" \
+  expect_check_fail check_decision_section_core "$scratch/degraded-decision-boundary.md" \
     "degraded decision record claiming the active skill owns the whole design method" \
     "$scratch/out-degraded-decision-boundary"
+fi
+
+# Fixture 2i: a real degraded copy of the active decisions.md — everything
+# else byte-identical — whose active Decision capability paragraph is
+# replaced entirely by neutral prose disclaiming any boundary, while the
+# same historical tokens survive elsewhere in the file, outside the extracted
+# `#### Decision` subsection. A reject-only check cannot tell this apart from
+# a correct decision: no forbidden phrase appears, so it must be caught by a
+# positive requirement instead.
+if [ -f "$decisions" ]; then
+  awk -v RS='' -v ORS='\n\n' '
+    /Dely owns only the design outcome and approval boundary/ {
+      gsub(/\n/, " ")
+      gsub(/Dely owns only the design outcome and approval boundary, task boundaries, role independence, bounded remediation, exception routing, and exact-HEAD closure\. The user, project, and harness determine which design skills and native modes are active\. Native Plan Mode governs its enforced action constraints, question and plan surfaces, artifact representation, and mode transitions; compatible active design skills may refine methodology within those constraints\. Normal harness instruction and tool precedence governs when more than one applies\. Dely does not select, activate, emulate, or compose them, and neither can bypass approval\./, \
+        "The design-method capability boundary is intentionally unspecified here; another artifact owns it.")
+    }
+    { print }
+  ' "$decisions" >"$scratch/neutral-decision-boundary.md"
+  expect_check_fail check_decision_section_core "$scratch/neutral-decision-boundary.md" \
+    "active durable Decision capability paragraph replaced by neutral unspecified-boundary prose while historical tokens survive elsewhere in the file" \
+    "$scratch/out-neutral-decision-boundary"
 fi
 
 # Fixture 2g: a real degraded copy of the approved design — everything else

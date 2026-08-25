@@ -2766,13 +2766,32 @@ covers the same design scope; a material scope change requires renewed
 approval. Dely itself does not select, activate, configure, emulate, or
 compose either mechanism, and neither one can bypass the approval invariant.
 
-`tests/delivery-contract.sh` now carries `check_design_boundary`, scoped to
-the shipped skill, and a lighter `check_design_boundary_rejects` run against
-the active `docs/decisions.md` paragraph — both reject the literal "Design
-ownership is split" phrasing and the pattern where a skill or Plan Mode is
-said to independently own only gating/approval UX, or to own the whole design
-method outright. The degraded fixture is a real copy of the shipped
-`docs/decisions.md` paragraph with only its capability-boundary sentence
-replaced by an exclusive-ownership claim — everything else, including every
-other required phrase, stays byte-identical to the current file — so
-whole-file token presence cannot satisfy the check the way it did before.
+`tests/delivery-contract.sh` extracts the active owning section of each of the
+three owners — the skill's `## The control session`, the approved design's
+`### Design methods and Plan Mode`, and the durable decision's `#### Decision`
+subsection — and checks each extracted section rather than the whole file, so
+a regression cannot hide behind matching tokens elsewhere. `check_design_boundary_rejects`
+still rejects the literal "Design ownership is split" phrasing and the
+patterns where a skill or Plan Mode independently owns only gating/approval
+UX, or owns the whole design method outright, for all three. A first
+remediation added the extraction but still ran the durable decision through
+that reject-only check; a scoped re-review then produced a complete-copy
+counterexample that replaced the active decision's entire capability
+paragraph with neutral "boundary unspecified" prose and showed the reject-only
+path printing `delivery-contract: ok`, because no forbidden phrase was
+present to reject. The fix is `check_design_boundary_core`, a shared positive
+core factored out of the prior skill/design checker and run against all three
+extracted sections: it requires the design-outcome/approval-boundary claim,
+the user/project/harness selection claim, Plan Mode's named surfaces
+(question/plan, artifact representation, mode transitions), refinement under
+normal instruction/tool precedence, and the no-select/no-activate claim, in
+addition to the existing rejects. `check_design_boundary` (full) layers two
+further clauses — the universal-interview-or-planning-method disclaimer and
+the material-scope-change requirement — that the shorter durable decision is
+not required to restate; the skill and approved design still run through the
+full checker. The load-bearing fixture is a real copy of the current
+`docs/decisions.md` with only its active capability paragraph replaced by the
+neutral prose above and every other paragraph, including its own historical
+tokens elsewhere in the file, left byte-identical — this is the fixture that
+must turn the focused script red under the reject-only path and green again
+once the decision path is routed through the positive core.
