@@ -2654,3 +2654,288 @@ three valid commands whose targets all existed.
 re-trust after every update; it now says re-trust only after a hook file
 changes. This `0.9.1` install used `ON_INSTALL` and a fresh Codex TUI ran both
 hooks without an extra manual trust step. That last step is not generalised.
+
+---
+
+## 36. The three-harness Orca evidence probe that retired the journal and doctor
+
+Recorded 2026-08-25, preceding "2026-08-25 — Dely is an automation-first thin
+control protocol" in `docs/decisions.md`.
+
+The automation-first design conditioned removal of the evidence journal and
+`delivery-doctor` on one non-mutating Orca capability probe per supported
+harness: a dispatch running a deterministic passing marker command and a
+deterministic failing one, with the resulting command, output, and outcome
+recovered by Control from Orca's own dispatch record — not this package's
+hooks — after the worker was released.
+
+Claude Code, Codex CLI, and Grok Build each passed: the dispatch-bound
+command, its verbatim output, and its pass/fail outcome were all recoverable
+through Orca after release, for both the passing and the failing marker. No
+harness needed its own evidence adapter, so the universal rail these findings
+spent §7 through §30 hardening was retired outright rather than kept as
+defense in depth — the redundant mechanism, not the discipline it encoded,
+was the target. `bin/delivery-doctor`, `bin/delivery-evidence`,
+`hooks/hooks.json`, `hooks/post-tool-journal.sh`,
+`hooks/session-start-context.sh`, `hooks/grok-hooks.json.template`, and their
+three tests were removed in the same change that landed this entry, with no
+compatibility stub.
+
+The exact commands, captured marker output, and per-harness pass/fail
+outcomes, plus the post-release readability result for each harness —
+including that Grok's low-level release call returned `retained` with
+`no_owned_resource` while its transcript stayed readable immediately after —
+are recorded as a compact table in `docs/harness-surface.md`, "Three-harness
+native evidence probe (2026-08-25)", Orca Run `run_51da9fff2301`. That detail
+is a time-bounded observation of one adapter response, not a portable
+guarantee about Grok's retention window.
+
+This does not retire the underlying lesson from §2 and §3: identifiers and
+evidence still fail where they cross a boundary. What changed is which
+program is trusted to hold the boundary — Orca's dispatch record now, this
+package's own hooks before.
+
+## 37. Role disposition and Control routing are distinct, and the focused suite must inspect the active subject, not just token presence
+
+The final exact-HEAD review at `de85132e66ff0514e79c38ff5c589fe971c6a441` found
+two present-but-wrong shapes the shipped skill's own green contract check did
+not catch: the reviewer-disposition sentence returned `REMEDIATE_ONCE` and
+`REPLAN_OR_SPLIT` in place of the approved `ACCEPT` / `CHANGES_REQUESTED` /
+`BLOCKED` role vocabulary, and the active `AGENTS.md` closure paragraph still
+attached the focused-instrument rule to the retired `Planned` shape instead of
+`Bounded or Architectural`. The prior contract check only grepped for
+`REPLAN_OR_SPLIT`'s presence anywhere in the file — satisfied even though the
+token belonged to a reviewer-facing sentence rather than a Control-routing one
+— and never inspected the active `AGENTS.md` subject at all.
+
+The standing distinction: a reviewer returns exactly one role disposition —
+`ACCEPT`, `CHANGES_REQUESTED`, or `BLOCKED` — describing what it found.
+`REMEDIATE_ONCE` and `REPLAN_OR_SPLIT` are Control's routing decisions in
+response to that disposition, never a value a reviewer returns itself. A first
+in-contract `CHANGES_REQUESTED` routes to the single original-party
+remediation; a scoped re-review that still does not accept routes to
+`REPLAN_OR_SPLIT`. `BLOCKED` preserves the candidate and escalates the
+unresolved dependency or authority question to Control, separately from a
+failed worker process, which is not `BLOCKED`.
+
+`tests/delivery-contract.sh` now scopes a reviewer-disposition checker to the
+active `## Review` section's return sentence and a taxonomy checker to the
+active `AGENTS.md` focused-instrument paragraph, each with a real degraded
+fixture derived from the shipped file rather than a synthetic one, so a
+whole-file token search can no longer pass while the owning sentence is wrong.
+
+---
+
+## 38. The strict design/Plan Mode split was itself wrong, and the old check could not see either error
+
+A final integration review at `7e13c0c1f9fb64cc6696d044f63726f29575f463` found
+a real cross-file contradiction: at that HEAD, the shipped skill's Control
+section and the approved design both said "Design ownership is split" — the
+active design skill owns exploration, questions, and presentation, while
+native Plan Mode independently owns only tool gating and plan-approval UX —
+but the durable decision record already used a different formulation, that
+the active skill or native Plan Mode owns the whole design method. The
+owner-approved design correction was commit
+`04a83c704070574bf3dad554bda16dd3b3637673`, which corrected the approved
+design and durable decision to the capability boundary below; commit
+`692998cc245a9e8034a94065059a9884fa40501e` then aligned the skill to match.
+Primary-source research
+into how native Plan Modes actually behave then showed the reviewer's first
+suggested repair, a strict split along the same seam, was also wrong: a native
+Plan Mode does not confine itself to gating and approval chrome, it also
+prescribes parts of the design method itself — its own question and plan
+surfaces, artifact representation, and mode transitions. A strict split cannot
+describe a mechanism that already crosses the line the split assumes.
+
+The old contract check stayed green through both the contradiction and the
+first wrong repair because it checked only that Plan Mode cannot bypass Dely's
+approval invariant — an orthogonal claim. It never inspected which surface
+(the skill, or Plan Mode) claims ownership of which capability, so a
+complete-looking "split" paragraph and a complete-looking "exclusive design
+method" paragraph both read as satisfying every token the check looked for.
+
+The standing rule is a capability boundary, not a split: Dely owns only the
+design outcome and the approval boundary, never a universal interview or
+planning method. The user, project, and harness determine which design skills
+and native modes are active. Native Plan Mode governs its own enforced action
+constraints, question and plan surfaces, artifact representation, and mode
+transitions; a compatible active design skill may refine exploration and
+design methodology within those constraints. Normal harness instruction and
+tool precedence governs when more than one is active. One explicit approval
+covers the same design scope; a material scope change requires renewed
+approval. Dely itself does not select, activate, configure, emulate, or
+compose either mechanism, and neither one can bypass the approval invariant.
+
+`tests/delivery-contract.sh` extracts the active owning section of each of the
+three owners — the skill's `## The control session`, the approved design's
+`### Design methods and Plan Mode`, and the durable decision's `#### Decision`
+subsection — and checks each extracted section rather than the whole file, so
+a regression cannot hide behind matching tokens elsewhere. `check_design_boundary_rejects`
+still rejects the literal "Design ownership is split" phrasing and the
+patterns where a skill or Plan Mode independently owns only gating/approval
+UX, or owns the whole design method outright, for all three. A first
+remediation added the extraction but still ran the durable decision through
+that reject-only check; a scoped re-review then produced a complete-copy
+counterexample that replaced the active decision's entire capability
+paragraph with neutral "boundary unspecified" prose and showed the reject-only
+path printing `delivery-contract: ok`, because no forbidden phrase was
+present to reject. The fix is `check_design_boundary_core`, a shared positive
+core factored out of the prior skill/design checker and run against all three
+extracted sections: it requires the design-outcome/approval-boundary claim,
+the user/project/harness selection claim, Plan Mode's named surfaces
+(question/plan, artifact representation, mode transitions), that compatible-skill
+refinement stays bound to Plan Mode's constraints by one clause-level
+alternative shared with the affirmative claim itself (not two independent
+keyword checks that a reversed relationship can each satisfy on its own),
+refinement under normal instruction/tool precedence, the no-select/no-activate
+claim, that Dely does not emulate or compose either mechanism by one
+clause-level alternative bound to the same no-select/no-activate prefix (not a
+bare "emulate ... or compose" token pair), and that neither mechanism can
+bypass approval by one of the four literal approved no-bypass sentences (not a
+broad negation-window pattern a differently-worded permissive sentence can
+still satisfy), in addition to the existing rejects. `check_design_boundary` (full)
+layers two further clauses — the universal-interview-or-planning-method
+disclaimer and the material-scope-change requirement — that the shorter
+durable decision is not required to restate; the skill and approved design
+still run through the full checker.
+
+A first version of this core checked only eight of these claims and matched
+just one prose form, so it rejected the durable decision's own compact
+"Clarified after the scoped design-boundary re-review" formulation of the same
+core — a false positive against a still-correct active owner — while three
+required claims (constraints-scoped refinement, no-emulation/composition, no
+approval bypass) went unchecked entirely against every owner. Each check now
+uses one small alternation covering the decision's two coexisting live
+formulations (the full capability paragraph and the compact clarification),
+plus, where the skill or approved design phrase the same claim differently in
+their own already-approved prose, that literal existing phrasing (for example
+the approved design's "approval invariant remains authoritative in every
+harness and mode" for the no-bypass claim). The neutral-decision fixture was
+also invalid in that first version: it replaced only the original capability
+paragraph and left the compact clarification's positive core live, so the
+"true absence" case it claimed to prove was actually the accepted
+current-prose-variant case. The load-bearing fixture is now a real copy of
+the current `docs/decisions.md` with the active capability paragraph replaced
+by neutral prose in *both* live formulations and every other paragraph,
+including its own historical tokens elsewhere in the file, left byte-identical
+— this is the fixture that must turn the focused script red under the
+reject-only path and green again once the decision path is routed through the
+complete positive core. Four further complete-copy fixtures prove the core is
+discriminating rather than merely present: the compact clarification alone
+(full paragraph removed) must pass, and removing the constraints-scoped
+refinement, no-emulation/composition, or no-approval-bypass claim from both
+live formulations must each fail the direct owner check for its own
+diagnostic.
+
+A same-reviewer re-review of that remediation
+(`b1fc0399a58d4d3940e7c3d0d598779ab2fac0f1`) found the eight-claims-pass
+result had not actually closed the gap: three of the required checks still
+matched disconnected tokens rather than the affirmative clause, so three
+complete-copy decision owners that flatly reversed the claimed relationship —
+compatible-skill refinement said to occur *outside* Plan Mode's constraints,
+Dely said to *permit* emulation and composition, and approval bypass said to
+be *permitted* or left unspecified, each with the expected nouns still present
+in both live formulations — all returned `owner_core_status=0`. A fourth,
+unrelated defect shared the same root cause: the design-outcome check used a
+wildcard `.` between "design" and "outcome", so replacing the separator with
+the meaningless token `designXoutcome` in both live formulations also passed.
+The fix binds each of these four checks to the exact approved clause-level
+alternatives rather than independent keyword presence: the constraints check
+now requires the literal "refine ... methodology within ... constraints"
+phrase or the compact clarification's literal "native constraints and
+question/plan/artifact/transition surfaces, compatible-skill refinement under
+normal precedence" phrase, as one alternation; the emulate/compose check now
+requires the full negative "does not select, activate, ... emulate, or
+compose (either mechanism|them)" phrase or the compact "no Dely selection or
+composition" phrase, not a bare "emulate ... or compose" substring; the
+approval-bypass check now requires one of the four exact approved sentences
+(the skill's "neither one owns or can bypass the approval invariant", the
+design's "approval invariant remains authoritative in every harness and
+mode", the full decision's "neither can bypass approval", or the compact
+clarification's "no approval bypass"), not a broad negation-window pattern; and
+the design-outcome check now requires a space or a hyphen, `design[- ]outcome`,
+not any character. Four further complete-copy fixtures — the same three
+reversed-relationship owners and the wildcard probe, reproduced beside
+fixtures 2i–2m — prove each diagnostic fires on the reversed or corrupted
+owner while the shipped skill, approved design, full decision, and
+compact-only decision all still pass.
+
+This is a clause-level guarantee, not a semantic one: the checker matches the
+four current approved owner formulations and the four named reverse-semantic
+counterexamples verbatim (modulo the one documented space/hyphen variant). It
+protects against a reversed relationship expressed in the owners' own existing
+words, not against an arbitrary future paraphrase that expresses the same
+reversal in different wording; a differently-worded correct owner would need
+its own literal alternative added to the same alternation, the same way the
+compact clarification's wording was added earlier. That limit is deliberate —
+the fix is four literal alternatives, not a parser or a synonym catalogue.
+
+## 39. The active pre-push hook told readers to pair it with the journal it no longer ships
+
+The final integration review at `7e13c0c1f9fb64cc6696d044f63726f29575f463`
+found `git-hooks/pre-push` still present-but-wrong: at line 15, past its own
+accident-and-drift limitation statement, it told an installer to "pair it with
+the PostToolUse journal, which records the command either way." The
+automation-first decision removed the journal, its hook wiring, its adapters,
+its tests, and every present-tense reference to it without a compatibility
+stub, and `README.md` already says no journal or hook adapter ships. The hook
+itself is still a supported, installed product surface, so this was live
+guidance pointing an installer at a component exact HEAD deliberately deleted.
+
+The correction deletes the two-line sentence and keeps the rest of the
+limitation text intact: `--no-verify` still skips the hook, and an
+unrestricted agent could still edit or unset it, so the hook remains a guard
+against accident and drift, not against a determined agent. No runtime
+mechanism replaces the deleted sentence, because there is nothing left to pair
+the hook with; a compatibility stub or a re-added reference would contradict
+the same removal this correction is closing. No permanent prose parser is
+added either — the fix is a one-time deletion of two lines that were always
+wrong after the journal's removal, not a recurring shape a future edit could
+reintroduce in a way worth watching mechanically.
+
+The focused instrument is `if rg -n 'PostToolUse journal|post-tool-journal\.sh'
+git-hooks/pre-push; then exit 1; fi`. It proves only that those two literal
+strings are absent from this one file today. It cannot prove that no other
+document still recommends the journal, that a future edit will not
+reintroduce a differently worded pairing instruction, or that the hook's
+remaining prose is otherwise accurate; a human reviewer reading the complete
+diff carries that boundary.
+
+## 40. The capability record kept a superseded sandbox deployment as current policy
+
+The same review found `docs/harness-surface.md` asserting, at its former line
+529, that "the sandbox and identifier-injection observations remain current,"
+and then, at its former lines 579-580, that "this repository's current review
+dispatch stays Codex `--sandbox read-only` until a separately observed role
+swap." Current `AGENTS.md` already states the opposite and more recent policy:
+this project adds no phase-implied sandbox, so native Internet access, closure
+gates, result writes, and coordinator completion stay available to the review
+role. The 2026-08-20 Codex `--sandbox read-only` observation was a real,
+correctly dated measurement of that harness's documented and locally observed
+sandbox behaviour; the error was presenting it as this repository's ongoing
+deployment choice rather than as a superseded historical one.
+
+The correction keeps the per-harness capability facts — what each harness's
+sandbox flag documents and was locally observed to do — because those facts
+did not change and remain useful to a future role swap. It narrows the
+blanket "remain current" claim to the identifier-injection observation alone,
+and it recasts the former deployment sentence as a dated "Historical
+deployment observation (dated 2026-08-20)" that names `AGENTS.md`'s current
+no-phase-implied-sandbox policy as its supersession. No runtime mechanism is
+added: this file only records observations and policy pointers, and the
+running policy itself already lives in `AGENTS.md`, so duplicating an
+enforcement rail here would create a second source of truth to keep in sync.
+No permanent prose parser is added either, for the same reason as above — the
+distinction between a dated observation and a current deployment is a
+one-time rewording, not a recurring shape.
+
+The focused instruments are `rg -n 'Historical deployment observation'
+docs/harness-surface.md`, `rg -n 'no phase-implied sandbox'
+docs/harness-surface.md`, and `if rg -n "This repository's current review
+dispatch stays" docs/harness-surface.md; then exit 1; fi`. Together they prove
+only that this exact historical/current boundary phrasing is present and the
+one named obsolete sentence is absent from this one file today. They cannot
+prove that every other paragraph in the file is consistent with `AGENTS.md`,
+that a future edit will not reintroduce a stale deployment claim in different
+words, or that the per-harness capability facts themselves are still accurate;
+a human reviewer reading the complete diff carries that boundary.

@@ -479,7 +479,57 @@ Build. No read-only monitor covering all three was found.
 
 ---
 
+## Three-harness native evidence probe (2026-08-25)
+
+Orca Run `run_51da9fff2301`, three tasks, one per harness. Each task ran two
+deterministic marker commands from `/Users/hieuphung/Projects/dely` with no
+other file or Git mutation, then reported through the injected `worker_done`
+lifecycle:
+
+- pass: `printf '<MARKER>\n'`
+- fail: `sh -c 'printf "<MARKER>\n"; exit 23'`
+
+| Harness | Task | Pass command | Pass output | Pass outcome | Fail command | Fail output | Fail outcome |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Claude Code | `task_ca819e990524` | `printf 'DELY_PROBE_PASS_CLAUDE\n'` | `DELY_PROBE_PASS_CLAUDE` | exit 0 | `sh -c 'printf "DELY_PROBE_FAIL_CLAUDE\n"; exit 23'` | `DELY_PROBE_FAIL_CLAUDE` | exit 23 |
+| Codex CLI | `task_5e925cc48391` | `printf 'DELY_PROBE_PASS_CODEX\n'` | `DELY_PROBE_PASS_CODEX` | exit 0 | `sh -c 'printf "DELY_PROBE_FAIL_CODEX\n"; exit 23'` | `DELY_PROBE_FAIL_CODEX` | exit 23 |
+| Grok Build | `task_7604a1cf6b98` | `printf 'DELY_PROBE_PASS_GROK\n'` | `DELY_PROBE_PASS_GROK` | exit 0 | `sh -c 'printf "DELY_PROBE_FAIL_GROK\n"; exit 23'` | `DELY_PROBE_FAIL_GROK` | exit 23 |
+
+All three pass markers exited 0 with the marker visible; all three fail
+markers exited 23 with the marker still visible — the failure did not swallow
+its own output.
+
+**Post-release readability.** Claude Code dispatch `ctx_664f3ae5a0e7` and
+Codex dispatch `ctx_47cd54eab575` were released with the transcript archived;
+`worker-read` after release returned the full transcript with `limited:
+false` and a complete `nextCursor`. Grok dispatch `ctx_7483ef59f3d7`
+completed and reported the same exact outputs, but its low-level release
+request returned `retained` with `no_owned_resource`, while the dispatch
+transcript and cursor were still readable immediately after that request. A
+later `worker-show` still retained a preview containing
+`DELY_PROBE_FAIL_GROK` and `worker_done`, while a still-later `worker-read`
+reported `session_not_reported`. Treat the Grok release response and the gap
+between those two reads as a time-bounded observed adapter detail, not a
+permanent API guarantee — retention duration was not itself probed.
+
+This is the probe the automation-first decision conditioned removal of the
+evidence journal and `delivery-doctor` on; see §36 in `docs/findings.md` for
+the narrative consequence and `docs/decisions.md`, "2026-08-25 — Dely is an
+automation-first thin control protocol", for the decision it supports.
+
+---
+
 ## Role capability matrix
+
+**Historical as of 2026-08-25.** The evidence-journal and `delivery-doctor`
+references below describe the rails that motivated and were retired by the
+three-harness Orca evidence probe recorded above and in `docs/decisions.md`,
+"2026-08-25 — Dely is an automation-first thin control protocol". Dispatch
+evidence is now read from Orca, not journaled by this package; the
+identifier-injection observations remain current. The per-harness sandbox
+capability facts below remain valid documented behaviour, but the sandbox
+deployment choice recorded further below is a historical observation, not a
+current policy.
 
 Roles are meant to be swappable: any harness as control session, any as worker.
 The invocations are already symmetric, and all three resume a session by id, so
@@ -526,10 +576,11 @@ commands and, locally observed, also blocks gate cache writes. Grok
 `read-only` keeps `~/.grok/` writable and does not enforce child-network
 restriction on macOS. Hosted or in-process web tools are documented as
 independent of command network on all three; that is not a claim that this
-install's web tool is enabled. This repository's current review dispatch stays
-Codex `--sandbox read-only` until a separately observed role swap. The stale
-Claude Code cell is recorded in `findings.md` §29 rather than silently
-rewritten.
+install's web tool is enabled. **Historical deployment observation (dated
+2026-08-20):** this repository's review dispatch was Codex `--sandbox
+read-only`. That deployment is superseded by the current project policy of
+no phase-implied sandbox, recorded in `AGENTS.md`. The stale Claude Code cell
+is recorded in `findings.md` §29 rather than silently rewritten.
 
 ### What this means for a role swap today
 

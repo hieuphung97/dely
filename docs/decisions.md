@@ -3,11 +3,170 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-08-22.
+Last updated 2026-08-25.
 
 ---
 
 ## Settled
+
+### 2026-08-25 — Dely is an automation-first thin control protocol
+
+#### Context
+
+The existing four-worker workflow duplicates state and evidence already owned by
+Orca, Git, CI, and the forge. It also asks a user to resolve details that an active
+design method can resolve, keeps universal journal and doctor rails, configures a
+coordinator that has become mandatory, and dispatches an LLM for mechanical
+release work. The result is more ceremony and more failure surfaces than the
+product needs.
+
+The owner approved the replacement contract in
+`docs/_plans/2026-08-24-automation-first-dely-design.md`. Before removal of the
+universal evidence rails, one non-mutating Orca probe on each supported harness
+recovered the exact passing and failing marker commands, their output and
+outcomes from the intended dispatch after worker release. Claude Code, Codex CLI,
+and Grok Build all passed, so no harness-specific adapter is justified.
+
+#### Decision
+
+Dely accepts a request that may still be vague, establishes an explicitly
+approved design contract before candidate mutation, then automates sequential
+implementation, independent review, exact-HEAD gates, and pull-request
+preparation. The normal human gates are design approval and merge or publication.
+
+Dely owns only the design outcome and approval boundary, task boundaries, role
+independence, bounded remediation, exception routing, and exact-HEAD closure. The
+user, project, and harness determine which design skills and native modes are
+active. Native Plan Mode governs its enforced action constraints, question and
+plan surfaces, artifact representation, and mode transitions; compatible active
+design skills may refine methodology within those constraints. Normal harness
+instruction and tool precedence governs when more than one applies. Dely does not
+select, activate, emulate, or compose them, and neither can bypass approval. Orca
+is the required execution plane. Git owns candidate state, Orca owns dispatch
+evidence, and CI plus the forge own release state. Dely does not duplicate any of
+those stores.
+
+Work has three shapes:
+
+- **Spike** investigates and recommends without starting a delivery run.
+- **Bounded** uses the smallest approved contract and one independent whole-change
+  review.
+- **Architectural** records a durable decision and task plan, gives independently
+  testable and reviewable tasks fresh implementers and task reviews, then uses a
+  different fresh integration reviewer.
+
+Implementation is sequential in the current checkout. Same-shaped mechanical
+work is batched. Reviewers are fresh by role, do not implement, and do not edit the
+candidate. One in-contract remediation returns to the original implementer and
+the reviewer that raised it; another non-accepting result is
+`REPLAN_OR_SPLIT`.
+
+**Clarified after the final exact-HEAD review.** Reviewer role dispositions
+remain `ACCEPT`, `CHANGES_REQUESTED`, and `BLOCKED`, as the approved design
+states. `REMEDIATE_ONCE` and `REPLAN_OR_SPLIT` are Control routing decisions,
+not values a reviewer returns: the first `CHANGES_REQUESTED` may route to the
+single original-party remediation, while a second non-accept routes to
+`REPLAN_OR_SPLIT`. `BLOCKED` preserves the candidate and returns the unresolved
+dependency or authority question to Control; it is also distinct from a worker
+process failure.
+
+**Clarified after the scoped design-boundary re-review.** A focused instrument
+that claims the portable skill, approved design, and durable decision describe
+one capability boundary must positively assert the minimum live boundary in
+each active owner as well as reject forbidden ownership shapes. A reject-only
+check is insufficient because it accepts an active decision that omits the
+boundary entirely. The shorter durable decision need not duplicate every
+skill/design sentence: its positive core is Dely's design-outcome and approval
+boundary, user/project/harness selection, Plan Mode's native constraints and
+question/plan/artifact/transition surfaces, compatible-skill refinement under
+normal precedence, no Dely selection or composition, and no approval bypass.
+
+**Clarified after the positive-core semantic re-review.** A prose instrument
+that claims to enforce those relationships must match the existing approved
+affirmative clauses, not disconnected tokens. Constraints and refinement stay
+in one approved clause alternative; emulation/composition and approval bypass
+stay under their approved negative clauses. Punctuation is literal unless the
+approved owners use an explicit space-or-hyphen variant. This deliberately
+protects only the current owner formulations and named reverse-semantic
+counterexamples; it is not a general natural-language parser.
+
+`dely:setup` is optional deployment preference only. Its managed block has exactly
+`implement` and `review`; Orca, control, release, Plan Mode, and design-skill
+selection are not configurable fields. Values are discovered from the live
+harness surface, and defaults are preferences rather than reproducible pins.
+
+Release is performed by Control without an LLM worker. It binds local gates, the
+applicable final review, CI, and the draft pull request to one exact HEAD, and
+never merges or force-pushes. Repository-specific closure commands remain in
+`AGENTS.md`.
+
+The evidence journal, doctor, hook wiring, Grok adapter, their tests, and their
+present-tense documentation are removed without compatibility stubs. Dispatch
+commands, outputs, and outcomes are read from Orca; durable candidate and release
+facts are read from Git, CI, and the forge. `input_accepted` remains a transport
+receipt: after 90 seconds without progress, Control reads the TUI and sends Enter
+exactly once only if the prompt is still pending.
+
+#### Alternatives considered
+
+- Make Dely a Superpowers composition kernel. Rejected because it would own skill
+  selection and duplicate executors, worktrees, review routing, and branch
+  completion. Compatible Superpowers methods remain independently invocable.
+- Preserve optional coordinators, direct dispatch, or headless fallback. Rejected
+  because Orca is now a required capability and a fallback would be a second
+  execution architecture.
+- Keep journal and doctor as defense in depth. Rejected because all three native
+  probes passed and the rails duplicate Orca while adding hooks, adapters, parsers,
+  setup, and failure modes.
+- Always create a fresh implementer for every edit or every remediation. Rejected
+  because freshness follows an independently testable and reviewable task;
+  remediation benefits from the original implementer's local context.
+- Always run task review plus integration review. Rejected because Bounded work
+  needs only one whole-change review; duplicate review adds latency without a new
+  boundary.
+- Treat keyword presence as proof of the positive capability boundary, or add a
+  prose parser. The first accepts clauses that assert the opposite relationship;
+  the second invents a second interpretation system for four approved clauses.
+  Rejected in favour of literal clause-level alternatives and complete-copy
+  reverse-semantic fixtures.
+- Dispatch a release worker. Rejected because release is deterministic state
+  convergence and gains nothing from another LLM handoff.
+
+#### Consequences
+
+The migration is breaking and ships no dual parser, deprecated field, fallback,
+adapter, or compatibility binary. Projects with managed blocks must rewrite them
+to two rows. Orca must be available for delivery execution. A missing capability,
+evidence item, review disposition, gate, or release state cannot produce a
+completion claim.
+
+The skill becomes shorter and more portable, but Orca is a deliberate hard
+dependency. Static contract tests can reject present-but-wrong instruction shapes;
+they cannot prove that every model obeys prose. Candidate review and the first
+post-install delivery are the forward behavioral checks.
+
+**Clarified after the remaining final-integration findings.** A supported
+present-tense surface may refer only to a component that still ships. Removed
+rails may remain in dated history, but current guidance must not tell a reader to
+use them. The harness capability record likewise distinguishes a stable harness
+capability, a dated deployment observation, and this project's current policy: a
+past Codex review dispatched with `--sandbox read-only` stays useful history, but
+it cannot remain labelled as the current deployment after `AGENTS.md` removes a
+phase-implied sandbox. These are documentation reconciliations, not reasons to
+restore the journal, add a sandbox mechanism, or build a prose parser.
+
+#### Non-goals
+
+No parallel Dely workers, Dely-created worktrees, in-harness subagents, generic
+orchestrator interface, model catalogue, skill catalogue, task ledger, evidence
+schema, retry engine, automatic merge, or self-modifying instructions.
+
+#### Deferred
+
+A second orchestrator abstraction is deferred until a second implementation has
+completed a real Dely delivery. A harness-specific evidence adapter is deferred
+until a supported harness fails the native Orca evidence contract. Either trigger
+returns the design to the owner rather than activating dormant code.
 
 ### The problem is the identifier and evidence path, not model judgement
 
@@ -260,6 +419,13 @@ permits writes inside the workspace by design. The cost is bounded because every
 phase boundary commits and pushes, so only the candidate diff is ever at risk.
 
 ### Roles are a choice per phase, not a property of a tool
+
+**Partly superseded 2026-08-25.** The evidence-journal references below are
+historical: dispatch evidence now comes from Orca, not a per-harness journal
+payload, and release is no longer a dispatched worker role — see
+"2026-08-25 — Dely is an automation-first thin control protocol". The
+role-swap and identifier-injection reasoning for control and review still
+holds.
 
 Claude Code is the control session for the pilot. Any harness must be able to take
 any role later — Codex as control, Claude Code as reviewer, Grok as implement and
@@ -1455,6 +1621,11 @@ behind a rule they were asked to follow.
 
 ### 2026-08-21 — Project configuration is a managed block in `AGENTS.md`, written by a second core skill `dely:setup`
 
+**Superseded in shape 2026-08-25.** The managed block now has exactly two
+phase rows, `implement` and `review`, and no `Coordinator` line — see
+"2026-08-25 — Dely is an automation-first thin control protocol". The
+skill-ownership and discovery reasoning below still holds.
+
 #### Context
 
 `dely` ships one skill. `delivery` reads the consuming project's `AGENTS.md` for
@@ -1843,6 +2014,12 @@ session that wrote the rule, so it is the least likely plan ever to violate it.
 Triggered by the first subsequent plan that copies the four-column template.
 
 ### 2026-08-21 — Setup states the coordinator choice it could not offer, and the skill keeps the name `setup`
+
+**Superseded in shape 2026-08-25.** Orca became the constant, required
+execution plane, so the managed block no longer carries a `Coordinator`
+field at all — see "2026-08-25 — Dely is an automation-first thin control
+protocol". The non-offerable-choice reasoning below still applies to the
+`CLAUDE.md` import.
 
 #### Context
 
@@ -2285,7 +2462,13 @@ is the post-release smoke above.
 
 ---
 
-## Open
+## Superseded evidence-design answers (historical)
+
+These three answers are pre-0.11.0 evidence-design conclusions, superseded by
+the 2026-08-25 automation-first decision above, which removes the evidence
+journal, doctor, hook wiring, adapters, tests, and present-tense documentation
+without compatibility stubs. Retained here as evidence of what was answered
+and why, not as current product guidance.
 
 ### Answered 2026-08-20 — hooks under bypass, and the exit code
 
@@ -2345,6 +2528,8 @@ the repository died of having no reader, and committing it would add noise to
 every run and break the clean-tree assertion every handoff depends on. The
 third way is a journal with a *program* reader, and the reader is what makes it
 survive. Not yet written.
+
+## Open
 
 ### Does Grok discover project-level `.agents/skills/`
 

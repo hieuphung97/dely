@@ -1,6 +1,6 @@
 {
   "name": "dely",
-  "description": "A cross-harness delivery workflow for coding agents.",
+  "description": "An automation-first, Orca-supervised delivery protocol for coding agents.",
   "owner": {
     "name": "Hieu Phung",
     "url": "https://github.com/hieuphung97"
@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "dely",
-      "description": "A cross-harness delivery workflow for coding agents.",
+      "description": "An automation-first, Orca-supervised delivery protocol for coding agents.",
       "source": "./",
       "category": "productivity"
     }

@@ -1,11 +1,13 @@
-# delivery-evidence — Agent Instructions
+# dely — Agent Instructions
 
 This repository contains the `dely` package: the `delivery` skill and its
-evidence rails for Claude Code, Codex CLI, and Grok Build.
+automation-first control protocol for Claude Code, Codex CLI, and Grok Build.
 
 ## Source of truth
 
 - The workflow contract is `skills/delivery/SKILL.md`.
+- The approved design is
+  `docs/_plans/2026-08-24-automation-first-dely-design.md`.
 - Observations and corrections are recorded in `docs/findings.md`.
 - Settled, open, and rejected decisions are recorded in `docs/decisions.md`.
 - Verified harness capabilities are recorded in `docs/harness-surface.md`.
@@ -16,18 +18,16 @@ Repository artifacts are written in English.
 ## Workflow
 
 - Default branch: `main`.
-- Routine corrections follow the Routine path in the `delivery` skill.
-- Planned or Critical work must invoke the `delivery` skill.
+- Bounded or Architectural work invokes the `delivery` skill; a Spike is
+  investigation only and starts no delivery run.
 - Durable decisions live in `docs/decisions.md`; transient plans live in
   `docs/_plans/`.
 - The delivery log is `docs/delivery-log.md`.
-- A self-update uses the frozen installed plugin version. Candidate changes run in
-  the project folder. Do not edit `hooks/session-start-context.sh` or
-  `hooks/post-tool-journal.sh` while a plan is running: Grok executes those two
-  scripts by absolute path from whichever copy the adapter points at — this
-  checkout before migration, Grok's installed copy after — so editing one
-  changes the harness under a live worker. Plugin caches and Grok hook wiring
-  are refreshed only between plans.
+- A self-update runs its release phase through the frozen installed plugin
+  version, because Control is already using it when the plan starts.
+  Candidate changes in this checkout take effect for the next delivery, not
+  the one shipping them. Plugin caches and any live worker hook wiring are
+  refreshed only between plans.
 
 ## Phase dispatch
 
@@ -36,16 +36,15 @@ Name the model and reasoning effort on every dispatch.
 <!-- dely:begin -->
 ## Dely
 
-Planned or Critical work must invoke `dely:delivery`.
-
-Coordinator: Orca
+Bounded or Architectural work invokes `dely:delivery`. Orca is the required
+execution plane, so there is no coordinator field; there is no control row
+because the current interactive session already exists, and no release row
+because release has no LLM worker.
 
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
-| `control` | Claude Code | `opus` | `high` |
-| `implement` | Grok Build | `grok-4.6` | `medium` |
-| `review` | Grok Build | `grok-4.6` | `xhigh` |
-| `release` | Grok Build | `grok-4.6` | `medium` |
+| `implement` | Claude Code | `sonnet` | `medium` |
+| `review` | Codex CLI | `gpt-5.6-sol` | `high` |
 <!-- dely:end -->
 
 The table is this repository's deployment selection, not the portable protocol.
@@ -53,16 +52,14 @@ Load Orca's native skill to launch and supervise each worker TUI. Do not wrap a
 headless `claude -p`, `codex exec` or `grok --prompt-file` in a shell tab.
 
 Review is independent by role: a fresh session that does not implement or edit
-the candidate. This project adds no phase-implied sandbox. Grok review is pinned
-to `--always-approve` so that choice is explicit rather than a hidden default.
-`cc-safety-net` is inert on Grok, which discovers plugin hooks and dispatches none
-of them, so the reviewer has no mechanical guard against in-repository git
-destruction; that gap is accepted and bounded by every phase boundary committing.
-Native Internet access, closure gates, result writes and coordinator completion
-stay available. If the selected coordinator is unavailable,
-stop and ask the human before any headless fallback.
+the candidate. This project adds no phase-implied sandbox. Native Internet
+access, closure gates, result writes and coordinator completion stay
+available. If Orca or a required capability is unavailable, stop and ask the
+human; there is no headless fallback.
 
-`design` runs in the control session and is not dispatched.
+`design` runs in the current interactive session and is not dispatched.
+Release is performed by that session with native Git and forge tools; it
+dispatches no worker.
 
 ## Closure gates
 
@@ -73,27 +70,15 @@ git diff --check
 ```
 
 ```bash
-bash -n bin/delivery-doctor bin/delivery-evidence git-hooks/pre-push hooks/post-tool-journal.sh hooks/session-start-context.sh tests/dispatch-submission-contract.sh tests/managed-block-contract.sh tests/plan-template-shape.sh
+bash -n git-hooks/pre-push tests/delivery-contract.sh tests/managed-block-contract.sh tests/plan-template-shape.sh
 ```
 
 ```bash
-jq -e . .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json hooks/hooks.json hooks/grok-hooks.json.template >/dev/null
+jq -e . .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json >/dev/null
 ```
 
 ```bash
-bash tests/delivery-evidence-pipeline.sh
-```
-
-```bash
-bash tests/delivery-doctor-grok-hook.sh
-```
-
-```bash
-bash tests/journal-path-shape.sh
-```
-
-```bash
-bash tests/dispatch-submission-contract.sh
+bash tests/delivery-contract.sh
 ```
 
 ```bash
@@ -105,13 +90,24 @@ bash tests/plan-template-shape.sh
 ```
 
 ```bash
+test ! -e bin/delivery-doctor
+test ! -e bin/delivery-evidence
+test ! -e hooks/hooks.json
+test ! -e hooks/grok-hooks.json.template
+test ! -e hooks/post-tool-journal.sh
+test ! -e hooks/session-start-context.sh
+```
+
+```bash
 git grep -Ei 'pace.?id' -- . ':!docs/_plans' && exit 1 || true
 git grep -E '(^|[^A-Za-z0-9])[A-Z][0-9]+[a-z]?([^A-Za-z0-9]|$)' -- . ':!docs/_plans' && exit 1 || true
 ```
 
-The first four gates prove repository shape and syntax only. A Planned change to
-runtime behaviour must also name a focused instrument that distinguishes the
-changed behaviour from its failure mode.
+The first three gates prove repository shape and syntax only. A Bounded or
+Architectural change to runtime behaviour must also name a focused instrument
+that distinguishes the changed behaviour from its failure mode. The absence
+commands distinguish a deleted rail from documentation that merely says it is
+deleted.
 
 The disclosure grep is lexical. It catches named consumer identifiers; it does
 not catch a quoted consumer path, a branch name, or a session id. A green result

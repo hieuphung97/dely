@@ -105,6 +105,84 @@ EOF
   return 0
 }
 
+# Text of ## Execution envelope up to the next ## heading in the plan
+# template. Checks that the automation-first execution envelope — protected
+# dirty paths, branch/base/remote/PR target, resolved phase pins, and
+# mutation/release authority — is a real, task-ready section rather than
+# left to reader inference.
+execution_envelope_section() {
+  awk '
+    /^## Execution envelope[[:space:]]*$/ { p = 1; next }
+    p && /^## / { exit }
+    p { print }
+  ' "$1"
+}
+
+check_execution_envelope() {
+  local root=$1
+  local file="$root/skills/delivery/templates/plan.md"
+  local section
+  local tmp=0
+
+  if [ ! -f "$file" ]; then
+    diag "missing plan template: $file"
+    return 1
+  fi
+
+  section=$(execution_envelope_section "$file")
+  if [ -z "$section" ]; then
+    diag "plan template has no Execution envelope section"
+    return 1
+  fi
+
+  if ! printf '%s\n' "$section" | grep -Ei 'protected dirty path' >/dev/null; then
+    diag "execution envelope does not name protected dirty paths"
+    tmp=1
+  fi
+  if ! printf '%s\n' "$section" | grep -Ei 'branch' >/dev/null; then
+    diag "execution envelope does not name the branch"
+    tmp=1
+  fi
+  if ! printf '%s\n' "$section" | grep -Ei 'base' >/dev/null; then
+    diag "execution envelope does not name the base"
+    tmp=1
+  fi
+  if ! printf '%s\n' "$section" | grep -Ei 'remote' >/dev/null; then
+    diag "execution envelope does not name the remote"
+    tmp=1
+  fi
+  if ! printf '%s\n' "$section" | grep -Ei 'pull.request target' >/dev/null; then
+    diag "execution envelope does not name the pull-request target"
+    tmp=1
+  fi
+  if ! printf '%s\n' "$section" | grep -Ei 'harness, model, and effort|harness.{0,15}model.{0,15}effort' >/dev/null; then
+    diag "execution envelope does not name resolved harness/model/effort phase pins"
+    tmp=1
+  fi
+  if ! printf '%s\n' "$section" | grep -Ei 'authority' >/dev/null; then
+    diag "execution envelope does not name authority"
+    tmp=1
+  fi
+  if ! printf '%s\n' "$section" | grep -Ei 'merge' >/dev/null; then
+    diag "execution envelope does not name merge as out of authority"
+    tmp=1
+  fi
+  if ! printf '%s\n' "$section" | grep -Ei 'force-push' >/dev/null; then
+    diag "execution envelope does not name force-push as out of authority"
+    tmp=1
+  fi
+  if ! printf '%s\n' "$section" | grep -Ei 'stash' >/dev/null; then
+    diag "execution envelope does not name stash as out of authority"
+    tmp=1
+  fi
+  if ! printf '%s\n' "$section" | grep -Ei 'reset' >/dev/null; then
+    diag "execution envelope does not name reset as out of authority"
+    tmp=1
+  fi
+
+  return $tmp
+}
+
 # Text of ### Acceptance up to the next ## heading.
 acceptance_section() {
   awk '
@@ -198,6 +276,7 @@ inspect_tree() {
   local root=$1
   local tmp=0
   check_template "$root" || tmp=1
+  check_execution_envelope "$root" || tmp=1
   check_skill "$root" || tmp=1
   if [ -f "$root/.claude-plugin/plugin.json" ] || [ -f "$root/.codex-plugin/plugin.json" ]; then
     check_manifests "$root" || tmp=1

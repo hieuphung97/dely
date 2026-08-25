@@ -1,5 +1,14 @@
 # Options per layer, ranked for testing
 
+**Historical research, superseded 2026-08-25.** This document is a snapshot of
+the option comparison that led to the pre-migration evidence journal, doctor,
+and hook rails. Those rails were removed as product components — see
+"2026-08-25 — Dely is an automation-first thin control protocol" in
+`docs/decisions.md` and the probe record in `docs/harness-surface.md`. Every
+present-tense claim below about a hook, journal, or doctor being current,
+needed, or in place describes that retired state, not the shipped product.
+Read this as the record of a past evaluation, not current guidance.
+
 The brief: prefer what already exists, keep it minimal, enumerate every option
 rather than commit to one design per layer, and only consider tools that are
 stable and actively maintained.
