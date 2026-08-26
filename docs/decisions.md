@@ -3,11 +3,83 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-08-25.
+Last updated 2026-08-26.
 
 ---
 
 ## Settled
+
+### 2026-08-26 — Antigravity CLI is a first-class fourth harness
+
+#### Context
+
+Dely shipped as an installable plugin for Claude Code, Codex CLI, and Grok Build.
+`dely:setup` discovered models and effort from those three CLIs. The repository had
+no root `plugin.json`. `agy plugin validate` of the checkout failed with
+`missing plugin.json`. `agy plugin validate .claude-plugin` returned `[ok]` with
+`skills : skipped (not found)`: a present, passing, empty plugin. Orca already
+detects and launches `agy` as a TUI agent. Antigravity CLI reads `AGENTS.md`
+natively. Its published plugin schema allows only `name` and `description`.
+Live `agy` 1.1.19 lists models as TSV (`agy models`) and takes `--effort
+low|medium|high`. Some model slugs already end in `-high`, `-medium`, or `-low`.
+
+#### Decision
+
+Antigravity CLI is a first-class harness, equal in kind to Claude Code, Codex CLI,
+and Grok Build.
+
+The repository root is the `agy` package: a root `plugin.json` with `name` `dely`
+and the existing `skills/` tree. Version remains only in the Claude and Codex
+manifests, bumped together. Install is `agy plugin install` of the git URL or a
+local path. Setup discovers models with `agy models` (offer the slug column) and
+effort from CLI help (`low|medium|high`), the same live-surface rule as the other
+harnesses. An uninstalled `agy` is omitted, not an error. Model and Effort cells
+are written as chosen; setup does not strip effort suffixes from slugs. Setup
+does not write `~/.gemini` and does not offer `GEMINI.md`. This repository's
+managed Dely table stays Claude Code for `implement` and Codex CLI for `review`.
+`skills/delivery/SKILL.md` still does not name harnesses.
+
+#### Alternatives considered
+
+- A nested `.agy/` or `.antigravity-plugin/` bundle. Rejected because `agy plugin
+  validate` and `agy plugin install` target the given directory's `plugin.json`
+  and sibling `skills/`; a nested layout needs a different install path or
+  duplicated skills.
+- Documenting `agy plugin import claude` as the supported path. Rejected because
+  import is a migration of an already-installed Claude copy, not first-class
+  install of this repository, and Customize cannot offer `agy` until setup
+  discovers it.
+- Storing an Antigravity model catalogue in setup. Rejected by the existing
+  discovery contract.
+- Adding `version` to root `plugin.json`. Rejected because the published schema
+  is `additionalProperties: false` with only `name` and `description`.
+- Changing this repository's phase pins to Antigravity CLI. Rejected as out of
+  scope: harness support is not a deployment-selection change.
+
+#### Consequences
+
+Consumers can install and pin Dely on `agy` the same way they do on the other
+three harnesses. Plugin caches still copy the package at install time. A future
+strict validator may reject unknown root-manifest fields, which is why that file
+stays within the published properties. Live docs and live install paths for
+staged plugins have disagreed (`~/.gemini/antigravity-cli/plugins/` versus
+`~/.gemini/config/plugins/`); Dely documents the command, not a cache path.
+
+#### Non-goals
+
+No Antigravity 2.0 desktop or IDE packaging. No Orca change. No hooks, agents,
+MCP, `.agents/skills/`, or `GEMINI.md`. No headless `agy -p` dispatch. No
+`plugin@marketplace` beyond git-URL or local-path install. No change to review
+depth, remediation, or the two-row managed block.
+
+#### Deferred
+
+Orca's ability to pass `--model` and `--effort` into a live `agy` TUI is an
+execution-time capability, not a repository instrument. Prove or escalate it
+when a delivery first dispatches `agy`. Interactive skill activation inside an
+`agy` session is the same class of observation. A native Antigravity marketplace
+selector is deferred until a consumer needs `plugin@marketplace` rather than a
+git URL.
 
 ### 2026-08-25 — Dely ships a verifiable community-ready open-source surface
 
