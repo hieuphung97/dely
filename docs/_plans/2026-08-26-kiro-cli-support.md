@@ -3,7 +3,7 @@
 Decision record: `docs/decisions.md` (settled 2026-08-26 — Kiro CLI is a
 first-class fifth harness)
 
-**Baseline:**
+**Baseline:** `279f9f425022393cbd3faf2fab7b827fe4baf319`
 
 ## Goal
 
