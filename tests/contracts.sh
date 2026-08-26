@@ -149,30 +149,72 @@ for f in .github/ISSUE_TEMPLATE/bug_report.yml .github/ISSUE_TEMPLATE/feature_re
 done
 
 
-# One CI entry point: the workflow must exist, be parseable YAML, declare a
-# job whose id is exactly "contracts" (that job id is the required status
-# check context), and invoke this same script's exact command — not a
-# different or missing entry point.
+# One CI entry point: the workflow must exist, parse as YAML, and match the
+# approved shape exactly: name, triggers, top-level permissions, the sole
+# "contracts" job id, its runner, its sole action, and every literal
+# AGENTS.md closure command present as a whole normalized run line, never a
+# substring. A heredoc keeps the required lines' own quoting literal.
 workflow="$root/.github/workflows/contracts.yml"
 if [ ! -f "$workflow" ]; then
   fail_with "missing $workflow"
 else
-  workflow_check="$(ruby -ryaml -e '
-    begin
-      d = YAML.safe_load(File.read(ARGV[0]))
-    rescue => e
-      puts "parse-error(#{e.message})"
-      exit
-    end
-    jobs = d.is_a?(Hash) ? d["jobs"] : nil
-    unless jobs.is_a?(Hash) && jobs.key?("contracts")
-      puts "missing-contracts-job"
-      exit
-    end
-    steps = jobs["contracts"]["steps"] || []
-    runs = steps.map { |s| s["run"] }.compact.join("\n")
-    puts "does-not-call-tests/contracts.sh" unless runs.include?("bash tests/contracts.sh")
-  ' "$workflow")"
+  workflow_checker="$(mktemp)"
+  cat >"$workflow_checker" <<'RUBY'
+require "yaml"
+begin
+  d = YAML.safe_load(File.read(ARGV[0]))
+rescue => e
+  puts "parse-error(#{e.message})"
+  exit
+end
+errs = []
+errs << "bad-name" unless d.is_a?(Hash) && d["name"] == "contracts"
+# YAML 1.1 parses the bare "on:" key as boolean true, not the string "on".
+on = d.is_a?(Hash) ? (d.key?(true) ? d[true] : d["on"]) : nil
+unless on.is_a?(Hash) && on.key?("pull_request") &&
+       on["push"].is_a?(Hash) && on["push"]["branches"] == ["main"]
+  errs << "bad-triggers"
+end
+errs << "bad-permissions" unless d["permissions"] == {"contents" => "read"}
+jobs = d["jobs"]
+if jobs.is_a?(Hash) && jobs.keys == ["contracts"]
+  job = jobs["contracts"]
+  errs << "bad-runner" unless job["runs-on"] == "ubuntu-latest"
+  steps = job["steps"] || []
+  uses_steps = steps.select { |s| s.key?("uses") }
+  unless uses_steps.length == 1 && uses_steps.first["uses"] == "actions/checkout@v4"
+    errs << "bad-checkout-step"
+  end
+  run_lines = steps.flat_map { |s| (s["run"] || "").split("\n") }.map(&:strip).reject(&:empty?)
+  required = [
+    'git diff --check',
+    'bash -n tests/contracts.sh',
+    'jq -e . .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json >/dev/null',
+    'bash tests/contracts.sh',
+    'test "$(wc -l < tests/contracts.sh)" -le 250',
+    'test ! -e git-hooks/pre-push',
+    'test ! -e docs/delivery-log.md',
+    'test ! -e docs/findings.md',
+    'test ! -e docs/harness-surface.md',
+    'test ! -e docs/options.md',
+    'test ! -e docs/_plans/2026-08-24-automation-first-dely-design.md',
+    'test ! -e bin/delivery-doctor',
+    'test ! -e bin/delivery-evidence',
+    'test ! -e hooks/hooks.json',
+    'test ! -e hooks/grok-hooks.json.template',
+    'test ! -e hooks/post-tool-journal.sh',
+    'test ! -e hooks/session-start-context.sh',
+    "git grep -Ei 'pace.?id' -- . ':!docs/_plans' && exit 1 || true",
+    "git grep -E '(^|[^A-Za-z0-9])[A-Z][0-9]+[a-z]?([^A-Za-z0-9]|$)' -- . ':!docs/_plans' && exit 1 || true",
+  ]
+  errs << "missing-run-lines" unless (required - run_lines).empty?
+else
+  errs << "bad-jobs"
+end
+puts errs.join(",") unless errs.empty?
+RUBY
+  workflow_check="$(ruby "$workflow_checker" "$workflow")"
+  rm -f "$workflow_checker"
   if [ -n "$workflow_check" ]; then
     fail_with "$workflow $workflow_check"
   fi
