@@ -54,10 +54,7 @@ because release has no LLM worker.
 The table is this repository's deployment selection, not the portable protocol.
 Load Orca's native skill to launch and supervise each worker TUI. Do not wrap a
 headless `claude -p`, `codex exec`, `grok --prompt-file`, or `agy -p`/`--print`
-in a shell tab. When composing an `agy` argv, include
-`--dangerously-skip-permissions` (Orca's Antigravity agent-tab default) with
-the model and effort pins. Do not add `--sandbox`. Write worker prompts inside
-the worktree.
+in a shell tab.
 
 Review is independent by role: a fresh session that does not implement or edit
 the candidate. This project adds no phase-implied sandbox. Native Internet
