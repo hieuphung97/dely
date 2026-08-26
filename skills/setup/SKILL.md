@@ -64,6 +64,8 @@ package, from memory, or from `docs/`.
 - Codex: `codex debug models`
 - Grok models: `grok models`
 - Antigravity CLI models: `agy models` (offer the slug column of its TSV output)
+- Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each
+  `model_id`)
 
 The two Claude probes are answered locally: `num_turns` 0, `total_cost_usd` 0,
 no model turn. Do not treat them as a dispatch.
@@ -79,6 +81,12 @@ Antigravity CLI effort is `low|medium|high`, read from `agy --help`'s
 `--effort` flag; do not prompt the model to learn it. Some model slugs already
 end in `-high`, `-medium`, or `-low` — that suffix names the model, not the
 effort flag, so do not strip it.
+
+Kiro CLI effort is read from `kiro-cli chat --help`'s model and effort flags;
+do not prompt the model to learn it and do not store a catalogue. Live
+discovery may offer only `auto` — that is a valid result, not a reason to
+invent model names. Omit Kiro discovery that is unavailable or unusable rather
+than guessing.
 
 A harness that is not installed is omitted from the offer, not an error.
 
@@ -123,8 +131,8 @@ authoritative.
 ## Claude Code and `AGENTS.md`
 
 Claude Code does not read `AGENTS.md`. The persistent instruction reaches
-Codex, Grok, and Antigravity CLI natively. It reaches Claude Code only where
-the project has a `CLAUDE.md` that imports `AGENTS.md`.
+Codex, Grok, Antigravity CLI, and Kiro CLI natively. It reaches Claude Code
+only where the project has a `CLAUDE.md` that imports `AGENTS.md`.
 
 Where the current harness is Claude Code and the project has no `CLAUDE.md`
 importing `AGENTS.md`, offer to create a one-line `CLAUDE.md` containing
@@ -139,8 +147,9 @@ expand the import at all.
 ## What setup will not do
 
 No plugin or skill install. No hook trust. No writes to `~/.claude`,
-`~/.codex`, `~/.grok`, or `~/.gemini`. No coordinator installation or field. No control or
-release row. No enumeration or invocation of project-owned workflow plugins.
-No model catalogue.
+`~/.codex`, `~/.grok`, `~/.gemini`, or `~/.kiro`. No custom Kiro agent creation
+or modification. No coordinator installation or field. No control or release
+row. No enumeration or invocation of project-owned workflow plugins. No model
+catalogue.
 
 Print verified install guidance only when the human explicitly asks for it.

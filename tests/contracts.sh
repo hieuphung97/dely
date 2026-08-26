@@ -103,11 +103,18 @@ if [ "$setup_block_check" != "ok" ]; then
   fail_with "$setup_skill managed block does not have exactly one implement and one review row"
 fi
 
-# Setup's Discovery section must name the live `agy models` command, not just
-# mention Antigravity in prose elsewhere in the file.
+# Setup's Discovery section must name the live `agy models` and Kiro CLI
+# commands, and offer Kiro's `model_id` field, not a stored catalogue or the
+# wrong JSON field.
 discovery_section="$(awk '/^## Discovery[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$setup_skill")"
-if ! printf '%s\n' "$discovery_section" | grep -Fq 'agy models'; then
-  fail_with "$setup_skill Discovery section does not name agy models"
+for needle in 'agy models' 'kiro-cli chat --list-models --format json' 'model_id'; do
+  printf '%s\n' "$discovery_section" | grep -Fq -- "$needle" || fail_with "$setup_skill Discovery section does not name: $needle"
+done
+
+# AGENTS.md's headless-forbidden dispatch list must name Kiro's no-interactive
+# invocation, not just list Kiro as a supported harness elsewhere.
+if ! grep -Fq 'kiro-cli chat --no-interactive' "$root/AGENTS.md"; then
+  fail_with "AGENTS.md headless-forbidden list is missing kiro-cli chat --no-interactive"
 fi
 
 # Kiro CLI's README section must document native `npx skills` install, update,
@@ -144,10 +151,8 @@ done
 # Community collaboration contract: the six community artifacts must exist,
 # and both issue forms must be present, parseable YAML with the top-level
 # keys GitHub requires to render an issue form (name, description, body).
-for f in CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md \
-         .github/ISSUE_TEMPLATE/bug_report.yml \
-         .github/ISSUE_TEMPLATE/feature_request.yml \
-         .github/pull_request_template.md; do
+for f in CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md .github/ISSUE_TEMPLATE/bug_report.yml \
+         .github/ISSUE_TEMPLATE/feature_request.yml .github/pull_request_template.md; do
   if [ ! -f "$root/$f" ]; then
     fail_with "missing required community artifact: $f"
   fi
@@ -214,23 +219,15 @@ if jobs.is_a?(Hash) && jobs.keys == ["contracts"]
   end
   run_lines = steps.flat_map { |s| (s["run"] || "").split("\n") }.map(&:strip).reject(&:empty?)
   required = [
-    'git diff --check',
-    'bash -n tests/contracts.sh',
+    'git diff --check', 'bash -n tests/contracts.sh',
     'jq -e . plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json >/dev/null',
-    'bash tests/contracts.sh',
-    'test "$(wc -l < tests/contracts.sh)" -le 250',
-    'test ! -e git-hooks/pre-push',
-    'test ! -e docs/delivery-log.md',
-    'test ! -e docs/findings.md',
-    'test ! -e docs/harness-surface.md',
-    'test ! -e docs/options.md',
+    'bash tests/contracts.sh', 'test "$(wc -l < tests/contracts.sh)" -le 250',
+    'test ! -e git-hooks/pre-push', 'test ! -e docs/delivery-log.md', 'test ! -e docs/findings.md',
+    'test ! -e docs/harness-surface.md', 'test ! -e docs/options.md',
     'test ! -e docs/_plans/2026-08-24-automation-first-dely-design.md',
-    'test ! -e bin/delivery-doctor',
-    'test ! -e bin/delivery-evidence',
-    'test ! -e hooks/hooks.json',
-    'test ! -e hooks/grok-hooks.json.template',
-    'test ! -e hooks/post-tool-journal.sh',
-    'test ! -e hooks/session-start-context.sh',
+    'test ! -e bin/delivery-doctor', 'test ! -e bin/delivery-evidence',
+    'test ! -e hooks/hooks.json', 'test ! -e hooks/grok-hooks.json.template',
+    'test ! -e hooks/post-tool-journal.sh', 'test ! -e hooks/session-start-context.sh',
     "git grep -Ei 'pace.?id' -- . ':!docs/_plans' && exit 1 || true",
     "git grep -E '(^|[^A-Za-z0-9])[A-Z][0-9]+[a-z]?([^A-Za-z0-9]|$)' -- . ':!docs/_plans' && exit 1 || true",
   ]
