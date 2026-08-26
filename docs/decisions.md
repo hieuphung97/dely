@@ -9,6 +9,90 @@ Last updated 2026-08-26.
 
 ## Settled
 
+### 2026-08-26 — Kiro CLI is a first-class fifth harness
+
+#### Context
+
+Dely shipped as an installable package for Claude Code, Codex CLI, Grok Build,
+and Antigravity CLI. `dely:setup` discovered models and effort from those four
+CLIs, but it could not offer Kiro CLI. Live Kiro CLI 2.16.2 exposes an
+interactive TUI, lists models as JSON through `kiro-cli chat --list-models
+--format json`, accepts `--model` and `--effort`, and reads `AGENTS.md`
+natively. Its default agent discovers skills from `.kiro/skills/` and
+`~/.kiro/skills/`. The open `npx skills` installer supports Kiro CLI at those
+paths, and Orca 1.4.188 ships a Kiro launcher.
+
+The repository's root `plugin.json` is deliberately limited to `name` and
+`description` for Antigravity CLI 1.1.19. A Kiro Power using Agent Plugins 1.0
+would require additional root manifest fields, so one root manifest cannot
+safely serve both checked command surfaces.
+
+#### Decision
+
+Kiro CLI is a first-class harness, equal in kind to Claude Code, Codex CLI,
+Grok Build, and Antigravity CLI.
+
+Kiro installs the existing `delivery` and `setup` skills with `npx skills`,
+targeting the `kiro-cli` agent at global scope. The native Kiro commands are
+`/delivery` and `/setup`; Dely does not add a Kiro-specific package or duplicate
+the skill tree. Install, verification, update, and removal use the installer's
+documented command surface.
+
+Setup discovers Kiro models from `kiro-cli chat --list-models --format json`
+and offers each `model_id`. It reads effort choices from `kiro-cli chat --help`
+rather than prompting a model or storing a catalogue. An unavailable Kiro CLI
+or an unusable discovery result is omitted, not guessed. Setup does not write
+`~/.kiro` or create or modify custom agents. Kiro receives the managed Dely
+block through its native `AGENTS.md` support.
+
+Orca launches Kiro as a real interactive TUI and keeps its configured
+permission-bypass arguments. A headless `kiro-cli chat --no-interactive`
+process in a shell tab is not a Dely worker. The portable delivery protocol
+still names no harness and does not change. The two versioned manifests advance
+together to `0.14.0`; root `plugin.json` stays unchanged. Human bug reports
+offer all five supported harnesses.
+
+#### Alternatives considered
+
+- Package Dely as a Kiro Power at the repository root. Rejected because the
+  required Agent Plugins manifest fields conflict with the checked strict
+  Antigravity manifest.
+- Add a nested Kiro Power with a second copy of `skills/`. Rejected because it
+  creates two sources of truth for the delivery contract and templates.
+- Tell Kiro users to copy or symlink the skills manually. Rejected because
+  install, update, and removal would no longer be one verifiable public path.
+- Create a custom Kiro agent for Dely. Rejected because Dely is a workflow skill,
+  not a replacement agent, and setup does not mutate harness configuration.
+
+#### Consequences
+
+Kiro users get the same delivery and setup behaviour without a fifth package
+format. The install command depends on the external `npx skills` command and
+uses global scope, so running it intentionally mutates the user's Kiro skill
+directory; Dely itself never performs that mutation. Kiro custom agents can
+change default resource inheritance, so users of such agents remain responsible
+for including the standard Kiro skill resources.
+
+Live discovery may offer only `auto`, as observed on Kiro CLI 2.16.2. That is a
+valid live result, not a reason to invent model names. This repository's own
+phase pins remain Claude Code for implementation and Codex CLI for review.
+
+#### Non-goals
+
+No Kiro Power, `.kiro/` package, custom agent, hook, MCP server, steering file,
+or write to `~/.kiro`. No Kiro IDE, Web, Mobile, Crew, ACP, or headless dispatch.
+No Orca change. No change to review depth, remediation, the two-row managed
+block, root `plugin.json`, or `skills/delivery/SKILL.md`.
+
+#### Deferred
+
+Adopt a Kiro Power only when one package manifest can satisfy every supported
+harness without duplicating the skill tree. Configure custom-agent resources
+only when a consumer explicitly needs an agent that disables default skill
+inheritance. End-to-end global installation and live skill activation remain a
+consumer-profile check because this repository does not mutate live harness
+configuration during compatibility validation.
+
 ### 2026-08-26 — Antigravity CLI is a first-class fourth harness
 
 #### Context
