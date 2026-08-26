@@ -148,4 +148,34 @@ for f in .github/ISSUE_TEMPLATE/bug_report.yml .github/ISSUE_TEMPLATE/feature_re
   fi
 done
 
+
+# One CI entry point: the workflow must exist, be parseable YAML, declare a
+# job whose id is exactly "contracts" (that job id is the required status
+# check context), and invoke this same script's exact command — not a
+# different or missing entry point.
+workflow="$root/.github/workflows/contracts.yml"
+if [ ! -f "$workflow" ]; then
+  fail_with "missing $workflow"
+else
+  workflow_check="$(ruby -ryaml -e '
+    begin
+      d = YAML.safe_load(File.read(ARGV[0]))
+    rescue => e
+      puts "parse-error(#{e.message})"
+      exit
+    end
+    jobs = d.is_a?(Hash) ? d["jobs"] : nil
+    unless jobs.is_a?(Hash) && jobs.key?("contracts")
+      puts "missing-contracts-job"
+      exit
+    end
+    steps = jobs["contracts"]["steps"] || []
+    runs = steps.map { |s| s["run"] }.compact.join("\n")
+    puts "does-not-call-tests/contracts.sh" unless runs.include?("bash tests/contracts.sh")
+  ' "$workflow")"
+  if [ -n "$workflow_check" ]; then
+    fail_with "$workflow $workflow_check"
+  fi
+fi
+
 exit "$fail"

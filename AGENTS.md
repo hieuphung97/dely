@@ -8,7 +8,12 @@ automation-first control protocol for Claude Code, Codex CLI, and Grok Build.
 - The workflow contract is `skills/delivery/SKILL.md`.
 - Settled, open, and rejected decisions are recorded in `docs/decisions.md`.
 - Installation and onboarding instructions are in `README.md`.
-- Structural contract checks live in `tests/contracts.sh`.
+- Structural contract checks live in `tests/contracts.sh`; GitHub Actions runs
+  them on every pull request and `main` from
+  `.github/workflows/contracts.yml`, whose unique required job is `contracts`.
+- `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, and `.github/`
+  (issue and pull-request templates) own the human contribution, conduct,
+  security, and PR contract; they need no Dely or Orca install to follow.
 
 Repository artifacts are written in English.
 
