@@ -1,7 +1,7 @@
 # dely
 
 An automation-first delivery protocol for coding agents, packaged for Claude
-Code, Codex CLI, and Grok Build.
+Code, Codex CLI, Grok Build, and Antigravity CLI.
 
 Dely accepts a request that may still be vague, brings it to an approved
 design contract, then automates sequential implementation, independent
@@ -114,9 +114,21 @@ commit SHA — a branch name such as `@main` is still mutable, not a pin.
 git-remote install prompts the same way is untested; if the prompt appears,
 it is the install asking for trust, not a failure.
 
+### Antigravity CLI
+
+```bash
+agy plugin install https://github.com/hieuphung97/dely.git
+
+agy plugin list                    # verify it is installed
+agy plugin uninstall dely          # uninstall
+```
+
+`agy plugin install` takes a git URL or a local path. This README documents
+the command, not a plugin cache directory.
+
 ### Cache refresh boundary
 
-All three harnesses run a **copy** of this package taken at install time, so
+All four harnesses run a **copy** of this package taken at install time, so
 editing the source changes nothing until each cache is refreshed. Bump the
 version and refresh every copy whenever a rule changes, or the harnesses
 disagree about what the workflow says. A self-update's release phase runs
