@@ -19,8 +19,25 @@ skill="$root/skills/delivery/SKILL.md"
 claude_version="$(jq -r .version "$claude_manifest" 2>/dev/null)"
 codex_version="$(jq -r .version "$codex_manifest" 2>/dev/null)"
 
-if [ "$claude_version" != "0.12.0" ] || [ "$codex_version" != "0.12.0" ]; then
-  fail_with "manifest versions must both be 0.12.0 (claude=$claude_version codex=$codex_version)"
+if [ "$claude_version" != "0.13.0" ] || [ "$codex_version" != "0.13.0" ]; then
+  fail_with "manifest versions must both be 0.13.0 (claude=$claude_version codex=$codex_version)"
+fi
+
+# Canonical MIT text (github.com/licenses/mit) with [year] -> 2026 and
+# [fullname] -> Hieu Phung, whitespace-normalized. A present LICENSE that only
+# names the license by word (e.g. "MIT") is not the grant itself.
+expected_license='MIT License Copyright (c) 2026 Hieu Phung Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.'
+
+license_file="$root/LICENSE"
+if [ ! -f "$license_file" ]; then
+  fail_with "missing LICENSE"
+else
+  actual_license="$(tr '\n' ' ' < "$license_file" | tr -s ' ')"
+  actual_license="${actual_license# }"
+  actual_license="${actual_license% }"
+  if [ "$actual_license" != "$expected_license" ]; then
+    fail_with "LICENSE is not the canonical MIT text for 2026 Hieu Phung"
+  fi
 fi
 
 # The whole maintenance-log section is matched verbatim (whitespace-normalized)
@@ -96,5 +113,111 @@ for col in Requirement Instrument Counterexample "Observed red"; do
     fail_with "$plan_template acceptance header is missing column: $col"
   fi
 done
+
+# Community collaboration contract: the six community artifacts must exist,
+# and both issue forms must be present, parseable YAML with the top-level
+# keys GitHub requires to render an issue form (name, description, body).
+for f in CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md \
+         .github/ISSUE_TEMPLATE/bug_report.yml \
+         .github/ISSUE_TEMPLATE/feature_request.yml \
+         .github/pull_request_template.md; do
+  if [ ! -f "$root/$f" ]; then
+    fail_with "missing required community artifact: $f"
+  fi
+done
+
+for f in .github/ISSUE_TEMPLATE/bug_report.yml .github/ISSUE_TEMPLATE/feature_request.yml; do
+  path="$root/$f"
+  [ -f "$path" ] || continue
+  missing="$(ruby -ryaml -e '
+    begin
+      d = YAML.safe_load(File.read(ARGV[0]))
+    rescue => e
+      puts "parse-error(#{e.message})"
+      exit
+    end
+    unless d.is_a?(Hash)
+      puts "not-a-mapping"
+      exit
+    end
+    m = %w[name description body].reject { |k| d.key?(k) }
+    puts m.join(",") unless m.empty?
+  ' "$path")"
+  if [ -n "$missing" ]; then
+    fail_with "$f is not a valid GitHub issue form: missing/invalid $missing"
+  fi
+done
+
+
+# One CI entry point: the workflow must exist, parse as YAML, and match the
+# approved shape exactly: name, triggers, top-level permissions, the sole
+# "contracts" job id, its runner, its sole action, and every literal
+# AGENTS.md closure command present as a whole normalized run line, never a
+# substring. A heredoc keeps the required lines' own quoting literal.
+workflow="$root/.github/workflows/contracts.yml"
+if [ ! -f "$workflow" ]; then
+  fail_with "missing $workflow"
+else
+  workflow_checker="$(mktemp)"
+  cat >"$workflow_checker" <<'RUBY'
+require "yaml"
+begin
+  d = YAML.safe_load(File.read(ARGV[0]))
+rescue => e
+  puts "parse-error(#{e.message})"
+  exit
+end
+errs = []
+errs << "bad-name" unless d.is_a?(Hash) && d["name"] == "contracts"
+# YAML 1.1 parses the bare "on:" key as boolean true, not the string "on".
+on = d.is_a?(Hash) ? (d.key?(true) ? d[true] : d["on"]) : nil
+unless on.is_a?(Hash) && on.key?("pull_request") &&
+       on["push"].is_a?(Hash) && on["push"]["branches"] == ["main"]
+  errs << "bad-triggers"
+end
+errs << "bad-permissions" unless d["permissions"] == {"contents" => "read"}
+jobs = d["jobs"]
+if jobs.is_a?(Hash) && jobs.keys == ["contracts"]
+  job = jobs["contracts"]
+  errs << "bad-runner" unless job["runs-on"] == "ubuntu-latest"
+  steps = job["steps"] || []
+  uses_steps = steps.select { |s| s.key?("uses") }
+  unless uses_steps.length == 1 && uses_steps.first["uses"] == "actions/checkout@v4"
+    errs << "bad-checkout-step"
+  end
+  run_lines = steps.flat_map { |s| (s["run"] || "").split("\n") }.map(&:strip).reject(&:empty?)
+  required = [
+    'git diff --check',
+    'bash -n tests/contracts.sh',
+    'jq -e . .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json >/dev/null',
+    'bash tests/contracts.sh',
+    'test "$(wc -l < tests/contracts.sh)" -le 250',
+    'test ! -e git-hooks/pre-push',
+    'test ! -e docs/delivery-log.md',
+    'test ! -e docs/findings.md',
+    'test ! -e docs/harness-surface.md',
+    'test ! -e docs/options.md',
+    'test ! -e docs/_plans/2026-08-24-automation-first-dely-design.md',
+    'test ! -e bin/delivery-doctor',
+    'test ! -e bin/delivery-evidence',
+    'test ! -e hooks/hooks.json',
+    'test ! -e hooks/grok-hooks.json.template',
+    'test ! -e hooks/post-tool-journal.sh',
+    'test ! -e hooks/session-start-context.sh',
+    "git grep -Ei 'pace.?id' -- . ':!docs/_plans' && exit 1 || true",
+    "git grep -E '(^|[^A-Za-z0-9])[A-Z][0-9]+[a-z]?([^A-Za-z0-9]|$)' -- . ':!docs/_plans' && exit 1 || true",
+  ]
+  errs << "missing-run-lines" unless (required - run_lines).empty?
+else
+  errs << "bad-jobs"
+end
+puts errs.join(",") unless errs.empty?
+RUBY
+  workflow_check="$(ruby "$workflow_checker" "$workflow")"
+  rm -f "$workflow_checker"
+  if [ -n "$workflow_check" ]; then
+    fail_with "$workflow $workflow_check"
+  fi
+fi
 
 exit "$fail"
