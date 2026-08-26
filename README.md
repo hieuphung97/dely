@@ -77,7 +77,7 @@ codex plugin marketplace upgrade   # update: see below
 codex plugin remove dely@dely      # uninstall
 ```
 
-`codex plugin marketplace add --ref <ref>` pins the marketplace to an
+`codex plugin marketplace add --ref <ref>` targets the marketplace at an
 explicit Git ref instead of the default branch — use a tag such as
 `v0.13.0` (once that release is tagged) or an exact full commit SHA for an
 immutable pin; `main` is a mutable branch, not a pin. There is no
