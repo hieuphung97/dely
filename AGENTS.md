@@ -77,7 +77,7 @@ bash -n tests/contracts.sh
 ```
 
 ```bash
-jq -e . .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json >/dev/null
+jq -e . plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json >/dev/null
 ```
 
 ```bash

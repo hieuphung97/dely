@@ -12,6 +12,7 @@ fail_with() {
   fail=1
 }
 
+root_manifest="$root/plugin.json"
 claude_manifest="$root/.claude-plugin/plugin.json"
 codex_manifest="$root/.codex-plugin/plugin.json"
 skill="$root/skills/delivery/SKILL.md"
@@ -21,6 +22,11 @@ codex_version="$(jq -r .version "$codex_manifest" 2>/dev/null)"
 
 if [ "$claude_version" != "0.13.0" ] || [ "$codex_version" != "0.13.0" ]; then
   fail_with "manifest versions must both be 0.13.0 (claude=$claude_version codex=$codex_version)"
+fi
+
+root_name="$(jq -r .name "$root_manifest" 2>/dev/null)"
+if [ "$root_name" != "dely" ]; then
+  fail_with "$root_manifest .name must be dely (got $root_name)"
 fi
 
 # Canonical MIT text (github.com/licenses/mit) with [year] -> 2026 and
@@ -189,7 +195,7 @@ if jobs.is_a?(Hash) && jobs.keys == ["contracts"]
   required = [
     'git diff --check',
     'bash -n tests/contracts.sh',
-    'jq -e . .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json >/dev/null',
+    'jq -e . plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json >/dev/null',
     'bash tests/contracts.sh',
     'test "$(wc -l < tests/contracts.sh)" -le 250',
     'test ! -e git-hooks/pre-push',
