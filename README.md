@@ -127,6 +127,23 @@ agy plugin uninstall dely          # uninstall
 `agy plugin install` takes a git URL or a local path. This README documents
 the command, not a plugin cache directory.
 
+### Kiro CLI
+
+```bash
+npx skills add hieuphung97/dely --agent kiro-cli --global --skill delivery --skill setup
+
+npx skills list --agent kiro-cli --global    # verify it is installed
+npx skills update --global                   # update
+npx skills remove --agent kiro-cli --global --skill delivery --skill setup  # uninstall
+```
+
+`npx skills add` installs the existing `delivery` and `setup` skills — no
+Kiro Power, no duplicated skill tree — through the open `npx skills`
+installer, targeting the `kiro-cli` agent (`--agent`) at global scope
+(`--global`). Kiro's default agent discovers global skills from
+`~/.kiro/skills/` automatically. Invoke them natively in a Kiro CLI session
+as `/delivery` and `/setup`.
+
 ### Cache refresh boundary
 
 All four harnesses run a **copy** of this package taken at install time, so

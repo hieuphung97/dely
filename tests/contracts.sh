@@ -20,8 +20,8 @@ skill="$root/skills/delivery/SKILL.md"
 claude_version="$(jq -r .version "$claude_manifest" 2>/dev/null)"
 codex_version="$(jq -r .version "$codex_manifest" 2>/dev/null)"
 
-if [ "$claude_version" != "0.13.0" ] || [ "$codex_version" != "0.13.0" ]; then
-  fail_with "manifest versions must both be 0.13.0 (claude=$claude_version codex=$codex_version)"
+if [ "$claude_version" != "0.14.0" ] || [ "$codex_version" != "0.14.0" ]; then
+  fail_with "manifest versions must both be 0.14.0 (claude=$claude_version codex=$codex_version)"
 fi
 
 root_name="$(jq -r .name "$root_manifest" 2>/dev/null)"
@@ -108,6 +108,20 @@ fi
 discovery_section="$(awk '/^## Discovery[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$setup_skill")"
 if ! printf '%s\n' "$discovery_section" | grep -Fq 'agy models'; then
   fail_with "$setup_skill Discovery section does not name agy models"
+fi
+
+# Kiro CLI's README section must document native `npx skills` install, update,
+# removal, and invocation, not just claim support with manual copying.
+kiro_section="$(awk '/^### Kiro CLI[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$root/README.md")"
+if [ -z "$kiro_section" ]; then
+  fail_with "README.md is missing a ### Kiro CLI section"
+elif printf '%s\n' "$kiro_section" | grep -Eiq 'copy (the |both )?skills? (files? )?(manually|by hand)'; then
+  fail_with "README.md Kiro CLI section instructs manual copying instead of npx skills"
+else
+  for needle in 'npx skills add' 'npx skills update' 'npx skills remove' \
+                '--agent kiro-cli' '--global' '--skill delivery' '--skill setup' '/delivery' '/setup'; do
+    printf '%s\n' "$kiro_section" | grep -Fq -- "$needle" || fail_with "README.md Kiro CLI section is missing: $needle"
+  done
 fi
 
 # Plan template's acceptance header: the four named columns must all be
