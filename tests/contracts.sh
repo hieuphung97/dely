@@ -112,7 +112,7 @@ fi
 
 # Kiro CLI's README section must document native `npx skills` install, update,
 # removal, and invocation, not just claim support with manual copying.
-kiro_section="$(awk '/^### Kiro CLI[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$root/README.md")"
+kiro_section="$(awk '/^### Kiro CLI[[:space:]]*$/{p=1;next} p && /^#{2,3} /{exit} p' "$root/README.md")"
 if [ -z "$kiro_section" ]; then
   fail_with "README.md is missing a ### Kiro CLI section"
 elif printf '%s\n' "$kiro_section" | grep -Eiq 'copy (the |both )?skills? (files? )?(manually|by hand)'; then
