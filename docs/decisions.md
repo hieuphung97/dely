@@ -45,9 +45,12 @@ or an unusable discovery result is omitted, not guessed. Setup does not write
 `~/.kiro` or create or modify custom agents. Kiro receives the managed Dely
 block through its native `AGENTS.md` support.
 
-Orca launches Kiro as a real interactive TUI and keeps its configured
-permission-bypass arguments. A headless `kiro-cli chat --no-interactive`
-process in a shell tab is not a Dely worker. The portable delivery protocol
+Orca launches Kiro as a real interactive TUI, `kiro-cli chat --tui`, without
+`--trust-all-tools` on that argv: putting it there opens a confirmation whose
+default is "No, exit", and Orca's Enter kills the session. Once the TUI is
+idle at its prompt, Control sends `/tools trust-all`, observed to trust tools
+for the session with no confirmation dialog, then the work prompt. A headless
+`kiro-cli chat --no-interactive` process in a shell tab is not a Dely worker. The portable delivery protocol
 still names no harness and does not change. The two versioned manifests advance
 together to `0.14.0`; root `plugin.json` stays unchanged. Human bug reports
 offer all five supported harnesses.
