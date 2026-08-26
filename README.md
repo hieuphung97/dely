@@ -1,7 +1,7 @@
 # dely
 
 An automation-first delivery protocol for coding agents, packaged for Claude
-Code, Codex CLI, Grok Build, and Antigravity CLI.
+Code, Codex CLI, Grok Build, Antigravity CLI, and Kiro CLI.
 
 Dely accepts a request that may still be vague, brings it to an approved
 design contract, then automates sequential implementation, independent
@@ -19,7 +19,7 @@ by a second core skill, `dely:setup`. Rationale for the current design is in
 ## Prerequisites
 
 - One of Claude Code, Codex CLI, Grok Build, or Antigravity CLI, each with
-  plugin support.
+  plugin support, or Kiro CLI with the `npx skills` installer.
 - [Orca](https://www.onorca.dev/docs/install) — a required, constant
   execution plane. It launches and supervises the per-phase worker TUIs.
   `dely:delivery` preflights Orca and stops when the CLI is missing, the
@@ -35,6 +35,7 @@ against — observations, not a promised minimum:
 | Codex CLI | 0.149.1 |
 | Grok Build | 1.0.5 |
 | Antigravity CLI | 1.1.19 |
+| Kiro CLI | 2.16.2 |
 | Orca | 1.4.188 |
 
 Preflight Orca before installing a harness plugin:
@@ -127,9 +128,26 @@ agy plugin uninstall dely          # uninstall
 `agy plugin install` takes a git URL or a local path. This README documents
 the command, not a plugin cache directory.
 
+### Kiro CLI
+
+```bash
+npx skills add hieuphung97/dely --agent kiro-cli --global --skill delivery --skill setup
+
+npx skills list --agent kiro-cli --global    # verify it is installed
+npx skills update --global                   # update
+npx skills remove --agent kiro-cli --global --skill delivery --skill setup  # uninstall
+```
+
+`npx skills add` installs the existing `delivery` and `setup` skills — no
+Kiro Power, no duplicated skill tree — through the open `npx skills`
+installer, targeting the `kiro-cli` agent (`--agent`) at global scope
+(`--global`). Kiro's default agent discovers global skills from
+`~/.kiro/skills/` automatically. Invoke them natively in a Kiro CLI session
+as `/delivery` and `/setup`.
+
 ### Cache refresh boundary
 
-All four harnesses run a **copy** of this package taken at install time, so
+All five harnesses run a **copy** of this package taken at install time, so
 editing the source changes nothing until each cache is refreshed. Bump the
 version and refresh every copy whenever a rule changes, or the harnesses
 disagree about what the workflow says. A self-update's release phase runs
@@ -151,8 +169,8 @@ coordinator field, no `control` row, and no `release` row — release is
 performed by the current interactive session with native Git and forge tools
 and dispatches no worker.
 
-**Claude Code does not read `AGENTS.md`.** Codex, Grok, and Antigravity CLI
-do. A consuming
+**Claude Code does not read `AGENTS.md`.** Codex, Grok, Antigravity CLI, and
+Kiro CLI do. A consuming
 project whose sessions run on Claude Code needs a `CLAUDE.md` containing
 `@AGENTS.md` — one line — or the managed block never reaches it. Grok does
 not expand that import, so the file helps one harness and is invisible to the

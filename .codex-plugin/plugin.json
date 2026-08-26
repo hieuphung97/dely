@@ -1,6 +1,6 @@
 {
   "name": "dely",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "An automation-first, Orca-supervised delivery protocol for coding agents.",
   "license": "MIT",
   "keywords": ["delivery", "workflow", "review", "orca", "automation"],

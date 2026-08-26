@@ -20,14 +20,12 @@ skill="$root/skills/delivery/SKILL.md"
 claude_version="$(jq -r .version "$claude_manifest" 2>/dev/null)"
 codex_version="$(jq -r .version "$codex_manifest" 2>/dev/null)"
 
-if [ "$claude_version" != "0.13.0" ] || [ "$codex_version" != "0.13.0" ]; then
-  fail_with "manifest versions must both be 0.13.0 (claude=$claude_version codex=$codex_version)"
+if [ "$claude_version" != "0.14.0" ] || [ "$codex_version" != "0.14.0" ]; then
+  fail_with "manifest versions must both be 0.14.0 (claude=$claude_version codex=$codex_version)"
 fi
 
 root_name="$(jq -r .name "$root_manifest" 2>/dev/null)"
-if [ "$root_name" != "dely" ]; then
-  fail_with "$root_manifest .name must be dely (got $root_name)"
-fi
+[ "$root_name" = "dely" ] || fail_with "$root_manifest .name must be dely (got $root_name)"
 
 # Canonical MIT text (github.com/licenses/mit) with [year] -> 2026 and
 # [fullname] -> Hieu Phung, whitespace-normalized. A present LICENSE that only
@@ -59,9 +57,7 @@ actual_log_section="$(awk '/^### Maintenance log$/{flag=1; next} flag && /^#/{ex
 actual_log_section="${actual_log_section# }"
 actual_log_section="${actual_log_section% }"
 
-if [ "$actual_log_section" != "$expected_log_section" ]; then
-  fail_with "maintenance log section in $skill no longer matches the approved opt-in, accepted-only, non-blocking contract verbatim"
-fi
+[ "$actual_log_section" = "$expected_log_section" ] || fail_with "maintenance log section in $skill no longer matches the approved opt-in, accepted-only, non-blocking contract verbatim"
 
 # Setup's managed block: the fenced "What to write" template must carry
 # exactly two data rows, phases {implement, review} with no duplicate or
@@ -99,15 +95,35 @@ setup_block_check="$(managed_block_template "$setup_skill" | awk '
   }
 ')"
 
-if [ "$setup_block_check" != "ok" ]; then
-  fail_with "$setup_skill managed block does not have exactly one implement and one review row"
-fi
+[ "$setup_block_check" = "ok" ] || fail_with "$setup_skill managed block does not have exactly one implement and one review row"
 
-# Setup's Discovery section must name the live `agy models` command, not just
-# mention Antigravity in prose elsewhere in the file.
+# Setup's whole "### Kiro CLI" Discovery subsection and AGENTS.md's
+# headless-forbidden dispatch sentence are matched verbatim: keyword presence
+# alone still passes a subsection that keeps the required strings but also
+# carries a contradictory paragraph (e.g. "use a stored catalogue") elsewhere
+# in Discovery, since a bullet-only or substring check cannot see it.
+norm() { tr '\n' ' ' | tr -s ' ' | sed -e 's/^ //' -e 's/ $//'; }
 discovery_section="$(awk '/^## Discovery[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$setup_skill")"
-if ! printf '%s\n' "$discovery_section" | grep -Fq 'agy models'; then
-  fail_with "$setup_skill Discovery section does not name agy models"
+printf '%s\n' "$discovery_section" | grep -Fq -- 'agy models' || fail_with "$setup_skill Discovery section does not name: agy models"
+expected_kiro_subsection='Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each `model_id`). Kiro CLI effort is read from `kiro-cli chat --help`'\''s model and effort flags; do not prompt the model to learn it and do not store a catalogue. Live discovery may offer only `auto` — that is a valid result, not a reason to invent model names. Omit Kiro discovery that is unavailable or unusable rather than guessing.'
+actual_kiro_subsection="$(awk '/^### Kiro CLI[[:space:]]*$/{p=1;next} p && /^#/{exit} p' "$setup_skill" | norm)"
+[ "$actual_kiro_subsection" = "$expected_kiro_subsection" ] || fail_with "$setup_skill ### Kiro CLI Discovery subsection no longer matches the approved live-discovery policy verbatim"
+expected_dispatch='Load Orca'\''s native skill to launch and supervise each worker TUI. Do not wrap a headless `claude -p`, `codex exec`, `grok --prompt-file`, `agy -p`/`--print`, or `kiro-cli chat --no-interactive` in a shell tab.'
+actual_dispatch="$(awk '/^Load Orca.s native skill/{p=1} p&&/^$/{exit} p{print}' "$root/AGENTS.md" | norm)"
+[ "$actual_dispatch" = "$expected_dispatch" ] || fail_with "AGENTS.md headless-forbidden dispatch sentence no longer matches the approved policy verbatim"
+
+# Kiro CLI's README section must document native `npx skills` install, update,
+# removal, and invocation, not just claim support with manual copying.
+kiro_section="$(awk '/^### Kiro CLI[[:space:]]*$/{p=1;next} p && /^#{2,3} /{exit} p' "$root/README.md")"
+if [ -z "$kiro_section" ]; then
+  fail_with "README.md is missing a ### Kiro CLI section"
+elif printf '%s\n' "$kiro_section" | grep -Eiq 'copy (the |both )?skills? (files? )?(manually|by hand)'; then
+  fail_with "README.md Kiro CLI section instructs manual copying instead of npx skills"
+else
+  for needle in 'npx skills add' 'npx skills update' 'npx skills remove' \
+                '--agent kiro-cli' '--global' '--skill delivery' '--skill setup' '/delivery' '/setup'; do
+    printf '%s\n' "$kiro_section" | grep -Fq -- "$needle" || fail_with "README.md Kiro CLI section is missing: $needle"
+  done
 fi
 
 # Plan template's acceptance header: the four named columns must all be
@@ -130,10 +146,8 @@ done
 # Community collaboration contract: the six community artifacts must exist,
 # and both issue forms must be present, parseable YAML with the top-level
 # keys GitHub requires to render an issue form (name, description, body).
-for f in CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md \
-         .github/ISSUE_TEMPLATE/bug_report.yml \
-         .github/ISSUE_TEMPLATE/feature_request.yml \
-         .github/pull_request_template.md; do
+for f in CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md .github/ISSUE_TEMPLATE/bug_report.yml \
+         .github/ISSUE_TEMPLATE/feature_request.yml .github/pull_request_template.md; do
   if [ ! -f "$root/$f" ]; then
     fail_with "missing required community artifact: $f"
   fi
@@ -161,6 +175,11 @@ for f in .github/ISSUE_TEMPLATE/bug_report.yml .github/ISSUE_TEMPLATE/feature_re
   fi
 done
 
+# Bug form's harness dropdown must offer all five exact harness names.
+harness_options="$(awk '/^ *id: harness$/{f=1} f&&/^ *validations:/{exit} f' "$root/.github/ISSUE_TEMPLATE/bug_report.yml" | sed 's/^ *- //')"
+for h in "Claude Code" "Codex CLI" "Grok Build" "Antigravity CLI" "Kiro CLI"; do
+  printf '%s\n' "$harness_options" | grep -Fxq -- "$h" || fail_with "bug_report.yml harness dropdown is missing: $h"
+done
 
 # One CI entry point: the workflow must exist, parse as YAML, and match the
 # approved shape exactly: name, triggers, top-level permissions, the sole
@@ -200,23 +219,15 @@ if jobs.is_a?(Hash) && jobs.keys == ["contracts"]
   end
   run_lines = steps.flat_map { |s| (s["run"] || "").split("\n") }.map(&:strip).reject(&:empty?)
   required = [
-    'git diff --check',
-    'bash -n tests/contracts.sh',
+    'git diff --check', 'bash -n tests/contracts.sh',
     'jq -e . plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json >/dev/null',
-    'bash tests/contracts.sh',
-    'test "$(wc -l < tests/contracts.sh)" -le 250',
-    'test ! -e git-hooks/pre-push',
-    'test ! -e docs/delivery-log.md',
-    'test ! -e docs/findings.md',
-    'test ! -e docs/harness-surface.md',
-    'test ! -e docs/options.md',
+    'bash tests/contracts.sh', 'test "$(wc -l < tests/contracts.sh)" -le 250',
+    'test ! -e git-hooks/pre-push', 'test ! -e docs/delivery-log.md', 'test ! -e docs/findings.md',
+    'test ! -e docs/harness-surface.md', 'test ! -e docs/options.md',
     'test ! -e docs/_plans/2026-08-24-automation-first-dely-design.md',
-    'test ! -e bin/delivery-doctor',
-    'test ! -e bin/delivery-evidence',
-    'test ! -e hooks/hooks.json',
-    'test ! -e hooks/grok-hooks.json.template',
-    'test ! -e hooks/post-tool-journal.sh',
-    'test ! -e hooks/session-start-context.sh',
+    'test ! -e bin/delivery-doctor', 'test ! -e bin/delivery-evidence',
+    'test ! -e hooks/hooks.json', 'test ! -e hooks/grok-hooks.json.template',
+    'test ! -e hooks/post-tool-journal.sh', 'test ! -e hooks/session-start-context.sh',
     "git grep -Ei 'pace.?id' -- . ':!docs/_plans' && exit 1 || true",
     "git grep -E '(^|[^A-Za-z0-9])[A-Z][0-9]+[a-z]?([^A-Za-z0-9]|$)' -- . ':!docs/_plans' && exit 1 || true",
   ]

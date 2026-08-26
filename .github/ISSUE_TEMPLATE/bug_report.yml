@@ -43,6 +43,8 @@ body:
         - Claude Code
         - Codex CLI
         - Grok Build
+        - Antigravity CLI
+        - Kiro CLI
         - Other / not sure
     validations:
       required: true
