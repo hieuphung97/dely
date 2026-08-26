@@ -174,6 +174,24 @@ test "$(git ls-remote https://github.com/hieuphung97/dely.git HEAD | wc -l)" -eq
 files from Task 1. The existing decision already records the package-version and
 compatibility rationale. No runtime skill text changes.
 
+### 2b. Reconcile the two remaining Task 2 review findings
+
+**Replan approved 2026-08-26.** The single Task 2 remediation was not accepted,
+so this is a new bounded task rather than a second remediation loop.
+
+**Behaviour.** Codex documentation uses neutral wording for a selected mutable
+Git ref and reserves “immutable pin” for a tag or exact full commit SHA. The Task
+2 Observed-red cell records both manifest mutation commands literally.
+
+**Direction.** Replace only the overbroad Codex “pins” wording and the shorthand
+description of the second `jq` mutation. Preserve every already-accepted Task 2
+behaviour and all reproduced evidence.
+
+**Files.** `README.md` and this plan's Task 2 Observed-red cell.
+
+**Focused verification.** Inspect the two-file diff, replay the recorded fixture,
+then run the Task 2 focused checks and all repository closure gates.
+
 ### 3. Every pull request receives one enforceable repository contract
 
 **Behaviour.** GitHub Actions runs all repository closure gates under one unique
