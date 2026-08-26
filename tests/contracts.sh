@@ -103,19 +103,19 @@ if [ "$setup_block_check" != "ok" ]; then
   fail_with "$setup_skill managed block does not have exactly one implement and one review row"
 fi
 
-# Setup's Discovery section must name the live `agy models` and Kiro CLI
-# commands, and offer Kiro's `model_id` field, not a stored catalogue or the
-# wrong JSON field.
+# Setup's Kiro CLI models bullet and AGENTS.md's headless-forbidden dispatch
+# sentence are matched verbatim: keyword presence alone still passes a bullet
+# that keeps the required strings but tells setup to use a stored catalogue,
+# or a policy reversed to "Wrap a headless ..." that keeps every command name.
+norm() { tr '\n' ' ' | tr -s ' ' | sed -e 's/^ //' -e 's/ $//'; }
 discovery_section="$(awk '/^## Discovery[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$setup_skill")"
-for needle in 'agy models' 'kiro-cli chat --list-models --format json' 'model_id'; do
-  printf '%s\n' "$discovery_section" | grep -Fq -- "$needle" || fail_with "$setup_skill Discovery section does not name: $needle"
-done
-
-# AGENTS.md's headless-forbidden dispatch list must name Kiro's no-interactive
-# invocation, not just list Kiro as a supported harness elsewhere.
-if ! grep -Fq 'kiro-cli chat --no-interactive' "$root/AGENTS.md"; then
-  fail_with "AGENTS.md headless-forbidden list is missing kiro-cli chat --no-interactive"
-fi
+printf '%s\n' "$discovery_section" | grep -Fq -- 'agy models' || fail_with "$setup_skill Discovery section does not name: agy models"
+expected_kiro_bullet='- Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each `model_id`)'
+actual_kiro_bullet="$(awk '/^- Kiro CLI models:/{p=1;print;next} p&&/^  /{print;next} {p=0}' "$setup_skill" | norm)"
+[ "$actual_kiro_bullet" = "$expected_kiro_bullet" ] || fail_with "$setup_skill Kiro CLI models bullet no longer matches the approved live-discovery policy verbatim"
+expected_dispatch='Load Orca'\''s native skill to launch and supervise each worker TUI. Do not wrap a headless `claude -p`, `codex exec`, `grok --prompt-file`, `agy -p`/`--print`, or `kiro-cli chat --no-interactive` in a shell tab.'
+actual_dispatch="$(awk '/^Load Orca.s native skill/{p=1} p&&/^$/{exit} p{print}' "$root/AGENTS.md" | norm)"
+[ "$actual_dispatch" = "$expected_dispatch" ] || fail_with "AGENTS.md headless-forbidden dispatch sentence no longer matches the approved policy verbatim"
 
 # Kiro CLI's README section must document native `npx skills` install, update,
 # removal, and invocation, not just claim support with manual copying.
