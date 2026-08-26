@@ -124,10 +124,12 @@ is no direct dispatch and no headless fallback of any kind.
 
 ### Launching a worker
 
-Write the prompt to a file. Never inline it in a shell argument: prompts carry
-backticks, quotes and newlines, and a shell argument mangles them. Load
-Orca's native skill and use it to launch a real interactive harness TUI for
-the phase, with the model and effort pinned from `AGENTS.md`.
+Write the prompt to a file **inside the worktree**. Never inline it in a
+shell argument: prompts carry backticks, quotes and newlines, and a shell
+argument mangles them. A path outside the workspace can trigger a second
+permission surface some harnesses still prompt for even when tool approval is
+skipped. Load Orca's native skill and use it to launch a real interactive
+harness TUI for the phase, with the model and effort pinned from `AGENTS.md`.
 A visible shell running a headless harness is not a TUI, and this skill has no
 compatibility matrix around one.
 
@@ -135,6 +137,11 @@ compatibility matrix around one.
 default is an unpinned environment: it lives in the harness's own config, it
 changes without announcing itself, and the dispatch that relies on it looks
 identical to one that pinned the same value deliberately.
+
+When composing the TUI launch command yourself, keep the execution plane's
+default permission-bypass flags for that harness. Dropping them leaves the
+worker on the harness Ask default, which is not the environment the host's
+agent tab uses. Do not add a sandbox the project did not pin.
 
 Keep waiting blocking. A worker is observed through Orca until it completes
 or its timeout fires. Do not add a relay, poll, or state machine to

@@ -124,7 +124,11 @@ agy plugin uninstall dely          # uninstall
 ```
 
 `agy plugin install` takes a git URL or a local path. This README documents
-the command, not a plugin cache directory.
+the command, not a plugin cache directory. Plugin install does not skip tool
+approvals. Orca's Antigravity agent tab already launches with
+`--dangerously-skip-permissions`; a composed `agy --model …` command must
+include that flag to match, and must not add `--sandbox` unless a project pin
+asks for it.
 
 ### Cache refresh boundary
 
