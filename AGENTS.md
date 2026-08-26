@@ -54,7 +54,10 @@ because release has no LLM worker.
 The table is this repository's deployment selection, not the portable protocol.
 Load Orca's native skill to launch and supervise each worker TUI. Do not wrap a
 headless `claude -p`, `codex exec`, `grok --prompt-file`, `agy -p`/`--print`, or
-`kiro-cli chat --no-interactive` in a shell tab.
+`kiro-cli chat --no-interactive` in a shell tab. Kiro workers launch as an
+interactive TUI, `kiro-cli chat --tui` with `--model` and `--effort` pinned
+from the managed block and no `--trust-all-tools` on that argv; once the TUI
+is idle at its prompt, send `/tools trust-all`, then the work prompt.
 
 Review is independent by role: a fresh session that does not implement or edit
 the candidate. This project adds no phase-implied sandbox. Native Internet
