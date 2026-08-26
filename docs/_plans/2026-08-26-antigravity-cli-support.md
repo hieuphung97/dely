@@ -2,7 +2,7 @@
 
 Decision record: `docs/decisions.md` (settled 2026-08-26 — Antigravity CLI is a first-class fourth harness)
 
-**Baseline:** leave empty until the commit that carries this plan exists.
+**Baseline:** `74a1b2e` (the commit that first carried the decision record and this plan).
 
 ## Goal
 
