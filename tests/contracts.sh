@@ -103,6 +103,13 @@ if [ "$setup_block_check" != "ok" ]; then
   fail_with "$setup_skill managed block does not have exactly one implement and one review row"
 fi
 
+# Setup's Discovery section must name the live `agy models` command, not just
+# mention Antigravity in prose elsewhere in the file.
+discovery_section="$(awk '/^## Discovery[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$setup_skill")"
+if ! printf '%s\n' "$discovery_section" | grep -Fq 'agy models'; then
+  fail_with "$setup_skill Discovery section does not name agy models"
+fi
+
 # Plan template's acceptance header: the four named columns must all be
 # present, in any order, alongside whatever else the row carries.
 plan_template="$root/skills/delivery/templates/plan.md"

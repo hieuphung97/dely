@@ -63,6 +63,7 @@ package, from memory, or from `docs/`.
 - Claude Code effort: `claude -p "/effort" --output-format json`
 - Codex: `codex debug models`
 - Grok models: `grok models`
+- Antigravity CLI models: `agy models` (offer the slug column of its TSV output)
 
 The two Claude probes are answered locally: `num_turns` 0, `total_cost_usd` 0,
 no model turn. Do not treat them as a dispatch.
@@ -73,6 +74,11 @@ are `supported_reasoning_levels` on each slug, not one vocabulary per harness.
 Grok effort is not discovered by calling the model. Read the installed CLI's
 help and any validation already observed. Do not run a Grok prompt to learn
 the flag.
+
+Antigravity CLI effort is `low|medium|high`, read from `agy --help`'s
+`--effort` flag; do not prompt the model to learn it. Some model slugs already
+end in `-high`, `-medium`, or `-low` — that suffix names the model, not the
+effort flag, so do not strip it.
 
 A harness that is not installed is omitted from the offer, not an error.
 
@@ -117,8 +123,8 @@ authoritative.
 ## Claude Code and `AGENTS.md`
 
 Claude Code does not read `AGENTS.md`. The persistent instruction reaches
-Codex and Grok natively. It reaches Claude Code only where the project has a
-`CLAUDE.md` that imports `AGENTS.md`.
+Codex, Grok, and Antigravity CLI natively. It reaches Claude Code only where
+the project has a `CLAUDE.md` that imports `AGENTS.md`.
 
 Where the current harness is Claude Code and the project has no `CLAUDE.md`
 importing `AGENTS.md`, offer to create a one-line `CLAUDE.md` containing
@@ -133,7 +139,7 @@ expand the import at all.
 ## What setup will not do
 
 No plugin or skill install. No hook trust. No writes to `~/.claude`,
-`~/.codex` or `~/.grok`. No coordinator installation or field. No control or
+`~/.codex`, `~/.grok`, or `~/.gemini`. No coordinator installation or field. No control or
 release row. No enumeration or invocation of project-owned workflow plugins.
 No model catalogue.
 

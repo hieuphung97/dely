@@ -18,7 +18,8 @@ by a second core skill, `dely:setup`. Rationale for the current design is in
 
 ## Prerequisites
 
-- One of Claude Code, Codex CLI, or Grok Build, each with plugin support.
+- One of Claude Code, Codex CLI, Grok Build, or Antigravity CLI, each with
+  plugin support.
 - [Orca](https://www.onorca.dev/docs/install) — a required, constant
   execution plane. It launches and supervises the per-phase worker TUIs.
   `dely:delivery` preflights Orca and stops when the CLI is missing, the
@@ -33,6 +34,7 @@ against — observations, not a promised minimum:
 | Claude Code | 2.1.245 |
 | Codex CLI | 0.149.1 |
 | Grok Build | 1.0.5 |
+| Antigravity CLI | 1.1.19 |
 | Orca | 1.4.188 |
 
 Preflight Orca before installing a harness plugin:
@@ -136,7 +138,8 @@ coordinator field, no `control` row, and no `release` row — release is
 performed by the current interactive session with native Git and forge tools
 and dispatches no worker.
 
-**Claude Code does not read `AGENTS.md`.** Codex and Grok do. A consuming
+**Claude Code does not read `AGENTS.md`.** Codex, Grok, and Antigravity CLI
+do. A consuming
 project whose sessions run on Claude Code needs a `CLAUDE.md` containing
 `@AGENTS.md` — one line — or the managed block never reaches it. Grok does
 not expand that import, so the file helps one harness and is invisible to the
