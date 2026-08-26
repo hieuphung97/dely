@@ -64,8 +64,6 @@ package, from memory, or from `docs/`.
 - Codex: `codex debug models`
 - Grok models: `grok models`
 - Antigravity CLI models: `agy models` (offer the slug column of its TSV output)
-- Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each
-  `model_id`)
 
 The two Claude probes are answered locally: `num_turns` 0, `total_cost_usd` 0,
 no model turn. Do not treat them as a dispatch.
@@ -82,13 +80,16 @@ Antigravity CLI effort is `low|medium|high`, read from `agy --help`'s
 end in `-high`, `-medium`, or `-low` — that suffix names the model, not the
 effort flag, so do not strip it.
 
-Kiro CLI effort is read from `kiro-cli chat --help`'s model and effort flags;
-do not prompt the model to learn it and do not store a catalogue. Live
-discovery may offer only `auto` — that is a valid result, not a reason to
-invent model names. Omit Kiro discovery that is unavailable or unusable rather
-than guessing.
-
 A harness that is not installed is omitted from the offer, not an error.
+
+### Kiro CLI
+
+Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each
+`model_id`). Kiro CLI effort is read from `kiro-cli chat --help`'s model and
+effort flags; do not prompt the model to learn it and do not store a
+catalogue. Live discovery may offer only `auto` — that is a valid result, not
+a reason to invent model names. Omit Kiro discovery that is unavailable or
+unusable rather than guessing.
 
 ## Pinning
 

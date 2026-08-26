@@ -103,16 +103,17 @@ if [ "$setup_block_check" != "ok" ]; then
   fail_with "$setup_skill managed block does not have exactly one implement and one review row"
 fi
 
-# Setup's Kiro CLI models bullet and AGENTS.md's headless-forbidden dispatch
-# sentence are matched verbatim: keyword presence alone still passes a bullet
-# that keeps the required strings but tells setup to use a stored catalogue,
-# or a policy reversed to "Wrap a headless ..." that keeps every command name.
+# Setup's whole "### Kiro CLI" Discovery subsection and AGENTS.md's
+# headless-forbidden dispatch sentence are matched verbatim: keyword presence
+# alone still passes a subsection that keeps the required strings but also
+# carries a contradictory paragraph (e.g. "use a stored catalogue") elsewhere
+# in Discovery, since a bullet-only or substring check cannot see it.
 norm() { tr '\n' ' ' | tr -s ' ' | sed -e 's/^ //' -e 's/ $//'; }
 discovery_section="$(awk '/^## Discovery[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$setup_skill")"
 printf '%s\n' "$discovery_section" | grep -Fq -- 'agy models' || fail_with "$setup_skill Discovery section does not name: agy models"
-expected_kiro_bullet='- Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each `model_id`)'
-actual_kiro_bullet="$(awk '/^- Kiro CLI models:/{p=1;print;next} p&&/^  /{print;next} {p=0}' "$setup_skill" | norm)"
-[ "$actual_kiro_bullet" = "$expected_kiro_bullet" ] || fail_with "$setup_skill Kiro CLI models bullet no longer matches the approved live-discovery policy verbatim"
+expected_kiro_subsection='Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each `model_id`). Kiro CLI effort is read from `kiro-cli chat --help`'\''s model and effort flags; do not prompt the model to learn it and do not store a catalogue. Live discovery may offer only `auto` — that is a valid result, not a reason to invent model names. Omit Kiro discovery that is unavailable or unusable rather than guessing.'
+actual_kiro_subsection="$(awk '/^### Kiro CLI[[:space:]]*$/{p=1;next} p && /^#/{exit} p' "$setup_skill" | norm)"
+[ "$actual_kiro_subsection" = "$expected_kiro_subsection" ] || fail_with "$setup_skill ### Kiro CLI Discovery subsection no longer matches the approved live-discovery policy verbatim"
 expected_dispatch='Load Orca'\''s native skill to launch and supervise each worker TUI. Do not wrap a headless `claude -p`, `codex exec`, `grok --prompt-file`, `agy -p`/`--print`, or `kiro-cli chat --no-interactive` in a shell tab.'
 actual_dispatch="$(awk '/^Load Orca.s native skill/{p=1} p&&/^$/{exit} p{print}' "$root/AGENTS.md" | norm)"
 [ "$actual_dispatch" = "$expected_dispatch" ] || fail_with "AGENTS.md headless-forbidden dispatch sentence no longer matches the approved policy verbatim"
