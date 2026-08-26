@@ -41,6 +41,26 @@ and harness-neutral. No `.kiro/`, `~/.kiro`, custom agent, Kiro Power, Orca
 source, hook, MCP, `CLAUDE.md`, or workflow file changes. Do not install Dely
 into the maintainer's live Kiro profile.
 
+## Replan (Kiro Discovery subsection)
+
+Opened after Task 2's scoped re-review did not accept `73be896`. Headless
+polarity is already an exact normalized sentence match in `AGENTS.md` and stays
+closed. The remaining finding is that Setup's stored-catalogue counterexample
+still passes: `tests/contracts.sh` exact-matches only the Kiro models bullet, so
+a contradictory "use stored catalogue" paragraph elsewhere in Discovery is
+invisible (`old=0`, `new=0`).
+
+Split one new task with a fresh implementer and a fresh reviewer. Create
+`### Kiro CLI` under Setup Discovery and match that whole subsection verbatim,
+so any contradictory paragraph in it is rejected. Do not change live-discovery
+behaviour, omit-if-unavailable, authority, package architecture, or owned
+scope. Do not start a second Task 2 repair loop. Task 3 waits until this new
+task accepts.
+
+The managed block in `AGENTS.md` is unchanged. Remaining reviews in this
+delivery use Claude Code `opus` at `high` (the live `/model` alias for Opus 5)
+instead of Codex CLI, per the 2026-08-26 Control-session override.
+
 ## Execution envelope
 
 Protected dirty paths: none; the tree was clean at baseline
@@ -50,8 +70,11 @@ Branch, base, remote, and pull-request target: `feat/kiro-cli-support`, based on
 `main` at `b79ea56aab734d0363557ed710bf4e8177b76e48`, pushes to `origin`, and opens a
 pull request into `main`.
 
-Resolved phase pins: `implement` runs Claude Code `sonnet` at `medium`; `review`
-runs Codex CLI `gpt-5.6-sol` at `high`. The project pins no phase sandbox.
+Resolved phase pins: `implement` runs Claude Code `sonnet` at `medium`. Task 1
+and Task 2 reviews used Codex CLI `gpt-5.6-sol` at `high`. Remaining reviews in
+this delivery (Task 2b, Task 3, and integration review) run Claude Code `opus`
+at `high`. The project pins no phase sandbox. This delivery does not rewrite
+the managed block.
 
 Authority: this plan may branch, commit only its owned paths, run focused checks
 and closure gates, push `feat/kiro-cli-support`, and open or update its pull
@@ -107,6 +130,31 @@ Kiro command.
 **Document impact.** `AGENTS.md` owns repository deployment policy;
 `skills/setup/SKILL.md` owns discovery and configuration boundaries.
 
+### 2b. Bound Setup's Kiro Discovery subsection
+
+**Behaviour.** Setup's Kiro live-discovery contract is the entire `### Kiro CLI`
+subsection under Discovery. A subsection that keeps the live command and
+`model_id` but tells setup to use a stored catalogue is rejected.
+
+**Direction.** Add `### Kiro CLI` under Setup Discovery. Move Kiro-specific
+model and effort discovery prose into that subsection. Match the whole
+subsection verbatim in `tests/contracts.sh`. Do not change live JSON discovery,
+`model_id`, help-derived effort, omit-if-unavailable, or the no-`~/.kiro` /
+no-custom-agent refusals. Do not edit `AGENTS.md`, README, manifests, or
+delivery. Keep `tests/contracts.sh` at most 250 lines; compact existing checks
+if needed, and do not drop a gate.
+
+**Files.** `skills/setup/SKILL.md`, `tests/contracts.sh`.
+
+**Focused verification.** Observe the Task 2 false pass first: on `73be896`, a
+Discovery section that keeps the current Kiro models bullet and adds a
+"use stored catalogue" paragraph must still exit 0. After the change, the same
+present-but-wrong subsection must exit non-zero, and the correct package must
+exit 0. `test "$(wc -l < tests/contracts.sh)" -le 250` remains true.
+
+**Document impact.** `skills/setup/SKILL.md` owns the Kiro discovery subsection;
+the contract test owns the whole-subsection match.
+
 ### 3. Five-harness onboarding and contribution surface
 
 **Behaviour.** The README consistently describes five supported harnesses and
@@ -134,7 +182,7 @@ the human harness vocabulary.
 | Requirement | Instrument | Counterexample | Observed red |
 | --- | --- | --- | --- |
 | Kiro has native install, update, removal, and `/delivery` invocation | Section-bounded README predicate plus `bash tests/contracts.sh` | A Kiro section says it is supported but tells users to copy the skills manually | 2026-08-26 in-memory probe: `wrong install rc=1`; correct shape `rc=0` |
-| Setup uses live Kiro model ids and help-derived effort | Setup Discovery structural check; live model JSON checked with `jq`; help checked for `--effort` | Kiro is present but setup uses a stored catalogue or offers `model_name` instead of `model_id` | 2026-08-26 probes: wrong Discovery `rc=1`, wrong model JSON `rc=1`; live discovery and effort surface `rc=0` |
+| Setup uses live Kiro model ids and help-derived effort | Whole `### Kiro CLI` subsection under Setup Discovery matched verbatim; live model JSON checked with `jq`; help checked for `--effort` | A Kiro subsection that keeps the live command and `model_id` but tells setup to use a stored catalogue, or that offers `model_name` instead of `model_id` | Task 2 re-review 2026-08-26: bullet-only check passed a stored-catalogue paragraph (`old=0`, `new=0`). Task 2b must observe that false pass on `73be896`, then reject it. Live model JSON and `--effort` help remain `rc=0`. |
 | Dely dispatches an interactive Kiro TUI only | AGENTS policy check names `kiro-cli chat --no-interactive` as forbidden headless dispatch | Kiro is listed as supported but a headless chat is allowed in a shell tab | 2026-08-26 in-memory probe: wrong dispatch policy `rc=1`; correct shape `rc=0` |
 | Human reports can identify all five harnesses | Issue-form option check requires the five exact harness names | The form adds Kiro but still omits Antigravity | 2026-08-26 in-memory probe: wrong options `rc=1`; correct shape `rc=0` |
 | Versioned manifests stay aligned at `0.14.0` | `bash tests/contracts.sh` reads both manifest versions | Only the Claude manifest is `0.14.0`; Codex remains `0.13.0` | 2026-08-26 in-memory predicate with split values: `rc=1` |
