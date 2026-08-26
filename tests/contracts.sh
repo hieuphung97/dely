@@ -59,6 +59,8 @@ actual_log_section="${actual_log_section% }"
 
 [ "$actual_log_section" = "$expected_log_section" ] || fail_with "maintenance log section in $skill no longer matches the approved opt-in, accepted-only, non-blocking contract verbatim"
 
+grep -Fq "launch command as-is" "$skill" && ! grep -Fq 'default permission-bypass flags' "$skill" || fail_with "$skill launch-argv guidance still names the old harness-default permission-bypass wording"
+
 # Setup's managed block: the fenced "What to write" template must carry
 # exactly two data rows, phases {implement, review} with no duplicate or
 # extra phase (e.g. a lingering control/release row). Word-presence alone
@@ -100,12 +102,13 @@ setup_block_check="$(managed_block_template "$setup_skill" | awk '
 # Setup's whole "### Kiro CLI" Discovery subsection and AGENTS.md's
 # headless-forbidden dispatch sentence are matched verbatim: keyword presence
 # alone still passes a subsection that keeps the required strings but also
-# carries a contradictory paragraph (e.g. "use a stored catalogue") elsewhere
-# in Discovery, since a bullet-only or substring check cannot see it.
+# carries a contradictory clause within that same subsection (e.g. "use a
+# stored catalogue"); the check only matches that subsection, not the rest of
+# Discovery.
 norm() { tr '\n' ' ' | tr -s ' ' | sed -e 's/^ //' -e 's/ $//'; }
 discovery_section="$(awk '/^## Discovery[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$setup_skill")"
 printf '%s\n' "$discovery_section" | grep -Fq -- 'agy models' || fail_with "$setup_skill Discovery section does not name: agy models"
-expected_kiro_subsection='Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each `model_id`). Kiro CLI effort is read from `kiro-cli chat --help`'\''s model and effort flags; do not prompt the model to learn it and do not store a catalogue. Live discovery may offer only `auto` — that is a valid result, not a reason to invent model names. Omit Kiro discovery that is unavailable or unusable rather than guessing.'
+expected_kiro_subsection='Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each `model_id`). Kiro CLI effort is read from `kiro-cli chat --help`'\''s `--effort` flag; do not prompt the model to learn it and do not store a catalogue. Live discovery may offer only `auto` — that is a valid result, not a reason to invent model names. Omit Kiro discovery that is unavailable or unusable rather than guessing.'
 actual_kiro_subsection="$(awk '/^### Kiro CLI[[:space:]]*$/{p=1;next} p && /^#/{exit} p' "$setup_skill" | norm)"
 [ "$actual_kiro_subsection" = "$expected_kiro_subsection" ] || fail_with "$setup_skill ### Kiro CLI Discovery subsection no longer matches the approved live-discovery policy verbatim"
 expected_dispatch='Load Orca'\''s native skill to launch and supervise each worker TUI. Do not wrap a headless `claude -p`, `codex exec`, `grok --prompt-file`, `agy -p`/`--print`, or `kiro-cli chat --no-interactive` in a shell tab. Kiro workers launch as an interactive TUI, `kiro-cli chat --tui` with `--model` and `--effort` pinned from the managed block and no `--trust-all-tools` on that argv; once the TUI is idle at its prompt, send `/tools trust-all`, then the work prompt.'
