@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: git diff --check
       - run: bash -n tests/contracts.sh
-      - run: jq -e . .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json >/dev/null
+      - run: jq -e . plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json >/dev/null
       - run: bash tests/contracts.sh
       - run: test "$(wc -l < tests/contracts.sh)" -le 250
       - run: |

@@ -1,7 +1,7 @@
 # dely
 
 An automation-first delivery protocol for coding agents, packaged for Claude
-Code, Codex CLI, and Grok Build.
+Code, Codex CLI, Grok Build, and Antigravity CLI.
 
 Dely accepts a request that may still be vague, brings it to an approved
 design contract, then automates sequential implementation, independent
@@ -18,7 +18,8 @@ by a second core skill, `dely:setup`. Rationale for the current design is in
 
 ## Prerequisites
 
-- One of Claude Code, Codex CLI, or Grok Build, each with plugin support.
+- One of Claude Code, Codex CLI, Grok Build, or Antigravity CLI, each with
+  plugin support.
 - [Orca](https://www.onorca.dev/docs/install) — a required, constant
   execution plane. It launches and supervises the per-phase worker TUIs.
   `dely:delivery` preflights Orca and stops when the CLI is missing, the
@@ -33,6 +34,7 @@ against — observations, not a promised minimum:
 | Claude Code | 2.1.245 |
 | Codex CLI | 0.149.1 |
 | Grok Build | 1.0.5 |
+| Antigravity CLI | 1.1.19 |
 | Orca | 1.4.188 |
 
 Preflight Orca before installing a harness plugin:
@@ -112,9 +114,22 @@ commit SHA — a branch name such as `@main` is still mutable, not a pin.
 git-remote install prompts the same way is untested; if the prompt appears,
 it is the install asking for trust, not a failure.
 
+### Antigravity CLI
+
+```bash
+agy plugin install https://github.com/hieuphung97/dely.git
+
+agy plugin list                    # verify it is installed
+agy plugin install https://github.com/hieuphung97/dely.git  # refresh: no `plugin update` subcommand
+agy plugin uninstall dely          # uninstall
+```
+
+`agy plugin install` takes a git URL or a local path. This README documents
+the command, not a plugin cache directory.
+
 ### Cache refresh boundary
 
-All three harnesses run a **copy** of this package taken at install time, so
+All four harnesses run a **copy** of this package taken at install time, so
 editing the source changes nothing until each cache is refreshed. Bump the
 version and refresh every copy whenever a rule changes, or the harnesses
 disagree about what the workflow says. A self-update's release phase runs
@@ -136,7 +151,8 @@ coordinator field, no `control` row, and no `release` row — release is
 performed by the current interactive session with native Git and forge tools
 and dispatches no worker.
 
-**Claude Code does not read `AGENTS.md`.** Codex and Grok do. A consuming
+**Claude Code does not read `AGENTS.md`.** Codex, Grok, and Antigravity CLI
+do. A consuming
 project whose sessions run on Claude Code needs a `CLAUDE.md` containing
 `@AGENTS.md` — one line — or the managed block never reaches it. Grok does
 not expand that import, so the file helps one harness and is invisible to the
