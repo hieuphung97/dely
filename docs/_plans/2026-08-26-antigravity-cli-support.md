@@ -19,6 +19,7 @@ plugin.json
 .claude-plugin/plugin.json
 .codex-plugin/plugin.json
 skills/setup/SKILL.md
+skills/delivery/SKILL.md
 README.md
 AGENTS.md
 docs/decisions.md
@@ -31,8 +32,17 @@ No `GEMINI.md`. `CLAUDE.md` stays `@AGENTS.md`.
 
 ## Forbidden scope
 
-`skills/delivery/SKILL.md` — portable protocol, does not name harnesses.
-Hook files, `.agents/`, Orca, this repository's Dely table pins.
+Hook files, `.agents/`, Orca, this repository's Dely table pins, a tracked
+prompt directory, gitignore solely for prompts. `skills/delivery/SKILL.md` may
+change only under the Replan below: two portable launch rules, no harness names.
+
+## Replan (dispatch contract)
+
+Opened after Codex `CHANGES_REQUESTED` on `538bf9d`. Delivery is in scope for
+two launch rules. README Install must not restate YOLO/sandbox. `AGENTS.md`
+must not name `agy --dangerously-skip-permissions`. Prompt files are untracked
+worktree artifacts Control deletes after dispatch, not `git clean`. Refresh
+of `agy` is re-running `agy plugin install` of the same source.
 
 ## Execution envelope
 
@@ -109,6 +119,23 @@ block still pins implement to Claude Code and review to Codex CLI.
 **Document impact.** README owns install. `AGENTS.md` owns this repository's
 intro and headless list.
 
+### 4. Replan — portable launch rules only in delivery
+
+**Behaviour.** Delivery states two launch rules and names no harness. README
+Antigravity install has no YOLO/sandbox text and names re-install as refresh.
+`AGENTS.md` does not contain `--dangerously-skip-permissions`.
+
+**Direction.** Shrink `Launching a worker` to those two rules, including
+untracked prompt file delete-after-dispatch. Strip the duplicate policy from
+README and `AGENTS.md`. Add a second `agy plugin install` line commented as
+refresh.
+
+**Files.** `skills/delivery/SKILL.md`, `README.md`, `AGENTS.md`.
+
+**Focused verification.** `grep` as in the replan acceptance rows.
+
+**Document impact.** Delivery owns launch. README owns install/refresh.
+
 ## Acceptance
 
 | Requirement | Instrument | Counterexample | Observed red |
@@ -120,6 +147,8 @@ intro and headless list.
 | Setup does not write `~/.gemini` and does not add `GEMINI.md` | grep refusals; `test ! -e GEMINI.md` | CLAUDE.md-style offer copied for GEMINI.md | 2026-08-26: `test ! -e GEMINI.md` holds; setup refusals name `~/.claude`, `~/.codex`, `~/.grok` only |
 | README install documents `agy plugin install` | grep Install section | Intro lists four harnesses; Install still has only three commands | 2026-08-26: Install has claude, codex, grok only; intro names three harnesses |
 | This repo's Dely table still pins implement=Claude Code, review=Codex CLI | `AGENTS.md` managed-block rows | Support change silently retargets this repo's workers | 2026-08-26: table already has those pins; the row stays a regression check after edits |
+| Launch policy is only in delivery, unnamed | `grep -F '--dangerously-skip-permissions' README.md AGENTS.md` is empty; delivery states bypass-flag and untracked-prompt rules without `agy` | Policy copied into README Install and AGENTS.md (`538bf9d`) | Codex review of `538bf9d` |
+| README Antigravity documents refresh as re-install | Antigravity Install block contains a refresh `agy plugin install` and no invented `plugin update` | Four-copy refresh claim with no `agy` update route | Codex review of `538bf9d` |
 
 **Cannot be observed:** whether Orca's `agy` launcher applies `--model` and
 `--effort` on a live TUI; whether `agy plugin install <git-url>` over the

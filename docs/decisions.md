@@ -37,7 +37,13 @@ harnesses. An uninstalled `agy` is omitted, not an error. Model and Effort cells
 are written as chosen; setup does not strip effort suffixes from slugs. Setup
 does not write `~/.gemini` and does not offer `GEMINI.md`. This repository's
 managed Dely table stays Claude Code for `implement` and Codex CLI for `review`.
-`skills/delivery/SKILL.md` still does not name harnesses.
+`skills/delivery/SKILL.md` still does not name harnesses. It may carry two
+portable launch rules only: write the worker prompt to an untracked file inside
+the worktree, do not stage it, and delete that same file after the worker
+returns; when composing TUI argv, keep the execution plane's default
+permission-bypass flags and add no unpinned sandbox. Install documentation
+does not restate those rules. Refresh of an `agy` install is a second
+`agy plugin install` of the same source; the CLI has no `plugin update`.
 
 #### Alternatives considered
 
@@ -55,6 +61,10 @@ managed Dely table stays Claude Code for `implement` and Codex CLI for `review`.
   is `additionalProperties: false` with only `name` and `description`.
 - Changing this repository's phase pins to Antigravity CLI. Rejected as out of
   scope: harness support is not a deployment-selection change.
+- Revert the launch-rule commit and leave dispatch undocumented. Rejected after
+  review: the portable rule belongs in `delivery`, not in this repository's
+  install docs or phase-table notes.
+- Invent `agy plugin update`. Rejected: the live CLI has no such subcommand.
 
 #### Consequences
 
