@@ -25,9 +25,7 @@ if [ "$claude_version" != "0.14.0" ] || [ "$codex_version" != "0.14.0" ]; then
 fi
 
 root_name="$(jq -r .name "$root_manifest" 2>/dev/null)"
-if [ "$root_name" != "dely" ]; then
-  fail_with "$root_manifest .name must be dely (got $root_name)"
-fi
+[ "$root_name" = "dely" ] || fail_with "$root_manifest .name must be dely (got $root_name)"
 
 # Canonical MIT text (github.com/licenses/mit) with [year] -> 2026 and
 # [fullname] -> Hieu Phung, whitespace-normalized. A present LICENSE that only
@@ -59,9 +57,7 @@ actual_log_section="$(awk '/^### Maintenance log$/{flag=1; next} flag && /^#/{ex
 actual_log_section="${actual_log_section# }"
 actual_log_section="${actual_log_section% }"
 
-if [ "$actual_log_section" != "$expected_log_section" ]; then
-  fail_with "maintenance log section in $skill no longer matches the approved opt-in, accepted-only, non-blocking contract verbatim"
-fi
+[ "$actual_log_section" = "$expected_log_section" ] || fail_with "maintenance log section in $skill no longer matches the approved opt-in, accepted-only, non-blocking contract verbatim"
 
 # Setup's managed block: the fenced "What to write" template must carry
 # exactly two data rows, phases {implement, review} with no duplicate or
@@ -99,9 +95,7 @@ setup_block_check="$(managed_block_template "$setup_skill" | awk '
   }
 ')"
 
-if [ "$setup_block_check" != "ok" ]; then
-  fail_with "$setup_skill managed block does not have exactly one implement and one review row"
-fi
+[ "$setup_block_check" = "ok" ] || fail_with "$setup_skill managed block does not have exactly one implement and one review row"
 
 # Setup's whole "### Kiro CLI" Discovery subsection and AGENTS.md's
 # headless-forbidden dispatch sentence are matched verbatim: keyword presence
@@ -181,6 +175,11 @@ for f in .github/ISSUE_TEMPLATE/bug_report.yml .github/ISSUE_TEMPLATE/feature_re
   fi
 done
 
+# Bug form's harness dropdown must offer all five exact harness names.
+harness_options="$(awk '/^ *id: harness$/{f=1} f&&/^ *validations:/{exit} f' "$root/.github/ISSUE_TEMPLATE/bug_report.yml" | sed 's/^ *- //')"
+for h in "Claude Code" "Codex CLI" "Grok Build" "Antigravity CLI" "Kiro CLI"; do
+  printf '%s\n' "$harness_options" | grep -Fxq -- "$h" || fail_with "bug_report.yml harness dropdown is missing: $h"
+done
 
 # One CI entry point: the workflow must exist, parse as YAML, and match the
 # approved shape exactly: name, triggers, top-level permissions, the sole
