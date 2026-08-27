@@ -3,11 +3,58 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-08-26.
+Last updated 2026-08-27.
 
 ---
 
 ## Settled
+
+### 2026-08-27 — Composed TUI argv carries the execution plane's permission default
+
+#### Context
+
+Commit `538bf9d` required Control, when composing a TUI launch argv itself, to
+keep the execution plane's default permission-bypass flags for that harness
+and add no unpinned sandbox. Twelve hours later, `1945bb8` rewrote that
+sentence to stay harness-agnostic after a Kiro live-probe review. The rewrite
+said to keep the launch command as-is and not add permission-bypass flags the
+command did not already carry. That inverts the rule: Orca applies permission
+defaults only on its `--agent` launcher path, and a hand-composed
+`orca terminal create --command` gets none of them. Grok, Antigravity CLI, and
+Kiro CLI cannot use launch-time model selection on `--agent`, so every
+dispatch of those harnesses is composed by hand and hits the defect. The
+released `v0.14.0` tag (`5c12c26`) carries the inversion, and a lexical
+contract check required the inverted wording.
+
+#### Decision
+
+The portable delivery rule is restored without naming a harness. Composing
+the TUI launch argv is not a request for a different permission posture than
+the one the execution plane is already configured to apply for that agent;
+that configured default is carried onto the composed argv. The rule still
+forbids adding a sandbox the project did not pin. Kiro CLI's existing
+exception stands: `--trust-all-tools` does not go on the argv.
+
+This repository's `AGENTS.md` prefers Orca's `--agent` launcher whenever it
+can pin the block's model and effort, and names the per-harness permission
+default used when argv is composed by hand.
+
+#### Alternatives considered
+
+- Keep the inverted as-is wording because it is harness-agnostic. Rejected:
+  agnostic wording that drops the configured default is the defect.
+- Name harness-specific bypass flags in the portable skill. Rejected: that is
+  what `1945bb8` set out to undo, and Kiro's default is not a bypass flag on
+  argv.
+- Rely on Orca's `--agent` path only. Rejected: three harnesses cannot pin
+  model and effort that way, and `AGENTS.md` requires both on every dispatch.
+
+#### Consequences
+
+Hand-composed launches match the host's configured agent-tab permission
+posture. The contract check now rejects the `v0.14.0` skill text. Live TUI
+permission posture has no automated instrument; Control confirms it by
+launching the composed argv and reading the TUI.
 
 ### 2026-08-26 — Kiro CLI is a first-class fifth harness
 

@@ -40,18 +40,22 @@ Name the model and reasoning effort on every dispatch.
 <!-- dely:begin -->
 ## Dely
 
-Bounded or Architectural work invokes `dely:delivery`. Orca is the required
-execution plane, so there is no coordinator field; there is no control row
-because the current interactive session already exists, and no release row
-because release has no LLM worker.
+Bounded or Architectural work invokes `dely:delivery`; Spike starts no
+delivery run.
 
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
-| `implement` | Claude Code | `sonnet` | `medium` |
-| `review` | Codex CLI | `gpt-5.6-sol` | `high` |
+| `implement` | Grok Build | `grok-4.6` | `medium` |
+| `review` | Claude Code | `opus` | `high` |
 <!-- dely:end -->
 
 The table is this repository's deployment selection, not the portable protocol.
+Prefer Orca's `--agent` launcher whenever it can pin the block's model and
+effort. Use hand-composed argv only where it cannot, and there carry that
+harness's permission default: Claude Code `--dangerously-skip-permissions`,
+Codex CLI `--dangerously-bypass-approvals-and-sandbox`, Grok
+`--permission-mode bypassPermissions`, Antigravity CLI
+`--dangerously-skip-permissions`.
 Load Orca's native skill to launch and supervise each worker TUI. Do not wrap a
 headless `claude -p`, `codex exec`, `grok --prompt-file`, `agy -p`/`--print`, or
 `kiro-cli chat --no-interactive` in a shell tab. Kiro workers launch as an
