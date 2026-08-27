@@ -157,7 +157,7 @@ disagree about what the workflow says.
 
 Kiro CLI instead reads from a shared store, usually a symlink into this
 checkout. `npx skills update --global` refreshes it by comparing a folder
-hash, not the `0.14.0` version string. `update` takes no `--agent`/`--skill`
+hash, not the `0.14.1` version string. `update` takes no `--agent`/`--skill`
 because the store is shared.
 
 A self-update's release phase runs through the frozen installed plugin
