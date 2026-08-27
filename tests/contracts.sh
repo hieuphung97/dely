@@ -59,7 +59,10 @@ actual_log_section="${actual_log_section% }"
 
 [ "$actual_log_section" = "$expected_log_section" ] || fail_with "maintenance log section in $skill no longer matches the approved opt-in, accepted-only, non-blocking contract verbatim"
 
-grep -Fq "launch command as-is" "$skill" && ! grep -Fq 'default permission-bypass flags' "$skill" || fail_with "$skill launch-argv guidance still names the old harness-default permission-bypass wording"
+# Restored launch rule: carry the configured permission default, not as-is.
+grep -Fq 'configured permission default' "$skill" && grep -Fq 'sandbox the project did not pin' "$skill" && ! grep -Fq 'launch command as-is' "$skill" || fail_with "$skill launch-argv guidance does not carry the execution plane's configured permission default onto composed argv"
+# Hand-composed-argv harnesses must name their permission default.
+grep -Fq -- '--permission-mode bypassPermissions' "$root/AGENTS.md" && grep -Fq -- '--dangerously-skip-permissions' "$root/AGENTS.md" && grep -Fq -- '--trust-all-tools' "$root/AGENTS.md" || fail_with "AGENTS.md does not name a permission default for each hand-composed-argv harness"
 
 # Setup's managed block: the fenced "What to write" template must carry
 # exactly two data rows, phases {implement, review} with no duplicate or
@@ -100,11 +103,7 @@ setup_block_check="$(managed_block_template "$setup_skill" | awk '
 [ "$setup_block_check" = "ok" ] || fail_with "$setup_skill managed block does not have exactly one implement and one review row"
 
 # Setup's whole "### Kiro CLI" Discovery subsection and AGENTS.md's
-# headless-forbidden dispatch sentence are matched verbatim: keyword presence
-# alone still passes a subsection that keeps the required strings but also
-# carries a contradictory clause within that same subsection (e.g. "use a
-# stored catalogue"); the check only matches that subsection, not the rest of
-# Discovery.
+# headless-forbidden dispatch sentence are matched verbatim.
 norm() { tr '\n' ' ' | tr -s ' ' | sed -e 's/^ //' -e 's/ $//'; }
 discovery_section="$(awk '/^## Discovery[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$setup_skill")"
 printf '%s\n' "$discovery_section" | grep -Fq -- 'agy models' || fail_with "$setup_skill Discovery section does not name: agy models"

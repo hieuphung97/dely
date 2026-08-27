@@ -50,6 +50,12 @@ delivery run.
 <!-- dely:end -->
 
 The table is this repository's deployment selection, not the portable protocol.
+Prefer Orca's `--agent` launcher whenever it can pin the block's model and
+effort. Use hand-composed argv only where it cannot, and there carry that
+harness's permission default: Claude Code `--dangerously-skip-permissions`,
+Codex CLI `--dangerously-bypass-approvals-and-sandbox`, Grok
+`--permission-mode bypassPermissions`, Antigravity CLI
+`--dangerously-skip-permissions`.
 Load Orca's native skill to launch and supervise each worker TUI. Do not wrap a
 headless `claude -p`, `codex exec`, `grok --prompt-file`, `agy -p`/`--print`, or
 `kiro-cli chat --no-interactive` in a shell tab. Kiro workers launch as an
