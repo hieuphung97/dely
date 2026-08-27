@@ -141,8 +141,8 @@ changes without announcing itself, and the dispatch that relies on it looks
 identical to one that pinned the same value deliberately.
 
 When composing the TUI launch argv yourself, keep the execution plane's
-default permission-bypass flags. Do not add a sandbox the project did not
-pin.
+launch command as-is; do not add permission-bypass flags it does not already
+carry; do not add a sandbox the project did not pin.
 
 Keep waiting blocking. A worker is observed through Orca until it completes
 or its timeout fires. Do not add a relay, poll, or state machine to

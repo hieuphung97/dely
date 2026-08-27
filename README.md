@@ -48,11 +48,13 @@ orca status --json   # confirms the runtime is reachable
 ## Install
 
 The plugin is `dely`, served from the `dely` marketplace at
-`https://github.com/hieuphung97/dely.git`. Install it in each harness from
-that remote. The skill keeps the name `delivery`; the intended namespaced
-name is `dely:delivery`. The marketplace entry keeps `"source": "./"`, which
-is what makes the plugin resolve inside its own repository whether the
-marketplace is added by path or by git URL.
+`https://github.com/hieuphung97/dely.git`. Install it in each of the four
+plugin harnesses — Claude Code, Codex CLI, Grok Build, and Antigravity CLI —
+from that remote. The skill keeps the name `delivery`; the intended
+namespaced name is `dely:delivery`. The marketplace entry keeps
+`"source": "./"`, which is what makes the plugin resolve inside its own
+repository whether the marketplace is added by path or by git URL. Kiro CLI
+has no plugin verb; see `### Kiro CLI` below for its `npx skills` install.
 
 ### Claude Code
 
@@ -147,12 +149,20 @@ as `/delivery` and `/setup`.
 
 ### Cache refresh boundary
 
-All five harnesses run a **copy** of this package taken at install time, so
-editing the source changes nothing until each cache is refreshed. Bump the
+The four plugin harnesses — Claude Code, Codex CLI, Grok Build, and
+Antigravity CLI — each run a **copy** of this package taken at install time,
+so editing the source changes nothing until each cache is refreshed. Bump the
 version and refresh every copy whenever a rule changes, or the harnesses
-disagree about what the workflow says. A self-update's release phase runs
-through the frozen installed plugin version already in use for that plan;
-candidate changes take effect starting with the next delivery.
+disagree about what the workflow says.
+
+Kiro CLI instead reads from a shared store, usually a symlink into this
+checkout. `npx skills update --global` refreshes it by comparing a folder
+hash, not the `0.14.0` version string. `update` takes no `--agent`/`--skill`
+because the store is shared.
+
+A self-update's release phase runs through the frozen installed plugin
+version already in use for that plan; candidate changes take effect starting
+with the next delivery.
 
 ## Setup
 

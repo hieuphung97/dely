@@ -85,11 +85,11 @@ A harness that is not installed is omitted from the offer, not an error.
 ### Kiro CLI
 
 Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each
-`model_id`). Kiro CLI effort is read from `kiro-cli chat --help`'s model and
-effort flags; do not prompt the model to learn it and do not store a
-catalogue. Live discovery may offer only `auto` — that is a valid result, not
-a reason to invent model names. Omit Kiro discovery that is unavailable or
-unusable rather than guessing.
+`model_id`). Kiro CLI effort is read from `kiro-cli chat --help`'s `--effort`
+flag; do not prompt the model to learn it and do not store a catalogue. Live
+discovery may offer only `auto` — that is a valid result, not a reason to
+invent model names. Omit Kiro discovery that is unavailable or unusable
+rather than guessing.
 
 ## Pinning
 
@@ -142,8 +142,8 @@ importing `AGENTS.md`, offer to create a one-line `CLAUDE.md` containing
 This is not a second managed block: no markers, no configuration, a pointer
 at the block rather than a copy of it.
 
-The offer is Claude-Code-only. On Codex the file is inert, and Grok does not
-expand the import at all.
+The offer is Claude-Code-only. On Codex, Antigravity CLI, and Kiro CLI the
+file is inert; Grok does not expand it.
 
 ## What setup will not do
 
