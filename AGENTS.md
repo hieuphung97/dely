@@ -40,15 +40,13 @@ Name the model and reasoning effort on every dispatch.
 <!-- dely:begin -->
 ## Dely
 
-Bounded or Architectural work invokes `dely:delivery`. Orca is the required
-execution plane, so there is no coordinator field; there is no control row
-because the current interactive session already exists, and no release row
-because release has no LLM worker.
+Bounded or Architectural work invokes `dely:delivery`; Spike starts no
+delivery run.
 
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
-| `implement` | Claude Code | `sonnet` | `medium` |
-| `review` | Codex CLI | `gpt-5.6-sol` | `high` |
+| `implement` | Grok Build | `grok-4.6` | `medium` |
+| `review` | Claude Code | `opus` | `high` |
 <!-- dely:end -->
 
 The table is this repository's deployment selection, not the portable protocol.
