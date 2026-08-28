@@ -151,10 +151,9 @@ importing `AGENTS.md`, offer to create a one-line `CLAUDE.md` containing
 This is not a second managed block: no markers, no configuration, a pointer
 at the block rather than a copy of it.
 
-The offer is Claude-Code-only. On Codex, Antigravity CLI, Kiro CLI, and
-Cursor Agent CLI the file is inert in the same sense that it is not imported;
-however, Cursor Agent CLI also applies `CLAUDE.md` as a rule, so that file is
-not called inert on Cursor. Grok does not expand it.
+The offer is Claude-Code-only. On Codex, Antigravity CLI, and Kiro CLI the
+file is inert in the same sense that it is not imported. Cursor Agent CLI
+applies `CLAUDE.md` as a rule. Grok does not expand it.
 
 ## What setup will not do
 
