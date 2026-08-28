@@ -1,7 +1,7 @@
 # dely
 
 An automation-first delivery protocol for coding agents, packaged for Claude
-Code, Codex CLI, Grok Build, Antigravity CLI, and Kiro CLI.
+Code, Codex CLI, Grok Build, Antigravity CLI, Kiro CLI, and Cursor Agent CLI.
 
 Dely accepts a request that may still be vague, brings it to an approved
 design contract, then automates sequential implementation, independent
@@ -18,8 +18,8 @@ by a second core skill, `dely:setup`. Rationale for the current design is in
 
 ## Prerequisites
 
-- One of Claude Code, Codex CLI, Grok Build, or Antigravity CLI, each with
-  plugin support, or Kiro CLI with the `npx skills` installer.
+- One of Claude Code, Codex CLI, Grok Build, Antigravity CLI, or Cursor Agent
+  CLI, each with plugin support, or Kiro CLI with the `npx skills` installer.
 - [Orca](https://www.onorca.dev/docs/install) — a required, constant
   execution plane. It launches and supervises the per-phase worker TUIs.
   `dely:delivery` preflights Orca and stops when the CLI is missing, the
@@ -36,6 +36,7 @@ against — observations, not a promised minimum:
 | Grok Build | 1.0.5 |
 | Antigravity CLI | 1.1.19 |
 | Kiro CLI | 2.16.2 |
+| Cursor Agent CLI | 2026.08.25-3e8eec8 |
 | Orca | 1.4.188 |
 
 Preflight Orca before installing a harness plugin:
@@ -48,10 +49,10 @@ orca status --json   # confirms the runtime is reachable
 ## Install
 
 The plugin is `dely`, served from the `dely` marketplace at
-`https://github.com/hieuphung97/dely.git`. Install it in each of the four
-plugin harnesses — Claude Code, Codex CLI, Grok Build, and Antigravity CLI —
-from that remote. The skill keeps the name `delivery`; the intended
-namespaced name is `dely:delivery`. The marketplace entry keeps
+`https://github.com/hieuphung97/dely.git`. Install it in each of the five
+plugin harnesses — Claude Code, Codex CLI, Grok Build, Antigravity CLI, and
+Cursor Agent CLI — from that remote. The skill keeps the name `delivery`; the
+intended namespaced name is `dely:delivery`. The marketplace entry keeps
 `"source": "./"`, which is what makes the plugin resolve inside its own
 repository whether the marketplace is added by path or by git URL. Kiro CLI
 has no plugin verb; see `### Kiro CLI` below for its `npx skills` install.
@@ -130,6 +131,28 @@ agy plugin uninstall dely          # uninstall
 `agy plugin install` takes a git URL or a local path. This README documents
 the command, not a plugin cache directory.
 
+### Cursor Agent CLI
+
+```bash
+cursor-agent plugin marketplace add https://github.com/hieuphung97/dely.git
+# then in a Cursor Agent session:
+/add-plugin dely
+
+# verify it is installed
+cursor-agent plugin marketplace list
+
+# update
+cursor-agent plugin marketplace update dely
+
+# uninstall
+cursor-agent plugin marketplace remove dely
+```
+
+Add the marketplace first with `cursor-agent plugin marketplace add`, then
+open a Cursor Agent session and run `/add-plugin dely` to activate the plugin.
+Invoke the skills natively in a Cursor Agent session as `/delivery` and
+`/setup`.
+
 ### Kiro CLI
 
 ```bash
@@ -149,15 +172,16 @@ as `/delivery` and `/setup`.
 
 ### Cache refresh boundary
 
-The four plugin harnesses — Claude Code, Codex CLI, Grok Build, and
-Antigravity CLI — each run a **copy** of this package taken at install time,
-so editing the source changes nothing until each cache is refreshed. Bump the
+The five plugin harnesses — Claude Code, Codex CLI, Grok Build, Antigravity
+CLI, and Cursor Agent CLI — each run a **copy** of this package taken at
+install time, so editing the source changes nothing until each cache is
+refreshed. Bump the
 version and refresh every copy whenever a rule changes, or the harnesses
 disagree about what the workflow says.
 
 Kiro CLI instead reads from a shared store, usually a symlink into this
 checkout. `npx skills update --global` refreshes it by comparing a folder
-hash, not the `0.14.1` version string. `update` takes no `--agent`/`--skill`
+hash, not the `0.15.0` version string. `update` takes no `--agent`/`--skill`
 because the store is shared.
 
 A self-update's release phase runs through the frozen installed plugin
@@ -179,12 +203,11 @@ coordinator field, no `control` row, and no `release` row — release is
 performed by the current interactive session with native Git and forge tools
 and dispatches no worker.
 
-**Claude Code does not read `AGENTS.md`.** Codex, Grok, Antigravity CLI, and
-Kiro CLI do. A consuming
-project whose sessions run on Claude Code needs a `CLAUDE.md` containing
-`@AGENTS.md` — one line — or the managed block never reaches it. Grok does
-not expand that import, so the file helps one harness and is invisible to the
-others.
+**Claude Code does not read `AGENTS.md`.** Codex, Grok, Antigravity CLI,
+Kiro CLI, and Cursor Agent CLI do. A consuming project whose sessions run on
+Claude Code needs a `CLAUDE.md` containing `@AGENTS.md` — one line — or the
+managed block never reaches it. Grok does not expand that import, so the file
+helps one harness and is invisible to the others.
 
 ## Ordinary use
 

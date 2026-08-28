@@ -45,6 +45,7 @@ body:
         - Grok Build
         - Antigravity CLI
         - Kiro CLI
+        - Cursor Agent CLI
         - Other / not sure
     validations:
       required: true
