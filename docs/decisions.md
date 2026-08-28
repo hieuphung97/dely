@@ -78,17 +78,45 @@ paths, default branch, the managed pin block — plus this repository's own rule
 self-update ordering, the absence of a phase-implied sandbox, and native Internet
 access. It loses lines 53-67 and gains a pointer.
 
-`AGENTS.md` also loses three restatements that duplicate the protocol without
-arriving earlier than it: review independence, the no-headless-fallback rule, and
-the design/release dispatch rule. All three are read only during a delivery, by
-which time the skill is loaded. Restatements that do arrive earlier stay: the
-default branch and the sentence selecting which shape invokes the skill are
-needed before any skill is invoked, because `CLAUDE.md` is one line, `@AGENTS.md`,
-loaded every session, while `SKILL.md` loads on invocation.
+`AGENTS.md` also loses three restatements that the shipped package already
+carries and that arrive no earlier than it: review independence, the
+no-headless-fallback rule, and the design/release dispatch rule. All three are
+read only during a delivery, by which time the skill is loaded.
+
+The three are not carried the same way, and the distinction is recorded because
+an earlier draft of this record got it wrong. Review independence and the
+no-headless-fallback rule are duplicated in `skills/delivery/SKILL.md`. The
+design/release sentence is a compound: its release half is duplicated at
+`SKILL.md:282`, but its design half — that design runs in the current
+interactive session and is not dispatched — has no counterpart in
+`skills/delivery/SKILL.md` at all. It is carried by `skills/setup/SKILL.md:19-21`,
+"There is no control row, because the current interactive session already exists
+and is never dispatched", which ships in the same package. So the rule is
+entailed by the package rather than duplicated inside one skill, and removing it
+from `AGENTS.md` loses nothing. Saying it "duplicates the protocol" without that
+qualification was false, and a task 2 review blocked on it.
+
+Restatements that do arrive earlier stay: the default branch and the sentence
+selecting which shape invokes the skill are needed before any skill is invoked,
+because `CLAUDE.md` is one line, `@AGENTS.md`, loaded every session, while
+`SKILL.md` loads on invocation.
 
 `tests/contracts.sh` retargets its permission-flag grep and its verbatim dispatch
 pin from `AGENTS.md` to the reference, and adds a negative check that `AGENTS.md`
 no longer carries the per-harness flags.
+
+The reference states each harness fact once. An earlier form of this decision
+required both a table and a retargeted verbatim pin on the original prose
+paragraph, which forced the same facts into the file twice: a pinned paragraph
+and an unpinned table. A task 1 review demonstrated that shape is not merely
+redundant but unprotected — falsifying a table row to claim `--yolo` as Cursor's
+permission default, contradicting the paragraph four lines above it, passed every
+gate with `rc 0`, because the table was checked only for the presence of literal
+flag strings that the paragraph already supplied. That is the drift class this
+record's Context names as the problem being solved, reintroduced inside the file
+built to end it. The verbatim pin therefore targets the table rows, and the prose
+paragraph is deleted rather than carried alongside them. The protection an
+earlier decision placed on that sentence survives; only its carrier changes.
 
 This amends the 2026-08-27 "Composed TUI argv carries the execution plane's
 permission default" decision, whose closing paragraph placed the per-harness

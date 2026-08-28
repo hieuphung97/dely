@@ -118,6 +118,32 @@ does not.
 
 **Document impact.** None beyond `AGENTS.md` itself.
 
+
+### 3. The reference states each harness fact once
+
+**Behaviour.** `skills/delivery/references/harnesses.md` contains the table and
+no prose paragraph restating it. The verbatim dispatch pin in
+`tests/contracts.sh` targets the table rows, so a falsified row fails a gate.
+
+**Direction.** Task 1 satisfied two contract requirements that could not both be
+met without stating every harness fact twice: a table, and a verbatim pin whose
+`awk` reads the original contiguous prose paragraph. A task 1 review proved the
+resulting shape unprotected — a falsified Cursor row claiming `--yolo` passed
+`contracts.sh` with `rc 0`, because the table is checked only for the presence of
+literal flag strings the paragraph already supplies. Delete the paragraph and
+move the pin onto the rows. Deleting prose does not lengthen `contracts.sh`;
+changing what the pin extracts should be close to line-neutral, and there is no
+headroom, so measure before assuming.
+
+**Files.** `skills/delivery/references/harnesses.md`, `tests/contracts.sh`.
+
+**Focused verification.** The falsified-row fixture that passed at `2acb0c9` must
+fail after this task. That is the whole point of the task and the only evidence
+that distinguishes it from moving text around.
+
+**Document impact.** `docs/decisions.md` owns the amended decision and is already
+reconciled by Control; this task does not edit it.
+
 ## Acceptance
 
 | Requirement | Instrument | Counterexample | Observed red |
@@ -127,6 +153,8 @@ does not.
 | The reference is reachable from the protocol | `contracts.sh`: `SKILL.md` contains the literal path `references/harnesses.md` and that path exists | the reference exists but nothing names it — a dead file no Control ever reads, with every other check green | |
 | The skill stops denying its own matrix | `contracts.sh`: `SKILL.md` must not contain the compatibility-matrix denial | mechanics moved into the skill while the denial survives — a self-contradictory shipped artifact | |
 | Restatements removed, pre-invoke ones kept | none — a human reads the diff | none | n/a |
+| A falsified table row fails a gate | `contracts.sh`: the verbatim pin extracts the table rows | the Cursor row rewritten to claim `--yolo` as its permission default and `cursor-agent --headless` as its forbidden form — the exact fixture that returned `rc 0` at `2acb0c9` | |
+| The reference states each fact once | `contracts.sh`: the reference must not contain the moved prose paragraph | the paragraph is left in place beside the table and the pin is duplicated onto both, which passes a presence check while restoring the drift | |
 | The closed delivery's plan is gone | `ls docs/_plans/` lists only this plan; `git grep` for its name outside `docs/_plans/` is empty | the plan is deleted while a document still links to it, leaving a dangling reference that no gate catches | `git grep -n '2026-08-27-cursor-agent-cli-harness' -- . ':!docs/_plans'` returned empty before removal; `ls docs/_plans/` now lists only `2026-08-28-ship-harness-mechanics.md` |
 
 **Cannot be observed:** whether `npx skills add … --skill delivery` copies a
