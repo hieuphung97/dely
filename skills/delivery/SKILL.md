@@ -132,8 +132,9 @@ approval is skipped. Do not stage that file. After the worker returns,
 delete it: Control owns that dispatch artifact, not `git clean`. Load Orca's
 native skill and use it to launch a real interactive harness TUI for the
 phase, with the model and effort pinned from `AGENTS.md`. A visible shell
-running a headless harness is not a TUI, and this skill has no compatibility
-matrix around one.
+running a headless harness is not a TUI; compose that TUI's launch using
+`references/harnesses.md`, this skill's compatibility matrix of permission
+defaults, forbidden headless forms, launch notes, and trust handling.
 
 **Name the model and effort on every dispatch.** A worker left on a harness
 default is an unpinned environment: it lives in the harness's own config, it
