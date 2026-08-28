@@ -65,17 +65,13 @@ a datum, not relied on. Removing the sidecar would be a deliberate decision
 against the documentation, not an inference from "it worked without it".
 
 These surfaces are recorded so no later reading mistakes them again. The install
-and uninstall behaviour itself is settled in the 2026-08-28 README record and is
-not restated here; what that record does not say is that the `(Claude Code)`
-entries are a read-only view of another harness's store, which is why they resist
-`plugin marketplace remove` and offer no `Uninstall`. `plugin marketplace add` on a URL
+and uninstall behaviour is settled in the 2026-08-28 README record; the Context
+above cites two of its facts as evidence, and this paragraph adds only what that
+record does not say — the `(Claude Code)` entries are a read-only view of another
+harness's store, which is why they resist `plugin marketplace remove` and offer
+no `Uninstall`. `plugin marketplace add` on a URL
 whose manifest carries an existing marketplace name overwrites that marketplace
-rather than adding a second. `--git-ref` is documented as taking a
-"Branch, tag, or commit", but a bare commit SHA does not work: `--git-ref
-54623e1` fails with `couldn't find remote ref`, because the underlying
-`git fetch --depth 1` needs a ref, while `--git-ref v0.14.1` succeeds against
-that same commit. A divergence from the flag's stated contract, recorded as
-observed behaviour rather than as the contract.
+rather than adding a second.
 
 #### Alternatives considered
 
@@ -394,8 +390,8 @@ unless a live reindex of this git marketplace still reports 0 plugins after
 `plugin.json` exists. Amended 2026-08-29: that condition is unusable, because
 `plugin marketplace update` reports `0 plugins indexed` where `add` reports
 `1 plugin` on the same URL seconds later. The count is not a plugin count. The
-file is added only if Cursor fails to resolve this repository's plugin by some
-other observable measure.
+file is added only if the marketplace detail view stops resolving this
+repository's skills — it showed `Skills: 2 (delivery, setup)` on 2026-08-29.
 
 Install is native Cursor: `cursor-agent plugin marketplace add` of the git
 URL, then in a Cursor Agent session type `/plugin`, go to the `Marketplace`
