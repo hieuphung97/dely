@@ -135,8 +135,6 @@ the command, not a plugin cache directory.
 
 ```bash
 cursor-agent plugin marketplace add https://github.com/hieuphung97/dely.git
-# then in a Cursor Agent session:
-/add-plugin dely
 
 # verify it is installed
 cursor-agent plugin marketplace list
@@ -148,10 +146,18 @@ cursor-agent plugin marketplace update dely
 cursor-agent plugin marketplace remove dely
 ```
 
-Add the marketplace first with `cursor-agent plugin marketplace add`, then
-open a Cursor Agent session and run `/add-plugin dely` to activate the plugin.
-Invoke the skills natively in a Cursor Agent session as `/delivery` and
-`/setup`.
+Add the marketplace first with `cursor-agent plugin marketplace add`, then in
+a Cursor Agent session type `/plugin` and press Enter. A panel opens with
+three tabs, `Plugins`, `Installed`, and `Marketplace`, cycled with the left
+and right arrows or Tab. Go to the `Marketplace` tab, type `dely` in the
+search box, and press Enter on the `dely (dely)` result, then choose
+`Install for you (user scope)` (the other offered action is `Install for all
+collaborators on this repository (project scope)`).
+
+Cursor does not namespace plugin skills the way Claude Code does with
+`dely:setup`; with another plugin also installed, the palette can show more
+than one bare `/setup` entry. Type `/dely` to filter the palette down to
+exactly Dely's `/delivery` and `/setup`, then pick from that filtered list.
 
 ### Kiro CLI
 

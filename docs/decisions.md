@@ -57,8 +57,10 @@ unless a live reindex of this git marketplace still reports 0 plugins after
 `plugin.json` exists.
 
 Install is native Cursor: `cursor-agent plugin marketplace add` of the git
-URL, then `/add-plugin dely` in a Cursor Agent session. Invoke `/delivery`
-and `/setup`. Do not document `npx skills --agent cursor`, PATH `agent`,
+URL, then in a Cursor Agent session type `/plugin`, go to the `Marketplace`
+tab, search `dely`, and choose `Install for you (user scope)`. Type `/dely`
+to filter the palette to Dely's own `/delivery` and `/setup` before invoking
+them. Do not document `npx skills --agent cursor`, PATH `agent`,
 `cursor` (the IDE wrapper), or copying into `.cursor/skills/`.
 
 Setup discovers models from `cursor-agent models` (offer the slug before

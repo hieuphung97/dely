@@ -126,7 +126,7 @@ expected_dispatch='Load Orca'"'"'s native skill to launch and supervise each wor
 actual_dispatch="$(awk '/^Load Orca.s native skill/{p=1} p&&/^$/{exit} p{print}' "$root/AGENTS.md" | norm)"
 [ "$actual_dispatch" = "$expected_dispatch" ] || fail_with "AGENTS.md headless-forbidden dispatch sentence no longer matches the approved policy verbatim"
 
-# README install sections: Kiro requires npx skills; Cursor requires marketplace add + /add-plugin.
+# README install sections: Kiro requires npx skills; Cursor requires marketplace add + /plugin + /dely.
 readme_section() { awk "/^### ${1}[[:space:]]*\$/{p=1;next} p && /^#{2,3} /{exit} p" "$root/README.md"; }
 kiro_section="$(readme_section 'Kiro CLI')"
 [ -n "$kiro_section" ] || fail_with "README.md is missing a ### Kiro CLI section"
@@ -138,9 +138,10 @@ cursor_section="$(readme_section 'Cursor Agent CLI')"
 [ -n "$cursor_section" ] || fail_with "README.md is missing a ### Cursor Agent CLI section"
 printf '%s\n' "$cursor_section" | grep -Fiq 'npx skills' && fail_with "README.md Cursor Agent CLI section must not document npx skills" || true
 printf '%s\n' "$cursor_section" | grep -Eiq 'copy (the |both )?skills? (files? )?(manually|by hand)' && fail_with "README.md Cursor Agent CLI section instructs manual copying instead of plugin marketplace add" || true
-for needle in 'plugin marketplace add' '/add-plugin' '/delivery' '/setup'; do
+for needle in 'plugin marketplace add' '`/plugin`' '`/dely`' '/delivery' '/setup'; do
   printf '%s\n' "$cursor_section" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI section is missing: $needle"
 done
+printf '%s\n' "$cursor_section" | grep -Fq -- '/add-plugin' && fail_with "README.md Cursor Agent CLI section must not document /add-plugin" || true
 
 # Plan template's acceptance header: the four named columns must all be present.
 plan_template="$root/skills/delivery/templates/plan.md"
