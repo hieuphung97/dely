@@ -144,6 +144,37 @@ that distinguishes it from moving text around.
 **Document impact.** `docs/decisions.md` owns the amended decision and is already
 reconciled by Control; this task does not edit it.
 
+
+### 4. The absence check gates the whole deleted block
+
+**Behaviour.** Re-inserting any part of the prose block deleted at `766f0ba`
+into `skills/delivery/references/harnesses.md` fails a gate. The plan's
+`Observed red` cell for that row describes the instrument that actually exists.
+
+**Direction.** `589d1bc` added an absence check anchored on the sentence
+beginning "Load Orca's native skill", which is the block's seventh sentence.
+Lines 9-14 — the half naming five permission defaults — are ungated: a scoped
+re-review reproduced re-inserting them at `589d1bc` for `rc 0`, no FAIL. It also
+showed the gap is not cosmetic: with those lines restored *and* the Cursor row
+falsified, one of the three expected FAILs disappears, because the prose supplies
+`--force` again and the presence checks stop being an independent signal about
+the table.
+
+`tests/contracts.sh` is at 250 against the `≤ 250` cap. Change the existing check
+line; do not add one. Also correct the `Observed red` cell that calls the grepped
+string "the paragraph's first sentence" — it is the seventh, and the wrong
+description points a reader away from the gap.
+
+**Files.** `tests/contracts.sh`, the acceptance table of this plan.
+
+**Focused verification.** Three fixtures from `git archive HEAD`, each
+re-inserting a different part of the deleted block above the table: the first
+half alone, the second half alone, and both. All three must fail. At `589d1bc`
+the first-half fixture passes, which is the discriminating observation.
+
+**Document impact.** None. `docs/decisions.md` already records that the
+reference states each fact once; this task makes the instrument match it.
+
 ## Acceptance
 
 | Requirement | Instrument | Counterexample | Observed red |
@@ -154,7 +185,7 @@ reconciled by Control; this task does not edit it.
 | The skill stops denying its own matrix | `contracts.sh`: `SKILL.md` must not contain the compatibility-matrix denial | mechanics moved into the skill while the denial survives — a self-contradictory shipped artifact | |
 | Restatements removed, pre-invoke ones kept | none — a human reads the diff | none | n/a |
 | A falsified table row fails a gate | `contracts.sh`: the verbatim pin extracts the table rows | the Cursor row rewritten to claim `--yolo` as its permission default and `cursor-agent --headless` as its forbidden form — the exact fixture that returned `rc 0` at `2acb0c9` | reproduced `rc 0` at `2acb0c9`; after `766f0ba` the same fixture returns `rc 1`, failing on the table-row verbatim mismatch |
-| The reference states each fact once | `contracts.sh`: the reference must not contain the moved prose paragraph | the paragraph is left in place beside the table and the pin is duplicated onto both, which passes a presence check while restoring the drift | reproduced at `766f0ba`: re-inserting the deleted paragraph above the table returned `exit 0`, no FAIL — the row-only pin does not constrain prose. After adding a `grep -Fq` absence check on the paragraph's first sentence, the same mutation returns `exit 1` and the clean tree still returns `exit 0` |
+| The reference states each fact once | `contracts.sh`: the reference must not contain any part of the deleted prose block. The block deleted at `766f0ba` was `harnesses.md:9-23`, which Markdown reads as **one** paragraph — line 14 ends "Cursor Agent CLI `--force`." and line 15 begins "Load Orca's native skill" with no blank line between. An anchor on one sentence gates only what follows it, so the instrument must be anchored such that neither half can return alone | the paragraph is left in place beside the table and the pin is duplicated onto both, which passes a presence check while restoring the drift | reproduced at `766f0ba`: re-inserting the deleted paragraph above the table returned `exit 0`, no FAIL — the row-only pin does not constrain prose. After adding a `grep -Fq` absence check on the paragraph's first sentence, the same mutation returns `exit 1` and the clean tree still returns `exit 0` |
 | The closed delivery's plan is gone | `ls docs/_plans/` lists only this plan; `git grep` for its name outside `docs/_plans/` is empty | the plan is deleted while a document still links to it, leaving a dangling reference that no gate catches | `git grep -n '2026-08-27-cursor-agent-cli-harness' -- . ':!docs/_plans'` returned empty before removal; `ls docs/_plans/` now lists only `2026-08-28-ship-harness-mechanics.md` |
 
 **Cannot be observed:** whether `npx skills add … --skill delivery` copies a
