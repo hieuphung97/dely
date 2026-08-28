@@ -20,8 +20,8 @@ skill="$root/skills/delivery/SKILL.md"
 claude_version="$(jq -r .version "$claude_manifest" 2>/dev/null)"
 codex_version="$(jq -r .version "$codex_manifest" 2>/dev/null)"
 
-if [ "$claude_version" != "0.15.0" ] || [ "$codex_version" != "0.15.0" ]; then
-  fail_with "manifest versions must both be 0.15.0 (claude=$claude_version codex=$codex_version)"
+if [ "$claude_version" != "0.16.0" ] || [ "$codex_version" != "0.16.0" ]; then
+  fail_with "manifest versions must both be 0.16.0 (claude=$claude_version codex=$codex_version)"
 fi
 
 root_name="$(jq -r .name "$root_manifest" 2>/dev/null)"
@@ -60,10 +60,13 @@ actual_log_section="${actual_log_section% }"
 
 [ "$actual_log_section" = "$expected_log_section" ] || fail_with "maintenance log section in $skill no longer matches the approved opt-in, accepted-only, non-blocking contract verbatim"
 
-# Restored launch rule: carry the configured permission default, not as-is.
+harnesses="$root/skills/delivery/references/harnesses.md"
 grep -Fq 'configured permission default' "$skill" && grep -Fq 'sandbox the project did not pin' "$skill" && ! grep -Fq 'launch command as-is' "$skill" || fail_with "$skill launch-argv guidance does not carry the execution plane's configured permission default onto composed argv"
-# Hand-composed-argv harnesses must name their permission default.
-grep -Fq -- '--permission-mode bypassPermissions' "$root/AGENTS.md" && grep -Fq -- '--dangerously-skip-permissions' "$root/AGENTS.md" && grep -Fq -- '--trust-all-tools' "$root/AGENTS.md" && grep -Fq -- '--force' "$root/AGENTS.md" || fail_with "AGENTS.md does not name a permission default for each hand-composed-argv harness"
+grep -Fq 'references/harnesses.md' "$skill" && [ -f "$harnesses" ] && ! tr '\n' ' ' < "$skill" | grep -Fq 'no compatibility matrix' || fail_with "$skill does not name an existing $harnesses, or still denies having a compatibility matrix"
+for f in '--permission-mode bypassPermissions' '--dangerously-skip-permissions' '--trust-all-tools' '--force' 'claude -p' 'codex exec' 'grok --prompt-file' 'agy -p' 'kiro-cli chat --no-interactive' 'cursor-agent -p'; do
+  grep -Fq -- "$f" "$harnesses" || fail_with "$harnesses does not name: $f"
+  grep -Fq -- "$f" "$root/AGENTS.md" && fail_with "AGENTS.md must not name: $f"
+done
 
 # Cursor sidecar: .name must be dely, .skills must be ./skills/, no version key.
 cursor_manifest="$root/.cursor-plugin/plugin.json"
@@ -122,9 +125,9 @@ actual_kiro_subsection="$(awk '/^### Kiro CLI[[:space:]]*$/{p=1;next} p && /^#/{
 expected_cursor_subsection='Cursor Agent CLI models: `cursor-agent models` (offer the slug before ` - `). There is no `--effort` flag: write the literal `default` for Effort. Do not invent an effort vocabulary, do not strip effort suffixes from slugs, and do not synthesize parameterized `[effort=…]` forms. Omit Cursor discovery that is unavailable or unusable rather than guessing.'
 actual_cursor_subsection="$(awk '/^### Cursor Agent CLI[[:space:]]*$/{p=1;next} p && /^#/{exit} p' "$setup_skill" | norm)"
 [ "$actual_cursor_subsection" = "$expected_cursor_subsection" ] || fail_with "$setup_skill ### Cursor Agent CLI Discovery subsection no longer matches the approved policy verbatim"
-expected_dispatch='Load Orca'"'"'s native skill to launch and supervise each worker TUI. Do not wrap a headless `claude -p`, `codex exec`, `grok --prompt-file`, `agy -p`/`--print`, `kiro-cli chat --no-interactive`, or `cursor-agent -p`/`--print` in a shell tab. Kiro workers launch as an interactive TUI, `kiro-cli chat --tui` with `--model` and `--effort` pinned from the managed block and no `--trust-all-tools` on that argv; once the TUI is idle at its prompt, send `/tools trust-all`, then the work prompt. Cursor workers launch as an interactive `cursor-agent` TUI; pin `--model` from the managed block unless the cell is `default`, and omit effort flags; do not use `-w`/`--worktree`.'
-actual_dispatch="$(awk '/^Load Orca.s native skill/{p=1} p&&/^$/{exit} p{print}' "$root/AGENTS.md" | norm)"
-[ "$actual_dispatch" = "$expected_dispatch" ] || fail_with "AGENTS.md headless-forbidden dispatch sentence no longer matches the approved policy verbatim"
+expected_harness_table='| Harness | Permission default | Forbidden headless forms | Launch notes | Trust handling | | --- | --- | --- | --- | --- | | Claude Code | `--dangerously-skip-permissions` | `claude -p` | Launch via Orca'"'"'s `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | | | Codex CLI | `--dangerously-bypass-approvals-and-sandbox` | `codex exec` | Launch via Orca'"'"'s `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | | | Grok Build | `--permission-mode bypassPermissions` | `grok --prompt-file` | Launch via Orca'"'"'s `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | | | Antigravity CLI | `--dangerously-skip-permissions` | `agy -p`/`--print` | Launch via Orca'"'"'s `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | | | Kiro CLI | none; `--trust-all-tools` is forbidden on the launch argv | `kiro-cli chat --no-interactive` | Launches as an interactive TUI, `kiro-cli chat --tui` with `--model` and `--effort` pinned from the managed block; once the TUI is idle at its prompt, send `/tools trust-all`, then the work prompt. | | | Cursor Agent CLI | `--force` | `cursor-agent -p`/`--print` | Launches as an interactive `cursor-agent` TUI; pin `--model` from the managed block unless the cell is `default`, and omit effort flags; do not use `-w`/`--worktree`. | |'
+[ "$(awk '/^\|/' "$harnesses" | norm)" = "$expected_harness_table" ] || fail_with "$harnesses table rows no longer match the approved per-harness facts verbatim"
+grep -Eq "Prefer Orca's|Load Orca's native skill to launch and supervise each worker TUI\." "$harnesses" && fail_with "$harnesses carries the deleted prose paragraph alongside the table"
 
 # README install sections: Kiro requires npx skills; Cursor requires marketplace add + /plugin + /dely.
 readme_section() { awk "/^### ${1}[[:space:]]*\$/{p=1;next} p && /^#{2,3} /{exit} p" "$root/README.md"; }
