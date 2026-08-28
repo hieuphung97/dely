@@ -70,6 +70,95 @@ No change to the four `plugin marketplace` commands, to `/plugin`, `/dely`,
 Document a non-interactive Cursor uninstall command if and when Cursor ships
 one.
 
+### 2026-08-29 — Cursor keeps its sidecar, and its plugin surfaces are not what they appear
+
+#### Context
+
+A Spike after `0.16.0` probed Cursor Agent CLI 2026.08.25-3e8eec8 directly and
+against Cursor's own documentation. Several beliefs this file records turned out
+to rest on misread evidence.
+
+`~/.claude/plugins/installed_plugins.json` holds `superpowers`, `codex`,
+`ponytail` and `dely@0.14.1`, all user scope, while `~/.cursor/plugins/local/`
+was empty. The four entries Cursor's `/plugin` → `Installed` list shows under
+`User`, labelled `(Claude Code)`, are Claude Code's installed plugins surfaced by
+Cursor, not Cursor installs. That is why `cursor-agent plugin marketplace remove
+dely` left `dely` installed, and why those entries offer only `Try in chat` with
+no `Uninstall`.
+
+An earlier reading — that Cursor had indexed and installed this repository before
+`.cursor-plugin/plugin.json` existed, so the sidecar was redundant — was that
+same surfaced Claude Code install, at the very version, `0.14.1`, that predates
+the Cursor work. That test never happened.
+
+The test has now happened. Pinning the marketplace to tag `v0.14.1`, whose commit
+`54623e1` carries no `.cursor-plugin/`, indexed `1 plugin` and its marketplace
+detail resolved `Skills: 2 (delivery, setup)`. So the sidecar is not required by
+this build; Cursor falls back to `.claude-plugin/marketplace.json`. But Cursor's
+documentation names `.cursor-plugin/plugin.json`, required field `name`, as the
+Cursor Plugin format, and documents no fallback.
+
+Installing from the marketplace produced the first Cursor-managed copy:
+`~/.cursor/plugins/cache/dely/dely/<merge SHA>`, a full clone pinned to the
+commit. It is labelled by marketplace name, `dely (dely)`, and its detail view
+does offer `Uninstall`.
+
+Cursor's CLI changelog dates the shell marketplace commands to 2026-07-13 and
+defines `remove` as deleting a user-scoped marketplace. Cursor staff, forum,
+2026-07: "There isn't a separate non-interactive command like `cursor-agent
+plugin install <plugin-id>` yet."
+
+#### Decision
+
+`.cursor-plugin/plugin.json` stays. It is the documented Cursor Plugin format.
+The fallback observed on 2026.08.25 is undocumented behaviour and is recorded as
+a datum, not relied on. Removing the sidecar would be a deliberate decision
+against the documentation, not an inference from "it worked without it".
+
+These surfaces are recorded so no later reading mistakes them again. Cursor
+surfaces Claude Code's plugin store read-only, labelled `(Claude Code)`; those
+entries cannot be uninstalled from Cursor and are unaffected by
+`plugin marketplace remove`. A Cursor-managed install is labelled by its
+marketplace and can be uninstalled from `/plugin` → `Installed`. There is no
+non-interactive install or uninstall command. `plugin marketplace add` on a URL
+whose manifest carries an existing marketplace name overwrites that marketplace
+rather than adding a second. `--git-ref` accepts a branch or tag, not a bare
+commit SHA: `--git-ref 54623e1` fails with `couldn't find remote ref`, while
+`--git-ref v0.14.1` succeeds against the same commit.
+
+#### Alternatives considered
+
+- Delete the sidecar as redundant. Rejected: the redundancy evidence was the
+  misread described above, and the documented format is the sidecar.
+- Say nothing and leave the earlier reading in place. Rejected: it had already
+  produced one wrong conclusion and a deferred trigger keyed on a meaningless
+  number.
+
+#### Consequences
+
+The 2026-08-27 deferred trigger for `.cursor-plugin/marketplace.json` is amended
+in place: it was keyed on a reindex reporting 0 plugins, and `update` reports `0
+plugins indexed` on the same URL where `add` reports `1 plugin` seconds later.
+That count does not mean what the trigger assumed, so the trigger is replaced.
+
+This repository now depends on a documented format that this build does not
+enforce. If Cursor ever stops falling back, nothing here changes; if Cursor ever
+requires something more, the sidecar is where it goes.
+
+#### Non-goals
+
+No change to any manifest, to `README.md`, or to what `setup` writes. No Cursor
+hooks, rules, MCP, or Marketplace submission. No attempt to make the Claude Code
+store manageable from Cursor.
+
+#### Deferred
+
+Whether a Cursor-managed install classifies differently from a surfaced Claude
+Code one in any way that matters beyond the label and the `Uninstall` action —
+trigger: a behaviour difference actually bites. Refreshing the Cursor-managed
+install past the commit it is pinned to — trigger: a human wants the newer
+version in Cursor.
+
 ### 2026-08-28 — Harness launch mechanics ship inside the delivery skill
 
 #### Context
@@ -233,7 +322,15 @@ limitation is recorded, not fixed.
 project needs them in context before the delivery skill is invoked. Trust
 handling rows in the reference — trigger: this decision lands. Asking Orca to
 expose a "blocked on confirmation" terminal state — trigger: a second observed
-worker loss, or an Orca release offering such a state. The stale line count in
+worker loss, or an Orca release offering such a state. One loss has now been
+observed, on 2026-08-28: with Claude Code's workspace-trust dialog on screen,
+`orca terminal wait --for tui-idle` returned `satisfied: true` and `agentWait`
+was `null`; the documented dispatch procedure typed its work prompt into the
+dialog and Enter selected the highlighted `No, exit`, ending the worker with the
+prompt undelivered. A second, related legibility gap was observed the same day:
+`orca terminal read` renders a harness's ghost-text suggestion in the same place
+as a pending prompt, so reading the input box does not establish that anything is
+waiting to be submitted. The stale line count in
 this file's 2026-08-25 record, the `/add-plugin superpowers` reference, and the
 `/dely` palette filter's undefended coupling to the word "Dely" in
 `skills/setup/SKILL.md`'s description — no trigger; recorded and unowned.
@@ -283,7 +380,11 @@ same one-line description as the other manifests, and `"skills": "./skills/"`.
 It carries no `version` (version stays the Claude and Codex pair), no hooks,
 and no second skill tree. `.cursor-plugin/marketplace.json` is not added
 unless a live reindex of this git marketplace still reports 0 plugins after
-`plugin.json` exists.
+`plugin.json` exists. Amended 2026-08-29: that condition is unusable, because
+`plugin marketplace update` reports `0 plugins indexed` where `add` reports
+`1 plugin` on the same URL seconds later. The count is not a plugin count. The
+file is added only if Cursor fails to resolve this repository's plugin by some
+other observable measure.
 
 Install is native Cursor: `cursor-agent plugin marketplace add` of the git
 URL, then in a Cursor Agent session type `/plugin`, go to the `Marketplace`
@@ -356,8 +457,9 @@ remediation, the two-row managed block, or `skills/delivery/SKILL.md`.
 
 #### Deferred
 
-Add `.cursor-plugin/marketplace.json` only if a live reindex of this git
-marketplace still reports 0 plugins after `plugin.json` exists. Submit Dely
+Add `.cursor-plugin/marketplace.json` only if Cursor fails to resolve this
+repository's plugin by an observable measure; see the 2026-08-29 amendment, which
+retires the reindex-count form of this trigger. Submit Dely
 to the official Cursor Marketplace when a human wants Customize search
 without a git URL. Prove Orca `--agent` plus `--model` on the first Cursor
 dispatch; escalate if it cannot pin. Adopt a Kiro-style two-step only after
