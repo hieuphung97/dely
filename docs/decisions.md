@@ -9,6 +9,134 @@ Last updated 2026-08-27.
 
 ## Settled
 
+### 2026-08-27 — Cursor Agent CLI is a first-class sixth harness
+
+#### Context
+
+Dely ships as an installable package for Claude Code, Codex CLI, Grok Build,
+Antigravity CLI, and Kiro CLI. Those five adapters share one `skills/` tree.
+Claude and Codex use nested sidecars (`.claude-plugin/`, `.codex-plugin/`).
+Antigravity and Grok validate root `plugin.json` (`name` and `description`
+only; Antigravity 1.1.19 is `additionalProperties: false`). Kiro has no
+plugin sidecar that can share that tree, so it installs with `npx skills`.
+
+Live Cursor Agent CLI 2026.08.25-3e8eec8 is an interactive TUI by default,
+lists models through `cursor-agent models`, accepts `--model`, has no
+`--effort` flag, and reads `AGENTS.md` natively. Its plugin CLI exposes
+`plugin marketplace add|list|remove|update` and no `plugin install`. This
+machine already had a user marketplace named `dely` pointing at this git
+URL; `cursor-agent plugin marketplace update dely` indexed **0 plugins**.
+Root `plugin.json` is not an Agent Plugin (`$schema` is required; adding it
+would break the Antigravity lock). Cursor identifies format by path:
+`.cursor-plugin/plugin.json` is a Cursor Plugin.
+
+Superpowers installs on Cursor via `.cursor-plugin/plugin.json` with
+`"skills": "./skills/"` and `/add-plugin superpowers`, not `npx skills`.
+
+`tests/contracts.sh` is 249 lines with a hard `≤ 250` gate. A sixth
+harness pasted as a second Kiro-sized block would blow that gate.
+
+#### Decision
+
+Cursor Agent CLI is a first-class harness, equal in kind to Claude Code,
+Codex CLI, Grok Build, Antigravity CLI, and Kiro CLI.
+
+Canonical skills stay in `skills/`. A plugin-capable harness gets a thin
+nested sidecar that points at `./skills/` and does not copy the tree and
+does not edit root `plugin.json`. A harness that owns the root manifest
+(Antigravity; Grok also validates it) does not grow that file for another
+vendor. `npx skills` remains the fallback only when a harness has no such
+sidecar (Kiro). A harness with a native plugin path does not also get an
+`npx skills` README section.
+
+Cursor packaging is `.cursor-plugin/plugin.json` with `name` `dely`, the
+same one-line description as the other manifests, and `"skills": "./skills/"`.
+It carries no `version` (version stays the Claude and Codex pair), no hooks,
+and no second skill tree. `.cursor-plugin/marketplace.json` is not added
+unless a live reindex of this git marketplace still reports 0 plugins after
+`plugin.json` exists.
+
+Install is native Cursor: `cursor-agent plugin marketplace add` of the git
+URL, then in a Cursor Agent session type `/plugin`, go to the `Marketplace`
+tab, search `dely`, and choose `Install for you (user scope)`. Type `/dely`
+to filter the palette to Dely's own `/delivery` and `/setup` before invoking
+them. Do not document `npx skills --agent cursor`, PATH `agent`,
+`cursor` (the IDE wrapper), or copying into `.cursor/skills/`.
+
+Setup discovers models from `cursor-agent models` (offer the slug before
+` - `). There is no `--effort` flag: write the literal `default` for Effort.
+Do not invent an effort vocabulary, do not strip effort suffixes from slugs,
+and do not synthesize parameterized `[effort=…]` forms. Omit unusable
+discovery. Setup does not write `~/.cursor`. Cursor is a native `AGENTS.md`
+reader; the CLI also applies `CLAUDE.md` as a rule, so that file is not
+called inert on Cursor. The `CLAUDE.md` write offer stays Claude-Code-only.
+
+Workers launch as an interactive `cursor-agent` TUI. Never PATH `agent`
+(it collides with Grok). Never `-p`/`--print`. Never `-w`/`--worktree`.
+Prefer Orca `--agent` when it can pin the block's model; otherwise
+hand-compose `cursor-agent --model <slug>` (omit `--model` when the cell
+is `default`) and carry `--force`. Do not put `--trust` or an unpinned
+`--sandbox` on that argv. Do not copy Kiro's two-step unless `--force` on
+argv is observed to be fatal.
+
+The two versioned manifests advance together to `0.15.0`; root `plugin.json`
+stays unchanged. Human bug reports offer the exact label `Cursor Agent CLI`.
+`tests/contracts.sh` covers the new sidecar, discovery, README path, dispatch
+sentence, permission default, and dropdown without exceeding 250 lines, by
+sharing loops with the Kiro checks rather than pasting a second block. The
+portable delivery protocol still names no harness. This repository's phase
+pins are not a Cursor-support change.
+
+#### Alternatives considered
+
+- `npx skills --agent cursor --global` as the Cursor path. Rejected:
+  Cursor has the sidecar family Dely already uses for Claude and Codex,
+  and this git marketplace already indexed 0 plugins for lack of
+  `.cursor-plugin/`.
+- Native plugin and `npx skills`. Rejected: two install truths.
+- Agent Plugins 1.0 at repo root (`$schema` on `plugin.json`). Rejected:
+  conflicts with the checked Antigravity schema; Grok validates that
+  file; Cursor might then see a second identity.
+- Duplicate `skills/` under `.cursor/`. Rejected: that is the drift the
+  packaging rule exists to prevent.
+- PATH `agent` as the documented binary. Rejected: it collides with Grok.
+- Raise the `tests/contracts.sh` 250-line cap. Rejected: that is how a
+  sixth harness would make a seventh impossible.
+- Change this repository's phase pins to Cursor. Rejected: harness
+  support is not deployment selection.
+
+#### Consequences
+
+Cursor users get the same skills through a sidecar, not a sixth tree.
+Existing Claude, Codex, Grok, Antigravity, and Kiro command surfaces are
+unchanged. Plugin caches still copy the package at install time; Cursor
+joins that copy-on-install family, not Kiro's shared symlink store.
+
+Live `/plugin` → `Marketplace` tab install and official Marketplace search
+remain consumer-profile checks: this repository does not mutate live harness
+configuration during compatibility validation. Interactive plugin install is
+the current Cursor CLI limit; there is no `plugin install` verb.
+
+#### Non-goals
+
+No Cursor hooks, rules, agents, commands, MCP, Cloud Agent, ACP, headless
+`--print` dispatch, PATH `agent` launcher, `--worktree` worker checkout,
+Orca change, write to `~/.cursor`, `npx skills` for Cursor, official
+Marketplace submission, root `plugin.json` growth, change to review depth,
+remediation, the two-row managed block, or `skills/delivery/SKILL.md`.
+
+#### Deferred
+
+Add `.cursor-plugin/marketplace.json` only if a live reindex of this git
+marketplace still reports 0 plugins after `plugin.json` exists. Submit Dely
+to the official Cursor Marketplace when a human wants Customize search
+without a git URL. Prove Orca `--agent` plus `--model` on the first Cursor
+dispatch; escalate if it cannot pin. Adopt a Kiro-style two-step only after
+`--force` on argv is observed to be fatal. Offer parameterized `[effort=…]`
+model forms in setup only if slugs that already encode effort are not
+enough. The next harness follows this packaging rule rather than reopening
+it.
+
 ### 2026-08-27 — Composed TUI argv carries the execution plane's permission default
 
 #### Context

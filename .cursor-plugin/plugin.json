@@ -1,0 +1,5 @@
+{
+  "name": "dely",
+  "description": "An automation-first, Orca-supervised delivery protocol for coding agents.",
+  "skills": "./skills/"
+}

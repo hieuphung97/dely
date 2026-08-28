@@ -20,12 +20,13 @@ skill="$root/skills/delivery/SKILL.md"
 claude_version="$(jq -r .version "$claude_manifest" 2>/dev/null)"
 codex_version="$(jq -r .version "$codex_manifest" 2>/dev/null)"
 
-if [ "$claude_version" != "0.14.1" ] || [ "$codex_version" != "0.14.1" ]; then
-  fail_with "manifest versions must both be 0.14.1 (claude=$claude_version codex=$codex_version)"
+if [ "$claude_version" != "0.15.0" ] || [ "$codex_version" != "0.15.0" ]; then
+  fail_with "manifest versions must both be 0.15.0 (claude=$claude_version codex=$codex_version)"
 fi
 
 root_name="$(jq -r .name "$root_manifest" 2>/dev/null)"
 [ "$root_name" = "dely" ] || fail_with "$root_manifest .name must be dely (got $root_name)"
+jq -e '[keys[]] | sort == ["description","name"]' "$root_manifest" > /dev/null 2>&1 || fail_with "$root_manifest must have exactly keys name and description (no \$schema or extra keys)"
 
 # Canonical MIT text (github.com/licenses/mit) with [year] -> 2026 and
 # [fullname] -> Hieu Phung, whitespace-normalized. A present LICENSE that only
@@ -62,7 +63,16 @@ actual_log_section="${actual_log_section% }"
 # Restored launch rule: carry the configured permission default, not as-is.
 grep -Fq 'configured permission default' "$skill" && grep -Fq 'sandbox the project did not pin' "$skill" && ! grep -Fq 'launch command as-is' "$skill" || fail_with "$skill launch-argv guidance does not carry the execution plane's configured permission default onto composed argv"
 # Hand-composed-argv harnesses must name their permission default.
-grep -Fq -- '--permission-mode bypassPermissions' "$root/AGENTS.md" && grep -Fq -- '--dangerously-skip-permissions' "$root/AGENTS.md" && grep -Fq -- '--trust-all-tools' "$root/AGENTS.md" || fail_with "AGENTS.md does not name a permission default for each hand-composed-argv harness"
+grep -Fq -- '--permission-mode bypassPermissions' "$root/AGENTS.md" && grep -Fq -- '--dangerously-skip-permissions' "$root/AGENTS.md" && grep -Fq -- '--trust-all-tools' "$root/AGENTS.md" && grep -Fq -- '--force' "$root/AGENTS.md" || fail_with "AGENTS.md does not name a permission default for each hand-composed-argv harness"
+
+# Cursor sidecar: .name must be dely, .skills must be ./skills/, no version key.
+cursor_manifest="$root/.cursor-plugin/plugin.json"
+[ -f "$cursor_manifest" ] || fail_with "missing $cursor_manifest"
+cursor_name="$(jq -r .name "$cursor_manifest" 2>/dev/null)"
+cursor_skills="$(jq -r .skills "$cursor_manifest" 2>/dev/null)"
+[ "$cursor_name" = "dely" ] || fail_with "$cursor_manifest .name must be dely (got $cursor_name)"
+[ "$cursor_skills" = "./skills/" ] || fail_with "$cursor_manifest .skills must be ./skills/ (got $cursor_skills)"
+jq -e 'has("version") | not' "$cursor_manifest" > /dev/null 2>&1 || fail_with "$cursor_manifest must not have a version field"
 
 # Setup's managed block: the fenced "What to write" template must carry
 # exactly two data rows, phases {implement, review} with no duplicate or
@@ -102,84 +112,72 @@ setup_block_check="$(managed_block_template "$setup_skill" | awk '
 
 [ "$setup_block_check" = "ok" ] || fail_with "$setup_skill managed block does not have exactly one implement and one review row"
 
-# Setup's whole "### Kiro CLI" Discovery subsection and AGENTS.md's
-# headless-forbidden dispatch sentence are matched verbatim.
+# Setup's discovery subsections and AGENTS.md dispatch are matched verbatim.
 norm() { tr '\n' ' ' | tr -s ' ' | sed -e 's/^ //' -e 's/ $//'; }
 discovery_section="$(awk '/^## Discovery[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$setup_skill")"
 printf '%s\n' "$discovery_section" | grep -Fq -- 'agy models' || fail_with "$setup_skill Discovery section does not name: agy models"
-expected_kiro_subsection='Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each `model_id`). Kiro CLI effort is read from `kiro-cli chat --help`'\''s `--effort` flag; do not prompt the model to learn it and do not store a catalogue. Live discovery may offer only `auto` — that is a valid result, not a reason to invent model names. Omit Kiro discovery that is unavailable or unusable rather than guessing.'
+expected_kiro_subsection='Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each `model_id`). Kiro CLI effort is read from `kiro-cli chat --help`'"'"'s `--effort` flag; do not prompt the model to learn it and do not store a catalogue. Live discovery may offer only `auto` — that is a valid result, not a reason to invent model names. Omit Kiro discovery that is unavailable or unusable rather than guessing.'
 actual_kiro_subsection="$(awk '/^### Kiro CLI[[:space:]]*$/{p=1;next} p && /^#/{exit} p' "$setup_skill" | norm)"
-[ "$actual_kiro_subsection" = "$expected_kiro_subsection" ] || fail_with "$setup_skill ### Kiro CLI Discovery subsection no longer matches the approved live-discovery policy verbatim"
-expected_dispatch='Load Orca'\''s native skill to launch and supervise each worker TUI. Do not wrap a headless `claude -p`, `codex exec`, `grok --prompt-file`, `agy -p`/`--print`, or `kiro-cli chat --no-interactive` in a shell tab. Kiro workers launch as an interactive TUI, `kiro-cli chat --tui` with `--model` and `--effort` pinned from the managed block and no `--trust-all-tools` on that argv; once the TUI is idle at its prompt, send `/tools trust-all`, then the work prompt.'
+[ "$actual_kiro_subsection" = "$expected_kiro_subsection" ] || fail_with "$setup_skill ### Kiro CLI Discovery subsection no longer matches the approved policy verbatim"
+expected_cursor_subsection='Cursor Agent CLI models: `cursor-agent models` (offer the slug before ` - `). There is no `--effort` flag: write the literal `default` for Effort. Do not invent an effort vocabulary, do not strip effort suffixes from slugs, and do not synthesize parameterized `[effort=…]` forms. Omit Cursor discovery that is unavailable or unusable rather than guessing.'
+actual_cursor_subsection="$(awk '/^### Cursor Agent CLI[[:space:]]*$/{p=1;next} p && /^#/{exit} p' "$setup_skill" | norm)"
+[ "$actual_cursor_subsection" = "$expected_cursor_subsection" ] || fail_with "$setup_skill ### Cursor Agent CLI Discovery subsection no longer matches the approved policy verbatim"
+expected_dispatch='Load Orca'"'"'s native skill to launch and supervise each worker TUI. Do not wrap a headless `claude -p`, `codex exec`, `grok --prompt-file`, `agy -p`/`--print`, `kiro-cli chat --no-interactive`, or `cursor-agent -p`/`--print` in a shell tab. Kiro workers launch as an interactive TUI, `kiro-cli chat --tui` with `--model` and `--effort` pinned from the managed block and no `--trust-all-tools` on that argv; once the TUI is idle at its prompt, send `/tools trust-all`, then the work prompt. Cursor workers launch as an interactive `cursor-agent` TUI; pin `--model` from the managed block unless the cell is `default`, and omit effort flags; do not use `-w`/`--worktree`.'
 actual_dispatch="$(awk '/^Load Orca.s native skill/{p=1} p&&/^$/{exit} p{print}' "$root/AGENTS.md" | norm)"
 [ "$actual_dispatch" = "$expected_dispatch" ] || fail_with "AGENTS.md headless-forbidden dispatch sentence no longer matches the approved policy verbatim"
 
-# Kiro CLI's README section must document native `npx skills` install, update,
-# removal, and invocation, not just claim support with manual copying.
-kiro_section="$(awk '/^### Kiro CLI[[:space:]]*$/{p=1;next} p && /^#{2,3} /{exit} p' "$root/README.md")"
-if [ -z "$kiro_section" ]; then
-  fail_with "README.md is missing a ### Kiro CLI section"
-elif printf '%s\n' "$kiro_section" | grep -Eiq 'copy (the |both )?skills? (files? )?(manually|by hand)'; then
-  fail_with "README.md Kiro CLI section instructs manual copying instead of npx skills"
-else
-  for needle in 'npx skills add' 'npx skills update' 'npx skills remove' \
-                '--agent kiro-cli' '--global' '--skill delivery' '--skill setup' '/delivery' '/setup'; do
-    printf '%s\n' "$kiro_section" | grep -Fq -- "$needle" || fail_with "README.md Kiro CLI section is missing: $needle"
-  done
-fi
+# README install sections: Kiro requires npx skills; Cursor requires marketplace add + /plugin + /dely.
+readme_section() { awk "/^### ${1}[[:space:]]*\$/{p=1;next} p && /^#{2,3} /{exit} p" "$root/README.md"; }
+kiro_section="$(readme_section 'Kiro CLI')"
+[ -n "$kiro_section" ] || fail_with "README.md is missing a ### Kiro CLI section"
+printf '%s\n' "$kiro_section" | grep -Eiq 'copy (the |both )?skills? (files? )?(manually|by hand)' && fail_with "README.md Kiro CLI section instructs manual copying instead of npx skills" || true
+for needle in 'npx skills add' 'npx skills update' 'npx skills remove' '--agent kiro-cli' '--global' '--skill delivery' '--skill setup' '/delivery' '/setup'; do
+  printf '%s\n' "$kiro_section" | grep -Fq -- "$needle" || fail_with "README.md Kiro CLI section is missing: $needle"
+done
+cursor_section="$(readme_section 'Cursor Agent CLI')"
+[ -n "$cursor_section" ] || fail_with "README.md is missing a ### Cursor Agent CLI section"
+printf '%s\n' "$cursor_section" | grep -Fiq 'npx skills' && fail_with "README.md Cursor Agent CLI section must not document npx skills" || true
+printf '%s\n' "$cursor_section" | grep -Eiq 'copy (the |both )?skills? (files? )?(manually|by hand)' && fail_with "README.md Cursor Agent CLI section instructs manual copying instead of plugin marketplace add" || true
+for needle in 'plugin marketplace add' '`/plugin`' '`/dely`' '/delivery' '/setup'; do
+  printf '%s\n' "$cursor_section" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI section is missing: $needle"
+done
+printf '%s\n' "$cursor_section" | grep -Fq -- '/add-plugin' && fail_with "README.md Cursor Agent CLI section must not document /add-plugin" || true
 
-# Plan template's acceptance header: the four named columns must all be
-# present, in any order, alongside whatever else the row carries.
+# Plan template's acceptance header: the four named columns must all be present.
 plan_template="$root/skills/delivery/templates/plan.md"
-
 acceptance_header="$(awk '
   /^## Acceptance[[:space:]]*$/ { in_acc = 1; next }
   in_acc && /^## / { exit }
   in_acc && /^\|/ && /[A-Za-z]/ { print; exit }
 ' "$plan_template")"
-
 for col in Requirement Instrument Counterexample "Observed red"; do
-  if ! printf '%s\n' "$acceptance_header" | grep -F "| $col " >/dev/null && \
-     ! printf '%s\n' "$acceptance_header" | grep -F "| $col |" >/dev/null; then
+  if ! printf '%s\n' "$acceptance_header" | grep -F "| $col " > /dev/null && \
+     ! printf '%s\n' "$acceptance_header" | grep -F "| $col |" > /dev/null; then
     fail_with "$plan_template acceptance header is missing column: $col"
   fi
 done
 
-# Community collaboration contract: the six community artifacts must exist,
-# and both issue forms must be present, parseable YAML with the top-level
-# keys GitHub requires to render an issue form (name, description, body).
+# Community collaboration contract: the six community artifacts must exist.
 for f in CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md .github/ISSUE_TEMPLATE/bug_report.yml \
          .github/ISSUE_TEMPLATE/feature_request.yml .github/pull_request_template.md; do
-  if [ ! -f "$root/$f" ]; then
-    fail_with "missing required community artifact: $f"
-  fi
+  [ -f "$root/$f" ] || fail_with "missing required community artifact: $f"
 done
-
 for f in .github/ISSUE_TEMPLATE/bug_report.yml .github/ISSUE_TEMPLATE/feature_request.yml; do
   path="$root/$f"
   [ -f "$path" ] || continue
   missing="$(ruby -ryaml -e '
-    begin
-      d = YAML.safe_load(File.read(ARGV[0]))
-    rescue => e
-      puts "parse-error(#{e.message})"
-      exit
-    end
-    unless d.is_a?(Hash)
-      puts "not-a-mapping"
-      exit
-    end
+    begin; d = YAML.safe_load(File.read(ARGV[0]))
+    rescue => e; puts "parse-error(#{e.message})"; exit; end
+    puts "not-a-mapping" unless d.is_a?(Hash)
     m = %w[name description body].reject { |k| d.key?(k) }
     puts m.join(",") unless m.empty?
   ' "$path")"
-  if [ -n "$missing" ]; then
-    fail_with "$f is not a valid GitHub issue form: missing/invalid $missing"
-  fi
+  [ -z "$missing" ] || fail_with "$f is not a valid GitHub issue form: missing/invalid $missing"
 done
 
-# Bug form's harness dropdown must offer all five exact harness names.
+# Bug form's harness dropdown must offer all six exact harness names.
 harness_options="$(awk '/^ *id: harness$/{f=1} f&&/^ *validations:/{exit} f' "$root/.github/ISSUE_TEMPLATE/bug_report.yml" | sed 's/^ *- //')"
-for h in "Claude Code" "Codex CLI" "Grok Build" "Antigravity CLI" "Kiro CLI"; do
+for h in "Claude Code" "Codex CLI" "Grok Build" "Antigravity CLI" "Kiro CLI" "Cursor Agent CLI"; do
   printf '%s\n' "$harness_options" | grep -Fxq -- "$h" || fail_with "bug_report.yml harness dropdown is missing: $h"
 done
 
@@ -222,7 +220,7 @@ if jobs.is_a?(Hash) && jobs.keys == ["contracts"]
   run_lines = steps.flat_map { |s| (s["run"] || "").split("\n") }.map(&:strip).reject(&:empty?)
   required = [
     'git diff --check', 'bash -n tests/contracts.sh',
-    'jq -e . plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json >/dev/null',
+    'jq -e . plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json .cursor-plugin/plugin.json >/dev/null',
     'bash tests/contracts.sh', 'test "$(wc -l < tests/contracts.sh)" -le 250',
     'test ! -e git-hooks/pre-push', 'test ! -e docs/delivery-log.md', 'test ! -e docs/findings.md',
     'test ! -e docs/harness-surface.md', 'test ! -e docs/options.md',
