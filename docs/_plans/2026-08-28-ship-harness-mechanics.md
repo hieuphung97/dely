@@ -127,7 +127,7 @@ does not.
 | The reference is reachable from the protocol | `contracts.sh`: `SKILL.md` contains the literal path `references/harnesses.md` and that path exists | the reference exists but nothing names it — a dead file no Control ever reads, with every other check green | |
 | The skill stops denying its own matrix | `contracts.sh`: `SKILL.md` must not contain the compatibility-matrix denial | mechanics moved into the skill while the denial survives — a self-contradictory shipped artifact | |
 | Restatements removed, pre-invoke ones kept | none — a human reads the diff | none | n/a |
-| The closed delivery's plan is gone | `ls docs/_plans/` lists only this plan; `git grep` for its name outside `docs/_plans/` is empty | the plan is deleted while a document still links to it, leaving a dangling reference that no gate catches | |
+| The closed delivery's plan is gone | `ls docs/_plans/` lists only this plan; `git grep` for its name outside `docs/_plans/` is empty | the plan is deleted while a document still links to it, leaving a dangling reference that no gate catches | `git grep -n '2026-08-27-cursor-agent-cli-harness' -- . ':!docs/_plans'` returned empty before removal; `ls docs/_plans/` now lists only `2026-08-28-ship-harness-mechanics.md` |
 
 **Cannot be observed:** whether `npx skills add … --skill delivery` copies a
 `references/` subdirectory. It resolves against the default branch on GitHub, so

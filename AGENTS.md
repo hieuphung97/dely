@@ -54,15 +54,8 @@ protocol. Per-harness launch mechanics — permission defaults, forbidden
 headless forms, launch notes, and trust handling — live in
 `skills/delivery/references/harnesses.md`.
 
-Review is independent by role: a fresh session that does not implement or edit
-the candidate. This project adds no phase-implied sandbox. Native Internet
-access, closure gates, result writes and coordinator completion stay
-available. If Orca or a required capability is unavailable, stop and ask the
-human; there is no headless fallback.
-
-`design` runs in the current interactive session and is not dispatched.
-Release is performed by that session with native Git and forge tools; it
-dispatches no worker.
+This project adds no phase-implied sandbox. Native Internet access, closure
+gates, result writes and coordinator completion stay available.
 
 ## Closure gates
 
