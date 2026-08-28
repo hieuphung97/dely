@@ -45,8 +45,8 @@ delivery run.
 
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
-| `implement` | Grok Build | `grok-4.6` | `medium` |
-| `review` | Claude Code | `opus` | `high` |
+| `implement` | Antigravity CLI | `claude-sonnet-4-6` | `medium` |
+| `review` | Grok Build | `grok-4.6` | `high` |
 <!-- dely:end -->
 
 The table is this repository's deployment selection, not the portable protocol.
