@@ -2,7 +2,7 @@
 
 This repository contains the `dely` package: the `delivery` skill and its
 automation-first control protocol for Claude Code, Codex CLI, Grok Build,
-Antigravity CLI, and Kiro CLI.
+Antigravity CLI, Kiro CLI, and Cursor Agent CLI.
 
 ## Source of truth
 
@@ -55,13 +55,16 @@ effort. Use hand-composed argv only where it cannot, and there carry that
 harness's permission default: Claude Code `--dangerously-skip-permissions`,
 Codex CLI `--dangerously-bypass-approvals-and-sandbox`, Grok
 `--permission-mode bypassPermissions`, Antigravity CLI
-`--dangerously-skip-permissions`.
+`--dangerously-skip-permissions`, Cursor Agent CLI `--force`.
 Load Orca's native skill to launch and supervise each worker TUI. Do not wrap a
-headless `claude -p`, `codex exec`, `grok --prompt-file`, `agy -p`/`--print`, or
-`kiro-cli chat --no-interactive` in a shell tab. Kiro workers launch as an
-interactive TUI, `kiro-cli chat --tui` with `--model` and `--effort` pinned
-from the managed block and no `--trust-all-tools` on that argv; once the TUI
-is idle at its prompt, send `/tools trust-all`, then the work prompt.
+headless `claude -p`, `codex exec`, `grok --prompt-file`, `agy -p`/`--print`,
+`kiro-cli chat --no-interactive`, or `cursor-agent -p`/`--print` in a shell
+tab. Kiro workers launch as an interactive TUI, `kiro-cli chat --tui` with
+`--model` and `--effort` pinned from the managed block and no
+`--trust-all-tools` on that argv; once the TUI is idle at its prompt, send
+`/tools trust-all`, then the work prompt. Cursor workers launch as an
+interactive `cursor-agent` TUI; pin `--model` from the managed block unless
+the cell is `default`, and omit effort flags; do not use `-w`/`--worktree`.
 
 Review is independent by role: a fresh session that does not implement or edit
 the candidate. This project adds no phase-implied sandbox. Native Internet
