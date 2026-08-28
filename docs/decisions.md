@@ -9,6 +9,61 @@ Last updated 2026-08-28.
 
 ## Settled
 
+### 2026-08-28 — README's Cursor uninstall step names the marketplace, not the plugin
+
+#### Context
+
+`README.md`'s `### Cursor Agent CLI` fenced block labelled
+`cursor-agent plugin marketplace remove dely` as `# uninstall`. It does not
+uninstall. Verified twice on cursor-agent 2026.08.25-3e8eec8: after running
+it, a new Cursor session still listed `dely` in `/plugin` → `Installed` with
+both skills present. Cursor's own CLI changelog (2026-07-13) defines
+`plugin marketplace remove` as deleting a user-scoped marketplace; installed
+plugins are unaffected. Every other harness section in the README pairs
+`# uninstall` with a command that actually uninstalls.
+
+Uninstalling is interactive: `/plugin` → `Installed` → select `dely` →
+`Uninstall`, observed present on a Cursor-managed install. That action
+appears only for plugins Cursor manages; Cursor also lists Claude Code's own
+installed plugins in the same panel, labelled `(Claude Code)`, offering only
+`Try in chat`. Cursor staff, forum, 2026-07: "There isn't a separate
+non-interactive command like `cursor-agent plugin install <plugin-id>` yet."
+There is no non-interactive install or uninstall command for either harness's
+plugins.
+
+#### Decision
+
+The fenced block's comment now says what `plugin marketplace remove` does —
+removes the marketplace, not the plugin. The prose tells the reader that
+uninstalling `dely` itself happens in `/plugin` → `Installed` → `Uninstall`,
+and that no non-interactive command exists for it. `tests/contracts.sh` pins
+the new comment text as a needle inside the existing Cursor needle loop, so a
+half-edit that fixes the prose but leaves the fenced block's `# uninstall`
+still fails contracts.
+
+#### Alternatives considered
+
+- Say uninstalling is impossible. Rejected: it is possible, just interactive.
+- Drop the `remove` command from the fenced block. Rejected: it is still a
+  real, useful command — it just isn't uninstall.
+
+#### Consequences
+
+The Cursor section stops promising a working `# uninstall` command that
+silently no-ops. Readers who copy the fenced block get an accurate comment;
+readers who want to actually uninstall are pointed at `/plugin` →
+`Installed`.
+
+#### Non-goals
+
+No change to the four `plugin marketplace` commands, to `/plugin`, `/dely`,
+`/delivery`, `/setup`, or to any other harness section.
+
+#### Deferred
+
+Document a non-interactive Cursor uninstall command if and when Cursor ships
+one.
+
 ### 2026-08-28 — Harness launch mechanics ship inside the delivery skill
 
 #### Context

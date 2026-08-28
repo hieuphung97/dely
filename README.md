@@ -142,7 +142,7 @@ cursor-agent plugin marketplace list
 # update
 cursor-agent plugin marketplace update dely
 
-# uninstall
+# removes the marketplace, not the plugin
 cursor-agent plugin marketplace remove dely
 ```
 
@@ -153,6 +153,11 @@ with the left and right arrows or Tab. Go to the `Marketplace` tab, type
 `dely` in the search box, and press Enter on the `dely (dely)` result, then choose
 `Install for you (user scope)` (the other offered action is `Install for all
 collaborators on this repository (project scope)`).
+
+To uninstall, go to the `Installed` tab instead, select `dely`, and choose
+`Uninstall`. There is no non-interactive uninstall command;
+`cursor-agent plugin marketplace remove` only removes the marketplace entry
+and leaves the plugin installed.
 
 Cursor does not namespace plugin skills the way Claude Code does with
 `dely:setup`; with another plugin also installed, the palette can show more
