@@ -2,7 +2,7 @@
 
 Decision record: `docs/decisions.md` (2026-08-27 — Cursor Agent CLI is a first-class sixth harness)
 
-**Baseline:**
+**Baseline:** `5f5b6ab847533af8e173eff97cbc9351340e8417`
 
 ## Goal
 
