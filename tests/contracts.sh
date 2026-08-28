@@ -26,6 +26,7 @@ fi
 
 root_name="$(jq -r .name "$root_manifest" 2>/dev/null)"
 [ "$root_name" = "dely" ] || fail_with "$root_manifest .name must be dely (got $root_name)"
+jq -e '[keys[]] | sort == ["description","name"]' "$root_manifest" > /dev/null 2>&1 || fail_with "$root_manifest must have exactly keys name and description (no \$schema or extra keys)"
 
 # Canonical MIT text (github.com/licenses/mit) with [year] -> 2026 and
 # [fullname] -> Hieu Phung, whitespace-normalized. A present LICENSE that only
@@ -136,6 +137,7 @@ done
 cursor_section="$(readme_section 'Cursor Agent CLI')"
 [ -n "$cursor_section" ] || fail_with "README.md is missing a ### Cursor Agent CLI section"
 printf '%s\n' "$cursor_section" | grep -Fiq 'npx skills' && fail_with "README.md Cursor Agent CLI section must not document npx skills" || true
+printf '%s\n' "$cursor_section" | grep -Eiq 'copy (the |both )?skills? (files? )?(manually|by hand)' && fail_with "README.md Cursor Agent CLI section instructs manual copying instead of plugin marketplace add" || true
 for needle in 'plugin marketplace add' '/add-plugin' '/delivery' '/setup'; do
   printf '%s\n' "$cursor_section" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI section is missing: $needle"
 done
