@@ -222,7 +222,7 @@ if jobs.is_a?(Hash) && jobs.keys == ["contracts"]
   run_lines = steps.flat_map { |s| (s["run"] || "").split("\n") }.map(&:strip).reject(&:empty?)
   required = [
     'git diff --check', 'bash -n tests/contracts.sh',
-    'jq -e . plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json >/dev/null',
+    'jq -e . plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json .cursor-plugin/plugin.json >/dev/null',
     'bash tests/contracts.sh', 'test "$(wc -l < tests/contracts.sh)" -le 250',
     'test ! -e git-hooks/pre-push', 'test ! -e docs/delivery-log.md', 'test ! -e docs/findings.md',
     'test ! -e docs/harness-surface.md', 'test ! -e docs/options.md',
