@@ -141,10 +141,10 @@ cursor_section="$(readme_section 'Cursor Agent CLI')"
 [ -n "$cursor_section" ] || fail_with "README.md is missing a ### Cursor Agent CLI section"
 printf '%s\n' "$cursor_section" | grep -Fiq 'npx skills' && fail_with "README.md Cursor Agent CLI section must not document npx skills" || true
 printf '%s\n' "$cursor_section" | grep -Eiq 'copy (the |both )?skills? (files? )?(manually|by hand)' && fail_with "README.md Cursor Agent CLI section instructs manual copying instead of plugin marketplace add" || true
-for needle in 'plugin marketplace add' '`/plugin`' '`/dely`' '/delivery' '/setup'; do
-  printf '%s\n' "$cursor_section" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI section is missing: $needle"
-done
-printf '%s\n' "$cursor_section" | grep -Fq -- '/add-plugin' && fail_with "README.md Cursor Agent CLI section must not document /add-plugin" || true
+cursor_fence="$(printf '%s\n' "$cursor_section" | awk '/^```/{f=!f;next} f')"
+for needle in 'plugin marketplace add' 'plugin marketplace list' 'plugin marketplace update' 'plugin marketplace remove' '# removes the marketplace, not the plugin'; do printf '%s\n' "$cursor_fence" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI fenced block is missing: $needle"; done
+for needle in '`/plugin`' '`/dely`' '/delivery' '/setup'; do printf '%s\n' "$cursor_section" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI section is missing: $needle"; done
+for needle in '/add-plugin' '#[[:space:]]*uninstall'; do printf '%s\n' "$cursor_section" | grep -Eiq -- "$needle" && fail_with "README.md Cursor Agent CLI section must not contain: $needle" || true; done
 
 # Plan template's acceptance header: the four named columns must all be present.
 plan_template="$root/skills/delivery/templates/plan.md"
