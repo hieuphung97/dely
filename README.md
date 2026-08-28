@@ -157,7 +157,10 @@ collaborators on this repository (project scope)`).
 To uninstall, go to the `Installed` tab instead, select `dely`, and choose
 `Uninstall`. There is no non-interactive uninstall command;
 `cursor-agent plugin marketplace remove` only removes the marketplace entry
-and leaves the plugin installed.
+and leaves the plugin installed. That `Uninstall` action only appears for a
+`dely` installed through Cursor's own marketplace; a `dely` installed through
+Claude Code shows as `dely (Claude Code)` in the same `Installed` tab with
+only `Try in chat`, and is not uninstallable from Cursor.
 
 Cursor does not namespace plugin skills the way Claude Code does with
 `dely:setup`; with another plugin also installed, the palette can show more

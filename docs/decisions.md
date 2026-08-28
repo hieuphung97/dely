@@ -3,7 +3,7 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-08-28.
+Last updated 2026-08-29.
 
 ---
 
@@ -28,18 +28,24 @@ appears only for plugins Cursor manages; Cursor also lists Claude Code's own
 installed plugins in the same panel, labelled `(Claude Code)`, offering only
 `Try in chat`. Cursor staff, forum, 2026-07: "There isn't a separate
 non-interactive command like `cursor-agent plugin install <plugin-id>` yet."
-There is no non-interactive install or uninstall command for either harness's
-plugins.
+There is no non-interactive install or uninstall command from `cursor-agent`
+itself (Claude Code has one, `claude plugin uninstall dely`, documented in
+this repository's own `README.md`).
 
 #### Decision
 
 The fenced block's comment now says what `plugin marketplace remove` does —
 removes the marketplace, not the plugin. The prose tells the reader that
 uninstalling `dely` itself happens in `/plugin` → `Installed` → `Uninstall`,
-and that no non-interactive command exists for it. `tests/contracts.sh` pins
-the new comment text as a needle inside the existing Cursor needle loop, so a
-half-edit that fixes the prose but leaves the fenced block's `# uninstall`
-still fails contracts.
+that no non-interactive command exists for it, and that the `Uninstall`
+action is absent for a `dely` installed through Claude Code.
+`tests/contracts.sh` extracts the fenced block on its own and requires all
+four `plugin marketplace` commands plus the new comment inside it, and
+separately forbids `# uninstall` from appearing anywhere in the Cursor
+section, so a half-edit that fixes the prose but leaves the fenced block's
+`# uninstall` — or that re-adds `# uninstall` beside the fence's `remove`
+line while keeping the new comment elsewhere in the block — still fails
+contracts.
 
 #### Alternatives considered
 
