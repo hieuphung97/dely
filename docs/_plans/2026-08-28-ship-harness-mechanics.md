@@ -2,8 +2,7 @@
 
 Decision record: `docs/decisions.md`, 2026-08-28 — Harness launch mechanics ship inside the delivery skill
 
-**Baseline:** empty until the commit carrying the decision record and this plan
-exists.
+**Baseline:** `0265467`, the commit carrying the decision record and this plan.
 
 ## Goal
 
