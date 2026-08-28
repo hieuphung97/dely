@@ -3,11 +3,151 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-08-27.
+Last updated 2026-08-28.
 
 ---
 
 ## Settled
+
+### 2026-08-28 — Harness launch mechanics ship inside the delivery skill
+
+#### Context
+
+`AGENTS.md:53-67` carries operational knowledge about six external CLIs: the
+permission default for each, the headless invocation forms forbidden for each,
+Kiro's two-step `/tools trust-all` launch, and Cursor's launch notes. It sits
+under `AGENTS.md:52`, "The table is this repository's deployment selection, not
+the portable protocol" — true of the pin table above it, false of the fifteen
+lines below it. Changing a pin changes nothing there; those lines describe how
+six tools behave, not what this repository chose.
+
+None of it reaches another project. The managed block `setup` writes, templated
+at `skills/setup/SKILL.md:40-52`, is one invocation sentence and a four-row pin
+table. A project installing Dely gets the portable protocol and its own pins,
+and nothing about launching any harness. A Kiro worker dispatched from another
+project launches without `/tools trust-all`, because the only place that
+instruction exists is a file that does not ship.
+
+`skills/delivery/SKILL.md:134-136` states the skill "has no compatibility matrix
+around one". The matrix exists; it was parked where that sentence could stay
+literally true.
+
+Probes on 2026-08-28 made the cost concrete. A blocking confirmation is
+invisible to the execution plane: with Claude Code's workspace-trust dialog on
+screen, `orca terminal wait --for tui-idle` returned `satisfied: true` and
+`agentWait` was `null`. Following the documented dispatch procedure against that
+state typed the work prompt into the dialog, and Enter selected its highlighted
+row, `No, exit`; the worker exited and the prompt was never delivered. Workspace
+trust is per-harness and per-path: after Claude Code recorded
+`hasTrustDialogAccepted` for a directory, Antigravity CLI and Cursor Agent CLI
+both still prompted for that same directory, while Codex, Grok and Kiro did not
+prompt at all. The defaults disagree — Claude Code highlights `No, exit`,
+Antigravity `Yes, I trust this folder`, Cursor `[a] Trust this workspace` — so no
+single keystroke is safe.
+
+That is the third item of its kind. Kiro's two-step has been stranded since
+2026-08-26 and Cursor's launch notes since 2026-08-27. Recording trust handling
+in `AGENTS.md` would strand a third.
+
+Portability is constrained by how each harness installs. `.cursor-plugin/plugin.json`
+points at `./skills/`, and the Kiro path installs with
+`npx skills add … --skill delivery --skill setup`, which selects skill
+directories. A file outside `skills/` reaches neither. A directory inside a skill
+reaches all of them: `skills/delivery/templates/` is present in
+`~/.agents/skills/delivery/`, `~/.grok/installed-plugins/dely-*/skills/delivery/`,
+`~/.gemini/config/plugins/dely/skills/delivery/`, and the Claude plugin cache.
+
+#### Decision
+
+Per-harness launch mechanics live in `skills/delivery/references/harnesses.md`
+and ship inside the delivery skill. The file is a table keyed by harness:
+permission default, forbidden headless forms, launch notes, and trust handling.
+The trust column is present and empty; filling it is a later delivery, and a
+column added later would be a schema change instead of a row edit.
+
+`skills/delivery/SKILL.md` names that path where it instructs Control to compose
+a worker launch. The protocol body still names no harness: the matrix is a
+reference the skill owns rather than prose the skill contains.
+`SKILL.md:134-136` is rewritten to say where the matrix lives instead of denying
+one exists. The denial is not left standing, because a shipped artifact that
+contradicts its own contents is the defect corrected in `README.md` earlier the
+same day.
+
+`AGENTS.md` keeps what the protocol delegates to it — gate commands, artifact
+paths, default branch, the managed pin block — plus this repository's own rules:
+self-update ordering, the absence of a phase-implied sandbox, and native Internet
+access. It loses lines 53-67 and gains a pointer.
+
+`AGENTS.md` also loses three restatements that duplicate the protocol without
+arriving earlier than it: review independence, the no-headless-fallback rule, and
+the design/release dispatch rule. All three are read only during a delivery, by
+which time the skill is loaded. Restatements that do arrive earlier stay: the
+default branch and the sentence selecting which shape invokes the skill are
+needed before any skill is invoked, because `CLAUDE.md` is one line, `@AGENTS.md`,
+loaded every session, while `SKILL.md` loads on invocation.
+
+`tests/contracts.sh` retargets its permission-flag grep and its verbatim dispatch
+pin from `AGENTS.md` to the reference, and adds a negative check that `AGENTS.md`
+no longer carries the per-harness flags.
+
+This amends the 2026-08-27 "Composed TUI argv carries the execution plane's
+permission default" decision, whose closing paragraph placed the per-harness
+permission defaults in this repository's `AGENTS.md`. The rule it settled is
+unchanged; only the file that carries the defaults moves. That record is amended
+in place rather than rewritten.
+
+#### Alternatives considered
+
+- A third skill, `dely:harness`. Rejected: the Kiro install line names skills
+  explicitly, so every existing user's documented install command would change,
+  and the skill would surface as a slash command in every palette for no
+  user-facing purpose.
+- A data file at the package root, `harnesses.json`. Rejected on the portability
+  constraint: it reaches neither the Cursor sidecar's `./skills/` tree nor a
+  `--skill`-selected Kiro install.
+- `setup` generates the mechanics into each project's `AGENTS.md`. Not rejected
+  on merit — it is the only option putting the mechanics in context before the
+  skill is invoked. Deferred: it ends the managed block's minimality, the
+  generated text must vary with the pins chosen, and each project keeps a copy
+  that goes stale when the plugin updates.
+- Leave it in `AGENTS.md`. Rejected: that is the status quo that stranded Kiro's
+  two-step and Cursor's launch notes, and would strand trust handling next.
+
+#### Consequences
+
+The shipped protocol changes, so the package version advances to `0.16.0`. Under
+`AGENTS.md`'s self-update rule the change takes effect for the delivery after the
+one shipping it.
+
+`tests/contracts.sh` is at 247 lines against a hard `≤ 250` gate. Retargeting is
+roughly neutral; the added negative check is not. If the work cannot fit, the
+outcome is `NEEDS_REPLAN`, not a raised cap — raising a gate to fit a plan is the
+failure the gate exists to catch.
+
+A project already running Dely receives the reference only after it updates the
+plugin. Until then its behaviour is unchanged, not worse.
+
+The reference becomes a maintenance surface: when a harness changes its CLI, that
+shows up there, versioned with the package rather than with any one project.
+
+#### Non-goals
+
+No trust-handling content in the reference; that is the next delivery and the
+first real exercise of the new home. No change to the pin table, to how `setup`
+discovers models and effort, or to what `setup` writes. No new ability for the
+execution plane to distinguish a blocking confirmation from an idle prompt; that
+limitation is recorded, not fixed.
+
+#### Deferred
+
+`setup` generating harness mechanics into a project's `AGENTS.md` — trigger: a
+project needs them in context before the delivery skill is invoked. Trust
+handling rows in the reference — trigger: this decision lands. Asking Orca to
+expose a "blocked on confirmation" terminal state — trigger: a second observed
+worker loss, or an Orca release offering such a state. The stale line count in
+this file's 2026-08-25 record, the `/add-plugin superpowers` reference, and the
+`/dely` palette filter's undefended coupling to the word "Dely" in
+`skills/setup/SKILL.md`'s description — no trigger; recorded and unowned.
 
 ### 2026-08-27 — Cursor Agent CLI is a first-class sixth harness
 
@@ -164,8 +304,10 @@ forbids adding a sandbox the project did not pin. Kiro CLI's existing
 exception stands: `--trust-all-tools` does not go on the argv.
 
 This repository's `AGENTS.md` prefers Orca's `--agent` launcher whenever it
-can pin the block's model and effort, and names the per-harness permission
-default used when argv is composed by hand.
+can pin the block's model and effort. Amended 2026-08-28: the per-harness
+permission defaults used when argv is composed by hand moved out of `AGENTS.md`
+into `skills/delivery/references/harnesses.md`, so they ship with the plugin.
+The rule settled here is unchanged; only its carrier moved.
 
 #### Alternatives considered
 
