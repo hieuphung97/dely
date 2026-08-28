@@ -147,10 +147,10 @@ cursor-agent plugin marketplace remove dely
 ```
 
 Add the marketplace first with `cursor-agent plugin marketplace add`, then in
-a Cursor Agent session type `/plugin` and press Enter. A panel opens with
-three tabs, `Plugins`, `Installed`, and `Marketplace`, cycled with the left
-and right arrows or Tab. Go to the `Marketplace` tab, type `dely` in the
-search box, and press Enter on the `dely (dely)` result, then choose
+a Cursor Agent session type `/plugin` and press Enter. A panel opens headed
+`Plugins`, with two selectable tabs, `Installed` and `Marketplace`, cycled
+with the left and right arrows or Tab. Go to the `Marketplace` tab, type
+`dely` in the search box, and press Enter on the `dely (dely)` result, then choose
 `Install for you (user scope)` (the other offered action is `Install for all
 collaborators on this repository (project scope)`).
 

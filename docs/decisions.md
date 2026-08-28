@@ -112,10 +112,10 @@ Existing Claude, Codex, Grok, Antigravity, and Kiro command surfaces are
 unchanged. Plugin caches still copy the package at install time; Cursor
 joins that copy-on-install family, not Kiro's shared symlink store.
 
-Live `/add-plugin` and official Marketplace search remain consumer-profile
-checks: this repository does not mutate live harness configuration during
-compatibility validation. Interactive plugin install is the current Cursor
-CLI limit; there is no `plugin install` verb.
+Live `/plugin` → `Marketplace` tab install and official Marketplace search
+remain consumer-profile checks: this repository does not mutate live harness
+configuration during compatibility validation. Interactive plugin install is
+the current Cursor CLI limit; there is no `plugin install` verb.
 
 #### Non-goals
 
