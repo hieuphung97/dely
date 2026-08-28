@@ -144,7 +144,7 @@ printf '%s\n' "$cursor_section" | grep -Eiq 'copy (the |both )?skills? (files? )
 cursor_fence="$(printf '%s\n' "$cursor_section" | awk '/^```/{f=!f;next} f')"
 for needle in 'plugin marketplace add' 'plugin marketplace list' 'plugin marketplace update' 'plugin marketplace remove' '# removes the marketplace, not the plugin'; do printf '%s\n' "$cursor_fence" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI fenced block is missing: $needle"; done
 for needle in '`/plugin`' '`/dely`' '/delivery' '/setup'; do printf '%s\n' "$cursor_section" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI section is missing: $needle"; done
-for needle in '/add-plugin' '# uninstall'; do printf '%s\n' "$cursor_section" | grep -Fq -- "$needle" && fail_with "README.md Cursor Agent CLI section must not contain: $needle" || true; done
+for needle in '/add-plugin' '#[[:space:]]*uninstall'; do printf '%s\n' "$cursor_section" | grep -Eiq -- "$needle" && fail_with "README.md Cursor Agent CLI section must not contain: $needle" || true; done
 
 # Plan template's acceptance header: the four named columns must all be present.
 plan_template="$root/skills/delivery/templates/plan.md"
