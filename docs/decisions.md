@@ -9,6 +9,69 @@ Last updated 2026-08-29.
 
 ## Settled
 
+### 2026-08-29 — Workspace trust is a second gate; Control answers it in the TUI
+
+#### Context
+
+`skills/delivery/references/harnesses.md` already records a per-harness
+permission default, which covers tool approval only. Four of the six
+harnesses still prompt a workspace-trust dialog on first interactive launch
+in a path that is not yet trusted: Claude Code, Codex CLI, Antigravity CLI,
+and Cursor Agent CLI. Grok Build and Kiro CLI open at the composer with no
+workspace-trust surface. Kiro still has a separate tool-trust step,
+`/tools trust-all`, already in Launch notes.
+
+Probes on 2026-08-29, each in a fresh `git init` directory with the argv the
+table records, showed: Claude Code defaults to `No, exit`; Codex CLI to
+`Yes, continue`; Antigravity CLI to `Yes, I trust this folder`; Cursor Agent
+CLI to `[a] Trust this workspace` when launched with `--force` alone.
+`cursor-agent --force --trust` opens at the composer. `--help` documents
+`--trust  Trust the current workspace without prompting`. The other three
+prompting harnesses persist trust in machine-global config
+(`~/.claude.json`, `~/.codex/config.toml`,
+`~/.gemini/antigravity-cli/settings.json`).
+
+These probes bind to the CLI builds installed on one machine on 2026-08-29.
+A harness that redesigns its dialog silently invalidates a cell, and no
+check in this repository catches that.
+
+#### Decision
+
+The two gates stay distinct. Permission default remains tool approval.
+Trust handling records the workspace-trust surface. Only Cursor has an
+argv flag for it (`--trust`), so Launch notes carry `--force --trust`.
+Dely's envelope does not authorise writing those machine-global config
+files, so for Claude Code, Codex CLI, and Antigravity CLI, Control answers
+the dialog in the TUI — the same shape as the existing Kiro
+`/tools trust-all` step. Claude Code's dialog defaults to exit: a bare
+Enter quits the worker, so Control selects `Yes, I trust this folder` and
+confirms before sending the work prompt.
+
+#### Alternatives considered
+
+- Write the machine-global trust stores from the envelope. Rejected: the
+  envelope does not authorise that write.
+- Treat a bare Enter as "accept trust" on every harness. Rejected: Claude
+  Code's default is `No, exit`.
+- Leave the Trust handling column empty. Rejected: a dispatched worker TUI
+  stalls on a dialog the record never mentions.
+
+#### Consequences
+
+Control must confirm workspace trust in the TUI for Claude Code, Codex CLI,
+and Antigravity CLI, and must not send Enter on Claude Code until
+`Yes, I trust this folder` is selected. Cursor workers launch with
+`--trust`. The table pin in `tests/contracts.sh` tracks the cells
+verbatim; it does not re-probe the live TUIs.
+
+#### Non-goals
+
+No write to `~/.claude.json`, `~/.codex/config.toml`, or
+`~/.gemini/antigravity-cli/settings.json`. No change to permission
+defaults, forbidden headless forms, or Kiro's `/tools trust-all` step
+beyond recording that it is the tool-trust path, not a workspace-trust
+dialog. No automated check that a harness still shows the recorded dialog.
+
 ### 2026-08-29 — Cursor keeps its sidecar, and its plugin surfaces are not what they appear
 
 #### Context
