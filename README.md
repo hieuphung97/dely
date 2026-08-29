@@ -1,43 +1,29 @@
 # dely
 
+[![contracts](https://github.com/hieuphung97/dely/actions/workflows/contracts.yml/badge.svg)](https://github.com/hieuphung97/dely/actions/workflows/contracts.yml)
+
 An automation-first delivery protocol for coding agents, packaged for Claude
-Code, Codex CLI, Grok Build, Antigravity CLI, Kiro CLI, and Cursor Agent CLI.
+Code, Codex CLI, Grok Build, Antigravity CLI, Kiro CLI, and Cursor Agent CLI:
+it takes a request that may still be vague, brings it to an approved design
+contract, then automates sequential implementation, independent review, and
+pull-request preparation.
 
-Dely accepts a request that may still be vague, brings it to an approved
-design contract, then automates sequential implementation, independent
-review, and pull-request preparation. It is a thin control protocol: Orca
-supervises dispatch, Git owns the candidate, and CI plus the forge own
-release state. Dely does not duplicate any of those stores, does not merge or
-force-push, and stops with no headless fallback when a required capability is
-unavailable.
+## Quickstart
 
-The workflow is `skills/delivery/SKILL.md`. Project pins — per-phase harness,
-model and effort for `implement` and `review` — are written into `AGENTS.md`
-by a second core skill, `dely:setup`. Rationale for the current design is in
-[`docs/decisions.md`](docs/decisions.md).
+Four steps, and nothing more:
 
-## Prerequisites
+1. Install `dely` in the harness.
+2. Open a session in the project.
+3. Invoke `dely:setup` (optional).
+4. Ask for a change normally.
 
-- One of Claude Code, Codex CLI, Grok Build, Antigravity CLI, or Cursor Agent
-  CLI, each with plugin support, or Kiro CLI with the `npx skills` installer.
-- [Orca](https://www.onorca.dev/docs/install) — a required, constant
-  execution plane. It launches and supervises the per-phase worker TUIs.
-  `dely:delivery` preflights Orca and stops when the CLI is missing, the
-  runtime cannot start, or a required capability is absent.
-- Git and a GitHub remote, for the project you run Dely against.
-
-These are the versions this README's commands were last locally checked
-against — observations, not a promised minimum:
-
-| Tool | Checked version |
-| --- | --- |
-| Claude Code | 2.1.245 |
-| Codex CLI | 0.149.1 |
-| Grok Build | 1.0.5 |
-| Antigravity CLI | 1.1.19 |
-| Kiro CLI | 2.16.2 |
-| Cursor Agent CLI | 2026.08.25-3e8eec8 |
-| Orca | 1.4.188 |
+You need one of Claude Code, Codex CLI, Grok Build, Antigravity CLI, or Cursor
+Agent CLI, each with plugin support, or Kiro CLI with the `npx skills`
+installer; [Orca](https://www.onorca.dev/docs/install) as the required,
+constant execution plane that launches and supervises the per-phase worker
+TUIs; and Git plus a GitHub remote for the project you run Dely against.
+`dely:delivery` preflights Orca and stops when the CLI is missing, the runtime
+cannot start, or a required capability is absent.
 
 Preflight Orca before installing a harness plugin:
 
@@ -45,6 +31,107 @@ Preflight Orca before installing a harness plugin:
 orca open           # launches Orca and waits for the runtime to be reachable
 orca status --json   # confirms the runtime is reachable
 ```
+
+Per-harness install commands live under [Install](#install). Project pins live
+under [Project setup](#project-setup).
+
+## How Dely works
+
+Dely is a thin control protocol, not an orchestrator, an SDLC framework, or a
+second source of Git state. The current interactive session is Control. Control
+owns the approval boundary, task boundaries, exception handling, dispatch
+supervision, and release. It never implements or reviews the candidate itself:
+those roles run in fresh worker sessions that Control launches and watches.
+
+There are two human gates and only two. The first is to approve the design
+contract before any candidate mutation. The second is to merge or publish after
+Dely has prepared the reviewed pull request. Between those gates Dely pauses
+only for a scope or architecture change, a destructive action, new authority, a
+replan, or an unavailable required runtime.
+
+Work takes one of three shapes, and you pick the smallest contract that safely
+holds the change. Risk may promote an otherwise small change; diff size never
+demotes data-loss, security, permission, or public-compatibility risk.
+
+A Spike is investigation only. It produces an approved probe and a
+recommendation. No candidate is delivered and no delivery run starts, so it
+gets no review.
+
+A Bounded change is small, with clear behaviour and ownership. Its artifact is
+an approved in-chat design plus a short execution envelope, and it gets one
+independent whole-change review.
+
+An Architectural change covers multiple behaviours, a public-contract change,
+an architecture decision, or promoted risk. Its artifacts are an approved
+decision record, a task plan, and an execution envelope. Each task gets its own
+review, then a different fresh reviewer performs one integration review. Only
+that final review is release-binding.
+
+An approved design contract states intent and success criteria; scope and
+authority; affected public contract or architecture; consequential risks and
+material assumptions; and a plausible counterexample or failure mode that
+distinguishes correct behaviour from a present-but-wrong implementation. If no
+executable instrument can discriminate the requirement, the contract names the
+manual inspection and its limit.
+
+Acceptance is one table: each requirement, the instrument that proves it, the
+plausible wrong implementation that instrument rejects, and where that
+rejection was observed. A row is invalid until its instrument discriminates. An
+instrument that passes both before and after the change proves nothing. Baseline
+red is not enough on its own: an instrument that is red only because the
+feature is absent says nothing about whether it can catch an implementation that
+is present, runs, returns a pass, and is wrong. "The feature is absent" is not
+a counterexample.
+
+Before mutation, Control records the execution envelope: owned scope and paths,
+protected pre-existing dirty paths, acceptance criteria, the feature branch,
+and the resolved harness, model, and effort. The envelope never authorises
+merge, force-push, stash, reset, cleanup, or an edit outside owned scope.
+
+The run itself is sequential. After the design contract is approved and the
+envelope is frozen, Control dispatches `implement`, then an independent
+`review`, then performs `release` on exact HEAD — native Git and forge tools,
+no LLM worker, no post-review candidate edit. Release pushes the feature
+branch, opens or updates a draft pull request, requires the applicable review's
+`ACCEPT` plus required checks green, then marks the pull request ready and
+reports it for the human to merge. Dely never merges or force-pushes.
+
+Each worker returns a structured handoff. `END OF HANDOFF` is the last line and
+load-bearing: it is the only thing that distinguishes a complete handoff from
+one cut off mid-write. The block names status, harness, session, baseline,
+changed paths, contract coverage, verification, deviations, unresolved
+findings, and git state.
+
+If review returns in-contract `CHANGES_REQUESTED`, there is one remediation
+pass by the original implementer: verify the finding, fix the root cause, rerun
+the affected instruments and closure gates, and write a separate remediation
+commit. The reviewer that raised the finding checks reproduction and the
+fix-only diff. If that scoped re-review does not accept, Control routes to
+replan rather than starting another repair loop.
+
+`BLOCKED` and `NEEDS_REPLAN` are distinct stop statuses, not synonyms for a
+crash. `BLOCKED` preserves the candidate and escalates an unresolved
+dependency or authority question to Control; it is not remediated by the
+original implementer. `NEEDS_REPLAN` means the task no longer fits the
+approved contract — the record contradicts the code, the contract is
+ambiguous, work outside the task became necessary, or an existing test
+disproves an assumption. A worker that *failed* — a non-zero exit with no
+result, an exhausted quota, an authentication error — is not the same as one
+that returned `BLOCKED`, and must not be treated as one.
+
+Ownership is split and Dely duplicates none of it. Orca owns dispatch: it
+launches and supervises the worker TUIs, and evidence is a property of a
+dispatch, not a skill-owned journal. Git owns the candidate. CI and the forge
+own release state. Durable facts come from those stores; Dely does not keep a
+second copy.
+
+The full workflow contract is
+[`skills/delivery/SKILL.md`](skills/delivery/SKILL.md). Per-harness launch
+mechanics — permission defaults, forbidden headless forms, launch notes, and
+trust handling — live in
+[`skills/delivery/references/harnesses.md`](skills/delivery/references/harnesses.md).
+Rationale for the current design is in
+[`docs/decisions.md`](docs/decisions.md).
 
 ## Install
 
@@ -85,7 +172,7 @@ codex plugin remove dely@dely      # uninstall
 
 `codex plugin marketplace add --ref <ref>` targets the marketplace at an
 explicit Git ref instead of the default branch — use a tag such as
-`v0.13.0` (once that release is tagged) or an exact full commit SHA for an
+`v0.16.1` or an exact full commit SHA for an
 immutable pin; `main` is a mutable branch, not a pin. There is no
 `codex plugin update`: `codex plugin marketplace upgrade` is the actual
 update command. On the checked CLI, when the marketplace's Git root has
@@ -111,7 +198,7 @@ grok plugin uninstall dely         # uninstall
 `grok plugin install` takes a source (git URL, GitHub shorthand, or local
 path), not a marketplace selector, and tracks the default branch unless you
 append `@ref`. For an immutable pin, use a tag such as
-`hieuphung97/dely@v0.13.0` (once that release is tagged) or an exact full
+`hieuphung97/dely@v0.16.1` or an exact full
 commit SHA — a branch name such as `@main` is still mutable, not a pin.
 
 `grok plugin install` refuses a local directory without `--trust`. Whether a
@@ -184,25 +271,22 @@ installer, targeting the `kiro-cli` agent (`--agent`) at global scope
 `~/.kiro/skills/` automatically. Invoke them natively in a Kiro CLI session
 as `/delivery` and `/setup`.
 
-### Cache refresh boundary
+### Checked versions
 
-The five plugin harnesses — Claude Code, Codex CLI, Grok Build, Antigravity
-CLI, and Cursor Agent CLI — each run a **copy** of this package taken at
-install time, so editing the source changes nothing until each cache is
-refreshed. Bump the
-version and refresh every copy whenever a rule changes, or the harnesses
-disagree about what the workflow says.
+These are the versions this README's commands were last locally checked
+against — observations, not a promised minimum:
 
-Kiro CLI instead reads from a shared store, usually a symlink into this
-checkout. `npx skills update --global` refreshes it by comparing a folder
-hash, not the `0.15.0` version string. `update` takes no `--agent`/`--skill`
-because the store is shared.
+| Tool | Checked version |
+| --- | --- |
+| Claude Code | 2.1.245 |
+| Codex CLI | 0.149.1 |
+| Grok Build | 1.0.5 |
+| Antigravity CLI | 1.1.19 |
+| Kiro CLI | 2.16.2 |
+| Cursor Agent CLI | 2026.08.25-3e8eec8 |
+| Orca | 1.4.188 |
 
-A self-update's release phase runs through the frozen installed plugin
-version already in use for that plan; candidate changes take effect starting
-with the next delivery.
-
-## Setup
+## Project setup
 
 A consuming project supplies its own facts through `AGENTS.md`: closure gate
 commands, artifact paths, the default branch. `dely:setup` writes the
@@ -223,14 +307,59 @@ Claude Code needs a `CLAUDE.md` containing `@AGENTS.md` — one line — or the
 managed block never reaches it. Grok does not expand that import, so the file
 helps one harness and is invisible to the others.
 
-## Ordinary use
+## Operating notes
 
-Four steps, and nothing more:
+### Cache refresh boundary
 
-1. Install `dely` in the harness.
-2. Open a session in the project.
-3. Invoke `dely:setup` (optional).
-4. Ask for a change normally.
+The five plugin harnesses — Claude Code, Codex CLI, Grok Build, Antigravity
+CLI, and Cursor Agent CLI — each run a **copy** of this package taken at
+install time, so editing the source changes nothing until each cache is
+refreshed. Bump the
+version and refresh every copy whenever a rule changes, or the harnesses
+disagree about what the workflow says.
+
+Kiro CLI instead reads from a shared store, usually a symlink into this
+checkout. `npx skills update --global` refreshes it by comparing a folder
+hash, not the `0.16.1` version string. `update` takes no `--agent`/`--skill`
+because the store is shared.
+
+A self-update's release phase runs through the frozen installed plugin
+version already in use for that plan; candidate changes take effect starting
+with the next delivery.
+
+### Version pinning
+
+Claude's checked command surface has no ref option. Codex pins the
+marketplace with `codex plugin marketplace add --ref <ref>` using a tag or
+an exact full commit SHA. Grok appends `@ref` to the install source. A
+branch name is mutable, not a pin. A delivery already running keeps the
+plugin version frozen at its start regardless of any later cache refresh.
+
+### Opt-in logging
+
+Maintenance logging is machine-local and off by default. Dely never creates
+`~/.dely/log`; a missing path is skipped silently, and deleting the file opts
+back out. Opt in by creating it yourself with owner-only permissions:
+
+```bash
+mkdir -p ~/.dely
+touch ~/.dely/log
+chmod 600 ~/.dely/log
+```
+
+Once the file exists, Control appends exactly one line only after a delivery
+is accepted and all required checks are green; aborted or incomplete
+deliveries are not recorded. Dely never reads this file for routing,
+recovery, or runtime decisions.
+
+### Compatibility limitation
+
+This README's install/verify/update/uninstall commands were checked against
+the harness's normal, already-configured profile, not an isolated
+clean-profile install: no supported harness offers a safe disposable
+configuration boundary that avoids touching live caches, so no such
+clean-install mutation was performed. Validation here is limited to public
+remote access, manifest validation, and the verified command surface.
 
 ## Troubleshooting
 
@@ -248,33 +377,7 @@ Four steps, and nothing more:
   `CLAUDE.md` contains `@AGENTS.md`; Claude Code does not read `AGENTS.md`
   directly.
 
-## Compatibility limitation
-
-This README's install/verify/update/uninstall commands were checked against
-the harness's normal, already-configured profile, not an isolated
-clean-profile install: no supported harness offers a safe disposable
-configuration boundary that avoids touching live caches, so no such
-clean-install mutation was performed. Validation here is limited to public
-remote access, manifest validation, and the verified command surface.
-
-## Opt-in logging
-
-Maintenance logging is machine-local and off by default. Dely never creates
-`~/.dely/log`; a missing path is skipped silently, and deleting the file opts
-back out. Opt in by creating it yourself with owner-only permissions:
-
-```bash
-mkdir -p ~/.dely
-touch ~/.dely/log
-chmod 600 ~/.dely/log
-```
-
-Once the file exists, Control appends exactly one line only after a delivery
-is accepted and all required checks are green; aborted or incomplete
-deliveries are not recorded. Dely never reads this file for routing,
-recovery, or runtime decisions.
-
-## Contributing and security
+## Contributing, security, and license
 
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — issue-first workflow, fork/branch/pull
   request flow, and review expectations. External contributors do not need
@@ -283,9 +386,5 @@ recovery, or runtime decisions.
 - [`SECURITY.md`](SECURITY.md) — how to report a vulnerability privately.
 - [`docs/decisions.md`](docs/decisions.md) — settled, open, and rejected
   design decisions, with rationale.
-
-[![contracts](https://github.com/hieuphung97/dely/actions/workflows/contracts.yml/badge.svg)](https://github.com/hieuphung97/dely/actions/workflows/contracts.yml)
-
-## License
 
 [MIT](LICENSE)
