@@ -2,15 +2,14 @@
 
 Per-harness launch mechanics for `dely:delivery`'s worker dispatch: each
 harness's permission default, forbidden headless invocation forms, launch
-notes, and trust handling. The trust column is present and empty; a later
-delivery fills it, since a column added later would be a schema change
-instead of a row edit.
+notes, and trust handling. Trust handling is a separate gate from the
+permission default; filling it is a row edit rather than a schema change.
 
 | Harness | Permission default | Forbidden headless forms | Launch notes | Trust handling |
 | --- | --- | --- | --- | --- |
-| Claude Code | `--dangerously-skip-permissions` | `claude -p` | Launch via Orca's `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | |
-| Codex CLI | `--dangerously-bypass-approvals-and-sandbox` | `codex exec` | Launch via Orca's `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | |
-| Grok Build | `--permission-mode bypassPermissions` | `grok --prompt-file` | Launch via Orca's `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | |
-| Antigravity CLI | `--dangerously-skip-permissions` | `agy -p`/`--print` | Launch via Orca's `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | |
-| Kiro CLI | none; `--trust-all-tools` is forbidden on the launch argv | `kiro-cli chat --no-interactive` | Launches as an interactive TUI, `kiro-cli chat --tui` with `--model` and `--effort` pinned from the managed block; once the TUI is idle at its prompt, send `/tools trust-all`, then the work prompt. | |
-| Cursor Agent CLI | `--force` | `cursor-agent -p`/`--print` | Launches as an interactive `cursor-agent` TUI; pin `--model` from the managed block unless the cell is `default`, and omit effort flags; do not use `-w`/`--worktree`. | |
+| Claude Code | `--dangerously-skip-permissions` | `claude -p` | Launch via Orca's `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | Interactive launch prompts a workspace trust dialog on a path not yet trusted, and `--dangerously-skip-permissions` does not suppress it. The default selection is `No, exit`, so Control selects `Yes, I trust this folder` and confirms before sending the work prompt; a bare Enter quits the worker. |
+| Codex CLI | `--dangerously-bypass-approvals-and-sandbox` | `codex exec` | Launch via Orca's `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | Interactive launch prompts `Do you trust the contents of this directory?` on a path not yet trusted, and `--dangerously-bypass-approvals-and-sandbox` does not suppress it. The default selection is `Yes, continue`; Control confirms it before sending the work prompt. |
+| Grok Build | `--permission-mode bypassPermissions` | `grok --prompt-file` | Launch via Orca's `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | No workspace trust surface; the TUI opens at its composer. |
+| Antigravity CLI | `--dangerously-skip-permissions` | `agy -p`/`--print` | Launch via Orca's `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | Interactive launch prompts `Do you trust the contents of this project?` on a path not yet trusted, and `--dangerously-skip-permissions` does not suppress it. The default selection is `Yes, I trust this folder`; Control confirms it before sending the work prompt. |
+| Kiro CLI | none; `--trust-all-tools` is forbidden on the launch argv | `kiro-cli chat --no-interactive` | Launches as an interactive TUI, `kiro-cli chat --tui` with `--model` and `--effort` pinned from the managed block; once the TUI is idle at its prompt, send `/tools trust-all`, then the work prompt. | No workspace trust surface; tool trust is the `/tools trust-all` step already in Launch notes. |
+| Cursor Agent CLI | `--force` | `cursor-agent -p`/`--print` | Launches as an interactive `cursor-agent` TUI with `--force --trust`; pin `--model` from the managed block unless the cell is `default`, and omit effort flags; do not use `-w`/`--worktree`. | `--force` covers tool approval only. `--trust`, in Launch notes, clears the workspace trust dialog; without it the TUI opens on `Workspace Trust Required`. |
