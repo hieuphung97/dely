@@ -179,9 +179,9 @@ update command. On the checked CLI, when the marketplace's Git root has
 advanced, that command refreshes both the marketplace snapshot and the
 already-installed plugin's cache, so a following `codex plugin add` is not
 required to pick up the change. This is a separate concern from the
-self-update boundary above: a delivery already running keeps the plugin
-version that was frozen at its start regardless of any refresh, and a
-refreshed cache is only picked up by the next session. `codex plugin
+[self-update boundary](#cache-refresh-boundary): a delivery already running
+keeps the plugin version that was frozen at its start regardless of any
+refresh, and a refreshed cache is only picked up by the next session. `codex plugin
 install` does not exist on the checked CLI (`codex plugin install --help`
 exits non-zero with "unrecognized subcommand 'install'"); do not use it.
 
@@ -326,14 +326,6 @@ because the store is shared.
 A self-update's release phase runs through the frozen installed plugin
 version already in use for that plan; candidate changes take effect starting
 with the next delivery.
-
-### Version pinning
-
-Claude's checked command surface has no ref option. Codex pins the
-marketplace with `codex plugin marketplace add --ref <ref>` using a tag or
-an exact full commit SHA. Grok appends `@ref` to the install source. A
-branch name is mutable, not a pin. A delivery already running keeps the
-plugin version frozen at its start regardless of any later cache refresh.
 
 ### Opt-in logging
 
