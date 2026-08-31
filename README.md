@@ -174,7 +174,7 @@ codex plugin remove dely@dely      # uninstall
 
 `codex plugin marketplace add --ref <ref>` targets the marketplace at an
 explicit Git ref instead of the default branch — use a tag such as
-`v0.16.1` or an exact full commit SHA for an
+`v0.17.0` or an exact full commit SHA for an
 immutable pin; `main` is a mutable branch, not a pin. There is no
 `codex plugin update`: `codex plugin marketplace upgrade` is the actual
 update command. On the checked CLI, when the marketplace's Git root has
@@ -200,7 +200,7 @@ grok plugin uninstall dely         # uninstall
 `grok plugin install` takes a source (git URL, GitHub shorthand, or local
 path), not a marketplace selector, and tracks the default branch unless you
 append `@ref`. For an immutable pin, use a tag such as
-`hieuphung97/dely@v0.16.1` or an exact full
+`hieuphung97/dely@v0.17.0` or an exact full
 commit SHA — a branch name such as `@main` is still mutable, not a pin.
 
 `grok plugin install` refuses a local directory without `--trust`. Whether a
@@ -335,7 +335,7 @@ disagree about what the workflow says.
 
 Kiro CLI instead reads from a shared store, usually a symlink into this
 checkout. `npx skills update --global` refreshes it by comparing a folder
-hash, not the `0.16.1` version string. `update` takes no `--agent`/`--skill`
+hash, not the `0.17.0` version string. `update` takes no `--agent`/`--skill`
 because the store is shared.
 
 A self-update's release phase runs through the frozen installed plugin
