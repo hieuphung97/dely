@@ -122,9 +122,13 @@ worth noting without being made into a rule from a single incident: this worker
 reported its closure gates as a count rather than per-command output, so Control
 reproduced them itself rather than accepting that account as the check.
 
-`AGENTS.md` is deliberately outside this change. It carried an uncommitted
-managed-block edit at baseline, and Dely does not combine ownership with a
-protected dirty path.
+`AGENTS.md` was deliberately outside this change for as long as it carried an
+uncommitted managed-block edit at baseline, because Dely does not combine
+ownership with a protected dirty path. Amended 2026-08-31: after both tasks were
+accepted, the human released that path and asked for it in this delivery, so it
+is now inside the change — commit `2abdb26`, the Copilot dispatch described
+above, adds the seventh harness to its intro sentence and corrects the `review`
+model cell. The ownership rule did not bend; the path stopped being protected.
 
 #### Alternatives considered
 
