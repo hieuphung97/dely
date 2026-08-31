@@ -106,6 +106,22 @@ into one helper rather than pasting a third block. The portable delivery protoco
 still names no harness, and this repository's own phase pins are unchanged:
 harness support is not deployment selection.
 
+Amended 2026-08-31, after the first live Copilot dispatch, which implemented the
+`AGENTS.md` edit described below. Every claim in the row above held against a
+real worker. Orca documents no `copilot` launcher id, so Control composed
+`copilot --allow-all --effort high` itself and ran it through an Orca terminal in
+the worktree; the `--effort` flag was accepted and, with `--model` omitted, the
+TUI reported `Auto`. `Confirm folder trust` appeared for a path already holding
+the repository, with `--allow-all` on the argv and `1. Yes` preselected;
+confirming it left `trustedFolders` empty, which is the point of preferring it
+over the remembering option. The `Restore interrupted sessions` picker then
+appeared and listed sessions belonging to four other directories, so Esc was
+load-bearing rather than theoretical. The work prompt submitted on the first
+Enter; no second Enter was needed. One difference from the other harnesses is
+worth noting without being made into a rule from a single incident: this worker
+reported its closure gates as a count rather than per-command output, so Control
+reproduced them itself rather than accepting that account as the check.
+
 `AGENTS.md` is deliberately outside this change. It carried an uncommitted
 managed-block edit at baseline, and Dely does not combine ownership with a
 protected dirty path.
@@ -139,7 +155,12 @@ protected dirty path.
 - Pin this repository's `implement` or `review` phase to Copilot to dogfood it.
   Rejected: harness support is not deployment selection.
 - Include the `AGENTS.md` prose that enumerates supported harnesses. Rejected:
-  that path is protected-dirty at baseline.
+  that path is protected-dirty at baseline. Amended 2026-08-31: once both tasks
+  were accepted, the human released that path and asked for it in this delivery,
+  so a later commit adds `GitHub Copilot CLI` to the sentence and corrects the
+  managed block's `review` model to `gpt-5.6-sol` — `gpt-5.6-sol-medium` is not
+  a Kiro model id, and the effort belongs in the separate `--effort` flag. That
+  is still not a phase pin change: the harnesses selected there are the human's.
 
 #### Consequences
 
@@ -159,9 +180,10 @@ This does not improve model pinning on Copilot. The block can carry a slug, but
 nothing in Dely can prove the account is entitled to it before the TUI reports a
 substitution, and nothing here makes Copilot's model surface scriptable.
 
-`AGENTS.md` keeps naming six harnesses in its prose until a later change owns
-that path, so this repository's own instructions and its README disagree about
-the count in the interim.
+`AGENTS.md` named six harnesses while the README named seven, until the human
+released that protected path late in the delivery. It now names seven, so this
+repository's own instructions and its README agree, and the interim disagreement
+this record originally predicted never reached `main`.
 
 #### Non-goals
 
@@ -177,10 +199,10 @@ two-row managed block, or `skills/delivery/SKILL.md`.
 Add a `.copilot-plugin/` sidecar only if Copilot stops resolving this repository
 from root `plugin.json` — the observable being `copilot plugin install dely@dely`
 no longer reporting two installed skills. Document a Copilot model pin path only
-when a non-interactive listing exists. Prove an Orca `--agent copilot` launcher
-on the first Copilot dispatch and record whether it pins model and effort;
-until then a hand-composed argv is the documented route. Reconcile the
-`AGENTS.md` harness prose when that path is next owned by a change. Revisit the
+when a non-interactive listing exists. Adopt an Orca `--agent copilot` launcher
+if one appears; the first live dispatch, recorded above, used a hand-composed
+argv because no such launcher id is documented, and that stays the route until
+one is. Revisit the
 250-line cap only if an eighth harness cannot fit after the helper refactor —
 the trigger is a measured overrun, not a preference.
 
