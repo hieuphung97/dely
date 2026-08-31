@@ -2,7 +2,7 @@
 
 This repository contains the `dely` package: the `delivery` skill and its
 automation-first control protocol for Claude Code, Codex CLI, Grok Build,
-Antigravity CLI, Kiro CLI, and Cursor Agent CLI.
+Antigravity CLI, Kiro CLI, Cursor Agent CLI, and GitHub Copilot CLI.
 
 ## Source of truth
 
@@ -45,8 +45,8 @@ delivery run.
 
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
-| `implement` | Antigravity CLI | `claude-sonnet-4-6` | `medium` |
-| `review` | Grok Build | `grok-4.6` | `high` |
+| `implement` | Cursor Agent CLI | cursor-grok-4.6-medium | default |
+| `review` | Kiro CLI | gpt-5.6-sol | medium |
 <!-- dely:end -->
 
 The table is this repository's deployment selection, not the portable
