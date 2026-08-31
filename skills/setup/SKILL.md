@@ -99,6 +99,15 @@ invent an effort vocabulary, do not strip effort suffixes from slugs, and do
 not synthesize parameterized `[effort=…]` forms. Omit Cursor discovery that
 is unavailable or unusable rather than guessing.
 
+### GitHub Copilot CLI
+
+GitHub Copilot CLI models: there is no non-interactive listing. Write
+the literal `default` for Model; do not invent a catalogue, do not prompt
+the model to learn one, and do not treat `copilot -p "/model"` as
+discovery. GitHub Copilot CLI effort is read from `copilot --help`'s
+`--effort` flag. Omit Copilot discovery that is unavailable or unusable
+rather than guessing.
+
 ## Pinning
 
 Where a managed block exists, pin its Harness, Model and Effort for
@@ -140,9 +149,9 @@ authoritative.
 ## Claude Code and `AGENTS.md`
 
 Claude Code does not read `AGENTS.md`. The persistent instruction reaches
-Codex, Grok, Antigravity CLI, Kiro CLI, and Cursor Agent CLI natively. It
-reaches Claude Code only where the project has a `CLAUDE.md` that imports
-`AGENTS.md`.
+Codex, Grok, Antigravity CLI, Kiro CLI, Cursor Agent CLI, and GitHub
+Copilot CLI natively. It reaches Claude Code only where the project has a
+`CLAUDE.md` that imports `AGENTS.md`.
 
 Where the current harness is Claude Code and the project has no `CLAUDE.md`
 importing `AGENTS.md`, offer to create a one-line `CLAUDE.md` containing
@@ -153,14 +162,15 @@ at the block rather than a copy of it.
 
 The offer is Claude-Code-only. On Codex, Antigravity CLI, and Kiro CLI the
 file is inert in the same sense that it is not imported. Cursor Agent CLI
-applies `CLAUDE.md` as a rule. Grok does not expand it.
+applies `CLAUDE.md` as a rule. GitHub Copilot CLI loads both `AGENTS.md`
+and `CLAUDE.md`. Grok does not expand it.
 
 ## What setup will not do
 
 No plugin or skill install. No hook trust. No writes to `~/.claude`,
-`~/.codex`, `~/.grok`, `~/.gemini`, `~/.kiro`, or `~/.cursor`. No custom Kiro
-agent creation or modification. No coordinator installation or field. No
-control or release row. No enumeration or invocation of project-owned workflow
-plugins. No model catalogue.
+`~/.codex`, `~/.grok`, `~/.gemini`, `~/.kiro`, `~/.cursor`, or `~/.copilot`.
+No custom Kiro agent creation or modification. No coordinator installation
+or field. No control or release row. No enumeration or invocation of
+project-owned workflow plugins. No model catalogue.
 
 Print verified install guidance only when the human explicitly asks for it.
