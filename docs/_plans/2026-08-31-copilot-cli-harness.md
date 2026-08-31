@@ -3,7 +3,7 @@
 Decision record: `docs/decisions.md`, 2026-08-31 — GitHub Copilot CLI is a
 first-class seventh harness, and it needs no sidecar
 
-**Baseline:** the commit carrying the decision record and this plan.
+**Baseline:** `77e80c5`, the commit carrying the decision record and this plan.
 
 ## Goal
 
