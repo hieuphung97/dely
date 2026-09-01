@@ -3,11 +3,212 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-08-29.
+Last updated 2026-08-31.
 
 ---
 
 ## Settled
+
+### 2026-08-31 — GitHub Copilot CLI is a first-class seventh harness, and it needs no sidecar
+
+#### Context
+
+Dely ships as an installable package for Claude Code, Codex CLI, Grok Build,
+Antigravity CLI, Kiro CLI, and Cursor Agent CLI. The 2026-08-27 packaging rule
+says a plugin-capable harness gets a thin nested sidecar pointing at `./skills/`,
+root `plugin.json` does not grow for another vendor, and `npx skills` is the
+fallback only where no such sidecar exists. That record also rejected raising the
+`tests/contracts.sh` 250-line cap, on the grounds that a sixth harness must not
+make a seventh impossible. This is that seventh harness.
+
+Live GitHub Copilot CLI 1.0.82 was probed on macOS on 2026-08-31, against the
+already-configured user profile:
+
+- `copilot plugin marketplace add https://github.com/hieuphung97/dely.git`
+  reports `Marketplace "dely" added successfully` and caches this repository's
+  existing `.claude-plugin/marketplace.json`. `copilot plugin marketplace browse
+  dely` lists the `dely` plugin. `copilot plugin install dely@dely` reports
+  `Installed 2 skills`, `copilot plugin update dely` reports `Updated 2 skills`,
+  `copilot plugin uninstall dely` succeeds, and `copilot skill list` shows
+  `delivery` and `setup`. Install copies the whole package into
+  `~/.copilot/installed-plugins/dely/dely/`.
+- Copilot therefore resolves this repository through manifests that already
+  exist. It reads the root `plugin.json` and finds `skills/` by convention; no
+  Copilot-specific manifest was present during any of those runs.
+- `copilot plugins list` reports repository instructions `AGENTS.md` and
+  `CLAUDE.md` as loaded; `--no-custom-instructions` is the flag that disables
+  that loading.
+- `copilot --help` enumerates `--effort, --reasoning-effort` as
+  `none|minimal|low|medium|high|xhigh|max`.
+- There is no non-interactive model listing. `copilot models` fails with
+  `Invalid command format`. `copilot -p "/model"` is not answered locally: it
+  dispatched a real turn that auto-routed to `claude-haiku-4.5`. An unavailable
+  `--model` value neither lists alternatives nor stops the run — the TUI prints
+  `Model "claude-sonnet-4.5" from --model flag is not available. Using "auto"
+  instead.` and continues. Entitlement is per account, so any stored slug list
+  would be wrong for some reader.
+- An interactive launch carrying `--allow-all` still opens `Confirm folder
+  trust` — `Do you trust the files in this folder?` with `1. Yes` preselected,
+  `2. Yes, and remember this folder for future sessions`, and `3. No (Esc)`. The
+  permission flag does not suppress it.
+- A second surface follows trust: `Restore interrupted sessions`, listing
+  interrupted sessions from every folder with them preselected, footed
+  `enter restore · esc start fresh`. It appeared on a first launch in a
+  brand-new empty directory, listing sessions belonging to other paths. Enter
+  there adopts an unrelated session instead of starting the dispatched worker.
+- `-p, --prompt` is the non-interactive form. `--allow-all` is the documented
+  equivalent of `--allow-all-tools --allow-all-paths --allow-all-urls`, with
+  `--yolo` as its alias.
+
+#### Decision
+
+GitHub Copilot CLI is a first-class harness, equal in kind to the other six.
+Its exact label everywhere a human reads or selects one is `GitHub Copilot CLI`.
+
+Packaging adds nothing. The 2026-08-27 rule is satisfied by observation rather
+than by a new file: Copilot installs from the manifests already in this
+repository, so there is no `.copilot-plugin/` sidecar, no growth of root
+`plugin.json`, no second skill tree, and no `npx skills` path for Copilot. A
+sidecar is added later only if Copilot stops resolving this repository.
+
+Install is documented with native Copilot verbs and the same shape as the Claude
+and Codex sections: `copilot plugin marketplace add` of the git URL, then
+`copilot plugin install dely@dely`, with `copilot plugin list`, `copilot plugin
+update dely`, and `copilot plugin uninstall dely`. Because Copilot registers the
+marketplace separately, uninstalling the plugin leaves that entry behind, and
+`copilot plugin marketplace remove dely` is documented beside it.
+
+Setup discovers Copilot effort from `copilot --help`'s `--effort` flag and does
+not discover a model. Model is written as the literal `default`, which omits the
+flag. A human may still name a slug, and setup does not invent one, store a
+catalogue, or learn one by prompting the model. Setup does not write
+`~/.copilot`. Copilot is a native `AGENTS.md` reader and also loads `CLAUDE.md`,
+so neither file is called inert on Copilot; the `CLAUDE.md` write offer stays
+Claude-Code-only.
+
+Workers launch as an interactive `copilot` TUI carrying `--allow-all`. Never
+`-p`/`--prompt`. `--model` and `--effort` are pinned from the managed block, each
+omitted when its cell is `default`. A pin the account cannot use is not an
+error: Control reads the `Using "auto" instead` line rather than assuming the pin
+held. Trust is answered with the preselected `1. Yes`, never
+`2. Yes, and remember this folder for future sessions`, because a dispatch must
+not leave persistent trusted-folder state on the machine. Where the
+`Restore interrupted sessions` picker follows, Control presses Esc to start
+fresh; Enter there is a wrong-session hazard, not a submission.
+
+The two versioned manifests advance together to `0.17.0`; root `plugin.json` and
+`.cursor-plugin/plugin.json` stay versionless and unchanged. Human bug reports
+offer the exact label `GitHub Copilot CLI`. `tests/contracts.sh` covers the
+harness row, the discovery subsection, the README path, the permission default,
+the forbidden headless form, and the dropdown **without exceeding 250 lines**, by
+sharing loops and folding the existing per-harness verbatim subsection checks
+into one helper rather than pasting a third block. The portable delivery protocol
+still names no harness, and this repository's own phase pins are unchanged:
+harness support is not deployment selection.
+
+Amended 2026-08-31, after the first live Copilot dispatch, which implemented the
+`AGENTS.md` edit described below. Every claim in the row above held against a
+real worker. Orca documents no `copilot` launcher id, so Control composed
+`copilot --allow-all --effort high` itself and ran it through an Orca terminal in
+the worktree; the `--effort` flag was accepted and, with `--model` omitted, the
+TUI reported `Auto`. `Confirm folder trust` appeared for a path already holding
+the repository, with `--allow-all` on the argv and `1. Yes` preselected;
+confirming it left `trustedFolders` empty, which is the point of preferring it
+over the remembering option. The `Restore interrupted sessions` picker then
+appeared and listed sessions belonging to four other directories, so Esc was
+load-bearing rather than theoretical. The work prompt submitted on the first
+Enter; no second Enter was needed. One difference from the other harnesses is
+worth noting without being made into a rule from a single incident: this worker
+reported its closure gates as a count rather than per-command output, so Control
+reproduced them itself rather than accepting that account as the check.
+
+`AGENTS.md` was deliberately outside this change for as long as it carried an
+uncommitted managed-block edit at baseline, because Dely does not combine
+ownership with a protected dirty path. Amended 2026-08-31: after both tasks were
+accepted, the human released that path and asked for it in this delivery, so it
+is now inside the change — commit `2abdb26`, the Copilot dispatch described
+above, adds the seventh harness to its intro sentence and corrects the `review`
+model cell. The ownership rule did not bend; the path stopped being protected.
+
+#### Alternatives considered
+
+- Add a `.copilot-plugin/plugin.json` sidecar for symmetry with Claude, Codex,
+  and Cursor. Rejected: a live install, update, and uninstall cycle succeeded
+  without it. A manifest whose absence changes nothing observable is decoration,
+  and the packaging rule exists to prevent duplicate identity, not to require a
+  file per vendor.
+- `npx skills --agent copilot` as the install path. Rejected: Copilot has native
+  plugin verbs, and the rule gives `npx skills` only to a harness that lacks
+  them.
+- Discover Copilot models by reading the `/model` picker in a session, or by
+  calling the Copilot models endpoint. Rejected: setup's discovery is
+  non-interactive by contract, and no local command lists models. Writing
+  `default` is the honest result of live discovery finding nothing.
+- Store a Copilot model list in this package. Rejected for the same reason as
+  every other harness, and additionally because entitlement is per account —
+  `claude-sonnet-4.5` was refused on the probing account while auto-routing
+  chose `claude-haiku-4.5`.
+- Treat the `Restore interrupted sessions` picker as a dispatch heartbeat and
+  press Enter. Rejected: Enter there restores whatever session is preselected,
+  including one from another folder.
+- Answer trust with `2. Yes, and remember this folder for future sessions` to
+  make later dispatches quieter. Rejected: a worker dispatch must not write
+  persistent machine state that outlives it.
+- Raise the `tests/contracts.sh` 250-line cap for the seventh harness. Rejected
+  again, on the reasoning already recorded on 2026-08-27.
+- Pin this repository's `implement` or `review` phase to Copilot to dogfood it.
+  Rejected: harness support is not deployment selection.
+- Include the `AGENTS.md` prose that enumerates supported harnesses. Rejected:
+  that path is protected-dirty at baseline. Amended 2026-08-31: once both tasks
+  were accepted, the human released that path and asked for it in this delivery,
+  so a later commit adds `GitHub Copilot CLI` to the sentence and corrects the
+  managed block's `review` model to `gpt-5.6-sol` — `gpt-5.6-sol-medium` is not
+  a Kiro model id, and the effort belongs in the separate `--effort` flag. That
+  is still not a phase pin change: the harnesses selected there are the human's.
+
+#### Consequences
+
+Copilot users get the same two skills through the manifests that already exist,
+and the package gains a seventh harness without gaining a seventh file. Existing
+Claude, Codex, Grok, Antigravity, Kiro, and Cursor surfaces are unchanged.
+Copilot joins the copy-on-install family, so the cache-refresh boundary now
+covers six plugin harnesses against Kiro's shared store, and `0.17.0` is what
+makes those copies refresh.
+
+Folding the per-harness verbatim subsection checks into one helper makes the
+approved-policy strings data rather than pasted blocks. That is what buys room
+under the 250-line cap; it also means a future harness costs roughly one line
+there instead of three.
+
+This does not improve model pinning on Copilot. The block can carry a slug, but
+nothing in Dely can prove the account is entitled to it before the TUI reports a
+substitution, and nothing here makes Copilot's model surface scriptable.
+
+`AGENTS.md` named six harnesses while the README named seven, until the human
+released that protected path late in the delivery. It now names seven, so this
+repository's own instructions and its README agree, and the interim disagreement
+this record originally predicted never reached `main`.
+
+#### Non-goals
+
+No `.copilot-plugin/` sidecar, root `plugin.json` growth, second skill tree,
+`npx skills` path for Copilot, Copilot hooks, custom agents, MCP configuration,
+`--add-dir` skill loading, autopilot or plan mode, ACP server use, remote or
+cloud session control, headless `-p` dispatch, write to `~/.copilot`, Orca
+change, phase-pin change, change to review depth, remediation routing, the
+two-row managed block, or `skills/delivery/SKILL.md`.
+
+#### Deferred
+
+Add a `.copilot-plugin/` sidecar only if Copilot stops resolving this repository
+from root `plugin.json` — the observable being `copilot plugin install dely@dely`
+no longer reporting two installed skills. Document a Copilot model pin path only
+when a non-interactive listing exists. Adopt an Orca `--agent copilot` launcher
+if one appears; the first live dispatch, recorded above, used a hand-composed
+argv because no such launcher id is documented, and that stays the route until
+one is. Revisit the
+250-line cap only if an eighth harness cannot fit after the helper refactor —
+the trigger is a measured overrun, not a preference.
 
 ### 2026-08-29 — Workspace trust is a second gate; Control answers it in the TUI
 

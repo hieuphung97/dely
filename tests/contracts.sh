@@ -20,17 +20,15 @@ skill="$root/skills/delivery/SKILL.md"
 claude_version="$(jq -r .version "$claude_manifest" 2>/dev/null)"
 codex_version="$(jq -r .version "$codex_manifest" 2>/dev/null)"
 
-if [ "$claude_version" != "0.16.1" ] || [ "$codex_version" != "0.16.1" ]; then
-  fail_with "manifest versions must both be 0.16.1 (claude=$claude_version codex=$codex_version)"
+if [ "$claude_version" != "0.17.0" ] || [ "$codex_version" != "0.17.0" ]; then
+  fail_with "manifest versions must both be 0.17.0 (claude=$claude_version codex=$codex_version)"
 fi
 
 root_name="$(jq -r .name "$root_manifest" 2>/dev/null)"
 [ "$root_name" = "dely" ] || fail_with "$root_manifest .name must be dely (got $root_name)"
 jq -e '[keys[]] | sort == ["description","name"]' "$root_manifest" > /dev/null 2>&1 || fail_with "$root_manifest must have exactly keys name and description (no \$schema or extra keys)"
 
-# Canonical MIT text (github.com/licenses/mit) with [year] -> 2026 and
-# [fullname] -> Hieu Phung, whitespace-normalized. A present LICENSE that only
-# names the license by word (e.g. "MIT") is not the grant itself.
+# Canonical MIT grant for 2026 Hieu Phung, whitespace-normalized; a file that only names "MIT" is not the grant.
 expected_license='MIT License Copyright (c) 2026 Hieu Phung Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.'
 
 license_file="$root/LICENSE"
@@ -45,13 +43,7 @@ else
   fi
 fi
 
-# The whole maintenance-log section is matched verbatim (whitespace-normalized)
-# rather than by scattered substrings: a substring check only proves a required
-# clause is present somewhere, so a fixture that leaves it untouched but adds a
-# contradictory instruction elsewhere (e.g. "Control creates the log if
-# missing"), or one that flips a single word in a required clause (e.g. "are
-# not recorded" -> "are recorded"), still passed. Exact-section matching
-# rejects any such addition or mutation.
+# Maintenance-log section is matched verbatim so a contradictory extra clause or a flipped word fails.
 expected_log_section='Maintenance logging is machine-local and opt-in at `~/.dely/log`. Dely never creates the directory or file: a missing path is skipped silently, and deleting the file opts out. Only after a delivery is accepted and all required checks are green does Control append exactly one physical line; aborted or incomplete deliveries are not recorded. The line carries an ISO-8601 UTC timestamp and labelled fields for the Git-root basename, plan, pull request or `none`, implementation-round count, ordered review dispositions, and one short drift-cause sentence. Tabs separate fields; embedded tabs and newlines become spaces. Dely never reads this file for routing, recovery, or runtime decisions, and its text layout is not a public parsing schema. An append failure produces a visible warning but does not invalidate or block an otherwise accepted release.'
 
 actual_log_section="$(awk '/^### Maintenance log$/{flag=1; next} flag && /^#/{exit} flag' "$skill" | tr '\n' ' ' | tr -s ' ')"
@@ -63,7 +55,7 @@ actual_log_section="${actual_log_section% }"
 harnesses="$root/skills/delivery/references/harnesses.md"
 grep -Fq 'configured permission default' "$skill" && grep -Fq 'sandbox the project did not pin' "$skill" && ! grep -Fq 'launch command as-is' "$skill" || fail_with "$skill launch-argv guidance does not carry the execution plane's configured permission default onto composed argv"
 grep -Fq 'references/harnesses.md' "$skill" && [ -f "$harnesses" ] && ! tr '\n' ' ' < "$skill" | grep -Fq 'no compatibility matrix' || fail_with "$skill does not name an existing $harnesses, or still denies having a compatibility matrix"
-for f in '--permission-mode bypassPermissions' '--dangerously-skip-permissions' '--trust-all-tools' '--force' 'claude -p' 'codex exec' 'grok --prompt-file' 'agy -p' 'kiro-cli chat --no-interactive' 'cursor-agent -p'; do
+for f in '--permission-mode bypassPermissions' '--dangerously-skip-permissions' '--trust-all-tools' '--force' 'claude -p' 'codex exec' 'grok --prompt-file' 'agy -p' 'kiro-cli chat --no-interactive' 'cursor-agent -p' 'copilot -p' '--allow-all'; do
   grep -Fq -- "$f" "$harnesses" || fail_with "$harnesses does not name: $f"
   grep -Fq -- "$f" "$root/AGENTS.md" && fail_with "AGENTS.md must not name: $f"
 done
@@ -115,17 +107,15 @@ setup_block_check="$(managed_block_template "$setup_skill" | awk '
 
 [ "$setup_block_check" = "ok" ] || fail_with "$setup_skill managed block does not have exactly one implement and one review row"
 
-# Setup's discovery subsections and AGENTS.md dispatch are matched verbatim.
+# Setup's discovery subsections are matched verbatim via one helper.
 norm() { tr '\n' ' ' | tr -s ' ' | sed -e 's/^ //' -e 's/ $//'; }
 discovery_section="$(awk '/^## Discovery[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$setup_skill")"
 printf '%s\n' "$discovery_section" | grep -Fq -- 'agy models' || fail_with "$setup_skill Discovery section does not name: agy models"
-expected_kiro_subsection='Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each `model_id`). Kiro CLI effort is read from `kiro-cli chat --help`'"'"'s `--effort` flag; do not prompt the model to learn it and do not store a catalogue. Live discovery may offer only `auto` — that is a valid result, not a reason to invent model names. Omit Kiro discovery that is unavailable or unusable rather than guessing.'
-actual_kiro_subsection="$(awk '/^### Kiro CLI[[:space:]]*$/{p=1;next} p && /^#/{exit} p' "$setup_skill" | norm)"
-[ "$actual_kiro_subsection" = "$expected_kiro_subsection" ] || fail_with "$setup_skill ### Kiro CLI Discovery subsection no longer matches the approved policy verbatim"
-expected_cursor_subsection='Cursor Agent CLI models: `cursor-agent models` (offer the slug before ` - `). There is no `--effort` flag: write the literal `default` for Effort. Do not invent an effort vocabulary, do not strip effort suffixes from slugs, and do not synthesize parameterized `[effort=…]` forms. Omit Cursor discovery that is unavailable or unusable rather than guessing.'
-actual_cursor_subsection="$(awk '/^### Cursor Agent CLI[[:space:]]*$/{p=1;next} p && /^#/{exit} p' "$setup_skill" | norm)"
-[ "$actual_cursor_subsection" = "$expected_cursor_subsection" ] || fail_with "$setup_skill ### Cursor Agent CLI Discovery subsection no longer matches the approved policy verbatim"
-expected_harness_table='| Harness | Permission default | Forbidden headless forms | Launch notes | Trust handling | | --- | --- | --- | --- | --- | | Claude Code | `--dangerously-skip-permissions` | `claude -p` | Launch via Orca'"'"'s `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | Interactive launch prompts a workspace trust dialog on a path not yet trusted, and `--dangerously-skip-permissions` does not suppress it. The default selection is `No, exit`, so Control selects `Yes, I trust this folder` and confirms before sending the work prompt; a bare Enter quits the worker. | | Codex CLI | `--dangerously-bypass-approvals-and-sandbox` | `codex exec` | Launch via Orca'"'"'s `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | Interactive launch prompts `Do you trust the contents of this directory?` on a path not yet trusted, and `--dangerously-bypass-approvals-and-sandbox` does not suppress it. The default selection is `Yes, continue`; Control confirms it before sending the work prompt. | | Grok Build | `--permission-mode bypassPermissions` | `grok --prompt-file` | Launch via Orca'"'"'s `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | No workspace trust surface; the TUI opens at its composer. | | Antigravity CLI | `--dangerously-skip-permissions` | `agy -p`/`--print` | Launch via Orca'"'"'s `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | Interactive launch prompts `Do you trust the contents of this project?` on a path not yet trusted, and `--dangerously-skip-permissions` does not suppress it. The default selection is `Yes, I trust this folder`; Control confirms it before sending the work prompt. | | Kiro CLI | none; `--trust-all-tools` is forbidden on the launch argv | `kiro-cli chat --no-interactive` | Launches as an interactive TUI, `kiro-cli chat --tui` with `--model` and `--effort` pinned from the managed block; once the TUI is idle at its prompt, send `/tools trust-all`, then the work prompt. | No workspace trust surface; tool trust is the `/tools trust-all` step already in Launch notes. | | Cursor Agent CLI | `--force` | `cursor-agent -p`/`--print` | Launches as an interactive `cursor-agent` TUI with `--force --trust`; pin `--model` from the managed block unless the cell is `default`, and omit effort flags; do not use `-w`/`--worktree`. | `--force` covers tool approval only. `--trust`, in Launch notes, clears the workspace trust dialog; without it the TUI opens on `Workspace Trust Required`. |'
+assert_discovery() { [ "$(awk "/^### ${1}[[:space:]]*\$/{p=1;next} p && /^#/{exit} p" "$setup_skill" | norm)" = "$2" ] || fail_with "$setup_skill ### $1 Discovery subsection no longer matches the approved policy verbatim"; }
+assert_discovery 'Kiro CLI' 'Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each `model_id`). Kiro CLI effort is read from `kiro-cli chat --help`'"'"'s `--effort` flag; do not prompt the model to learn it and do not store a catalogue. Live discovery may offer only `auto` — that is a valid result, not a reason to invent model names. Omit Kiro discovery that is unavailable or unusable rather than guessing.'
+assert_discovery 'Cursor Agent CLI' 'Cursor Agent CLI models: `cursor-agent models` (offer the slug before ` - `). There is no `--effort` flag: write the literal `default` for Effort. Do not invent an effort vocabulary, do not strip effort suffixes from slugs, and do not synthesize parameterized `[effort=…]` forms. Omit Cursor discovery that is unavailable or unusable rather than guessing.'
+assert_discovery 'GitHub Copilot CLI' 'GitHub Copilot CLI models: there is no non-interactive listing. Write the literal `default` for Model; do not invent a catalogue, do not prompt the model to learn one, and do not treat `copilot -p "/model"` as discovery. GitHub Copilot CLI effort is read from `copilot --help`'"'"'s `--effort` flag. Omit Copilot discovery that is unavailable or unusable rather than guessing.'
+expected_harness_table='| Harness | Permission default | Forbidden headless forms | Launch notes | Trust handling | | --- | --- | --- | --- | --- | | Claude Code | `--dangerously-skip-permissions` | `claude -p` | Launch via Orca'"'"'s `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | Interactive launch prompts a workspace trust dialog on a path not yet trusted, and `--dangerously-skip-permissions` does not suppress it. The default selection is `No, exit`, so Control selects `Yes, I trust this folder` and confirms before sending the work prompt; a bare Enter quits the worker. | | Codex CLI | `--dangerously-bypass-approvals-and-sandbox` | `codex exec` | Launch via Orca'"'"'s `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | Interactive launch prompts `Do you trust the contents of this directory?` on a path not yet trusted, and `--dangerously-bypass-approvals-and-sandbox` does not suppress it. The default selection is `Yes, continue`; Control confirms it before sending the work prompt. | | Grok Build | `--permission-mode bypassPermissions` | `grok --prompt-file` | Launch via Orca'"'"'s `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | No workspace trust surface; the TUI opens at its composer. | | Antigravity CLI | `--dangerously-skip-permissions` | `agy -p`/`--print` | Launch via Orca'"'"'s `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | Interactive launch prompts `Do you trust the contents of this project?` on a path not yet trusted, and `--dangerously-skip-permissions` does not suppress it. The default selection is `Yes, I trust this folder`; Control confirms it before sending the work prompt. | | Kiro CLI | none; `--trust-all-tools` is forbidden on the launch argv | `kiro-cli chat --no-interactive` | Launches as an interactive TUI, `kiro-cli chat --tui` with `--model` and `--effort` pinned from the managed block; once the TUI is idle at its prompt, send `/tools trust-all`, then the work prompt. | No workspace trust surface; tool trust is the `/tools trust-all` step already in Launch notes. | | Cursor Agent CLI | `--force` | `cursor-agent -p`/`--print` | Launches as an interactive `cursor-agent` TUI with `--force --trust`; pin `--model` from the managed block unless the cell is `default`, and omit effort flags; do not use `-w`/`--worktree`. | `--force` covers tool approval only. `--trust`, in Launch notes, clears the workspace trust dialog; without it the TUI opens on `Workspace Trust Required`. | | GitHub Copilot CLI | `--allow-all` | `copilot -p`/`--prompt` | Launches as an interactive `copilot` TUI with `--allow-all`; pin `--model` and `--effort` from the managed block, each omitted when its cell is `default`. An unavailable pinned model is reported as `Using "auto" instead` rather than failing. A `Restore interrupted sessions` picker may follow trust and is answered with Esc, never Enter. | `--allow-all` does not suppress `Do you trust the files in this folder?`. The preselected `1. Yes` is what Control confirms; `2. Yes, and remember this folder for future sessions` is not used because it writes persistent machine state. |'
 [ "$(awk '/^\|/' "$harnesses" | norm)" = "$expected_harness_table" ] || fail_with "$harnesses table rows no longer match the approved per-harness facts verbatim"
 grep -Eq "Prefer Orca's|Load Orca's native skill to launch and supervise each worker TUI\." "$harnesses" && fail_with "$harnesses carries the deleted prose paragraph alongside the table"
 
@@ -145,6 +135,11 @@ cursor_fence="$(printf '%s\n' "$cursor_section" | awk '/^```/{f=!f;next} f')"
 for needle in 'plugin marketplace add' 'plugin marketplace list' 'plugin marketplace update' 'plugin marketplace remove' '# removes the marketplace, not the plugin'; do printf '%s\n' "$cursor_fence" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI fenced block is missing: $needle"; done
 for needle in '`/plugin`' '`/dely`' '/delivery' '/setup'; do printf '%s\n' "$cursor_section" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI section is missing: $needle"; done
 for needle in '/add-plugin' '#[[:space:]]*uninstall'; do printf '%s\n' "$cursor_section" | grep -Eiq -- "$needle" && fail_with "README.md Cursor Agent CLI section must not contain: $needle" || true; done
+copilot_section="$(readme_section 'GitHub Copilot CLI')"
+[ -n "$copilot_section" ] || fail_with "README.md is missing a ### GitHub Copilot CLI section"
+printf '%s\n' "$copilot_section" | grep -Fiq 'npx skills' && fail_with "README.md GitHub Copilot CLI section must not document npx skills" || true
+copilot_fence="$(printf '%s\n' "$copilot_section" | awk '/^```/{f=!f;next} f')"
+for needle in 'plugin marketplace add' 'plugin install dely@dely' 'plugin list' 'plugin update dely' 'plugin uninstall dely' 'plugin marketplace remove dely' '# removes the marketplace, not the plugin'; do printf '%s\n' "$copilot_fence" | grep -Fq -- "$needle" || fail_with "README.md GitHub Copilot CLI fenced block is missing: $needle"; done
 
 # Plan template's acceptance header: the four named columns must all be present.
 plan_template="$root/skills/delivery/templates/plan.md"
@@ -178,9 +173,9 @@ for f in .github/ISSUE_TEMPLATE/bug_report.yml .github/ISSUE_TEMPLATE/feature_re
   [ -z "$missing" ] || fail_with "$f is not a valid GitHub issue form: missing/invalid $missing"
 done
 
-# Bug form's harness dropdown must offer all six exact harness names.
+# Bug form's harness dropdown must offer all seven exact harness names.
 harness_options="$(awk '/^ *id: harness$/{f=1} f&&/^ *validations:/{exit} f' "$root/.github/ISSUE_TEMPLATE/bug_report.yml" | sed 's/^ *- //')"
-for h in "Claude Code" "Codex CLI" "Grok Build" "Antigravity CLI" "Kiro CLI" "Cursor Agent CLI"; do
+for h in "Claude Code" "Codex CLI" "Grok Build" "Antigravity CLI" "Kiro CLI" "Cursor Agent CLI" "GitHub Copilot CLI"; do
   printf '%s\n' "$harness_options" | grep -Fxq -- "$h" || fail_with "bug_report.yml harness dropdown is missing: $h"
 done
 

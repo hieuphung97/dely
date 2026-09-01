@@ -3,10 +3,10 @@
 [![contracts](https://github.com/hieuphung97/dely/actions/workflows/contracts.yml/badge.svg)](https://github.com/hieuphung97/dely/actions/workflows/contracts.yml)
 
 An automation-first delivery protocol for coding agents, packaged for Claude
-Code, Codex CLI, Grok Build, Antigravity CLI, Kiro CLI, and Cursor Agent CLI:
-it takes a request that may still be vague, brings it to an approved design
-contract, then automates sequential implementation, independent review, and
-pull-request preparation.
+Code, Codex CLI, Grok Build, Antigravity CLI, Kiro CLI, Cursor Agent CLI, and
+GitHub Copilot CLI: it takes a request that may still be vague, brings it to
+an approved design contract, then automates sequential implementation,
+independent review, and pull-request preparation.
 
 ## Quickstart
 
@@ -17,9 +17,10 @@ Four steps, and nothing more:
 3. Invoke `dely:setup` (optional).
 4. Ask for a change normally.
 
-You need one of Claude Code, Codex CLI, Grok Build, Antigravity CLI, or Cursor
-Agent CLI, each with plugin support, or Kiro CLI with the `npx skills`
-installer; [Orca](https://www.onorca.dev/docs/install) as the required,
+You need one of Claude Code, Codex CLI, Grok Build, Antigravity CLI, Cursor
+Agent CLI, or GitHub Copilot CLI, each with plugin support, or Kiro CLI with
+the `npx skills` installer; [Orca](https://www.onorca.dev/docs/install) as the
+required,
 constant execution plane that launches and supervises the per-phase worker
 TUIs; and Git plus a GitHub remote for the project you run Dely against.
 `dely:delivery` preflights Orca and stops when the CLI is missing, the runtime
@@ -136,12 +137,13 @@ Rationale for the current design is in
 ## Install
 
 The plugin is `dely`, served from the `dely` marketplace at
-`https://github.com/hieuphung97/dely.git`. Install it in each of the five
-plugin harnesses — Claude Code, Codex CLI, Grok Build, Antigravity CLI, and
-Cursor Agent CLI — from that remote. The skill keeps the name `delivery`; the
-intended namespaced name is `dely:delivery`. The marketplace entry keeps
-`"source": "./"`, which is what makes the plugin resolve inside its own
-repository whether the marketplace is added by path or by git URL. Kiro CLI
+`https://github.com/hieuphung97/dely.git`. Install it in each of the six
+plugin harnesses — Claude Code, Codex CLI, Grok Build, Antigravity CLI,
+Cursor Agent CLI, and GitHub Copilot CLI — from that remote. The skill keeps
+the name `delivery`; the intended namespaced name is `dely:delivery`. The
+marketplace entry keeps `"source": "./"`, which is what makes the plugin
+resolve inside its own repository whether the marketplace is added by path
+or by git URL. Kiro CLI
 has no plugin verb; see `### Kiro CLI` below for its `npx skills` install.
 
 ### Claude Code
@@ -172,7 +174,7 @@ codex plugin remove dely@dely      # uninstall
 
 `codex plugin marketplace add --ref <ref>` targets the marketplace at an
 explicit Git ref instead of the default branch — use a tag such as
-`v0.16.1` or an exact full commit SHA for an
+`v0.17.0` or an exact full commit SHA for an
 immutable pin; `main` is a mutable branch, not a pin. There is no
 `codex plugin update`: `codex plugin marketplace upgrade` is the actual
 update command. On the checked CLI, when the marketplace's Git root has
@@ -198,7 +200,7 @@ grok plugin uninstall dely         # uninstall
 `grok plugin install` takes a source (git URL, GitHub shorthand, or local
 path), not a marketplace selector, and tracks the default branch unless you
 append `@ref`. For an immutable pin, use a tag such as
-`hieuphung97/dely@v0.16.1` or an exact full
+`hieuphung97/dely@v0.17.0` or an exact full
 commit SHA — a branch name such as `@main` is still mutable, not a pin.
 
 `grok plugin install` refuses a local directory without `--trust`. Whether a
@@ -254,6 +256,18 @@ Cursor does not namespace plugin skills the way Claude Code does with
 than one bare `/setup` entry. Type `/dely` to filter the palette down to
 exactly Dely's `/delivery` and `/setup`, then pick from that filtered list.
 
+### GitHub Copilot CLI
+
+```bash
+copilot plugin marketplace add https://github.com/hieuphung97/dely.git
+copilot plugin install dely@dely
+
+copilot plugin list                 # verify it is installed
+copilot plugin update dely          # update
+copilot plugin uninstall dely       # uninstall
+copilot plugin marketplace remove dely  # removes the marketplace, not the plugin
+```
+
 ### Kiro CLI
 
 ```bash
@@ -284,6 +298,7 @@ against — observations, not a promised minimum:
 | Antigravity CLI | 1.1.19 |
 | Kiro CLI | 2.16.2 |
 | Cursor Agent CLI | 2026.08.25-3e8eec8 |
+| GitHub Copilot CLI | 1.0.82 |
 | Orca | 1.4.188 |
 
 ## Project setup
@@ -302,25 +317,25 @@ performed by the current interactive session with native Git and forge tools
 and dispatches no worker.
 
 **Claude Code does not read `AGENTS.md`.** Codex, Grok, Antigravity CLI,
-Kiro CLI, and Cursor Agent CLI do. A consuming project whose sessions run on
-Claude Code needs a `CLAUDE.md` containing `@AGENTS.md` — one line — or the
-managed block never reaches it. Grok does not expand that import, so the file
-helps one harness and is invisible to the others.
+Kiro CLI, Cursor Agent CLI, and GitHub Copilot CLI do. A consuming project
+whose sessions run on Claude Code needs a `CLAUDE.md` containing `@AGENTS.md`
+— one line — or the managed block never reaches it. Grok does not expand that
+import. GitHub Copilot CLI loads both `AGENTS.md` and `CLAUDE.md`.
 
 ## Operating notes
 
 ### Cache refresh boundary
 
-The five plugin harnesses — Claude Code, Codex CLI, Grok Build, Antigravity
-CLI, and Cursor Agent CLI — each run a **copy** of this package taken at
-install time, so editing the source changes nothing until each cache is
-refreshed. Bump the
+The six plugin harnesses — Claude Code, Codex CLI, Grok Build, Antigravity
+CLI, Cursor Agent CLI, and GitHub Copilot CLI — each run a **copy** of this
+package taken at install time, so editing the source changes nothing until
+each cache is refreshed. Bump the
 version and refresh every copy whenever a rule changes, or the harnesses
 disagree about what the workflow says.
 
 Kiro CLI instead reads from a shared store, usually a symlink into this
 checkout. `npx skills update --global` refreshes it by comparing a folder
-hash, not the `0.16.1` version string. `update` takes no `--agent`/`--skill`
+hash, not the `0.17.0` version string. `update` takes no `--agent`/`--skill`
 because the store is shared.
 
 A self-update's release phase runs through the frozen installed plugin
