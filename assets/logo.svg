@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Dely">
+  <title>Dely</title>
+  <rect width="512" height="512" fill="#161113"/>
+  <rect x="84" y="84" width="168" height="168" rx="24" fill="none" stroke="#F2F1ED" stroke-width="48"/>
+  <polygon points="348,244 452,348 348,452 244,348" fill="#E0596E"/>
+</svg>
