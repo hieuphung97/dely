@@ -225,9 +225,9 @@ section requires a command, and that the handoff block names `Residue`.
 
 | Requirement | Instrument | Counterexample | Observed red |
 | --- | --- | --- | --- |
-| `SKILL.md` no longer carries a hand-rolled readiness or submission procedure | `bash tests/contracts.sh` absence assertions on `Keep waiting blocking`, `input_accepted` is not submission, `Allow 90 seconds` | An edit that adds `worker-start` and `worker_done` while leaving the 90-second single-Enter paragraph in place: both mechanisms present, file parses, every existing gate green, contract self-contradictory | |
-| Completion cannot be inferred from reading a worker's terminal | `bash tests/contracts.sh` presence assertion on `do not infer it from reading` | The deleted sentence restored verbatim — "Do not add a relay, poll, or state machine to manufacture completion" — which forbids the very repeated wait the mechanics now require: present, parses, reads as an invariant, contradicts the section above it | |
-| `SKILL.md` names the orchestration verbs and both typed recovery routes | `bash tests/contracts.sh` presence assertions on `worker-start`, `worker_done`, `agent_prompt_blocked`, `agent_prompt_stalled`, `payload.reportPath` | An edit that deletes the old apparatus and replaces it with prose that says "use Orca's orchestration skill" without naming a verb or a route: shorter, parses, absence assertions pass, leaves Control with no route for a blocked launch | |
+| `SKILL.md` no longer carries a hand-rolled readiness or submission procedure | `bash tests/contracts.sh` absence assertions on `Keep waiting blocking`, `input_accepted` is not submission, `Allow 90 seconds` | An edit that adds `worker-start` and `worker_done` while leaving the 90-second single-Enter paragraph in place: both mechanisms present, file parses, every existing gate green, contract self-contradictory |Red on baseline `d97cc90`: `still carries a hand-rolled readiness or submission procedure`. Reproduced at review by running the candidate script against the baseline file, and each of the three phrases trips it in isolation. |
+| Completion cannot be inferred from reading a worker's terminal | `bash tests/contracts.sh` presence assertion on `do not infer it from reading` | The deleted sentence restored verbatim — "Do not add a relay, poll, or state machine to manufacture completion" — which forbids the very repeated wait the mechanics now require: present, parses, reads as an invariant, contradicts the section above it |Red at `5507b86` before the fix, and red again with the deleted sentence restored verbatim, via the missing `do not infer it from reading` conjunct. Reproduced at review in a scratch fixture. |
+| `SKILL.md` names the orchestration verbs and both typed recovery routes | `bash tests/contracts.sh` presence assertions on `worker-start`, `worker_done`, `agent_prompt_blocked`, `agent_prompt_stalled`, `payload.reportPath` | An edit that deletes the old apparatus and replaces it with prose that says "use Orca's orchestration skill" without naming a verb or a route: shorter, parses, absence assertions pass, leaves Control with no route for a blocked launch |Red on baseline `d97cc90`: `does not name the orchestration verbs and both typed recovery routes`. Reproduced at review; each of the six required tokens trips it alone. |
 | `harnesses.md` carries the seven Orca agent ids and not the binary names | `bash tests/contracts.sh` presence of each id, and the updated verbatim table pin | A row edit that adds an `Orca agent id` column but fills the Kiro cell with `kiro-cli`: table shape correct, pin updated to match, every launch through it fails `agent_unconfigured` | |
 | The stale Claude Code trust claim is gone rather than reworded | `bash tests/contracts.sh` absence assertion on `does not suppress it` | A rewording to "may not suppress it" that keeps the instruction to select a dialog option which never appears: hedged, plausible, still sends Control after a dialog that is not there | |
 | The orchestration prerequisite is documented once, in shared prerequisites | `bash tests/contracts.sh` assertion scoped to the shared prerequisites section via the existing section extractor | The prerequisite written inside the Kiro CLI section only: a whole-file grep passes, six of seven harness readers never see it | |
@@ -250,6 +250,33 @@ is only worth keeping if someone actually reads it.
 A second boundary: this delivery's own dispatches run through the frozen installed
 plugin version, so the mechanics being shipped do not govern the run that ships them.
 Nothing in this plan is validated by its own execution.
+
+
+### Deferred findings, recorded for Task 5 and the integration review
+
+Raised in flight by Control or by the Task 1 review, accepted as not blocking that
+task, and to be absorbed where they belong rather than forgotten:
+
+- **Each delivery opens its own Run.** This delivery's dispatches landed in the
+  Run opened for the 2026-09-04 Spike, so four stale probe reports had to be
+  drained before the first real wait could settle. Control bookkeeping, but the
+  contract should say it.
+- **The wait acknowledges after handling.** A wait that exits on its settling
+  message without acknowledging it leaves that message unacknowledged, and the
+  plane redelivers it to the next wait. Observed twice in this delivery.
+- **The repeated wait has no stated exit** (Task 1 review, Minor). `timeout`
+  occurred once in the baseline and zero times in the candidate. Restating a
+  Control-side stopwatch would re-hand-roll what the decision delegates, but the
+  plane's own wait requires a per-call timeout, and the contract can say that
+  without owning a deadline. Residual risk if the plane ever fails to surface a
+  dead worker as an arriving message.
+- **Split the invariant assertion from the verbs assertion** (Task 1 review,
+  Minor). Folded as a sixth conjunct, it discriminates correctly but reports the
+  wrong half on failure. Costs one line; deferred until Task 3 frees the budget.
+- **The absence assertions are literal** (Task 1 review, Minor). A paraphrased
+  restoration of the deleted procedure passes. Inside the limit already declared
+  under **Cannot be observed**; recorded so the limit is not mistaken for
+  coverage. No change requested.
 
 ## Stop conditions
 
