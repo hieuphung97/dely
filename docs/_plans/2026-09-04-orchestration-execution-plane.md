@@ -284,6 +284,30 @@ plugin version, so the mechanics being shipped do not govern the run that ships 
 Nothing in this plan is validated by its own execution.
 
 
+**Task 2 closed by split, 2026-09-04.** The scoped re-review of Control's
+remediation returned `CHANGES_REQUESTED`, so the contract routes to
+`REPLAN_OR_SPLIT` rather than a second repair pass, and the human chose to split.
+The candidate work is closed at `7631296`: no reviewer raised a Blocking finding
+against it, and the re-review confirmed the remediation widened no decision and no
+task boundary. Three defects remain, all in Control's own text, and they move to
+the release reconciliation where the integration review verifies them:
+
+1. This plan still says `worker-start --agent` with `--model` "pins Claude, Codex
+   and Cursor launches", a measurement this delivery never made — the Run's
+   receipts show every `codex` dispatch launched with no model. The acceptance
+   cell added at the same time says so, so the file contradicts itself.
+2. The agent-id row's `Observed red` cell records eight `FAIL` lines where nine
+   reproduce; the omitted one is the verbatim table pin its own Instrument column
+   names.
+3. The Second follow-up still contains "its wording does not change" about
+   `AGENTS.md`, which the amendment at `f2d5b20` contradicts.
+
+Root cause of the failed remediation, recorded because it is the same shape as the
+defects it failed to fix: Control's edit script applied four of six replacements
+without asserting that the target matched, so a replacement whose target was
+line-wrapped silently did nothing while the script still reported success. An edit
+is not made because a script finished; it is made when its diff is read.
+
 ### Deferred findings, recorded for Task 5 and the integration review
 
 Raised in flight by Control or by the Task 1 review, accepted as not blocking that
