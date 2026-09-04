@@ -243,7 +243,16 @@ log's field labels; the current text says "labelled fields" without saying which
 five different label spellings are already in service.
 
 **Files.** `skills/delivery/SKILL.md`, `skills/delivery/templates/plan.md`,
-`tests/contracts.sh`.
+`tests/contracts.sh`, `README.md`.
+
+**Widened after the Task 4 review.** `README.md` describes both things Task 5
+changes, and Task 4's "Document impact: None outside `SKILL.md`" was asserted
+without reading it — the same defect this task's own extent rule exists to
+prevent. Verified by reading: `README.md:108` frames the remediation pass as one
+per review, the reading decision 10 removes; and `README.md:105-107` lists
+`unresolved findings` among the handoff block's fields, which this task renames.
+`README.md` was already in this plan's Allowed scope, so this reassigns an owned
+file between tasks rather than widening the delivery.
 
 **Focused verification.** `bash tests/contracts.sh`: the existing acceptance-header
 column check still passes, plus an assertion that the plan template's Allowed scope
@@ -264,7 +273,7 @@ section requires a command, and that the handoff block names `Residue`.
 | Launch notes carry what this delivery verified | Human reads the diff against the 2026-09-04 measurements | An empty column kept under an intro sentence that promises it: the table parses, every pin passes, and the file promises guidance it does not give |No executable instrument; a human reads the diff. The review resolved it from the Run's own launch receipts: `claude` requested equal to effective at `opus`/`high` five times, `cursor` at `cursor-grok-4.6-high` with effort null six times, and no `codex` dispatch carrying a model. |
 | The orchestration prerequisite is documented once, in shared prerequisites | `bash tests/contracts.sh` assertion scoped to the shared prerequisites section via the existing section extractor | The prerequisite written inside the Kiro CLI section only: a whole-file grep passes, six of seven harness readers never see it |Red at `00d7cf0`: `README.md Quickstart does not give orca orchestration run-list --json as the confirmation command`. Still red at review with the command present only inside `### Kiro CLI`, where a whole-file grep passes. |
 | The contract script stays under its ceiling | `test "$(wc -l < tests/contracts.sh)" -le 250` | New assertions added without removing the Ruby issue-form block: script grows past 250, gate fails loudly rather than silently |Red at review by re-applying the deleted Ruby hunk: the script reaches 254 lines and the ceiling gate fails on exit code. |
-| Review-contract rules land in the review contract, not merely somewhere in the file | `bash tests/contracts.sh` assertions scoped to the `## Review` section | `Not verified` added to the handoff block instead of the review's return: the words exist, a whole-file grep passes, the reviewer contract is unchanged | |
+| Review-contract rules land in the review contract, not merely somewhere in the file | `bash tests/contracts.sh` assertions scoped to the `## Review` section | `Not verified` added to the handoff block instead of the review's return: the words exist, a whole-file grep passes, the reviewer contract is unchanged |Red at `d08b23f` on the unedited Review section, and red again at review with each of the four needles relocated to the handoff block in isolation, where a whole-file grep still passes. |
 | The handoff asks for residue rather than accepting a claim of none | `bash tests/contracts.sh` assertion on the burden sentence, not the label | `Unresolved findings` renamed to `Residue` with the surrounding text untouched: the label check passes, the field still reads as an exception path | |
 | Plan deletion cannot invalidate the release-binding review | Human reads the diff of the Release section against the invalidation sentence | No executable instrument distinguishes a correct ordering sentence from an incorrect one. A human confirms that the step that deletes the plan precedes the step that runs the release-binding review | |
 | The extent rule is stated where Bounded work can reach it | Human reads the diff | A rule placed only in `templates/plan.md`, which Bounded work never opens: the template check passes, half the shapes are uncovered. No grep distinguishes correct placement from plausible-but-wrong placement | |
@@ -361,6 +370,13 @@ task, and to be absorbed where they belong rather than forgotten:
   pinned too; and "omit `--effort` when Effort is `default`" is a general rule
   sitting in one row. Recorded rather than remediated: all three are wording, and
   this task has already had three implementer dispatches.
+
+- **Three wording defects from the Task 4 review** (Minor). `SKILL.md:269` opens
+  "State what it did not verify" with a pronoun that has no antecedent; the
+  Control-ownership sentences sit after the `REPLAN_OR_SPLIT` route rather than
+  beside the remediation they qualify; and `tests/contracts.sh:63` folds onto line
+  62, returning the file to 249 lines. The last is not cosmetic: it is the only
+  budget Task 5 has, since Task 4 left the script at its 250-line ceiling.
 
 
 ## Stop conditions
