@@ -151,7 +151,15 @@ the managed block says `default` — reconcile both descriptor sentences to the
 table's real columns, and either fill or drop the empty column.
 
 **Files.** `skills/delivery/references/harnesses.md`, `tests/contracts.sh`,
-`skills/delivery/SKILL.md`, `AGENTS.md`.
+`skills/delivery/SKILL.md`, `AGENTS.md`, `README.md`.
+
+**Second follow-up.** Control twice stated the descriptor drift's extent without
+measuring it. Measured with `git grep -n -i 'trust handling' -- . ':!docs/_plans'`,
+three tracked documents named the removed column, not two: `SKILL.md`, `AGENTS.md`
+and `README.md`. The first follow-up's assertion inherited the same blind spot — it
+loops over the skill and `AGENTS.md` only, so it returns green on the one file that
+is still wrong. `README.md` was already in this plan's Allowed scope, so this
+reassigns an owned file between tasks rather than widening the delivery.
 
 **Focused verification.** `bash tests/contracts.sh`: the updated verbatim table pin,
 plus an assertion that each of the seven agent ids appears and that the string

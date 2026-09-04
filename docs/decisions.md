@@ -88,6 +88,9 @@ it, and it changed the design:
    destroys the worker. An unverified per-harness fact is deleted rather than
    carried, because this skill tells Control to prefer that file over a
    harness's own help output, which makes a stale cell worse than an empty one.
+   This supersedes the column list settled on 2026-08-28, which named trust
+   handling as a column of this table; that record is amended in place rather
+   than rewritten, because its reason for the file's existence still holds.
 6. No worker runs while a review of the same working tree runs, and the reason
    is stated: the tree and its gate surface are shared mutable state, and a
    review reproduces gates in that tree.
@@ -675,6 +678,13 @@ and ship inside the delivery skill. The file is a table keyed by harness:
 permission default, forbidden headless forms, launch notes, and trust handling.
 The trust column is present and empty; filling it is a later delivery, and a
 column added later would be a schema change instead of a row edit.
+
+**Superseded in part on 2026-09-04.** The trust column was filled, then removed
+together with the rest of the trust catalogue, and an Orca agent id column was
+added. The reasoning above stands as the reason the file exists and ships inside
+the skill; only its column list is out of date. See
+`2026-09-04 — Orca orchestration is the execution plane, and Dely stops
+hand-rolling dispatch`.
 
 `skills/delivery/SKILL.md` names that path where it instructs Control to compose
 a worker launch. The protocol body still names no harness: the matrix is a
