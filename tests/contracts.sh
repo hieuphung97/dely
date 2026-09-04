@@ -20,8 +20,8 @@ skill="$root/skills/delivery/SKILL.md"
 claude_version="$(jq -r .version "$claude_manifest" 2>/dev/null)"
 codex_version="$(jq -r .version "$codex_manifest" 2>/dev/null)"
 
-if [ "$claude_version" != "0.17.0" ] || [ "$codex_version" != "0.17.0" ]; then
-  fail_with "manifest versions must both be 0.17.0 (claude=$claude_version codex=$codex_version)"
+if [ "$claude_version" != "0.17.1" ] || [ "$codex_version" != "0.17.1" ]; then
+  fail_with "manifest versions must both be 0.17.1 (claude=$claude_version codex=$codex_version)"
 fi
 
 root_name="$(jq -r .name "$root_manifest" 2>/dev/null)"
