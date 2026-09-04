@@ -1,16 +1,18 @@
 # Harness launch mechanics
 
 Per-harness launch mechanics for `dely:delivery`'s worker dispatch: each
-harness's permission default, forbidden headless invocation forms, launch
-notes, and trust handling. Trust handling is a separate gate from the
-permission default; filling it is a row edit rather than a schema change.
+harness's Orca agent id, permission default, forbidden headless invocation
+forms, and launch notes. `worker-start --agent` resolves these ids; the
+binary names `agy`, `kiro-cli` and `cursor-agent` return `agent_unconfigured`
+and create no terminal. `worker-start --model` supports Claude, Codex and
+Cursor ids; `--effort` requires `--model`; neither combines with `--terminal`.
 
-| Harness | Permission default | Forbidden headless forms | Launch notes | Trust handling |
+| Harness | Orca agent id | Permission default | Forbidden headless forms | Launch notes |
 | --- | --- | --- | --- | --- |
-| Claude Code | `--dangerously-skip-permissions` | `claude -p` | Launch via Orca's `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | Interactive launch prompts a workspace trust dialog on a path not yet trusted, and `--dangerously-skip-permissions` does not suppress it. The default selection is `No, exit`, so Control selects `Yes, I trust this folder` and confirms before sending the work prompt; a bare Enter quits the worker. |
-| Codex CLI | `--dangerously-bypass-approvals-and-sandbox` | `codex exec` | Launch via Orca's `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | Interactive launch prompts `Do you trust the contents of this directory?` on a path not yet trusted, and `--dangerously-bypass-approvals-and-sandbox` does not suppress it. The default selection is `Yes, continue`; Control confirms it before sending the work prompt. |
-| Grok Build | `--permission-mode bypassPermissions` | `grok --prompt-file` | Launch via Orca's `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | No workspace trust surface; the TUI opens at its composer. |
-| Antigravity CLI | `--dangerously-skip-permissions` | `agy -p`/`--print` | Launch via Orca's `--agent` launcher when it can pin model and effort; hand-composed argv otherwise. | Interactive launch prompts `Do you trust the contents of this project?` on a path not yet trusted, and `--dangerously-skip-permissions` does not suppress it. The default selection is `Yes, I trust this folder`; Control confirms it before sending the work prompt. |
-| Kiro CLI | none; `--trust-all-tools` is forbidden on the launch argv | `kiro-cli chat --no-interactive` | Launches as an interactive TUI, `kiro-cli chat --tui` with `--model` and `--effort` pinned from the managed block; once the TUI is idle at its prompt, send `/tools trust-all`, then the work prompt. | No workspace trust surface; tool trust is the `/tools trust-all` step already in Launch notes. |
-| Cursor Agent CLI | `--force` | `cursor-agent -p`/`--print` | Launches as an interactive `cursor-agent` TUI with `--force --trust`; pin `--model` from the managed block unless the cell is `default`, and omit effort flags; do not use `-w`/`--worktree`. | `--force` covers tool approval only. `--trust`, in Launch notes, clears the workspace trust dialog; without it the TUI opens on `Workspace Trust Required`. |
-| GitHub Copilot CLI | `--allow-all` | `copilot -p`/`--prompt` | Launches as an interactive `copilot` TUI with `--allow-all`; pin `--model` and `--effort` from the managed block, each omitted when its cell is `default`. An unavailable pinned model is reported as `Using "auto" instead` rather than failing. A `Restore interrupted sessions` picker may follow trust and is answered with Esc, never Enter. | `--allow-all` does not suppress `Do you trust the files in this folder?`. The preselected `1. Yes` is what Control confirms; `2. Yes, and remember this folder for future sessions` is not used because it writes persistent machine state. |
+| Claude Code | `claude` | `--dangerously-skip-permissions` | `claude -p` | `--model` pin honoured |
+| Codex CLI | `codex` | `--dangerously-bypass-approvals-and-sandbox` | `codex exec` | |
+| Grok Build | `grok` | `--permission-mode bypassPermissions` | `grok --prompt-file` | |
+| Antigravity CLI | `antigravity` | `--dangerously-skip-permissions` | `agy -p`/`--print` | |
+| Kiro CLI | `kiro` | none; `--trust-all-tools` is forbidden on the launch argv | `kiro-cli chat --no-interactive` | |
+| Cursor Agent CLI | `cursor` | `--force` | `cursor-agent -p`/`--print` | `--model` pin honoured; omit `--effort` when Effort is `default` |
+| GitHub Copilot CLI | `copilot` | `--allow-all` | `copilot -p`/`--prompt` | |

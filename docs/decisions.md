@@ -3,11 +3,243 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-08-31.
+Last updated 2026-09-04.
 
 ---
 
 ## Settled
+
+### 2026-09-04 — Orca orchestration is the execution plane, and Dely stops hand-rolling dispatch
+
+#### Context
+
+Dely already requires Orca and forbids headless dispatch, but it wrote its own
+procedure for the parts of a dispatch Orca can perform: waiting for a worker,
+deciding whether a prompt was submitted, recovering from a harness dialog, and
+identifying a session. That procedure is prose, and it has been failing.
+
+Twenty-eight accepted deliveries are recorded in the opt-in machine-local
+maintenance log. Across them, roughly one hundred and forty review dispositions
+carry about fifty-five `CHANGES_REQUESTED` — near two in five. Twenty of the
+twenty-eight deliveries carry at least one, and thirteen fail their first review.
+The rate is not converging: deliveries in the first half of the window carry
+zero to three, deliveries in the last week carry four, five and eight. The
+protocol repository fares far better than the consuming application repository
+that exercises it at scale, which is where the contract's assumptions break.
+
+Sixteen frictions recurred across four consecutive delivery waves in that
+consuming repository. Nine of the ten worst deliveries name Control's own
+contract — an under-scoped plan, an unchecked premise, a wrong census, a rule
+defined twice — rather than an implementer's work, as the drift source. The
+remediation clause routes an in-contract finding to "the original implementer",
+which is the wrong party for a defect in the plan.
+
+A probe on 2026-09-04 measured the execution plane rather than reasoning about
+it, and it changed the design:
+
+- Orca knows all seven harnesses, but under agent ids that are not the binary
+  names. `agy`, `kiro-cli` and `cursor-agent` return `agent_unconfigured`;
+  `antigravity`, `kiro` and `cursor` are the ids that resolve.
+- `worker-start` proves readiness by exiting 0 with a receipt that reports
+  `launch.requested` beside `launch.effective`. The rule "name the model and
+  effort on every dispatch" has had no evidence behind it until now; that
+  receipt is the evidence.
+- Two typed failures correspond exactly to two paragraphs Dely wrote by hand.
+  `agent_prompt_blocked` is a modal sitting between launch and composer.
+  `agent_prompt_stalled` is input that never took — the readiness failure this
+  skill described as a ninety-second allowance and a single Enter.
+- The modal that actually blocked a launch was not a trust dialog. It was a
+  version-update prompt. The trust-handling column has been enumerating
+  instances of a class it cannot finish enumerating: trust dialogs, update
+  nags, session-restore pickers, changelogs.
+- Worse, one of its cells is wrong. On a path with no entry in Claude Code's
+  exact-path trust store, a launch carrying `--dangerously-skip-permissions`
+  reached the composer with no dialog shown and no entry created. The cell
+  asserts that flag "does not suppress it" and tells Control to select an
+  option that never appears — while the same cell warns that a bare Enter
+  quits the worker. Acting on the stale instruction is actively harmful.
+- Orca's injected worker preamble already requires a short executive summary in
+  the message body and a `payload.reportPath` pointing at any long-form
+  artifact. The convention this project was about to invent already exists.
+
+#### Decision
+
+1. Orchestration is a required Orca capability. When it is absent, the existing
+   rule applies unchanged: stop, with no headless fallback. `README.md`
+   documents enabling it once, in the shared prerequisites, because the
+   requirement is harness-independent.
+2. Dispatch mechanics come from the plane. `worker-start` establishes
+   readiness, `check --wait` is the completion wait, the worker reports once
+   with `worker_done` and an outcome, `worker-release` returns the terminal,
+   and `worker-read` is the bounded evidence read. The blocking-wait paragraph,
+   the submission-detection paragraph with its ninety-second allowance and
+   single-Enter procedure, and the session-id capture instruction are deleted;
+   the dispatch id replaces the last of these.
+3. Two typed errors replace the dialog catalogue. `agent_prompt_blocked` means
+   read that terminal and clear the modal that is actually there;
+   `agent_prompt_stalled` is a liveness inspection. Neither enumerates a
+   vendor's dialogs, so neither goes stale when a vendor ships a new one.
+4. The prompt and the handoff stay files inside the worktree. Messages carry a
+   short body and a `payload.reportPath`. The reason is this skill's own rule:
+   a task spec and a message body are shell arguments, and prompts do not go in
+   shell arguments.
+5. `references/harnesses.md` keeps only facts verified in this delivery — the
+   Orca agent id, the forbidden headless forms, and answers whose wrong choice
+   destroys the worker. An unverified per-harness fact is deleted rather than
+   carried, because this skill tells Control to prefer that file over a
+   harness's own help output, which makes a stale cell worse than an empty one.
+   This supersedes the column list settled on 2026-08-28, which named trust
+   handling as a column of this table; that record is amended in place rather
+   than rewritten, because its reason for the file's existence still holds.
+6. No worker runs while a review of the same working tree runs, and the reason
+   is stated: the tree and its gate surface are shared mutable state, and a
+   review reproduces gates in that tree.
+7. A review states what it did not verify, mirroring the design side's existing
+   record of what the instruments cannot observe.
+8. Control owns the plan and the decision record for the whole run, including
+   remediating findings inside them. Amending them is not implementing the
+   candidate. The reviewer that raised such a finding scope-checks the
+   amendment.
+9. Any claim about extent — an allowed scope, a count, a set of call sites —
+   states the command that produced it, and where the claim is a count or a
+   scope its instrument enumerates rather than samples.
+10. `One pass` means one remediation pass per finding, not per review.
+11. The plan is deleted in the release commit, before the release-binding
+    review, so its deletion is inside the candidate that review verdicts.
+12. The maintenance log's field labels are named. The text has said "labelled
+    fields" without saying which, and five different spellings are already in
+    service across the recorded lines.
+
+#### Alternatives considered
+
+**Terminal primitives plus a sentinel file.** Wait on `tui-idle` and have the
+worker end a handoff file with the existing end-of-handoff sentinel. Rejected:
+idle cannot distinguish a finished worker from one waiting on a question, which
+is a distinction this skill already depends on; the idle detector is documented
+for six agent CLIs that do not include four of the seven harnesses here; and a
+worker's death stays silent until a deadline instead of arriving as an outcome.
+The file half survives in decision four for a different reason — shell-argument
+safety — not as a completion mechanism.
+
+**Optional orchestration with a fallback path.** Rejected: two dispatch paths in
+one contract, of which the rare one rots unexercised. The probe also showed the
+adoption cost is lower than assumed; the feature was already enabled and already
+carrying this project's own deliveries.
+
+**Task graphs with dependencies, and the plane's decision gates.** Rejected:
+tasks are sequential by contract, so a dependency graph buys nothing and invites
+the concurrency that decision six forbids. Decision gates would add a second
+approval surface beside the in-chat approval this skill treats as its boundary.
+
+**A ready-indicator column in the harness reference.** This was the shape
+proposed before the probe. Rejected by the probe itself: a cell can go stale, and
+one already had. A typed error cannot go stale the way an enumerated fact does.
+
+**Deleting the maintenance log as redundant with the plane's run records.** The
+run records hold dispatch lifecycle; they do not hold why a delivery drifted.
+Reading the log showed its drift-cause sentences are the source of nearly every
+friction this record fixes, at a cost of one appended line per accepted delivery.
+Rejected, and the log's field labels are named instead.
+
+**Raising the contract script's line ceiling.** Rejected for this delivery. The
+budget is met by removing a check the hosting platform already performs, and the
+ceiling should be revisited on its own evidence rather than inside the change it
+constrains.
+
+**A mandatory read-only scoping dispatch before planning.** Correct in diagnosis
+and wrong in shape: it adds a phase, taxing every future delivery, to fix what
+decision nine fixes with one sentence. Deferred rather than adopted.
+
+#### Consequences
+
+Dely's dependence on Orca deepens from launching terminals to owning the worker
+lifecycle. The orchestration guide documents its own contract migrations, so the
+mitigation is the practice this skill already follows: reference the version-
+matched guide, state invariants, and never pin argv.
+
+Control must run inside an Orca-managed terminal, because a run binds to a
+coordinator handle. Users must enable a feature that ships disabled.
+
+Removing the issue-form checker trades a fast local signal for a slower one: the
+hosting platform surfaces a malformed issue form on its own pages rather than in
+continuous integration.
+
+The skill gets shorter while gaining rules, because the deleted procedure is
+longer than the delegation that replaces it.
+
+This decision is **not** expected to improve: concurrency safety, which the plane
+explicitly declines to schedule or infer, leaving decision six as Dely's own
+rule; mid-run dispatch drops in any individual harness; or a vendor's first-run
+modals, which decision three routes rather than prevents.
+
+#### Non-goals
+
+Parallel task execution. Workers on another connected host. Nested workers.
+Replacing the in-chat approval gate. A capability matrix describing the harness
+that Control itself runs on.
+
+#### Deferred
+
+- Giving the repeated completion wait a stated exit. `timeout` occurs nowhere in
+  the skill; the wait is bounded only by whatever deadline Control passes the
+  plane. Trigger: a measurement showing the plane does not always surface a dead
+  worker as an arriving settling message.
+- A worker that ends its turn without finishing or reporting has no typed error.
+  The plane reports the terminal alive and ready, so only a Control-side deadline
+  distinguishes it from slow work. Trigger: a second occurrence, or a typed
+  signal appearing in the plane.
+- The prerequisite command is unverified against a disabled runtime. `README.md`
+  tells a reader that `orca orchestration run-list --json` confirms orchestration
+  is enabled; nobody has observed it fail when orchestration is disabled. An
+  instrument only ever seen green is the defect this record is about. Trigger: a
+  runtime with the feature off.
+- The issue-form checker's removal rests on an unobserved premise: that the
+  hosting platform rejects a malformed issue form. Nothing in the repository
+  depended on the checker, but that argument was not tested. Trigger: a malformed
+  form reaching a contributor.
+- Absence assertions are literal, so a paraphrased restoration of deleted text
+  passes. Inside the limit already stated: the checker proves a phrase present or
+  absent, never that a rule means what it says.
+- Wording defects left unabsorbed, each recorded rather than fixed because none
+  lets an instrument accept a wrong implementation: the launch table's intro
+  promises a note per harness while two of seven carry one, with no statement
+  that an empty cell means "not measured here"; the Claude Code cell records the
+  model pin but not the effort pin the receipts also show; a general rule about
+  omitting effort sits in one row; the troubleshooting entry names orchestration
+  as a possible missing capability but offers no command that distinguishes it;
+  the preflight fence's comment column is misaligned; and the release-ordering
+  check pins a line whose semantics-preserving rewrap would turn it red, and
+  lacks a guard that keeps shell noise off a correct failure.
+
+- Restoring any per-harness behavioural claim deleted by decision 5. The launch
+  table previously asserted, for each harness, whether an interactive launch
+  prompts a workspace trust dialog, whether the permission-default flag suppresses
+  it, which option is preselected, and which keystroke is destructive; plus
+  per-harness launch notes covering the `--agent` launcher, Kiro's `/tools
+  trust-all` step and its interactive flag, Cursor's `--force --trust` and its
+  `-w` prohibition, and Copilot's unavailable-model fallback and its
+  session-restore picker answered with Escape. One of those claims was measured
+  false on 2026-09-04 and the rest were not measured at all. Trigger for restoring
+  any single one: a launch that a probe shows it would have prevented.
+- Requiring the implementer to re-run the scope command before implementing.
+  Trigger: drift-cause sentences still naming late scope discovery after roughly
+  ten further deliveries.
+- Raising the contract script's line ceiling. Trigger: an eighth harness, whose
+  README and discovery assertions do not fit the remaining budget.
+- Flipping the Kiro launch prescription away from its interactive flag. Trigger:
+  a second machine or a second version reproducing the stall.
+- Handling a first-run vendor modal beyond reading the terminal. Trigger: a
+  blocked launch that reading the terminal cannot clear.
+
+#### Limits of this delivery's evidence
+
+`tests/contracts.sh` is a structural checker. It proves a phrase present or absent
+and that a named section contains it; it cannot prove a rule means what it says,
+that Control will follow it, or that the execution plane behaves as described.
+Runtime behaviour was measured once, on one machine and one Orca build, by the
+2026-09-04 probe and by this delivery's own dispatches; no gate re-measures it.
+Several rules ship with no executable instrument and a human reading the diff as
+their declared check, which is only worth keeping if someone reads it.
 
 ### 2026-08-31 — GitHub Copilot CLI is a first-class seventh harness, and it needs no sidecar
 
@@ -212,6 +444,19 @@ the trigger is a measured overrun, not a preference.
 
 ### 2026-08-29 — Workspace trust is a second gate; Control answers it in the TUI
 
+
+**Superseded on 2026-09-04.** Measurement contradicted this record's central
+instruction. On a path with no entry in Claude Code's exact-path trust store, a
+launch carrying `--dangerously-skip-permissions` reached the composer with no
+dialog shown and no trust entry created. The instruction to select
+`Yes, I trust this folder`, the warning that a bare Enter quits the worker, the
+Trust handling column this record defends, and its rejection of leaving that
+column empty are all withdrawn: the column was deleted outright. What stands is
+the observation that a modal can sit between launch and composer — but it is not
+always a trust dialog, and it is now routed by the execution plane's typed
+`agent_prompt_blocked` rather than by an enumerated per-harness answer. See
+`2026-09-04 — Orca orchestration is the execution plane, and Dely stops
+hand-rolling dispatch`.
 #### Context
 
 `skills/delivery/references/harnesses.md` already records a per-harness
@@ -487,6 +732,13 @@ and ship inside the delivery skill. The file is a table keyed by harness:
 permission default, forbidden headless forms, launch notes, and trust handling.
 The trust column is present and empty; filling it is a later delivery, and a
 column added later would be a schema change instead of a row edit.
+
+**Superseded in part on 2026-09-04.** The trust column was filled, then removed
+together with the rest of the trust catalogue, and an Orca agent id column was
+added. The reasoning above stands as the reason the file exists and ships inside
+the skill; only its column list is out of date. See
+`2026-09-04 — Orca orchestration is the execution plane, and Dely stops
+hand-rolling dispatch`.
 
 `skills/delivery/SKILL.md` names that path where it instructs Control to compose
 a worker launch. The protocol body still names no harness: the matrix is a

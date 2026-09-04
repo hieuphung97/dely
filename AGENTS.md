@@ -45,13 +45,13 @@ delivery run.
 
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
-| `implement` | Cursor Agent CLI | cursor-grok-4.6-medium | default |
-| `review` | Kiro CLI | gpt-5.6-sol | medium |
+| `implement` | Cursor Agent CLI | cursor-grok-4.6-high | default |
+| `review` | Claude Code | opus | high |
 <!-- dely:end -->
 
 The table is this repository's deployment selection, not the portable
-protocol. Per-harness launch mechanics — permission defaults, forbidden
-headless forms, launch notes, and trust handling — live in
+protocol. Per-harness launch mechanics — Orca agent id, permission
+defaults, forbidden headless forms, and launch notes — live in
 `skills/delivery/references/harnesses.md`.
 
 This project adds no phase-implied sandbox. Native Internet access, closure

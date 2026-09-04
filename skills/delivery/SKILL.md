@@ -71,8 +71,9 @@ executable instrument can discriminate the requirement, the contract names the
 manual inspection and its limit.
 
 Architectural work uses `templates/decision-record.md` (durable) and
-`templates/plan.md` (transient, deleted at closure). Commit both before
-implementation begins — that commit is the review baseline.
+`templates/plan.md` (transient, deleted in the release commit, before
+the release-binding review). Commit both before implementation begins
+— that commit is the review baseline.
 
 ### Acceptance
 
@@ -94,6 +95,12 @@ says a human reads the diff.
 
 Record what the available instruments cannot observe. Prefer the simplest
 instrument that proves the contract.
+
+Any claim about extent — an allowed scope, a count, a set of call sites —
+states the command that produced it. Naming the command is not the
+measurement: the command must have been run, and the claim reports its
+output. Where the claim is a count or a scope, the instrument enumerates
+rather than samples.
 
 ## Execution envelope
 
@@ -117,10 +124,11 @@ rather than combining ownership.
 ## Orca is mandatory
 
 Orca is the required execution plane. It launches and supervises fresh native
-harness TUIs with the resolved harness, model, and effort. `dely:delivery`
-starts and preflights Orca before execution. It stops only when the CLI is
-missing, the runtime cannot start, or a required capability is absent — there
-is no direct dispatch and no headless fallback of any kind.
+harness TUIs with the resolved harness, model, and effort. Orchestration is a
+required Orca capability. `dely:delivery` starts and preflights Orca before
+execution. It stops only when the CLI is missing, the runtime cannot start, or a
+required capability is absent — there is no direct dispatch and no headless
+fallback of any kind.
 
 ### Launching a worker
 
@@ -129,12 +137,18 @@ it in a shell argument: prompts carry backticks, quotes and newlines, and a
 shell argument mangles them. A path outside the workspace can trigger a
 second permission surface some harnesses still prompt for even when tool
 approval is skipped. Do not stage that file. After the worker returns,
-delete it: Control owns that dispatch artifact, not `git clean`. Load Orca's
-native skill and use it to launch a real interactive harness TUI for the
-phase, with the model and effort pinned from `AGENTS.md`. A visible shell
-running a headless harness is not a TUI; compose that TUI's launch using
-`references/harnesses.md`, this skill's compatibility matrix of permission
-defaults, forbidden headless forms, launch notes, and trust handling.
+delete it: Control owns that dispatch artifact, not `git clean`. The handoff
+is likewise a file in the worktree; its path travels as `payload.reportPath`
+and the message body stays short. `--spec` and `--body` are shell arguments,
+which this skill already forbids for prompts.
+
+`worker-start` proves readiness by exiting 0 with a receipt carrying
+`launch.requested` and `launch.effective`. Launch a real interactive harness
+TUI for the phase, with the model and effort pinned from `AGENTS.md`. A
+visible shell running a headless harness is not a TUI; compose that TUI's
+launch using `references/harnesses.md`, this skill's compatibility matrix of
+Orca agent id, permission defaults, forbidden headless forms, and launch
+notes.
 
 **Name the model and effort on every dispatch.** A worker left on a harness
 default is an unpinned environment: it lives in the harness's own config, it
@@ -146,24 +160,24 @@ configured permission default for that agent onto the composed argv;
 composing argv is not a request for a different permission posture. Do not
 add a sandbox the project did not pin.
 
-Keep waiting blocking. A worker is observed through Orca until it completes
-or its timeout fires. Do not add a relay, poll, or state machine to
-manufacture completion.
+`check --wait` on `worker_done,escalation,question` is the completion wait,
+repeated past heartbeats until a settling message arrives for that dispatch —
+a heartbeat ends one wait but settles nothing.
+The worker reports once with `worker_done` and an `--outcome`.
+Completion comes from the worker's own `worker_done`;
+do not infer it from reading the worker's terminal.
+`worker-release` returns the terminal. `worker-read` is the bounded evidence
+read.
 
-**`input_accepted` is not submission.** It is a transport receipt, not proof
-that the harness submitted the prompt. Allow 90 seconds for a dispatch
-heartbeat or visible agent progress. If neither appears, read the worker TUI.
-Only when that read shows the task still pending in the input box does
-Control send Enter, exactly once, then return to the normal blocking wait.
+Each delivery opens its own Run on the execution plane rather than reusing
+another's, so a stale report cannot settle a new wait. A wait acknowledges
+its settling message after handling it, or the plane redelivers that
+message to the next wait.
 
-Do not send Enter when the worker is already reasoning, using a tool, asking a
-question or reporting completion. Do not infer submission from a rendered copy
-of the prompt alone. A second missing signal is a liveness problem to
-inspect, not permission to keep pressing Enter.
-
-Capture the worker's session id from its output and put it in the handoff: it
-is how the human opens that session to inspect or steer it, and a harness need
-not list a dispatched session in its own picker.
+A blocked or stalled launch is routed by the plane's typed error, not by an
+enumerated vendor dialog. `agent_prompt_blocked` means a modal sits between
+launch and composer, so read that terminal and clear what is actually there.
+`agent_prompt_stalled` is a liveness inspection.
 
 ### Investigation
 
@@ -215,19 +229,21 @@ session. A task needing continuation is a decomposition failure.
 ```text
 Status: DONE | BLOCKED | NEEDS_REPLAN
 Harness:            name, model, effort, sandbox
-Session:            the worker's own session id
+Session:            the dispatch id
 Baseline:
 Changed paths:
 Contract coverage:
 Verification:
 Deviations from plan:
-Unresolved findings:
+Residue:
 Git state:
 END OF HANDOFF
 ```
 
 `END OF HANDOFF` is the last line and load-bearing: the only thing that
-distinguishes a handoff from one cut off mid-write. Under `Verification`, cite
+distinguishes a handoff from one cut off mid-write. Under `Residue`, a
+claim of nothing left is the thing that needs evidence: name the check
+that returned empty. Under `Verification`, cite
 the dispatch-bound command, output, and outcome that Orca recovers for that
 task — the transcript or terminal it selects, and any cursor mechanics, are
 Orca's concern, not this skill's. Do not transcribe output by hand. Where
@@ -250,6 +266,11 @@ candidate identity, and release readiness. Only that final review is
 release-binding for Architectural work; Bounded work has no earlier task
 review and no duplicate integration review.
 
+No worker runs while a review of the same working tree runs. The working
+tree and its gate surface are shared mutable state, and a review reproduces
+gates in that tree, so a concurrent edit makes another task's work look
+like this one's result.
+
 **Reproduce, do not accept.** Run the gates yourself. A claim you did not
 reproduce is not evidence.
 
@@ -259,20 +280,25 @@ reconciliation. **Minor** — useful, does not block. **Out of scope** —
 recorded, not absorbed.
 
 Return exactly one role disposition: `ACCEPT`, `CHANGES_REQUESTED`, or
-`BLOCKED`. A contradiction you cannot resolve is `CHANGES_REQUESTED`.
+`BLOCKED`. State what the review did not verify — what it did not
+reproduce or read. A contradiction you cannot resolve is `CHANGES_REQUESTED`.
 Do not open remediation over wording when deterministic checks already prove
 the contract.
 
 ### Remediation
 
-One pass. For an in-contract `CHANGES_REQUESTED` finding, the **original
-implementer** verifies it, fixes the root cause, reruns the affected
-instruments and closure gates, and writes a separate remediation commit —
-this is the single original-party remediation. The **reviewer that raised
-the finding** checks its reproduction and the fix-only diff. If that scoped
-re-review does not accept, Control routes to `REPLAN_OR_SPLIT` — it does not
-start another repair loop. `BLOCKED` preserves the candidate and escalates
-the unresolved dependency or authority question to Control separately from a
+One pass is one remediation pass per finding, not per review. For an
+in-contract `CHANGES_REQUESTED` finding, the **original implementer**
+verifies it, fixes the root cause, reruns the affected instruments and
+closure gates, and writes a separate remediation commit — this is the
+single original-party remediation. Control owns the plan and the decision
+record for the whole run, including remediating findings inside them.
+Amending them is not implementing the candidate. The **reviewer that raised
+the finding** checks its reproduction and the fix-only diff, and
+scope-checks a Control amendment the same way. If that scoped re-review
+does not accept, Control routes to `REPLAN_OR_SPLIT` — it does not start
+another repair loop. `BLOCKED` preserves the candidate and escalates the
+unresolved dependency or authority question to Control separately from a
 failed worker process; it is not remediated by the original implementer. A
 fresh replacement reviewer is used only when the original reviewer is
 unavailable or contested, and for the Architectural integration review.
@@ -283,7 +309,7 @@ Control performs release with native Git and forge tools; release dispatches
 no LLM worker and makes no post-review candidate edit.
 
 1. Complete implementation and, for Architectural work, its task reviews.
-2. Reconcile owning documentation and commit the complete candidate.
+2. Reconcile owning documentation, delete the plan, and commit the complete candidate.
 3. Run the focused instruments and project closure gates on exact HEAD.
 4. Push the feature branch and create or update a draft pull request.
 5. Run the applicable final review while remote CI runs on that same HEAD.
@@ -292,6 +318,9 @@ no LLM worker and makes no post-review candidate edit.
 
 Any candidate mutation after the applicable final review invalidates that
 verdict; Control reruns the affected gates and review on the new exact HEAD.
+Affected gates are those that can observe the change class; a project may
+name that subset.
+
 Dely never merges, force-pushes, or publishes outside the approved target and
 authority. If project policy cannot publish work in progress, Dely delays the
 push and pull request until the applicable review accepts.
@@ -303,9 +332,9 @@ creates the directory or file: a missing path is skipped silently, and
 deleting the file opts out. Only after a delivery is accepted and all
 required checks are green does Control append exactly one physical line;
 aborted or incomplete deliveries are not recorded. The line carries an
-ISO-8601 UTC timestamp and labelled fields for the Git-root basename, plan,
-pull request or `none`, implementation-round count, ordered review
-dispositions, and one short drift-cause sentence. Tabs separate fields;
+ISO-8601 UTC timestamp and labelled fields `git-root`, `plan`,
+`pull-request` or `none`, `implementation-rounds`, `review-dispositions`,
+and `drift-cause`. Tabs separate fields;
 embedded tabs and newlines become spaces. Dely never reads this file for
 routing, recovery, or runtime decisions, and its text layout is not a public
 parsing schema. An append failure produces a visible warning but does not
