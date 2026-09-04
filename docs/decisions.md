@@ -152,6 +152,14 @@ decision nine fixes with one sentence. Deferred rather than adopted.
 
 #### Consequences
 
+This decision ships in **0.17.1**. `0.17.0` was not reusable: that number had
+already been tagged and released on 2026-09-01 for the tree that added the
+seventh harness, and this record's own change merged three days later. Bumping
+the manifests without advancing the number left two contents sharing one
+version, and an install of `0.17.0` from the release surface returned the
+protocol this decision replaced. A decision that changes the shipped protocol
+names the version that carries it, in this section, before the tag is cut.
+
 Dely's dependence on Orca deepens from launching terminals to owning the worker
 lifecycle. The orchestration guide documents its own contract migrations, so the
 mitigation is the practice this skill already follows: reference the version-
