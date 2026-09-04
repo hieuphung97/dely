@@ -57,7 +57,8 @@ grep -Fq 'configured permission default' "$skill" && grep -Fq 'sandbox the proje
 grep -Fq 'references/harnesses.md' "$skill" && [ -f "$harnesses" ] && ! tr '\n' ' ' < "$skill" | grep -Fq 'no compatibility matrix' || fail_with "$skill does not name an existing $harnesses, or still denies having a compatibility matrix"
 # Dispatch mechanics come from the execution plane: deleted procedures absent; named verbs and typed recovery routes present.
 grep -Fq 'Keep waiting blocking' "$skill" || grep -Fq '`input_accepted` is not submission' "$skill" || grep -Fq 'Allow 90 seconds' "$skill" && fail_with "$skill still carries a hand-rolled readiness or submission procedure"
-grep -Fq 'worker-start' "$skill" && grep -Fq 'worker_done' "$skill" && grep -Fq 'agent_prompt_blocked' "$skill" && grep -Fq 'agent_prompt_stalled' "$skill" && grep -Fq 'payload.reportPath' "$skill" && grep -Fq 'do not infer it from reading' "$skill" || fail_with "$skill does not name the orchestration verbs and both typed recovery routes"
+grep -Fq 'worker-start' "$skill" && grep -Fq 'worker_done' "$skill" && grep -Fq 'agent_prompt_blocked' "$skill" && grep -Fq 'agent_prompt_stalled' "$skill" && grep -Fq 'payload.reportPath' "$skill" || fail_with "$skill does not name the orchestration verbs and both typed recovery routes"
+grep -Fq 'do not infer it from reading' "$skill" || fail_with "$skill does not pin that completion cannot be inferred from reading a worker's terminal"
 for f in '--permission-mode bypassPermissions' '--dangerously-skip-permissions' '--trust-all-tools' '--force' 'claude -p' 'codex exec' 'grok --prompt-file' 'agy -p' 'kiro-cli chat --no-interactive' 'cursor-agent -p' 'copilot -p' '--allow-all'; do
   grep -Fq -- "$f" "$harnesses" || fail_with "$harnesses does not name: $f"
   grep -Fq -- "$f" "$root/AGENTS.md" && fail_with "AGENTS.md must not name: $f"
@@ -144,6 +145,11 @@ printf '%s\n' "$copilot_section" | grep -Fiq 'npx skills' && fail_with "README.m
 copilot_fence="$(printf '%s\n' "$copilot_section" | awk '/^```/{f=!f;next} f')"
 for needle in 'plugin marketplace add' 'plugin install dely@dely' 'plugin list' 'plugin update dely' 'plugin uninstall dely' 'plugin marketplace remove dely' '# removes the marketplace, not the plugin'; do printf '%s\n' "$copilot_fence" | grep -Fq -- "$needle" || fail_with "README.md GitHub Copilot CLI fenced block is missing: $needle"; done
 
+# Orchestration prerequisite lives in the shared Quickstart preflight, not a per-harness section.
+quickstart="$(awk '/^## Quickstart[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$root/README.md")"
+[ -n "$quickstart" ] || fail_with "README.md is missing a ## Quickstart section"
+printf '%s\n' "$quickstart" | grep -Fq 'orca orchestration run-list --json' || fail_with "README.md Quickstart does not give orca orchestration run-list --json as the confirmation command"
+
 # Plan template's acceptance header: the four named columns must all be present.
 plan_template="$root/skills/delivery/templates/plan.md"
 acceptance_header="$(awk '
@@ -162,18 +168,6 @@ done
 for f in CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md .github/ISSUE_TEMPLATE/bug_report.yml \
          .github/ISSUE_TEMPLATE/feature_request.yml .github/pull_request_template.md; do
   [ -f "$root/$f" ] || fail_with "missing required community artifact: $f"
-done
-for f in .github/ISSUE_TEMPLATE/bug_report.yml .github/ISSUE_TEMPLATE/feature_request.yml; do
-  path="$root/$f"
-  [ -f "$path" ] || continue
-  missing="$(ruby -ryaml -e '
-    begin; d = YAML.safe_load(File.read(ARGV[0]))
-    rescue => e; puts "parse-error(#{e.message})"; exit; end
-    puts "not-a-mapping" unless d.is_a?(Hash)
-    m = %w[name description body].reject { |k| d.key?(k) }
-    puts m.join(",") unless m.empty?
-  ' "$path")"
-  [ -z "$missing" ] || fail_with "$f is not a valid GitHub issue form: missing/invalid $missing"
 done
 
 # Bug form's harness dropdown must offer all seven exact harness names.

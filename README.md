@@ -26,11 +26,13 @@ TUIs; and Git plus a GitHub remote for the project you run Dely against.
 `dely:delivery` preflights Orca and stops when the CLI is missing, the runtime
 cannot start, or a required capability is absent.
 
-Preflight Orca before installing a harness plugin:
+Preflight Orca before installing a harness plugin. Orca's orchestration
+feature must be enabled:
 
 ```bash
 orca open           # launches Orca and waits for the runtime to be reachable
 orca status --json   # confirms the runtime is reachable
+orca orchestration run-list --json  # confirms orchestration is enabled
 ```
 
 Per-harness install commands live under [Install](#install). Project pins live
@@ -299,7 +301,7 @@ against — observations, not a promised minimum:
 | Kiro CLI | 2.16.2 |
 | Cursor Agent CLI | 2026.08.25-3e8eec8 |
 | GitHub Copilot CLI | 1.0.82 |
-| Orca | 1.4.188 |
+| Orca | 1.4.196 |
 
 ## Project setup
 
@@ -371,7 +373,8 @@ remote access, manifest validation, and the verified command surface.
 ## Troubleshooting
 
 - **`dely:delivery` stops immediately.** Orca is not running or a required
-  capability is absent. Run `orca open` and `orca status --json`, then retry.
+  capability is absent, including orchestration. Run `orca open` and
+  `orca status --json`, then retry.
 - **A harness still runs the old workflow after you edited this checkout.**
   You edited the source, not an installed copy. Bump the version and
   reinstall/update in the harness (see Cache refresh boundary above).
