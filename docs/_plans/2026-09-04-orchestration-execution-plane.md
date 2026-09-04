@@ -230,8 +230,8 @@ section requires a command, and that the handoff block names `Residue`.
 | `SKILL.md` names the orchestration verbs and both typed recovery routes | `bash tests/contracts.sh` presence assertions on `worker-start`, `worker_done`, `agent_prompt_blocked`, `agent_prompt_stalled`, `payload.reportPath` | An edit that deletes the old apparatus and replaces it with prose that says "use Orca's orchestration skill" without naming a verb or a route: shorter, parses, absence assertions pass, leaves Control with no route for a blocked launch |Red on baseline `d97cc90`: `does not name the orchestration verbs and both typed recovery routes`. Reproduced at review; each of the six required tokens trips it alone. |
 | `harnesses.md` carries the seven Orca agent ids and not the binary names | `bash tests/contracts.sh` presence of each id, and the updated verbatim table pin | A row edit that adds an `Orca agent id` column but fills the Kiro cell with `kiro-cli`: table shape correct, pin updated to match, every launch through it fails `agent_unconfigured` | |
 | The stale Claude Code trust claim is gone rather than reworded | `bash tests/contracts.sh` absence assertion on `does not suppress it` | A rewording to "may not suppress it" that keeps the instruction to select a dialog option which never appears: hedged, plausible, still sends Control after a dialog that is not there | |
-| The orchestration prerequisite is documented once, in shared prerequisites | `bash tests/contracts.sh` assertion scoped to the shared prerequisites section via the existing section extractor | The prerequisite written inside the Kiro CLI section only: a whole-file grep passes, six of seven harness readers never see it | |
-| The contract script stays under its ceiling | `test "$(wc -l < tests/contracts.sh)" -le 250` | New assertions added without removing the Ruby issue-form block: script grows past 250, gate fails loudly rather than silently | |
+| The orchestration prerequisite is documented once, in shared prerequisites | `bash tests/contracts.sh` assertion scoped to the shared prerequisites section via the existing section extractor | The prerequisite written inside the Kiro CLI section only: a whole-file grep passes, six of seven harness readers never see it |Red at `00d7cf0`: `README.md Quickstart does not give orca orchestration run-list --json as the confirmation command`. Still red at review with the command present only inside `### Kiro CLI`, where a whole-file grep passes. |
+| The contract script stays under its ceiling | `test "$(wc -l < tests/contracts.sh)" -le 250` | New assertions added without removing the Ruby issue-form block: script grows past 250, gate fails loudly rather than silently |Red at review by re-applying the deleted Ruby hunk: the script reaches 254 lines and the ceiling gate fails on exit code. |
 | Review-contract rules land in the review contract, not merely somewhere in the file | `bash tests/contracts.sh` assertions scoped to the `## Review` section | `Not verified` added to the handoff block instead of the review's return: the words exist, a whole-file grep passes, the reviewer contract is unchanged | |
 | The handoff asks for residue rather than accepting a claim of none | `bash tests/contracts.sh` assertion on the burden sentence, not the label | `Unresolved findings` renamed to `Residue` with the surrounding text untouched: the label check passes, the field still reads as an exception path | |
 | Plan deletion cannot invalidate the release-binding review | Human reads the diff of the Release section against the invalidation sentence | No executable instrument distinguishes a correct ordering sentence from an incorrect one. A human confirms that the step that deletes the plan precedes the step that runs the release-binding review | |
@@ -277,6 +277,27 @@ task, and to be absorbed where they belong rather than forgotten:
   restoration of the deleted procedure passes. Inside the limit already declared
   under **Cannot be observed**; recorded so the limit is not mistaken for
   coverage. No change requested.
+- **A worker can end its turn without finishing or reporting, and no typed error
+  covers it.** The Task 3 review stopped at an idle prompt having written no
+  report; the plane reported `worker: ready`, `liveness: live`, because the
+  terminal was alive. Neither `agent_prompt_blocked` nor `agent_prompt_stalled`
+  describes this. Only Control's own wait deadline surfaced it, which is direct
+  evidence for the "repeated wait has no stated exit" finding above rather than
+  against it. One nudge recovered it with its context intact.
+- **The prerequisite command is unverified against a disabled runtime** (Task 3
+  review, limit). `README.md` tells a reader that `orca orchestration run-list
+  --json` confirms orchestration is enabled, but nobody has observed it fail when
+  orchestration is disabled. An instrument that has only ever been seen green is
+  the exact defect this decision record is about.
+- **The Ruby deletion's premise is unverified** (Task 3 review, limit). Nothing in
+  the repository depended on the checker, but that the hosting platform rejects a
+  malformed issue form — the argument that makes the deletion safe rather than
+  merely cheap — was not observed.
+- **Two README wording defects** (Task 3 review, Minor). The Troubleshooting bullet
+  names orchestration as a possible missing capability but offers a retry line that
+  cannot distinguish it; and the preflight fence's comment column is misaligned
+  after the third line. `README.md` is owned by no remaining task, so absorbing
+  these requires widening a later task's Files.
 
 ## Stop conditions
 
