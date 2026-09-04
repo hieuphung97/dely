@@ -177,6 +177,16 @@ that Control itself runs on.
 
 #### Deferred
 
+- Restoring any per-harness behavioural claim deleted by decision 5. The launch
+  table previously asserted, for each harness, whether an interactive launch
+  prompts a workspace trust dialog, whether the permission-default flag suppresses
+  it, which option is preselected, and which keystroke is destructive; plus
+  per-harness launch notes covering the `--agent` launcher, Kiro's `/tools
+  trust-all` step and its interactive flag, Cursor's `--force --trust` and its
+  `-w` prohibition, and Copilot's unavailable-model fallback and its
+  session-restore picker answered with Escape. One of those claims was measured
+  false on 2026-09-04 and the rest were not measured at all. Trigger for restoring
+  any single one: a launch that a probe shows it would have prevented.
 - Requiring the implementer to re-run the scope command before implementing.
   Trigger: drift-cause sentences still naming late scope discovery after roughly
   ten further deliveries.

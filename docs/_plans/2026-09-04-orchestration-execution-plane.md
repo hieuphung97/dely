@@ -20,6 +20,7 @@ gate.
 skills/delivery/SKILL.md
 skills/delivery/references/harnesses.md
 skills/delivery/templates/plan.md
+AGENTS.md
 README.md
 tests/contracts.sh
 docs/decisions.md
@@ -34,9 +35,10 @@ scope below because this plan changes neither the gate list nor the managed bloc
 
 ## Forbidden scope
 
-- `AGENTS.md` — carries a pre-existing uncommitted change (the managed block's phase
-  pins). This plan alters no closure gate and no managed-block row, so ownership is
-  not combined. If a task finds it must edit `AGENTS.md`, that is a stop condition.
+- `AGENTS.md` was forbidden while it carried a pre-existing uncommitted change. The
+  human committed that change at `77423b0`, releasing the path, so Task 2 now owns
+  it for one sentence only: the descriptor that names this reference's columns. No
+  closure gate and no managed-block row may change.
 - `.AGENTS.md.swp` — pre-existing untracked editor state. Never staged, never removed.
 - `skills/setup/SKILL.md` — its Discovery subsections are pinned verbatim and concern
   model/effort discovery, not dispatch. Its filename suggests relevance; its contents
@@ -48,9 +50,9 @@ scope below because this plan changes neither the gate list nor the managed bloc
 
 ## Execution envelope
 
-Protected dirty paths: `AGENTS.md` (modified — managed block phase pins) and
-`.AGENTS.md.swp` (untracked). Both existed at baseline and are not staged, reset or
-removed by this plan.
+Protected dirty paths: `.AGENTS.md.swp` (untracked editor state), never staged,
+reset or removed. `AGENTS.md` was protected until the human committed its
+pre-existing change at `77423b0`; from that commit it is an owned path.
 
 Branch, base, remote, and pull-request target: `feat/orchestration-execution-plane`,
 based on `origin/main` at `86666a6`, remote `origin`, pull request into `main`.
@@ -135,7 +137,21 @@ verify is deleted, not carried: a stale cell is worse than an empty one, because
 `SKILL.md` tells Control to prefer this file over a harness's own `--help`. Update
 the verbatim table pin in `tests/contracts.sh` to the new shape.
 
-**Files.** `skills/delivery/references/harnesses.md`, `tests/contracts.sh`.
+**Follow-up, after the first Task 2 commit `6a46072`.** Three defects, none of them
+the implementer's: the rule was applied to facts this delivery *did* verify, which
+decision 5 says to keep; `Launch notes` is now an empty column under an intro
+sentence that still promises it; and both documents describing this reference —
+`SKILL.md`'s "compatibility matrix of permission defaults, forbidden headless
+forms, launch notes, and trust handling" and the matching sentence in `AGENTS.md` —
+now describe a file that no longer exists in that shape. Control's plan asserted
+that `AGENTS.md`'s wording would not need to change without reading it. Restore the
+launch-note facts this delivery verified — that `worker-start --agent` with
+`--model` pins Claude, Codex and Cursor launches, and that effort is omitted where
+the managed block says `default` — reconcile both descriptor sentences to the
+table's real columns, and either fill or drop the empty column.
+
+**Files.** `skills/delivery/references/harnesses.md`, `tests/contracts.sh`,
+`skills/delivery/SKILL.md`, `AGENTS.md`.
 
 **Focused verification.** `bash tests/contracts.sh`: the updated verbatim table pin,
 plus an assertion that each of the seven agent ids appears and that the string
@@ -230,6 +246,8 @@ section requires a command, and that the handoff block names `Residue`.
 | `SKILL.md` names the orchestration verbs and both typed recovery routes | `bash tests/contracts.sh` presence assertions on `worker-start`, `worker_done`, `agent_prompt_blocked`, `agent_prompt_stalled`, `payload.reportPath` | An edit that deletes the old apparatus and replaces it with prose that says "use Orca's orchestration skill" without naming a verb or a route: shorter, parses, absence assertions pass, leaves Control with no route for a blocked launch |Red on baseline `d97cc90`: `does not name the orchestration verbs and both typed recovery routes`. Reproduced at review; each of the six required tokens trips it alone. |
 | `harnesses.md` carries the seven Orca agent ids and not the binary names | `bash tests/contracts.sh` presence of each id, and the updated verbatim table pin | A row edit that adds an `Orca agent id` column but fills the Kiro cell with `kiro-cli`: table shape correct, pin updated to match, every launch through it fails `agent_unconfigured` | |
 | The stale Claude Code trust claim is gone rather than reworded | `bash tests/contracts.sh` absence assertion on `does not suppress it` | A rewording to "may not suppress it" that keeps the instruction to select a dialog option which never appears: hedged, plausible, still sends Control after a dialog that is not there | |
+| The reference's descriptor sentences match its real columns | `bash tests/contracts.sh` assertion that neither `SKILL.md` nor `AGENTS.md` names a column the table does not have | Reconciling `SKILL.md` alone and leaving `AGENTS.md` naming trust handling: the skill reads correctly, the project document a contributor opens first still describes a deleted column | |
+| Launch notes carry what this delivery verified | Human reads the diff against the 2026-09-04 measurements | An empty column kept under an intro sentence that promises it: the table parses, every pin passes, and the file promises guidance it does not give | |
 | The orchestration prerequisite is documented once, in shared prerequisites | `bash tests/contracts.sh` assertion scoped to the shared prerequisites section via the existing section extractor | The prerequisite written inside the Kiro CLI section only: a whole-file grep passes, six of seven harness readers never see it |Red at `00d7cf0`: `README.md Quickstart does not give orca orchestration run-list --json as the confirmation command`. Still red at review with the command present only inside `### Kiro CLI`, where a whole-file grep passes. |
 | The contract script stays under its ceiling | `test "$(wc -l < tests/contracts.sh)" -le 250` | New assertions added without removing the Ruby issue-form block: script grows past 250, gate fails loudly rather than silently |Red at review by re-applying the deleted Ruby hunk: the script reaches 254 lines and the ceiling gate fails on exit code. |
 | Review-contract rules land in the review contract, not merely somewhere in the file | `bash tests/contracts.sh` assertions scoped to the `## Review` section | `Not verified` added to the handoff block instead of the review's return: the words exist, a whole-file grep passes, the reviewer contract is unchanged | |
