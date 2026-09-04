@@ -180,6 +180,37 @@ that Control itself runs on.
 
 #### Deferred
 
+- Giving the repeated completion wait a stated exit. `timeout` occurs nowhere in
+  the skill; the wait is bounded only by whatever deadline Control passes the
+  plane. Trigger: a measurement showing the plane does not always surface a dead
+  worker as an arriving settling message.
+- A worker that ends its turn without finishing or reporting has no typed error.
+  The plane reports the terminal alive and ready, so only a Control-side deadline
+  distinguishes it from slow work. Trigger: a second occurrence, or a typed
+  signal appearing in the plane.
+- The prerequisite command is unverified against a disabled runtime. `README.md`
+  tells a reader that `orca orchestration run-list --json` confirms orchestration
+  is enabled; nobody has observed it fail when orchestration is disabled. An
+  instrument only ever seen green is the defect this record is about. Trigger: a
+  runtime with the feature off.
+- The issue-form checker's removal rests on an unobserved premise: that the
+  hosting platform rejects a malformed issue form. Nothing in the repository
+  depended on the checker, but that argument was not tested. Trigger: a malformed
+  form reaching a contributor.
+- Absence assertions are literal, so a paraphrased restoration of deleted text
+  passes. Inside the limit already stated: the checker proves a phrase present or
+  absent, never that a rule means what it says.
+- Wording defects left unabsorbed, each recorded rather than fixed because none
+  lets an instrument accept a wrong implementation: the launch table's intro
+  promises a note per harness while two of seven carry one, with no statement
+  that an empty cell means "not measured here"; the Claude Code cell records the
+  model pin but not the effort pin the receipts also show; a general rule about
+  omitting effort sits in one row; the troubleshooting entry names orchestration
+  as a possible missing capability but offers no command that distinguishes it;
+  the preflight fence's comment column is misaligned; and the release-ordering
+  check pins a line whose semantics-preserving rewrap would turn it red, and
+  lacks a guard that keeps shell noise off a correct failure.
+
 - Restoring any per-harness behavioural claim deleted by decision 5. The launch
   table previously asserted, for each harness, whether an interactive launch
   prompts a workspace trust dialog, whether the permission-default flag suppresses
@@ -199,6 +230,16 @@ that Control itself runs on.
   a second machine or a second version reproducing the stall.
 - Handling a first-run vendor modal beyond reading the terminal. Trigger: a
   blocked launch that reading the terminal cannot clear.
+
+#### Limits of this delivery's evidence
+
+`tests/contracts.sh` is a structural checker. It proves a phrase present or absent
+and that a named section contains it; it cannot prove a rule means what it says,
+that Control will follow it, or that the execution plane behaves as described.
+Runtime behaviour was measured once, on one machine and one Orca build, by the
+2026-09-04 probe and by this delivery's own dispatches; no gate re-measures it.
+Several rules ship with no executable instrument and a human reading the diff as
+their declared check, which is only worth keeping if someone reads it.
 
 ### 2026-08-31 — GitHub Copilot CLI is a first-class seventh harness, and it needs no sidecar
 
