@@ -50,8 +50,8 @@ delivery run.
 <!-- dely:end -->
 
 The table is this repository's deployment selection, not the portable
-protocol. Per-harness launch mechanics — permission defaults, forbidden
-headless forms, launch notes, and trust handling — live in
+protocol. Per-harness launch mechanics — Orca agent id, permission
+defaults, forbidden headless forms, and launch notes — live in
 `skills/delivery/references/harnesses.md`.
 
 This project adds no phase-implied sandbox. Native Internet access, closure

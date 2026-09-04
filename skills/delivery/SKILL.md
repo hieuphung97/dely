@@ -140,8 +140,8 @@ which this skill already forbids for prompts.
 TUI for the phase, with the model and effort pinned from `AGENTS.md`. A
 visible shell running a headless harness is not a TUI; compose that TUI's
 launch using `references/harnesses.md`, this skill's compatibility matrix of
-permission defaults, forbidden headless forms, launch notes, and trust
-handling.
+Orca agent id, permission defaults, forbidden headless forms, and launch
+notes.
 
 **Name the model and effort on every dispatch.** A worker left on a harness
 default is an unpinned environment: it lives in the harness's own config, it
