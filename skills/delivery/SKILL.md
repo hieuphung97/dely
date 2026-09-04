@@ -153,8 +153,12 @@ configured permission default for that agent onto the composed argv;
 composing argv is not a request for a different permission posture. Do not
 add a sandbox the project did not pin.
 
-`check --wait` on `worker_done,escalation,question` is the completion wait.
+`check --wait` on `worker_done,escalation,question` is the completion wait,
+repeated past heartbeats until a settling message arrives for that dispatch —
+a heartbeat ends one wait but settles nothing.
 The worker reports once with `worker_done` and an `--outcome`.
+Completion comes from the worker's own `worker_done`;
+do not infer it from reading the worker's terminal.
 `worker-release` returns the terminal. `worker-read` is the bounded evidence
 read.
 

@@ -57,7 +57,7 @@ grep -Fq 'configured permission default' "$skill" && grep -Fq 'sandbox the proje
 grep -Fq 'references/harnesses.md' "$skill" && [ -f "$harnesses" ] && ! tr '\n' ' ' < "$skill" | grep -Fq 'no compatibility matrix' || fail_with "$skill does not name an existing $harnesses, or still denies having a compatibility matrix"
 # Dispatch mechanics come from the execution plane: deleted procedures absent; named verbs and typed recovery routes present.
 grep -Fq 'Keep waiting blocking' "$skill" || grep -Fq '`input_accepted` is not submission' "$skill" || grep -Fq 'Allow 90 seconds' "$skill" && fail_with "$skill still carries a hand-rolled readiness or submission procedure"
-grep -Fq 'worker-start' "$skill" && grep -Fq 'worker_done' "$skill" && grep -Fq 'agent_prompt_blocked' "$skill" && grep -Fq 'agent_prompt_stalled' "$skill" && grep -Fq 'payload.reportPath' "$skill" || fail_with "$skill does not name the orchestration verbs and both typed recovery routes"
+grep -Fq 'worker-start' "$skill" && grep -Fq 'worker_done' "$skill" && grep -Fq 'agent_prompt_blocked' "$skill" && grep -Fq 'agent_prompt_stalled' "$skill" && grep -Fq 'payload.reportPath' "$skill" && grep -Fq 'do not infer it from reading' "$skill" || fail_with "$skill does not name the orchestration verbs and both typed recovery routes"
 for f in '--permission-mode bypassPermissions' '--dangerously-skip-permissions' '--trust-all-tools' '--force' 'claude -p' 'codex exec' 'grok --prompt-file' 'agy -p' 'kiro-cli chat --no-interactive' 'cursor-agent -p' 'copilot -p' '--allow-all'; do
   grep -Fq -- "$f" "$harnesses" || fail_with "$harnesses does not name: $f"
   grep -Fq -- "$f" "$root/AGENTS.md" && fail_with "AGENTS.md must not name: $f"
