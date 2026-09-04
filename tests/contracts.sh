@@ -170,8 +170,8 @@ for col in Requirement Instrument Counterexample "Observed red"; do
     fail_with "$plan_template acceptance header is missing column: $col"
   fi
 done
-h="$(awk '/^### Handoff/{p=1;next} p && /^## /{exit} p' "$skill")"; printf '%s\n' "$h" | grep -Fq 'Residue' && printf '%s\n' "$h" | grep -Fq 'nothing left' && printf '%s\n' "$(awk '/^## Allowed scope/{p=1;next} p && /^## /{exit} p' "$plan_template")" | grep -Fq 'command' || fail_with "$skill handoff does not name Residue with inverted burden, or $plan_template Allowed scope does not require a command"
-
+h="$(awk '/^### Handoff/{p=1;next} p && /^## /{exit} p' "$skill")"; printf '%s\n' "$h" | grep -Fq 'Residue' && printf '%s\n' "$h" | grep -Fq 'nothing left is the thing that needs evidence' && printf '%s\n' "$(awk '/^## Allowed scope/{p=1;next} p && /^## /{exit} p' "$plan_template")" | grep -Fq 'the command that produced' || fail_with "$skill handoff does not name Residue with inverted burden, or $plan_template Allowed scope does not require a command"
+rel="$(awk '/^## Release/{p=1;next} p && /^## /{exit} p' "$skill")"; a="$(printf '%s\n' "$rel" | grep -n 'delete the plan' | head -1 | cut -d: -f1)"; b="$(printf '%s\n' "$rel" | grep -n 'final review' | head -1 | cut -d: -f1)"; [ -n "$a" ] && [ "$a" -lt "$b" ] || fail_with "$skill Release does not delete the plan before the final review"
 # Community collaboration contract: the six community artifacts must exist.
 for f in CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md .github/ISSUE_TEMPLATE/bug_report.yml \
          .github/ISSUE_TEMPLATE/feature_request.yml .github/pull_request_template.md; do
