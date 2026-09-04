@@ -59,6 +59,9 @@ grep -Fq 'references/harnesses.md' "$skill" && [ -f "$harnesses" ] && ! tr '\n' 
 grep -Fq 'Keep waiting blocking' "$skill" || grep -Fq '`input_accepted` is not submission' "$skill" || grep -Fq 'Allow 90 seconds' "$skill" && fail_with "$skill still carries a hand-rolled readiness or submission procedure"
 grep -Fq 'worker-start' "$skill" && grep -Fq 'worker_done' "$skill" && grep -Fq 'agent_prompt_blocked' "$skill" && grep -Fq 'agent_prompt_stalled' "$skill" && grep -Fq 'payload.reportPath' "$skill" || fail_with "$skill does not name the orchestration verbs and both typed recovery routes"
 grep -Fq 'do not infer it from reading' "$skill" || fail_with "$skill does not pin that completion cannot be inferred from reading a worker's terminal"
+review="$(awk '/^## Review[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$skill")"
+[ -n "$review" ] || fail_with "$skill is missing a ## Review section"
+printf '%s\n' "$review" | grep -Fq 'shared mutable state' && printf '%s\n' "$review" | grep -Fq 'did not verify' && printf '%s\n' "$review" | grep -Fq 'not implementing the candidate' && printf '%s\n' "$review" | grep -Fq 'per finding, not per review' || fail_with "$skill ## Review does not carry the sequencing, unverified, Control-owned-amendment, and one-pass-per-finding rules"
 for f in '--permission-mode bypassPermissions' '--dangerously-skip-permissions' '--trust-all-tools' '--force' 'claude -p' 'codex exec' 'grok --prompt-file' 'agy -p' 'kiro-cli chat --no-interactive' 'cursor-agent -p' 'copilot -p' '--allow-all'; do
   grep -Fq -- "$f" "$harnesses" || fail_with "$harnesses does not name: $f"
   grep -Fq -- "$f" "$root/AGENTS.md" && fail_with "AGENTS.md must not name: $f"

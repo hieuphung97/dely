@@ -252,6 +252,11 @@ candidate identity, and release readiness. Only that final review is
 release-binding for Architectural work; Bounded work has no earlier task
 review and no duplicate integration review.
 
+No worker runs while a review of the same working tree runs. The working
+tree and its gate surface are shared mutable state, and a review reproduces
+gates in that tree, so a concurrent edit makes another task's work look
+like this one's result.
+
 **Reproduce, do not accept.** Run the gates yourself. A claim you did not
 reproduce is not evidence.
 
@@ -261,23 +266,29 @@ reconciliation. **Minor** — useful, does not block. **Out of scope** —
 recorded, not absorbed.
 
 Return exactly one role disposition: `ACCEPT`, `CHANGES_REQUESTED`, or
-`BLOCKED`. A contradiction you cannot resolve is `CHANGES_REQUESTED`.
+`BLOCKED`. State what it did not verify — what the review did not
+reproduce or read. A contradiction you cannot resolve is `CHANGES_REQUESTED`.
 Do not open remediation over wording when deterministic checks already prove
 the contract.
 
 ### Remediation
 
-One pass. For an in-contract `CHANGES_REQUESTED` finding, the **original
-implementer** verifies it, fixes the root cause, reruns the affected
-instruments and closure gates, and writes a separate remediation commit —
-this is the single original-party remediation. The **reviewer that raised
-the finding** checks its reproduction and the fix-only diff. If that scoped
-re-review does not accept, Control routes to `REPLAN_OR_SPLIT` — it does not
-start another repair loop. `BLOCKED` preserves the candidate and escalates
-the unresolved dependency or authority question to Control separately from a
-failed worker process; it is not remediated by the original implementer. A
-fresh replacement reviewer is used only when the original reviewer is
-unavailable or contested, and for the Architectural integration review.
+One pass is one remediation pass per finding, not per review. For an
+in-contract `CHANGES_REQUESTED` finding, the **original implementer**
+verifies it, fixes the root cause, reruns the affected instruments and
+closure gates, and writes a separate remediation commit — this is the
+single original-party remediation. The **reviewer that raised the
+finding** checks its reproduction and the fix-only diff. If that scoped
+re-review does not accept, Control routes to `REPLAN_OR_SPLIT` — it does
+not start another repair loop. Control owns the plan and the decision
+record for the whole run, including remediating findings inside them.
+Amending them is not implementing the candidate. The reviewer that raised
+such a finding scope-checks the amendment on the fix-only diff. `BLOCKED`
+preserves the candidate and escalates the unresolved dependency or
+authority question to Control separately from a failed worker process; it
+is not remediated by the original implementer. A fresh replacement
+reviewer is used only when the original reviewer is unavailable or
+contested, and for the Architectural integration review.
 
 ## Release
 
