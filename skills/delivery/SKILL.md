@@ -117,10 +117,11 @@ rather than combining ownership.
 ## Orca is mandatory
 
 Orca is the required execution plane. It launches and supervises fresh native
-harness TUIs with the resolved harness, model, and effort. `dely:delivery`
-starts and preflights Orca before execution. It stops only when the CLI is
-missing, the runtime cannot start, or a required capability is absent — there
-is no direct dispatch and no headless fallback of any kind.
+harness TUIs with the resolved harness, model, and effort. Orchestration is a
+required Orca capability. `dely:delivery` starts and preflights Orca before
+execution. It stops only when the CLI is missing, the runtime cannot start, or a
+required capability is absent — there is no direct dispatch and no headless
+fallback of any kind.
 
 ### Launching a worker
 
@@ -129,12 +130,18 @@ it in a shell argument: prompts carry backticks, quotes and newlines, and a
 shell argument mangles them. A path outside the workspace can trigger a
 second permission surface some harnesses still prompt for even when tool
 approval is skipped. Do not stage that file. After the worker returns,
-delete it: Control owns that dispatch artifact, not `git clean`. Load Orca's
-native skill and use it to launch a real interactive harness TUI for the
-phase, with the model and effort pinned from `AGENTS.md`. A visible shell
-running a headless harness is not a TUI; compose that TUI's launch using
-`references/harnesses.md`, this skill's compatibility matrix of permission
-defaults, forbidden headless forms, launch notes, and trust handling.
+delete it: Control owns that dispatch artifact, not `git clean`. The handoff
+is likewise a file in the worktree; its path travels as `payload.reportPath`
+and the message body stays short. `--spec` and `--body` are shell arguments,
+which this skill already forbids for prompts.
+
+`worker-start` proves readiness by exiting 0 with a receipt carrying
+`launch.requested` and `launch.effective`. Launch a real interactive harness
+TUI for the phase, with the model and effort pinned from `AGENTS.md`. A
+visible shell running a headless harness is not a TUI; compose that TUI's
+launch using `references/harnesses.md`, this skill's compatibility matrix of
+permission defaults, forbidden headless forms, launch notes, and trust
+handling.
 
 **Name the model and effort on every dispatch.** A worker left on a harness
 default is an unpinned environment: it lives in the harness's own config, it
@@ -146,24 +153,15 @@ configured permission default for that agent onto the composed argv;
 composing argv is not a request for a different permission posture. Do not
 add a sandbox the project did not pin.
 
-Keep waiting blocking. A worker is observed through Orca until it completes
-or its timeout fires. Do not add a relay, poll, or state machine to
-manufacture completion.
+`check --wait` on `worker_done,escalation,question` is the completion wait.
+The worker reports once with `worker_done` and an `--outcome`.
+`worker-release` returns the terminal. `worker-read` is the bounded evidence
+read.
 
-**`input_accepted` is not submission.** It is a transport receipt, not proof
-that the harness submitted the prompt. Allow 90 seconds for a dispatch
-heartbeat or visible agent progress. If neither appears, read the worker TUI.
-Only when that read shows the task still pending in the input box does
-Control send Enter, exactly once, then return to the normal blocking wait.
-
-Do not send Enter when the worker is already reasoning, using a tool, asking a
-question or reporting completion. Do not infer submission from a rendered copy
-of the prompt alone. A second missing signal is a liveness problem to
-inspect, not permission to keep pressing Enter.
-
-Capture the worker's session id from its output and put it in the handoff: it
-is how the human opens that session to inspect or steer it, and a harness need
-not list a dispatched session in its own picker.
+A blocked or stalled launch is routed by the plane's typed error, not by an
+enumerated vendor dialog. `agent_prompt_blocked` means a modal sits between
+launch and composer, so read that terminal and clear what is actually there.
+`agent_prompt_stalled` is a liveness inspection.
 
 ### Investigation
 
@@ -215,7 +213,7 @@ session. A task needing continuation is a decomposition failure.
 ```text
 Status: DONE | BLOCKED | NEEDS_REPLAN
 Harness:            name, model, effort, sandbox
-Session:            the worker's own session id
+Session:            the dispatch id
 Baseline:
 Changed paths:
 Contract coverage:
