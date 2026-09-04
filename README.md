@@ -102,15 +102,15 @@ reports it for the human to merge. Dely never merges or force-pushes.
 Each worker returns a structured handoff. `END OF HANDOFF` is the last line and
 load-bearing: it is the only thing that distinguishes a complete handoff from
 one cut off mid-write. The block names status, harness, session, baseline,
-changed paths, contract coverage, verification, deviations, unresolved
-findings, and git state.
+changed paths, contract coverage, verification, deviations, residue,
+and git state.
 
 If review returns in-contract `CHANGES_REQUESTED`, there is one remediation
-pass by the original implementer: verify the finding, fix the root cause, rerun
-the affected instruments and closure gates, and write a separate remediation
-commit. The reviewer that raised the finding checks reproduction and the
-fix-only diff. If that scoped re-review does not accept, Control routes to
-replan rather than starting another repair loop.
+pass per finding by the original implementer: verify the finding, fix the
+root cause, rerun the affected instruments and closure gates, and write a
+separate remediation commit. The reviewer that raised the finding checks
+reproduction and the fix-only diff. If that scoped re-review does not accept,
+Control routes to replan rather than starting another repair loop.
 
 `BLOCKED` and `NEEDS_REPLAN` are distinct stop statuses, not synonyms for a
 crash. `BLOCKED` preserves the candidate and escalates an unresolved

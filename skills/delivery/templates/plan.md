@@ -1,7 +1,8 @@
 # Plan template
 
-Transient. Deleted at closure, after anything durable has moved into the decision
-record or the documents that own the changed paths.
+Transient. Deleted in the release commit, before the release-binding review,
+after anything durable has moved into the decision record or the documents
+that own the changed paths.
 
 Three to five tightly related tasks. One coherent contract. One acceptance table.
 No status duplicated anywhere else.
@@ -28,7 +29,9 @@ One paragraph. What is true when this is done, and what is out of reach.
 Carried without being listed: the colocated test of any allowed source file, any
 registry test enumerating what this plan adds, and any document owning an allowed
 path. State here which of those apply and which yielded nothing — checked, not
-assumed.
+assumed. State the command that produced the listed paths and any count or
+scope; the claim reports that command's output, and a count or a scope
+enumerates rather than samples.
 
 ## Forbidden scope
 

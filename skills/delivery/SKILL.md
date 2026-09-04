@@ -71,8 +71,9 @@ executable instrument can discriminate the requirement, the contract names the
 manual inspection and its limit.
 
 Architectural work uses `templates/decision-record.md` (durable) and
-`templates/plan.md` (transient, deleted at closure). Commit both before
-implementation begins — that commit is the review baseline.
+`templates/plan.md` (transient, deleted in the release commit, before
+the release-binding review). Commit both before implementation begins
+— that commit is the review baseline.
 
 ### Acceptance
 
@@ -94,6 +95,12 @@ says a human reads the diff.
 
 Record what the available instruments cannot observe. Prefer the simplest
 instrument that proves the contract.
+
+Any claim about extent — an allowed scope, a count, a set of call sites —
+states the command that produced it. Naming the command is not the
+measurement: the command must have been run, and the claim reports its
+output. Where the claim is a count or a scope, the instrument enumerates
+rather than samples.
 
 ## Execution envelope
 
@@ -162,6 +169,11 @@ do not infer it from reading the worker's terminal.
 `worker-release` returns the terminal. `worker-read` is the bounded evidence
 read.
 
+Each delivery opens its own Run on the execution plane rather than reusing
+another's, so a stale report cannot settle a new wait. A wait acknowledges
+its settling message after handling it, or the plane redelivers that
+message to the next wait.
+
 A blocked or stalled launch is routed by the plane's typed error, not by an
 enumerated vendor dialog. `agent_prompt_blocked` means a modal sits between
 launch and composer, so read that terminal and clear what is actually there.
@@ -223,13 +235,15 @@ Changed paths:
 Contract coverage:
 Verification:
 Deviations from plan:
-Unresolved findings:
+Residue:
 Git state:
 END OF HANDOFF
 ```
 
 `END OF HANDOFF` is the last line and load-bearing: the only thing that
-distinguishes a handoff from one cut off mid-write. Under `Verification`, cite
+distinguishes a handoff from one cut off mid-write. Under `Residue`, a
+claim of nothing left is the thing that needs evidence: name the check
+that returned empty. Under `Verification`, cite
 the dispatch-bound command, output, and outcome that Orca recovers for that
 task — the transcript or terminal it selects, and any cursor mechanics, are
 Orca's concern, not this skill's. Do not transcribe output by hand. Where
@@ -266,7 +280,7 @@ reconciliation. **Minor** — useful, does not block. **Out of scope** —
 recorded, not absorbed.
 
 Return exactly one role disposition: `ACCEPT`, `CHANGES_REQUESTED`, or
-`BLOCKED`. State what it did not verify — what the review did not
+`BLOCKED`. State what the review did not verify — what it did not
 reproduce or read. A contradiction you cannot resolve is `CHANGES_REQUESTED`.
 Do not open remediation over wording when deterministic checks already prove
 the contract.
@@ -277,18 +291,17 @@ One pass is one remediation pass per finding, not per review. For an
 in-contract `CHANGES_REQUESTED` finding, the **original implementer**
 verifies it, fixes the root cause, reruns the affected instruments and
 closure gates, and writes a separate remediation commit — this is the
-single original-party remediation. The **reviewer that raised the
-finding** checks its reproduction and the fix-only diff. If that scoped
-re-review does not accept, Control routes to `REPLAN_OR_SPLIT` — it does
-not start another repair loop. Control owns the plan and the decision
+single original-party remediation. Control owns the plan and the decision
 record for the whole run, including remediating findings inside them.
-Amending them is not implementing the candidate. The reviewer that raised
-such a finding scope-checks the amendment on the fix-only diff. `BLOCKED`
-preserves the candidate and escalates the unresolved dependency or
-authority question to Control separately from a failed worker process; it
-is not remediated by the original implementer. A fresh replacement
-reviewer is used only when the original reviewer is unavailable or
-contested, and for the Architectural integration review.
+Amending them is not implementing the candidate. The **reviewer that raised
+the finding** checks its reproduction and the fix-only diff, and
+scope-checks a Control amendment the same way. If that scoped re-review
+does not accept, Control routes to `REPLAN_OR_SPLIT` — it does not start
+another repair loop. `BLOCKED` preserves the candidate and escalates the
+unresolved dependency or authority question to Control separately from a
+failed worker process; it is not remediated by the original implementer. A
+fresh replacement reviewer is used only when the original reviewer is
+unavailable or contested, and for the Architectural integration review.
 
 ## Release
 
@@ -296,7 +309,7 @@ Control performs release with native Git and forge tools; release dispatches
 no LLM worker and makes no post-review candidate edit.
 
 1. Complete implementation and, for Architectural work, its task reviews.
-2. Reconcile owning documentation and commit the complete candidate.
+2. Reconcile owning documentation, delete the plan, and commit the complete candidate.
 3. Run the focused instruments and project closure gates on exact HEAD.
 4. Push the feature branch and create or update a draft pull request.
 5. Run the applicable final review while remote CI runs on that same HEAD.
@@ -305,6 +318,9 @@ no LLM worker and makes no post-review candidate edit.
 
 Any candidate mutation after the applicable final review invalidates that
 verdict; Control reruns the affected gates and review on the new exact HEAD.
+Affected gates are those that can observe the change class; a project may
+name that subset.
+
 Dely never merges, force-pushes, or publishes outside the approved target and
 authority. If project policy cannot publish work in progress, Dely delays the
 push and pull request until the applicable review accepts.
@@ -316,9 +332,9 @@ creates the directory or file: a missing path is skipped silently, and
 deleting the file opts out. Only after a delivery is accepted and all
 required checks are green does Control append exactly one physical line;
 aborted or incomplete deliveries are not recorded. The line carries an
-ISO-8601 UTC timestamp and labelled fields for the Git-root basename, plan,
-pull request or `none`, implementation-round count, ordered review
-dispositions, and one short drift-cause sentence. Tabs separate fields;
+ISO-8601 UTC timestamp and labelled fields `git-root`, `plan`,
+`pull-request` or `none`, `implementation-rounds`, `review-dispositions`,
+and `drift-cause`. Tabs separate fields;
 embedded tabs and newlines become spaces. Dely never reads this file for
 routing, recovery, or runtime decisions, and its text layout is not a public
 parsing schema. An append failure produces a visible warning but does not

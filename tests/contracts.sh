@@ -44,7 +44,7 @@ else
 fi
 
 # Maintenance-log section is matched verbatim so a contradictory extra clause or a flipped word fails.
-expected_log_section='Maintenance logging is machine-local and opt-in at `~/.dely/log`. Dely never creates the directory or file: a missing path is skipped silently, and deleting the file opts out. Only after a delivery is accepted and all required checks are green does Control append exactly one physical line; aborted or incomplete deliveries are not recorded. The line carries an ISO-8601 UTC timestamp and labelled fields for the Git-root basename, plan, pull request or `none`, implementation-round count, ordered review dispositions, and one short drift-cause sentence. Tabs separate fields; embedded tabs and newlines become spaces. Dely never reads this file for routing, recovery, or runtime decisions, and its text layout is not a public parsing schema. An append failure produces a visible warning but does not invalidate or block an otherwise accepted release.'
+expected_log_section='Maintenance logging is machine-local and opt-in at `~/.dely/log`. Dely never creates the directory or file: a missing path is skipped silently, and deleting the file opts out. Only after a delivery is accepted and all required checks are green does Control append exactly one physical line; aborted or incomplete deliveries are not recorded. The line carries an ISO-8601 UTC timestamp and labelled fields `git-root`, `plan`, `pull-request` or `none`, `implementation-rounds`, `review-dispositions`, and `drift-cause`. Tabs separate fields; embedded tabs and newlines become spaces. Dely never reads this file for routing, recovery, or runtime decisions, and its text layout is not a public parsing schema. An append failure produces a visible warning but does not invalidate or block an otherwise accepted release.'
 
 actual_log_section="$(awk '/^### Maintenance log$/{flag=1; next} flag && /^#/{exit} flag' "$skill" | tr '\n' ' ' | tr -s ' ')"
 actual_log_section="${actual_log_section# }"
@@ -59,8 +59,7 @@ grep -Fq 'references/harnesses.md' "$skill" && [ -f "$harnesses" ] && ! tr '\n' 
 grep -Fq 'Keep waiting blocking' "$skill" || grep -Fq '`input_accepted` is not submission' "$skill" || grep -Fq 'Allow 90 seconds' "$skill" && fail_with "$skill still carries a hand-rolled readiness or submission procedure"
 grep -Fq 'worker-start' "$skill" && grep -Fq 'worker_done' "$skill" && grep -Fq 'agent_prompt_blocked' "$skill" && grep -Fq 'agent_prompt_stalled' "$skill" && grep -Fq 'payload.reportPath' "$skill" || fail_with "$skill does not name the orchestration verbs and both typed recovery routes"
 grep -Fq 'do not infer it from reading' "$skill" || fail_with "$skill does not pin that completion cannot be inferred from reading a worker's terminal"
-review="$(awk '/^## Review[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$skill")"
-[ -n "$review" ] || fail_with "$skill is missing a ## Review section"
+review="$(awk '/^## Review[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$skill")"; [ -n "$review" ] || fail_with "$skill is missing a ## Review section"
 printf '%s\n' "$review" | grep -Fq 'shared mutable state' && printf '%s\n' "$review" | grep -Fq 'did not verify' && printf '%s\n' "$review" | grep -Fq 'not implementing the candidate' && printf '%s\n' "$review" | grep -Fq 'per finding, not per review' || fail_with "$skill ## Review does not carry the sequencing, unverified, Control-owned-amendment, and one-pass-per-finding rules"
 for f in '--permission-mode bypassPermissions' '--dangerously-skip-permissions' '--trust-all-tools' '--force' 'claude -p' 'codex exec' 'grok --prompt-file' 'agy -p' 'kiro-cli chat --no-interactive' 'cursor-agent -p' 'copilot -p' '--allow-all'; do
   grep -Fq -- "$f" "$harnesses" || fail_with "$harnesses does not name: $f"
@@ -171,6 +170,7 @@ for col in Requirement Instrument Counterexample "Observed red"; do
     fail_with "$plan_template acceptance header is missing column: $col"
   fi
 done
+h="$(awk '/^### Handoff/{p=1;next} p && /^## /{exit} p' "$skill")"; printf '%s\n' "$h" | grep -Fq 'Residue' && printf '%s\n' "$h" | grep -Fq 'nothing left' && printf '%s\n' "$(awk '/^## Allowed scope/{p=1;next} p && /^## /{exit} p' "$plan_template")" | grep -Fq 'command' || fail_with "$skill handoff does not name Residue with inverted burden, or $plan_template Allowed scope does not require a command"
 
 # Community collaboration contract: the six community artifacts must exist.
 for f in CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md .github/ISSUE_TEMPLATE/bug_report.yml \
