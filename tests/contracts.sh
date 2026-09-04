@@ -126,7 +126,7 @@ for id in claude codex grok antigravity kiro cursor copilot; do
   grep -Eq "^[|] [^|]+[|] \`$id\` [|]" "$harnesses" || fail_with "$harnesses does not name Orca agent id: $id"
 done
 grep -Fq 'does not suppress it' "$harnesses" || grep -Fq 'may not suppress it' "$harnesses" && fail_with "$harnesses still carries the stale Claude Code trust claim"
-header="$(awk '/^\|/{print; exit}' "$harnesses")"; for doc in "$skill" "$root/AGENTS.md"; do for p in "trust handling" "permission default" "forbidden headless" "launch notes" "orca agent id"; do tr '\n' ' ' < "$doc" | grep -Fiq "$p" && ! printf '%s\n' "$header" | grep -Fiq "$p" && fail_with "$doc names a column the table does not have: $p"; done; done
+header="$(awk '/^\|/{print; exit}' "$harnesses")"; for doc in "$skill" "$root/AGENTS.md" "$root/README.md"; do for p in "trust handling" "permission default" "forbidden headless" "launch notes" "orca agent id"; do tr '\n' ' ' < "$doc" | grep -Fiq "$p" && ! printf '%s\n' "$header" | grep -Fiq "$p" && fail_with "$doc names a column the table does not have: $p"; done; done
 
 # README install sections: Kiro requires npx skills; Cursor requires marketplace add + /plugin + /dely.
 readme_section() { awk "/^### ${1}[[:space:]]*\$/{p=1;next} p && /^#{2,3} /{exit} p" "$root/README.md"; }

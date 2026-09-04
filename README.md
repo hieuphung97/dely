@@ -130,8 +130,8 @@ second copy.
 
 The full workflow contract is
 [`skills/delivery/SKILL.md`](skills/delivery/SKILL.md). Per-harness launch
-mechanics — permission defaults, forbidden headless forms, launch notes, and
-trust handling — live in
+mechanics — Orca agent id, permission defaults, forbidden headless forms, and
+launch notes — live in
 [`skills/delivery/references/harnesses.md`](skills/delivery/references/harnesses.md).
 Rationale for the current design is in
 [`docs/decisions.md`](docs/decisions.md).
