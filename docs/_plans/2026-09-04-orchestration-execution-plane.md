@@ -81,12 +81,17 @@ error rather than by an enumerated vendor dialog.
 
 **Direction.** Replace the `Launching a worker` mechanics with: `worker-start`
 proves readiness by exiting 0 with a receipt carrying `launch.requested` and
-`launch.effective`; `check --wait` on `worker_done,escalation,question` is the
-completion wait; the worker reports once with `worker_done` and an `--outcome`;
+`launch.effective`; the completion wait is `check --wait` on
+`worker_done,escalation,question` **repeated past heartbeats** until a settling
+message arrives for that dispatch — a heartbeat ends one wait but settles
+nothing; the worker reports once with `worker_done` and an `--outcome`;
 `worker-release` returns the terminal; `worker-read` is the bounded evidence read.
-Delete the `Keep waiting blocking` paragraph, the `input_accepted is not submission`
-paragraph with its 90-second allowance and single-Enter procedure, and the
-session-id capture instruction — the dispatch id replaces it. Add the two recovery
+Delete the obsolete mechanics of the `Keep waiting blocking` paragraph but **keep
+its invariant**, reworded to name what is actually forbidden: completion comes
+from the worker's own `worker_done`, and Control does not infer it from reading
+the worker's terminal. Delete the `input_accepted is not submission` paragraph
+with its 90-second allowance and single-Enter procedure, and the session-id
+capture instruction — the dispatch id replaces it. Add the two recovery
 routes: `agent_prompt_blocked` means a modal sits between launch and composer, so
 read that terminal and clear what is actually there; `agent_prompt_stalled` is a
 liveness inspection. Keep the existing rule that the prompt is a file in the
@@ -105,6 +110,13 @@ It fails if either half is missing.
 
 **Document impact.** None outside `SKILL.md`. `AGENTS.md` describes phase dispatch
 and sandboxes, neither of which changes.
+
+**Amended 2026-09-04 after Task 1 returned.** Control wrote two defects into this
+task's Direction and the implementer executed them faithfully: the completion wait
+was described as a single `check --wait`, which measurement contradicts because
+heartbeats pass the type filter and end the wait; and deleting the whole
+`Keep waiting blocking` paragraph discarded an invariant that should have been
+reworded. Both are corrected above. The reviewer scope-checks this amendment.
 
 ### 2. `references/harnesses.md` carries only verified facts
 
@@ -214,6 +226,7 @@ section requires a command, and that the handoff block names `Residue`.
 | Requirement | Instrument | Counterexample | Observed red |
 | --- | --- | --- | --- |
 | `SKILL.md` no longer carries a hand-rolled readiness or submission procedure | `bash tests/contracts.sh` absence assertions on `Keep waiting blocking`, `input_accepted` is not submission, `Allow 90 seconds` | An edit that adds `worker-start` and `worker_done` while leaving the 90-second single-Enter paragraph in place: both mechanisms present, file parses, every existing gate green, contract self-contradictory | |
+| Completion cannot be inferred from reading a worker's terminal | `bash tests/contracts.sh` presence assertion on `do not infer it from reading` | The deleted sentence restored verbatim — "Do not add a relay, poll, or state machine to manufacture completion" — which forbids the very repeated wait the mechanics now require: present, parses, reads as an invariant, contradicts the section above it | |
 | `SKILL.md` names the orchestration verbs and both typed recovery routes | `bash tests/contracts.sh` presence assertions on `worker-start`, `worker_done`, `agent_prompt_blocked`, `agent_prompt_stalled`, `payload.reportPath` | An edit that deletes the old apparatus and replaces it with prose that says "use Orca's orchestration skill" without naming a verb or a route: shorter, parses, absence assertions pass, leaves Control with no route for a blocked launch | |
 | `harnesses.md` carries the seven Orca agent ids and not the binary names | `bash tests/contracts.sh` presence of each id, and the updated verbatim table pin | A row edit that adds an `Orca agent id` column but fills the Kiro cell with `kiro-cli`: table shape correct, pin updated to match, every launch through it fails `agent_unconfigured` | |
 | The stale Claude Code trust claim is gone rather than reworded | `bash tests/contracts.sh` absence assertion on `does not suppress it` | A rewording to "may not suppress it" that keeps the instruction to select a dialog option which never appears: hedged, plausible, still sends Control after a dialog that is not there | |
