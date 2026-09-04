@@ -30,8 +30,10 @@ docs/_plans/2026-09-04-orchestration-execution-plane.md
 Carried without being listed: no colocated tests exist for these paths, and there is
 no registry test enumerating what this plan adds — checked with
 `git ls-files 'tests/*'`, which returns `tests/contracts.sh` alone. The document that
-owns `tests/contracts.sh` and the closure gates is `AGENTS.md`; it is in Forbidden
-scope below because this plan changes neither the gate list nor the managed block.
+owns `tests/contracts.sh` and the closure gates is `AGENTS.md`. It was in Forbidden
+scope until the human committed its pre-existing change at `77423b0`; it is now
+owned for one descriptor sentence only, and neither the gate list nor the managed
+block may change.
 
 ## Forbidden scope
 
@@ -154,9 +156,13 @@ table's real columns, and either fill or drop the empty column.
 `skills/delivery/SKILL.md`, `AGENTS.md`, `README.md`.
 
 **Second follow-up.** Control twice stated the descriptor drift's extent without
-measuring it. Measured with `git grep -n -i 'trust handling' -- . ':!docs/_plans'`,
-three tracked documents named the removed column, not two: `SKILL.md`, `AGENTS.md`
-and `README.md`. The first follow-up's assertion inherited the same blind spot — it
+measuring it. A line-based grep cannot measure this: `SKILL.md` wraps the
+phrase across a newline. The reproducing command is the whitespace-normalising
+idiom `tests/contracts.sh` itself uses — for each tracked file outside
+`docs/_plans`, `tr '\n' ' ' | grep -Fiq 'trust handling'`. At `6a46072` it returns
+four files: `AGENTS.md`, `README.md`, `skills/delivery/SKILL.md`, and
+`docs/decisions.md`, the last being durable history rather than a descriptor. So
+three candidate documents named the removed column, not the two Control asserted. The first follow-up's assertion inherited the same blind spot — it
 loops over the skill and `AGENTS.md` only, so it returns green on the one file that
 is still wrong. `README.md` was already in this plan's Allowed scope, so this
 reassigns an owned file between tasks rather than widening the delivery.
@@ -252,10 +258,10 @@ section requires a command, and that the handoff block names `Residue`.
 | `SKILL.md` no longer carries a hand-rolled readiness or submission procedure | `bash tests/contracts.sh` absence assertions on `Keep waiting blocking`, `input_accepted` is not submission, `Allow 90 seconds` | An edit that adds `worker-start` and `worker_done` while leaving the 90-second single-Enter paragraph in place: both mechanisms present, file parses, every existing gate green, contract self-contradictory |Red on baseline `d97cc90`: `still carries a hand-rolled readiness or submission procedure`. Reproduced at review by running the candidate script against the baseline file, and each of the three phrases trips it in isolation. |
 | Completion cannot be inferred from reading a worker's terminal | `bash tests/contracts.sh` presence assertion on `do not infer it from reading` | The deleted sentence restored verbatim — "Do not add a relay, poll, or state machine to manufacture completion" — which forbids the very repeated wait the mechanics now require: present, parses, reads as an invariant, contradicts the section above it |Red at `5507b86` before the fix, and red again with the deleted sentence restored verbatim, via the missing `do not infer it from reading` conjunct. Reproduced at review in a scratch fixture. |
 | `SKILL.md` names the orchestration verbs and both typed recovery routes | `bash tests/contracts.sh` presence assertions on `worker-start`, `worker_done`, `agent_prompt_blocked`, `agent_prompt_stalled`, `payload.reportPath` | An edit that deletes the old apparatus and replaces it with prose that says "use Orca's orchestration skill" without naming a verb or a route: shorter, parses, absence assertions pass, leaves Control with no route for a blocked launch |Red on baseline `d97cc90`: `does not name the orchestration verbs and both typed recovery routes`. Reproduced at review; each of the six required tokens trips it alone. |
-| `harnesses.md` carries the seven Orca agent ids and not the binary names | `bash tests/contracts.sh` presence of each id, and the updated verbatim table pin | A row edit that adds an `Orca agent id` column but fills the Kiro cell with `kiro-cli`: table shape correct, pin updated to match, every launch through it fails `agent_unconfigured` | |
-| The stale Claude Code trust claim is gone rather than reworded | `bash tests/contracts.sh` absence assertion on `does not suppress it` | A rewording to "may not suppress it" that keeps the instruction to select a dialog option which never appears: hedged, plausible, still sends Control after a dialog that is not there | |
-| The reference's descriptor sentences match its real columns | `bash tests/contracts.sh` assertion that neither `SKILL.md` nor `AGENTS.md` names a column the table does not have | Reconciling `SKILL.md` alone and leaving `AGENTS.md` naming trust handling: the skill reads correctly, the project document a contributor opens first still describes a deleted column | |
-| Launch notes carry what this delivery verified | Human reads the diff against the 2026-09-04 measurements | An empty column kept under an intro sentence that promises it: the table parses, every pin passes, and the file promises guidance it does not give | |
+| `harnesses.md` carries the seven Orca agent ids and not the binary names | `bash tests/contracts.sh` presence of each id, and the updated verbatim table pin | A row edit that adds an `Orca agent id` column but fills the Kiro cell with `kiro-cli`: table shape correct, pin updated to match, every launch through it fails `agent_unconfigured` |Red at `a94cc96`: eight `FAIL` lines, one per missing id plus the stale trust claim. Reproduced at review in a scratch fixture; the `kiro-cli` counterexample stays red because the pin matches a complete second-column cell. |
+| The stale Claude Code trust claim is gone rather than reworded | `bash tests/contracts.sh` absence assertion on `does not suppress it` | A rewording to "may not suppress it" that keeps the instruction to select a dialog option which never appears: hedged, plausible, still sends Control after a dialog that is not there |Red at `a94cc96`: `still carries the stale Claude Code trust claim`. Reproduced at review, and still red for the `may not suppress it` rewording, which the pin also names. |
+| The reference's descriptor sentences match its real columns | `bash tests/contracts.sh` assertion that none of `SKILL.md`, `AGENTS.md` or `README.md` names a column the table does not have | Reconciling `SKILL.md` alone and leaving `AGENTS.md` naming trust handling: the skill reads correctly, the project document a contributor opens first still describes a deleted column |Red at `f2d5b20` naming `SKILL.md` and `AGENTS.md`, and red again at `9f44739` naming `README.md` once that file entered the loop. Reproduced at review for each of the three documents in isolation. |
+| Launch notes carry what this delivery verified | Human reads the diff against the 2026-09-04 measurements | An empty column kept under an intro sentence that promises it: the table parses, every pin passes, and the file promises guidance it does not give |No executable instrument; a human reads the diff. The review resolved it from the Run's own launch receipts: `claude` requested equal to effective at `opus`/`high` five times, `cursor` at `cursor-grok-4.6-high` with effort null six times, and no `codex` dispatch carrying a model. |
 | The orchestration prerequisite is documented once, in shared prerequisites | `bash tests/contracts.sh` assertion scoped to the shared prerequisites section via the existing section extractor | The prerequisite written inside the Kiro CLI section only: a whole-file grep passes, six of seven harness readers never see it |Red at `00d7cf0`: `README.md Quickstart does not give orca orchestration run-list --json as the confirmation command`. Still red at review with the command present only inside `### Kiro CLI`, where a whole-file grep passes. |
 | The contract script stays under its ceiling | `test "$(wc -l < tests/contracts.sh)" -le 250` | New assertions added without removing the Ruby issue-form block: script grows past 250, gate fails loudly rather than silently |Red at review by re-applying the deleted Ruby hunk: the script reaches 254 lines and the ceiling gate fails on exit code. |
 | Review-contract rules land in the review contract, not merely somewhere in the file | `bash tests/contracts.sh` assertions scoped to the `## Review` section | `Not verified` added to the handoff block instead of the review's return: the words exist, a whole-file grep passes, the reviewer contract is unchanged | |
@@ -324,11 +330,20 @@ task, and to be absorbed where they belong rather than forgotten:
   cannot distinguish it; and the preflight fence's comment column is misaligned
   after the third line. `README.md` is owned by no remaining task, so absorbing
   these requires widening a later task's Files.
+- **Three wording defects in `harnesses.md`** (Task 2 review, Minor 6, 8, 9). The
+  intro still promises a launch note per harness while two of seven cells are
+  filled, with no statement that an empty cell means "not measured here"; the
+  Claude Code cell records only the model pin though the receipts show effort was
+  pinned too; and "omit `--effort` when Effort is `default`" is a general rule
+  sitting in one row. Recorded rather than remediated: all three are wording, and
+  this task has already had three implementer dispatches.
+
 
 ## Stop conditions
 
-- A task finds it must edit `AGENTS.md` — ownership would combine with a protected
-  dirty path. Return `NEEDS_REPLAN`.
+- A task finds it must edit a path still carrying protected uncommitted work —
+  ownership would combine. Return `NEEDS_REPLAN`. This applied to `AGENTS.md` until
+  the human released it at `77423b0`; it still applies to `.AGENTS.md.swp`.
 - The verbatim harness-table pin cannot be updated without exceeding the 250-line
   ceiling. Return `NEEDS_REPLAN` rather than deleting an unrelated check to make room.
 - An orchestration verb named in Task 1 does not exist in the installed Orca CLI, or

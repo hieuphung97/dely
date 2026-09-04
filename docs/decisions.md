@@ -403,6 +403,19 @@ the trigger is a measured overrun, not a preference.
 
 ### 2026-08-29 — Workspace trust is a second gate; Control answers it in the TUI
 
+
+**Superseded on 2026-09-04.** Measurement contradicted this record's central
+instruction. On a path with no entry in Claude Code's exact-path trust store, a
+launch carrying `--dangerously-skip-permissions` reached the composer with no
+dialog shown and no trust entry created. The instruction to select
+`Yes, I trust this folder`, the warning that a bare Enter quits the worker, the
+Trust handling column this record defends, and its rejection of leaving that
+column empty are all withdrawn: the column was deleted outright. What stands is
+the observation that a modal can sit between launch and composer — but it is not
+always a trust dialog, and it is now routed by the execution plane's typed
+`agent_prompt_blocked` rather than by an enumerated per-harness answer. See
+`2026-09-04 — Orca orchestration is the execution plane, and Dely stops
+hand-rolling dispatch`.
 #### Context
 
 `skills/delivery/references/harnesses.md` already records a per-harness
