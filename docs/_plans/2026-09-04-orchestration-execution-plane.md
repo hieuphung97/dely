@@ -3,8 +3,7 @@
 Decision record: `docs/decisions.md`, section `2026-09-04 — Orca orchestration is the
 execution plane, and Dely stops hand-rolling dispatch`
 
-**Baseline:** leave empty until the commit carrying the decision record and this plan
-exists.
+**Baseline:** `d97cc90` — the commit carrying the decision record and this plan.
 
 ## Goal
 
