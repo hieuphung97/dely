@@ -170,12 +170,16 @@ earlier wording bound only the author of a new decision, who would name the
 version in this section; pull request #42 amended existing records, so there
 was no section to fill and the manifests stayed at 0.17.1 while the protocol
 changed. The obligation is stated in `AGENTS.md`, which a delivery actually
-reads. It has no executable guard: `tests/contracts.sh` takes a fixture root
-and so cannot read Git history by design, and the continuous-integration guard
-drafted for this delivery was withdrawn after review found it failed the
-compliant case as well as the violating one. Until that guard lands, the rule
-holds by reading only. **0.17.2** carries that dispatch-claim correction and
-this rule.
+reads. `tests/contracts.sh` takes a fixture root and so cannot read Git
+history by design, which is why continuous integration has to carry the
+guard. CI on `pull_request` now fails when `skills/` changes without a
+change to both versioned manifests. That step fires only on `pull_request`,
+so a direct push to `main` is uncovered. It proves a bump happened, never
+that the number is right — it would not have caught the `0.17.0` reuse that
+started this whole thread. It is satisfiable by bumping the manifests
+alone; the existing pin in `tests/contracts.sh` is what forces the third
+site to follow. **0.17.2** carries that dispatch-claim correction and this
+rule.
 
 Dely's dependence on Orca deepens from launching terminals to owning the worker
 lifecycle. The orchestration guide documents its own contract migrations, so the
