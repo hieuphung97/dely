@@ -178,7 +178,11 @@ message to the next wait.
 A dispatch that does not reach `ready` is diagnosed by reading its terminal
 and handling what is actually there. It is retried into that same terminal
 with `--terminal` and `--retry-of` only when that read shows the worker is
-not already progressing; a `failed` receipt is not that showing. `--model`
+not already progressing; a `failed` receipt is not that showing. A
+`dispatched` receipt is not evidence the worker is alive any more than a
+`failed` receipt is evidence it is dead. Retry is refused while the plane
+still considers the dispatch live, whether or not the worker still is; the
+live terminal is re-engaged instead. `--model`
 and `--effort` cannot combine with `--terminal`; that is not an exception
 to naming the model and effort on every dispatch, because the terminal was
 launched pinned and the retry reuses it rather than launching an unpinned
@@ -264,9 +268,9 @@ implement and does not edit the candidate. It gets the decision record (or
 Bounded design), the baseline, and the diff. The reviewer reads the
 implementer's dispatch record itself — not the implementer's reasoning.
 `worker-read` returns the hook-reported transcript when Orca can prove the
-worker session, and otherwise returns bounded terminal output with a typed
-`fallbackReason`. The phase adds no sandbox by default; `AGENTS.md` may
-pin one for a concrete risk.
+worker session, and otherwise returns bounded terminal output, with a typed
+`fallbackReason` when the plane supplies one. The phase adds no sandbox
+by default; `AGENTS.md` may pin one for a concrete risk.
 
 Review depth is adaptive: Bounded work gets one independent whole-change
 review. Each Architectural task gets an independent task review. After all
