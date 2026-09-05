@@ -69,17 +69,20 @@ it, and it changed the design:
    rule applies unchanged: stop, with no headless fallback. `README.md`
    documents enabling it once, in the shared prerequisites, because the
    requirement is harness-independent.
-2. Dispatch mechanics come from the plane. `worker-start` establishes
-   readiness, `check --wait` is the completion wait, the worker reports once
+2. Dispatch mechanics come from the plane. `worker-start` starts a worker and
+   reports what was requested, `check --wait` is the completion wait, the worker reports once
    with `worker_done` and an outcome, `worker-release` returns the terminal,
    and `worker-read` is the bounded evidence read. The blocking-wait paragraph,
    the submission-detection paragraph with its ninety-second allowance and
    single-Enter procedure, and the session-id capture instruction are deleted;
    the dispatch id replaces the last of these.
-3. Two typed errors replace the dialog catalogue. `agent_prompt_blocked` means
-   read that terminal and clear the modal that is actually there;
-   `agent_prompt_stalled` is a liveness inspection. Neither enumerates a
-   vendor's dialogs, so neither goes stale when a vendor ships a new one.
+3. One recovery route replaces the dialog catalogue: a dispatch that does not
+   reach `ready` is diagnosed by reading its terminal and handling what is
+   actually there, then retried into that same terminal. This record first
+   split that route across two typed errors; a later measurement found the
+   plane does not distinguish them, and the single route is what every
+   recovery actually performed. It enumerates no vendor's dialogs, so it does
+   not go stale when a vendor ships a new one.
 4. The prompt and the handoff stay files inside the worktree. Messages carry a
    short body and a `payload.reportPath`. The reason is this skill's own rule:
    a task spec and a message body are shell arguments, and prompts do not go in
