@@ -32,6 +32,9 @@ Repository artifacts are written in English.
   Candidate changes in this checkout take effect for the next delivery, not
   the one shipping them. Plugin caches and any live worker hook wiring are
   refreshed only between plans.
+- A delivery that changes anything under `skills/` advances the version in
+  both plugin manifests and the pin in `tests/contracts.sh`, within that
+  same delivery.
 
 ## Phase dispatch
 

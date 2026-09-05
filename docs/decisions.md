@@ -3,7 +3,7 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-04.
+Last updated 2026-09-05.
 
 ---
 
@@ -163,13 +163,21 @@ already been tagged and released on 2026-09-01 for the tree that added the
 seventh harness, and this record's own change merged three days later. Bumping
 the manifests without advancing the number left two contents sharing one
 version, and an install of `0.17.0` from the release surface returned the
-protocol this decision replaced. A delivery that alters shipped protocol text
-advances the version within that same delivery — whether it authors a decision
-record, amends an existing one, or touches no record at all. The earlier
-wording bound only the author of a new decision, who would name the version
-in this section; pull request #42 amended existing records, so there was no
-section to fill and the manifests stayed at 0.17.1 while the protocol changed.
-**0.17.2** carries that dispatch-claim correction and this rule.
+protocol this decision replaced. A delivery that changes anything under
+`skills/` advances the version within that same delivery — whether it authors
+a decision record, amends an existing one, or touches no record at all. The
+earlier wording bound only the author of a new decision, who would name the
+version in this section; pull request #42 amended existing records, so there
+was no section to fill and the manifests stayed at 0.17.1 while the protocol
+changed. The obligation is stated in `AGENTS.md`, which a delivery actually
+reads. Continuous integration on `pull_request` fails when `skills/` changes
+without a change to both versioned manifests; `tests/contracts.sh` then forces
+the pin to match. That guard fires only on `pull_request`, so a direct push
+to `main` is uncovered; it proves a bump happened, never that the number is
+right, so it would not have caught the `0.17.0` reuse; and it is satisfiable
+by bumping the manifests alone, with the existing pin check forcing the third
+site to follow. **0.17.2** carries that dispatch-claim correction and this
+rule.
 
 Dely's dependence on Orca deepens from launching terminals to owning the worker
 lifecycle. The orchestration guide documents its own contract migrations, so the
