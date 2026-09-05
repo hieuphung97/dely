@@ -81,7 +81,7 @@ bash tests/contracts.sh
 ```
 
 ```bash
-test "$(wc -l < tests/contracts.sh)" -le 250
+test "$(wc -l < tests/contracts.sh)" -le 280
 ```
 
 ```bash

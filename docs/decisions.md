@@ -9,6 +9,98 @@ Last updated 2026-09-05.
 
 ## Settled
 
+### 2026-09-05 — The reviewer reads the implementer's dispatch record, and the contract-script ceiling is 280
+
+#### Context
+
+Probe round 7 ran a full Bounded delivery. The implementer did not observe its
+counterexample; it used the instrument's failure against an absent feature as
+the baseline — exactly what the implementation rule says does not count.
+Control did not catch it. The reviewer did not catch it and returned ACCEPT.
+
+None of the three broke a rule outright. The rules did not join up. The
+counterexample obligation sat on the implementer, as prose in a handoff field
+nothing can check. Review "gets ... the dispatch evidence" — passive. Control
+handed the reviewer a three-line brief with no dispatch evidence in it, and
+the reviewer had no instruction to go and get any. "Reproduce, do not accept"
+named the gates. The reviewer ran the gates. Nothing said to reproduce the
+counterexample.
+
+`tests/contracts.sh` was at exactly 250 lines, with a hard `≤ 250` gate in
+`AGENTS.md` and in `.github/workflows/contracts.yml`. The ceiling exists to
+stop that script growing into a test suite.
+
+#### Decision
+
+The reviewer reads the implementer's dispatch record itself. Review no longer
+describes dispatch evidence as something handed over. The capability is
+`worker-read`: the hook-reported transcript when Orca can prove the worker
+session, otherwise bounded terminal output with a typed `fallbackReason`. The
+skill names that capability; it does not pin argv.
+
+A disposition is not reachable until the reviewer has located, in the
+implementer's dispatch record, the run where the counterexample was observed
+red — an implementation that is present, runs, returns a pass, and is wrong.
+An instrument red because the behaviour was absent is not that run. Where
+Orca cannot recover the record, the reviewer says so with the reason the
+plane gave, and treats the implementer's own account as the thing under
+check rather than as the check.
+
+`tests/contracts.sh` pins that Review prose verbatim. The ceiling rises from
+250 to 280 so the pin can exist. The raise is deliberate room for a pin the
+contract needs; it is not permission to grow the script into a test suite.
+The new budget is not spent beyond the pin.
+
+The pin prevents the sentence from being silently weakened later. It cannot
+make a future reviewer actually look. No instrument available in this
+repository can observe that.
+
+The coupled version is **0.17.3**.
+
+#### Alternatives considered
+
+**Keep review as a recipient of dispatch evidence Control attaches to the
+brief.** Rejected: round 7 already showed Control omitting it, and a
+recipient with nothing in the brief has no rule that tells them to fetch.
+
+**Pin a keyword `grep` for `dispatch record` or `worker-read`.** Rejected:
+that is the counterexample. A weakened "should read the dispatch record"
+keeps the keywords, runs, and passes.
+
+**Raise the ceiling only as far as the pin needs, to 260 or similar.**
+Rejected: a one-off exact fit recreates the bind that forced this raise, and
+the 280 figure is the approved room, not a target to fill.
+
+**Leave the ceiling at 250 and drop a different check to make room.**
+Rejected: the pin is the contract this delivery needs; deleting another
+check to avoid a decided raise would spend the wrong budget.
+
+#### Consequences
+
+Review independence now includes fetching evidence, not only refusing the
+implementer's reasoning. A review that stops at green gates is incomplete
+when the counterexample run is missing from the dispatch record.
+
+The verbatim pin will turn red on a semantics-preserving rewrap of the
+Review section, the same way the maintenance-log pin does. That is accepted.
+
+A later reader should not judge this pin against reviewer behaviour. The
+gap is named, not solved.
+
+#### Non-goals
+
+No new evidence mechanism. No argv for `worker-read`. No checklist, numbered
+procedure, or extra Review subsection. No change to the CI version guard,
+which this delivery is the first to exercise on its guarded path. No
+instrument that observes whether a reviewer looked.
+
+#### Deferred
+
+A further ceiling raise. Trigger: a pin the contract needs that does not fit
+in the remaining budget, with the same reason — room for a pin, not growth
+into a test suite. An eighth harness is one possible such pin, not a
+pre-committed reason to raise.
+
 ### 2026-09-04 — Orca orchestration is the execution plane, and Dely stops hand-rolling dispatch
 
 #### Context
@@ -253,8 +345,9 @@ that Control itself runs on.
 - Requiring the implementer to re-run the scope command before implementing.
   Trigger: drift-cause sentences still naming late scope discovery after roughly
   ten further deliveries.
-- Raising the contract script's line ceiling. Trigger: an eighth harness, whose
-  README and discovery assertions do not fit the remaining budget.
+- Raising the contract script's line ceiling. Settled 2026-09-05 at 280 for a
+  verbatim review pin, not for an eighth harness. A further raise is deferred
+  from that later record.
 - Flipping the Kiro launch prescription away from its interactive flag. Trigger:
   a second machine or a second version reproducing the stall.
 - Handling a first-run vendor modal beyond reading the terminal. Trigger: a

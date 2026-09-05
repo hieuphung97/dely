@@ -27,7 +27,7 @@ jobs:
       - run: bash -n tests/contracts.sh
       - run: jq -e . plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json .cursor-plugin/plugin.json >/dev/null
       - run: bash tests/contracts.sh
-      - run: test "$(wc -l < tests/contracts.sh)" -le 250
+      - run: test "$(wc -l < tests/contracts.sh)" -le 280
       - run: |
           test ! -e git-hooks/pre-push
           test ! -e docs/delivery-log.md
