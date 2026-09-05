@@ -294,7 +294,12 @@ observed red — an implementation that is present, runs, returns a pass,
 and is wrong. An instrument red because the behaviour was absent is not
 that run. Where Orca cannot recover the record, the reviewer says so with
 the reason the plane gave, and treats the implementer's own account as
-the thing under check rather than as the check.
+the thing under check rather than as the check. Where the implementer
+had no authority to produce the counterexample, locating that run in the
+implementer's dispatch record is not required; the observation is valid
+only when a role that does have that authority recorded it as that
+role's observation, not as the implementer's. The reviewer verifies as
+much as its own seat reaches, and records the remainder as not verified.
 
 Classify findings: **Blocking** — contract failure, regression, data or
 security risk. **Important** — missing required behaviour, test, or
