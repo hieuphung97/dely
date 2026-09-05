@@ -9,6 +9,64 @@ Last updated 2026-09-05.
 
 ## Settled
 
+### 2026-09-05 — The reviewer reproduces the counterexample; the dispatch-record lookup is deleted
+
+#### Context
+
+The record below required a disposition to wait until the reviewer had located
+the counterexample's red run in the implementer's dispatch record. Two further
+deliveries each added a branch to rescue that lookup: one for a counterexample
+the implementer had no authority to produce, one proposed for a record recovered
+only in part.
+
+A Spike then measured the lookup instead of extending it. Across all ten settled
+dispatches of those deliveries, `worker-read` returned one of two shapes. Cursor
+dispatches gave `source: terminal`, 120 lines, `truncated: true`, `cursor: null`
+— no way to page backwards. Claude Code dispatches gave `source: transcript`
+with a cursor, warning that older messages were omitted from the bounded archive.
+
+Searching a Cursor implementer's retained window for its own evidence found the
+fixture command zero times and the failing output zero times. The window holds
+the worker's closing summary, not the middle of the session where the
+counterexample ran. `AGENTS.md` pins Cursor for `implement`, so in this
+repository the implementer's dispatch record structurally cannot hold the red
+run.
+
+Across the five reviews written under the rule, none located the run. All five
+reproduced the counterexample themselves and said so.
+
+#### Decision
+
+The lookup is deleted, with both of its escape branches. The surviving
+obligation joins the rule it always belonged to: the reviewer observes the
+counterexample discriminate for itself, and an instrument red only because the
+behaviour was absent is not that observation. Review's opening paragraph no
+longer describes `worker-read`; `## Evidence` and the `### Handoff`
+`Verification` clause already carry that machinery, including what to do when
+Orca cannot recover a dispatch item.
+
+This removes the dependency on plane retention entirely, so the partial-recovery
+case needs no branch. `tests/contracts.sh` pins the shortened prose verbatim.
+
+#### Consequences
+
+The `## Review` section falls from 353 words to 206. It remains 26 words larger
+than the 180 it was before the lookup was introduced, so this is a reduction
+against the peak and not a return to the starting point; the residue is the
+discriminator sentence, which is the part that was load-bearing.
+
+What the deletion does not do is make a reviewer look. Nothing in this
+repository can observe that. The change moves the obligation to something a
+reviewer can discharge from its own seat rather than one it provably could not.
+
+The cost of the original rule was three deliveries of repair after it, because
+it was written asserting what the plane retained without measuring it first.
+That is the reusable part.
+
+This decision ships in **0.17.6**.
+
+---
+
 ### 2026-09-05 — The reviewer reads the implementer's dispatch record, and the contract-script ceiling is 280
 
 #### Context
@@ -45,6 +103,10 @@ An instrument red because the behaviour was absent is not that run. Where
 Orca cannot recover the record, the reviewer says so with the reason the
 plane gave, and treats the implementer's own account as the thing under
 check rather than as the check.
+
+**Superseded on 2026-09-05.** A Spike measured the dispatch record and found
+it structurally cannot hold the red run under this repository's harness pin;
+the lookup and its branches are deleted. The ceiling raise stands.
 
 `tests/contracts.sh` pins that Review prose verbatim. The ceiling rises from
 250 to 280 so the pin can exist. The raise is deliberate room for a pin the
