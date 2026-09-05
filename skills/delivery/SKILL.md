@@ -265,11 +265,7 @@ thing under check rather than as the check, and say so.
 
 Review independence is role independence: a fresh session that did not
 implement and does not edit the candidate. It gets the decision record (or
-Bounded design), the baseline, and the diff. The reviewer reads the
-implementer's dispatch record itself — not the implementer's reasoning.
-`worker-read` returns the hook-reported transcript when Orca can prove the
-worker session, and otherwise returns bounded terminal output, with a typed
-`fallbackReason` when the plane supplies one. The phase adds no sandbox
+Bounded design), the baseline, and the diff. The phase adds no sandbox
 by default; `AGENTS.md` may pin one for a concrete risk.
 
 Review depth is adaptive: Bounded work gets one independent whole-change
@@ -286,20 +282,10 @@ gates in that tree, so a concurrent edit makes another task's work look
 like this one's result.
 
 **Reproduce, do not accept.** Run the gates yourself. A claim you did not
-reproduce is not evidence.
-
-A disposition is not reachable until the reviewer has located, in the
-implementer's dispatch record, the run where the counterexample was
-observed red — an implementation that is present, runs, returns a pass,
-and is wrong. An instrument red because the behaviour was absent is not
-that run. Where Orca cannot recover the record, the reviewer says so with
-the reason the plane gave, and treats the implementer's own account as
-the thing under check rather than as the check. Where the implementer
-had no authority to produce the counterexample, locating that run in the
-implementer's dispatch record is not required; the observation is valid
-only when a role that does have that authority recorded it as that
-role's observation, not as the implementer's. The reviewer verifies as
-much as its own seat reaches, and records the remainder as not verified.
+reproduce is not evidence. The reviewer observes the counterexample
+discriminate for itself — an implementation that is present, runs, returns
+a pass, and is wrong. An instrument red only because the behaviour was
+absent is not that observation.
 
 Classify findings: **Blocking** — contract failure, regression, data or
 security risk. **Important** — missing required behaviour, test, or
