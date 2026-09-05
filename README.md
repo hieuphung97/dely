@@ -233,7 +233,7 @@ cursor-agent plugin marketplace list
 # re-index, no fetch
 cursor-agent plugin marketplace update dely
 
-# removes the marketplace, not the plugin
+# refresh: remove and re-add (remove drops the marketplace, not the plugin)
 cursor-agent plugin marketplace remove dely
 cursor-agent plugin marketplace add https://github.com/hieuphung97/dely.git
 ```
