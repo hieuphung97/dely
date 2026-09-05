@@ -163,8 +163,13 @@ already been tagged and released on 2026-09-01 for the tree that added the
 seventh harness, and this record's own change merged three days later. Bumping
 the manifests without advancing the number left two contents sharing one
 version, and an install of `0.17.0` from the release surface returned the
-protocol this decision replaced. A decision that changes the shipped protocol
-names the version that carries it, in this section, before the tag is cut.
+protocol this decision replaced. A delivery that alters shipped protocol text
+advances the version within that same delivery — whether it authors a decision
+record, amends an existing one, or touches no record at all. The earlier
+wording bound only the author of a new decision, who would name the version
+in this section; pull request #42 amended existing records, so there was no
+section to fill and the manifests stayed at 0.17.1 while the protocol changed.
+**0.17.2** carries that dispatch-claim correction and this rule.
 
 Dely's dependence on Orca deepens from launching terminals to owning the worker
 lifecycle. The orchestration guide documents its own contract migrations, so the
