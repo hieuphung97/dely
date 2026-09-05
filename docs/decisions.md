@@ -40,10 +40,11 @@ it, and it changed the design:
 - Orca knows all seven harnesses, but under agent ids that are not the binary
   names. `agy`, `kiro-cli` and `cursor-agent` return `agent_unconfigured`;
   `antigravity`, `kiro` and `cursor` are the ids that resolve.
-- `worker-start` proves readiness by exiting 0 with a receipt that reports
-  `launch.requested` beside `launch.effective`. The rule "name the model and
-  effort on every dispatch" has had no evidence behind it until now; that
-  receipt is the evidence.
+- `worker-start` exits 0 with a receipt that reports `launch.requested`
+  beside `launch.effective`. The rule "name the model and effort on every
+  dispatch" had had no evidence behind it until this record cited that
+  receipt; a later measurement withdrew that evidence. The rule stands, and
+  now rests on the launch argv rather than on a receipt.
 - Two typed failures correspond exactly to two paragraphs Dely wrote by hand.
   `agent_prompt_blocked` is a modal sitting between launch and composer.
   `agent_prompt_stalled` is input that never took — the readiness failure this

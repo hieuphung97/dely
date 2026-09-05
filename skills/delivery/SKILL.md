@@ -142,13 +142,14 @@ is likewise a file in the worktree; its path travels as `payload.reportPath`
 and the message body stays short. `--spec` and `--body` are shell arguments,
 which this skill already forbids for prompts.
 
-`worker-start` proves readiness by exiting 0 with a receipt carrying
-`launch.requested` and `launch.effective`. Launch a real interactive harness
-TUI for the phase, with the model and effort pinned from `AGENTS.md`. A
-visible shell running a headless harness is not a TUI; compose that TUI's
-launch using `references/harnesses.md`, this skill's compatibility matrix of
-Orca agent id, permission defaults, forbidden headless forms, and launch
-notes.
+The `worker-start` receipt records `launch.requested` and `launch.effective`;
+it does not establish that the worker can serve the request or that it
+cannot. Readiness is established by the worker's own `worker_done`. Launch a
+real interactive harness TUI for the phase, with the model and effort pinned
+from `AGENTS.md`. A visible shell running a headless harness is not a TUI;
+compose that TUI's launch using `references/harnesses.md`, this skill's
+compatibility matrix of Orca agent id, permission defaults, forbidden
+headless forms, and launch notes.
 
 **Name the model and effort on every dispatch.** A worker left on a harness
 default is an unpinned environment: it lives in the harness's own config, it
@@ -174,10 +175,11 @@ another's, so a stale report cannot settle a new wait. A wait acknowledges
 its settling message after handling it, or the plane redelivers that
 message to the next wait.
 
-A blocked or stalled launch is routed by the plane's typed error, not by an
-enumerated vendor dialog. `agent_prompt_blocked` means a modal sits between
-launch and composer, so read that terminal and clear what is actually there.
-`agent_prompt_stalled` is a liveness inspection.
+A dispatch that does not reach `ready` is diagnosed by reading its terminal
+and handling what is actually there, then retried into that same terminal
+with `--terminal` and `--retry-of`. Control does not route by an enumerated
+vendor dialog; `agent_prompt_blocked` and `agent_prompt_stalled` do not
+distinguish separate recoveries.
 
 ### Investigation
 
