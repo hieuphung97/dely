@@ -40,14 +40,17 @@ it, and it changed the design:
 - Orca knows all seven harnesses, but under agent ids that are not the binary
   names. `agy`, `kiro-cli` and `cursor-agent` return `agent_unconfigured`;
   `antigravity`, `kiro` and `cursor` are the ids that resolve.
-- `worker-start` proves readiness by exiting 0 with a receipt that reports
-  `launch.requested` beside `launch.effective`. The rule "name the model and
-  effort on every dispatch" has had no evidence behind it until now; that
-  receipt is the evidence.
-- Two typed failures correspond exactly to two paragraphs Dely wrote by hand.
-  `agent_prompt_blocked` is a modal sitting between launch and composer.
-  `agent_prompt_stalled` is input that never took — the readiness failure this
-  skill described as a ninety-second allowance and a single Enter.
+- `worker-start` exits 0 with a receipt that reports `launch.requested`
+  beside `launch.effective`. The rule "name the model and effort on every
+  dispatch" had had no evidence behind it until this record cited that
+  receipt; a later measurement withdrew that evidence. The rule stands, and
+  now rests on the launch argv rather than on a receipt.
+- Two typed failures appeared to correspond to two paragraphs Dely wrote by
+  hand: a modal sitting between launch and composer, and input that never took.
+  A later ten-round probe withdrew that reading — it never once observed
+  `agent_prompt_blocked`, on any harness, and saw `agent_prompt_stalled`
+  returned for a modal repeatedly. What the codes replace is real; the
+  distinction between them was not.
 - The modal that actually blocked a launch was not a trust dialog. It was a
   version-update prompt. The trust-handling column has been enumerating
   instances of a class it cannot finish enumerating: trust dialogs, update
@@ -68,17 +71,20 @@ it, and it changed the design:
    rule applies unchanged: stop, with no headless fallback. `README.md`
    documents enabling it once, in the shared prerequisites, because the
    requirement is harness-independent.
-2. Dispatch mechanics come from the plane. `worker-start` establishes
-   readiness, `check --wait` is the completion wait, the worker reports once
+2. Dispatch mechanics come from the plane. `worker-start` starts a worker and
+   reports what was requested, `check --wait` is the completion wait, the worker reports once
    with `worker_done` and an outcome, `worker-release` returns the terminal,
    and `worker-read` is the bounded evidence read. The blocking-wait paragraph,
    the submission-detection paragraph with its ninety-second allowance and
    single-Enter procedure, and the session-id capture instruction are deleted;
    the dispatch id replaces the last of these.
-3. Two typed errors replace the dialog catalogue. `agent_prompt_blocked` means
-   read that terminal and clear the modal that is actually there;
-   `agent_prompt_stalled` is a liveness inspection. Neither enumerates a
-   vendor's dialogs, so neither goes stale when a vendor ships a new one.
+3. One recovery route replaces the dialog catalogue: a dispatch that does not
+   reach `ready` is diagnosed by reading its terminal and handling what is
+   actually there, then retried into that same terminal. This record first
+   split that route across two typed errors; a later measurement found the
+   plane does not distinguish them, and the single route is what every
+   recovery actually performed. It enumerates no vendor's dialogs, so it does
+   not go stale when a vendor ships a new one.
 4. The prompt and the handoff stay files inside the worktree. Messages carry a
    short body and a `payload.reportPath`. The reason is this skill's own rule:
    a task spec and a message body are shell arguments, and prompts do not go in
@@ -461,8 +467,10 @@ dialog shown and no trust entry created. The instruction to select
 Trust handling column this record defends, and its rejection of leaving that
 column empty are all withdrawn: the column was deleted outright. What stands is
 the observation that a modal can sit between launch and composer — but it is not
-always a trust dialog, and it is now routed by the execution plane's typed
-`agent_prompt_blocked` rather than by an enumerated per-harness answer. See
+always a trust dialog, and it is now handled by reading that terminal and
+retrying into it rather than by an enumerated per-harness answer. This note
+first attributed that routing to a typed `agent_prompt_blocked`; a later probe
+never observed that code, so the route does not depend on it. See
 `2026-09-04 — Orca orchestration is the execution plane, and Dely stops
 hand-rolling dispatch`.
 #### Context
