@@ -153,8 +153,9 @@ cursor_section="$(readme_section 'Cursor Agent CLI')"
 printf '%s\n' "$cursor_section" | grep -Fiq 'npx skills' && fail_with "README.md Cursor Agent CLI section must not document npx skills" || true
 printf '%s\n' "$cursor_section" | grep -Eiq 'copy (the |both )?skills? (files? )?(manually|by hand)' && fail_with "README.md Cursor Agent CLI section instructs manual copying instead of plugin marketplace add" || true
 cursor_fence="$(printf '%s\n' "$cursor_section" | awk '/^```/{f=!f;next} f')"
-for needle in 'plugin marketplace add' 'plugin marketplace list' 'plugin marketplace update' 'plugin marketplace remove' '# removes the marketplace, not the plugin'; do printf '%s\n' "$cursor_fence" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI fenced block is missing: $needle"; done
-for needle in '`/plugin`' '`/dely`' '/delivery' '/setup'; do printf '%s\n' "$cursor_section" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI section is missing: $needle"; done
+for needle in 'plugin marketplace add' 'plugin marketplace list' 'plugin marketplace update' 'plugin marketplace remove' '# removes the marketplace, not the plugin' '# re-index, no fetch'; do printf '%s\n' "$cursor_fence" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI fenced block is missing: $needle"; done
+printf '%s\n' "$cursor_fence" | awk '/plugin marketplace remove/{r=1} r && /plugin marketplace add/{ok=1} END{exit ok?0:1}' || fail_with "README.md Cursor Agent CLI fenced block does not re-add the marketplace after remove"
+for needle in '`/plugin`' '`/dely`' '/delivery' '/setup' 'addressed by commit'; do printf '%s\n' "$cursor_section" | grep -Fq -- "$needle" || fail_with "README.md Cursor Agent CLI section is missing: $needle"; done
 for needle in '/add-plugin' '#[[:space:]]*uninstall'; do printf '%s\n' "$cursor_section" | grep -Eiq -- "$needle" && fail_with "README.md Cursor Agent CLI section must not contain: $needle" || true; done
 copilot_section="$(readme_section 'GitHub Copilot CLI')"
 [ -n "$copilot_section" ] || fail_with "README.md is missing a ### GitHub Copilot CLI section"
