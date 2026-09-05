@@ -14,10 +14,10 @@ Last updated 2026-09-05.
 #### Context
 
 The record below required a disposition to wait until the reviewer had located
-the counterexample's red run in the implementer's dispatch record. Two further
-deliveries each added a branch to rescue that lookup: one for a counterexample
-the implementer had no authority to produce, one proposed for a record recovered
-only in part.
+the counterexample's red run in the implementer's dispatch record, with an
+escape for a record Orca cannot recover. A later delivery added a second escape,
+for a counterexample the implementer had no authority to produce. A third case —
+a record recovered only in part — was found and queued, and is not shipped.
 
 A Spike then measured the lookup instead of extending it. Across all ten settled
 dispatches of those deliveries, `worker-read` returned one of two shapes. Cursor
