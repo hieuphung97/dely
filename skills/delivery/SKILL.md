@@ -142,6 +142,11 @@ is likewise a file in the worktree; its path travels as `payload.reportPath`
 and the message body stays short. `--spec` and `--body` are shell arguments,
 which this skill already forbids for prompts.
 
+The dispatch prompt carries the task, its scope and the evidence required.
+It does not define the role dispositions or the conditions for reaching
+one — those belong to this skill, and a prompt that restates them
+narrows or contradicts them.
+
 The `worker-start` receipt records `launch.requested` and `launch.effective`;
 it does not establish that the worker can serve the request or that it
 cannot. Launch a real interactive harness TUI for the phase, with the model
