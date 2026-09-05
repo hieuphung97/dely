@@ -20,8 +20,8 @@ skill="$root/skills/delivery/SKILL.md"
 claude_version="$(jq -r .version "$claude_manifest" 2>/dev/null)"
 codex_version="$(jq -r .version "$codex_manifest" 2>/dev/null)"
 
-if [ "$claude_version" != "0.17.2" ] || [ "$codex_version" != "0.17.2" ]; then
-  fail_with "manifest versions must both be 0.17.2 (claude=$claude_version codex=$codex_version)"
+if [ "$claude_version" != "0.17.3" ] || [ "$codex_version" != "0.17.3" ]; then
+  fail_with "manifest versions must both be 0.17.3 (claude=$claude_version codex=$codex_version)"
 fi
 
 root_name="$(jq -r .name "$root_manifest" 2>/dev/null)"
@@ -61,6 +61,16 @@ grep -Fq 'worker-start' "$skill" && grep -Fq 'worker_done' "$skill" && grep -Fq 
 grep -Fq 'do not infer it from reading' "$skill" && ! grep -Fq 'proves readiness' "$skill" && grep -Fq 'does not establish that the worker can serve' "$skill" && ! grep -Fq 'that receipt is the evidence' "$root/docs/decisions.md" && grep -Fq 'now rests on the launch argv' "$root/docs/decisions.md" || fail_with "$skill still treats the worker-start receipt as readiness, or $root/docs/decisions.md still cites that receipt as evidence"
 review="$(awk '/^## Review[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$skill")"; [ -n "$review" ] || fail_with "$skill is missing a ## Review section"
 printf '%s\n' "$review" | grep -Fq 'shared mutable state' && printf '%s\n' "$review" | grep -Fq 'did not verify' && printf '%s\n' "$review" | grep -Fq 'not implementing the candidate' && printf '%s\n' "$review" | grep -Fq 'per finding, not per review' || fail_with "$skill ## Review does not carry the sequencing, unverified, Control-owned-amendment, and one-pass-per-finding rules"
+
+# Reviewer dispatch-record obligation is matched verbatim so a weakened 'should' or a dropped locator fails.
+expected_review_section='Review independence is role independence: a fresh session that did not implement and does not edit the candidate. It gets the decision record (or Bounded design), the baseline, and the diff. The reviewer reads the implementer'"'"'s dispatch record itself — not the implementer'"'"'s reasoning. `worker-read` returns the hook-reported transcript when Orca can prove the worker session, and otherwise returns bounded terminal output with a typed `fallbackReason`. The phase adds no sandbox by default; `AGENTS.md` may pin one for a concrete risk. Review depth is adaptive: Bounded work gets one independent whole-change review. Each Architectural task gets an independent task review. After all tasks are accepted, a different fresh reviewer performs one integration review of task interactions, complete-contract coverage, deferred findings, candidate identity, and release readiness. Only that final review is release-binding for Architectural work; Bounded work has no earlier task review and no duplicate integration review. No worker runs while a review of the same working tree runs. The working tree and its gate surface are shared mutable state, and a review reproduces gates in that tree, so a concurrent edit makes another task'"'"'s work look like this one'"'"'s result. **Reproduce, do not accept.** Run the gates yourself. A claim you did not reproduce is not evidence. A disposition is not reachable until the reviewer has located, in the implementer'"'"'s dispatch record, the run where the counterexample was observed red — an implementation that is present, runs, returns a pass, and is wrong. An instrument red because the behaviour was absent is not that run. Where Orca cannot recover the record, the reviewer says so with the reason the plane gave, and treats the implementer'"'"'s own account as the thing under check rather than as the check. Classify findings: **Blocking** — contract failure, regression, data or security risk. **Important** — missing required behaviour, test, or reconciliation. **Minor** — useful, does not block. **Out of scope** — recorded, not absorbed. Return exactly one role disposition: `ACCEPT`, `CHANGES_REQUESTED`, or `BLOCKED`. State what the review did not verify — what it did not reproduce or read. A contradiction you cannot resolve is `CHANGES_REQUESTED`. Do not open remediation over wording when deterministic checks already prove the contract.'
+
+actual_review_section="$(awk '/^## Review$/{flag=1; next} flag && /^#/{exit} flag' "$skill" | tr '\n' ' ' | tr -s ' ')"
+actual_review_section="${actual_review_section# }"
+actual_review_section="${actual_review_section% }"
+
+[ "$actual_review_section" = "$expected_review_section" ] || fail_with "review section in $skill no longer matches the approved reviewer-reads-dispatch-record and counterexample-reproduction contract verbatim"
+
 for f in '--permission-mode bypassPermissions' '--dangerously-skip-permissions' '--trust-all-tools' '--force' 'claude -p' 'codex exec' 'grok --prompt-file' 'agy -p' 'kiro-cli chat --no-interactive' 'cursor-agent -p' 'copilot -p' '--allow-all'; do
   grep -Fq -- "$f" "$harnesses" || fail_with "$harnesses does not name: $f"
   grep -Fq -- "$f" "$root/AGENTS.md" && fail_with "AGENTS.md must not name: $f"
@@ -224,7 +234,7 @@ if jobs.is_a?(Hash) && jobs.keys == ["contracts"]
   required = [
     'git diff --check', 'bash -n tests/contracts.sh',
     'jq -e . plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json .cursor-plugin/plugin.json >/dev/null',
-    'bash tests/contracts.sh', 'test "$(wc -l < tests/contracts.sh)" -le 250',
+    'bash tests/contracts.sh', 'test "$(wc -l < tests/contracts.sh)" -le 280',
     'test ! -e git-hooks/pre-push', 'test ! -e docs/delivery-log.md', 'test ! -e docs/findings.md',
     'test ! -e docs/harness-surface.md', 'test ! -e docs/options.md',
     'test ! -e docs/_plans/2026-08-24-automation-first-dely-design.md',
