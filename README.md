@@ -230,12 +230,18 @@ cursor-agent plugin marketplace add https://github.com/hieuphung97/dely.git
 # verify it is installed
 cursor-agent plugin marketplace list
 
-# update
+# re-index, no fetch
 cursor-agent plugin marketplace update dely
 
-# removes the marketplace, not the plugin
+# refresh: remove and re-add (remove drops the marketplace, not the plugin)
 cursor-agent plugin marketplace remove dely
+cursor-agent plugin marketplace add https://github.com/hieuphung97/dely.git
 ```
+
+The snapshot is addressed by commit, so `marketplace update` only re-indexes
+and does not fetch. Remove and re-add the marketplace to pick up new commits,
+then install again from the `/plugin` panel — the panel install is still
+required after that refresh.
 
 Add the marketplace first with `cursor-agent plugin marketplace add`, then in
 a Cursor Agent session type `/plugin` and press Enter. A panel opens headed
