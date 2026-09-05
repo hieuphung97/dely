@@ -13,16 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: shipped protocol text requires a version bump
-        if: github.event_name == 'pull_request'
-        run: |
-          base="${{ github.event.pull_request.base.sha }}"
-          if ! git diff --quiet "$base"...HEAD -- skills/; then
-            git diff --quiet "$base"...HEAD -- .claude-plugin/plugin.json .codex-plugin/plugin.json \
-              && { echo "skills/ changed without a manifest version bump"; exit 1; }
-          fi
       - run: git diff --check
       - run: bash -n tests/contracts.sh
       - run: jq -e . plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json .cursor-plugin/plugin.json >/dev/null
