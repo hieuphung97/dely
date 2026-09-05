@@ -174,9 +174,9 @@ reads. `tests/contracts.sh` takes a fixture root and so cannot read Git
 history by design, which is why continuous integration has to carry the
 guard. CI on `pull_request` now fails when `skills/` changes without a
 change to both versioned manifests. That step fires only on `pull_request`,
-so a direct push to `main` is uncovered. It proves a bump happened, never
-that the number is right — it would not have caught the `0.17.0` reuse that
-started this whole thread. It is satisfiable by bumping the manifests
+so a direct push to `main` is uncovered. It proves both versioned manifests
+changed, never that the number is right: a manifest edited without advancing
+its `version` satisfies it. It is satisfiable by bumping the manifests
 alone; the existing pin in `tests/contracts.sh` is what forces the third
 site to follow. **0.17.2** carries that dispatch-claim correction and this
 rule.
