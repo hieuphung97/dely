@@ -144,9 +144,9 @@ which this skill already forbids for prompts.
 
 The `worker-start` receipt records `launch.requested` and `launch.effective`;
 it does not establish that the worker can serve the request or that it
-cannot. Readiness is established by the worker's own `worker_done`. Launch a
-real interactive harness TUI for the phase, with the model and effort pinned
-from `AGENTS.md`. A visible shell running a headless harness is not a TUI;
+cannot. Launch a real interactive harness TUI for the phase, with the model
+and effort pinned from `AGENTS.md`. A visible shell running a headless
+harness is not a TUI;
 compose that TUI's launch using `references/harnesses.md`, this skill's
 compatibility matrix of Orca agent id, permission defaults, forbidden
 headless forms, and launch notes.
@@ -176,10 +176,15 @@ its settling message after handling it, or the plane redelivers that
 message to the next wait.
 
 A dispatch that does not reach `ready` is diagnosed by reading its terminal
-and handling what is actually there, then retried into that same terminal
-with `--terminal` and `--retry-of`. Control does not route by an enumerated
-vendor dialog; `agent_prompt_blocked` and `agent_prompt_stalled` do not
-distinguish separate recoveries.
+and handling what is actually there. It is retried into that same terminal
+with `--terminal` and `--retry-of` only when that read shows the worker is
+not already progressing; a `failed` receipt is not that showing. `--model`
+and `--effort` cannot combine with `--terminal`; that is not an exception
+to naming the model and effort on every dispatch, because the terminal was
+launched pinned and the retry reuses it rather than launching an unpinned
+one. Control does not route by an enumerated vendor dialog;
+`agent_prompt_blocked` and `agent_prompt_stalled` do not distinguish
+separate recoveries.
 
 ### Investigation
 
