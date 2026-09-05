@@ -45,10 +45,12 @@ it, and it changed the design:
   dispatch" had had no evidence behind it until this record cited that
   receipt; a later measurement withdrew that evidence. The rule stands, and
   now rests on the launch argv rather than on a receipt.
-- Two typed failures correspond exactly to two paragraphs Dely wrote by hand.
-  `agent_prompt_blocked` is a modal sitting between launch and composer.
-  `agent_prompt_stalled` is input that never took — the readiness failure this
-  skill described as a ninety-second allowance and a single Enter.
+- Two typed failures appeared to correspond to two paragraphs Dely wrote by
+  hand: a modal sitting between launch and composer, and input that never took.
+  A later ten-round probe withdrew that reading — it never once observed
+  `agent_prompt_blocked`, on any harness, and saw `agent_prompt_stalled`
+  returned for a modal repeatedly. What the codes replace is real; the
+  distinction between them was not.
 - The modal that actually blocked a launch was not a trust dialog. It was a
   version-update prompt. The trust-handling column has been enumerating
   instances of a class it cannot finish enumerating: trust dialogs, update
@@ -465,8 +467,10 @@ dialog shown and no trust entry created. The instruction to select
 Trust handling column this record defends, and its rejection of leaving that
 column empty are all withdrawn: the column was deleted outright. What stands is
 the observation that a modal can sit between launch and composer — but it is not
-always a trust dialog, and it is now routed by the execution plane's typed
-`agent_prompt_blocked` rather than by an enumerated per-harness answer. See
+always a trust dialog, and it is now handled by reading that terminal and
+retrying into it rather than by an enumerated per-harness answer. This note
+first attributed that routing to a typed `agent_prompt_blocked`; a later probe
+never observed that code, so the route does not depend on it. See
 `2026-09-04 — Orca orchestration is the execution plane, and Dely stops
 hand-rolling dispatch`.
 #### Context
