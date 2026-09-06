@@ -20,8 +20,8 @@ skill="$root/skills/delivery/SKILL.md"
 claude_version="$(jq -r .version "$claude_manifest" 2>/dev/null)"
 codex_version="$(jq -r .version "$codex_manifest" 2>/dev/null)"
 
-if [ "$claude_version" != "0.17.7" ] || [ "$codex_version" != "0.17.7" ]; then
-  fail_with "manifest versions must both be 0.17.7 (claude=$claude_version codex=$codex_version)"
+if [ "$claude_version" != "0.17.8" ] || [ "$codex_version" != "0.17.8" ]; then
+  fail_with "manifest versions must both be 0.17.8 (claude=$claude_version codex=$codex_version)"
 fi
 
 root_name="$(jq -r .name "$root_manifest" 2>/dev/null)"
@@ -59,7 +59,7 @@ grep -Fq 'references/harnesses.md' "$skill" && [ -f "$harnesses" ] && ! tr '\n' 
 grep -Fq 'Keep waiting blocking' "$skill" || grep -Fq '`input_accepted` is not submission' "$skill" || grep -Fq 'Allow 90 seconds' "$skill" && fail_with "$skill still carries a hand-rolled readiness or submission procedure"
 grep -Fq 'worker-start' "$skill" && grep -Fq 'worker_done' "$skill" && grep -Fq 'agent_prompt_blocked' "$skill" && grep -Fq 'agent_prompt_stalled' "$skill" && grep -Fq 'payload.reportPath' "$skill" && ! grep -Fq 'is a liveness inspection' "$skill" "$root/docs/decisions.md" && grep -Fq 'retried into that same terminal' "$skill" && grep -Fq 'does not distinguish them' "$root/docs/decisions.md" || fail_with "$skill does not name the orchestration verbs, both typed codes, and a single read-then-retry recovery, or $root/docs/decisions.md still splits recovery across two typed errors"
 grep -Fq 'do not infer it from reading' "$skill" && ! grep -Fq 'proves readiness' "$skill" && grep -Fq 'does not establish that the worker can serve' "$skill" && ! grep -Fq 'that receipt is the evidence' "$root/docs/decisions.md" && grep -Fq 'now rests on the launch argv' "$root/docs/decisions.md" || fail_with "$skill still treats the worker-start receipt as readiness, or $root/docs/decisions.md still cites that receipt as evidence"
-launch="$(awk '/^### Launching a worker$/{flag=1; next} flag && /^#/{exit} flag' "$skill")"; printf '%s\n' "$launch" | grep -Fq 'The dispatch prompt carries the task' && printf '%s\n' "$launch" | grep -Fq 'does not define the role dispositions' || fail_with "$skill does not keep the dispatch prompt from defining the role dispositions"
+launch="$(awk '/^### Launching a worker$/{flag=1; next} flag && /^#/{exit} flag' "$skill")"; printf '%s\n' "$launch" | grep -Fq 'The dispatch prompt carries the task' && printf '%s\n' "$launch" | grep -Fq 'does not define the role dispositions' && printf '%s\n' "$launch" | grep -Fq 'carries that row as written' || fail_with "$skill does not keep the dispatch prompt from defining the role dispositions, or from restating an acceptance row"
 review="$(awk '/^## Review[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$skill")"; [ -n "$review" ] || fail_with "$skill is missing a ## Review section"
 printf '%s\n' "$review" | grep -Fq 'shared mutable state' && printf '%s\n' "$review" | grep -Fq 'did not verify' && printf '%s\n' "$review" | grep -Fq 'not implementing the candidate' && printf '%s\n' "$review" | grep -Fq 'per finding, not per review' || fail_with "$skill ## Review does not carry the sequencing, unverified, Control-owned-amendment, and one-pass-per-finding rules"
 
