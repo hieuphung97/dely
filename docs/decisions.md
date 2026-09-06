@@ -15,8 +15,10 @@ Last updated 2026-09-06.
 
 Probe 5 repeated the controlled round under `0.17.7`, which forbids the prompt
 from defining role dispositions. On the measured variable it worked: where the
-previous round's prompt said "if the instrument passes, return ACCEPT", this one
-said only "return exactly one role disposition", echoing this skill's own phrasing.
+previous round's prompt said "If the implementation meets the requirement and the
+instrument passes, return role disposition ACCEPT", this one said only "Return
+exactly one role disposition: ACCEPT or CHANGES_REQUESTED", echoing this skill's
+own phrasing.
 One observation, one harness, a nondeterministic model — a signal, not a proof.
 
 With that defect closed, a second became visible. Control relayed the
