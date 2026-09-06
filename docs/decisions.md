@@ -3,7 +3,7 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-05.
+Last updated 2026-09-06.
 
 ---
 
@@ -16,7 +16,9 @@ Last updated 2026-09-05.
 A controlled probe repeated an earlier harness round against the current protocol:
 same configuration, same brief verbatim, same task, one variable changed. The
 reviewer accepted a change whose counterexample had never been observed — the same
-failure three consecutive releases had been written to close.
+failure `0.17.3`, `0.17.5` and `0.17.6` had each been written to close. They were
+not consecutive: `0.17.4` shipped between the first two and addressed something
+else.
 
 The reviewer was not at fault. Control's dispatch prompt told it: "If the
 implementation meets the requirement and the instrument passes, return role
@@ -26,9 +28,9 @@ protocol, and the reviewer complied with what it was given.
 A Spike then measured the channels to a dispatched worker. The Orca preamble has
 three sections, all Orca-authored, with no slot Dely or the project can extend;
 the only project-controlled content is the prompt Control writes. Separately, four
-harnesses were each asked for a canary planted in `AGENTS.md`, with instructions
-not to read any file: all four returned it, so `AGENTS.md` auto-loads into a
-worker's context. Those are the only two routes.
+harnesses — Claude Code, Codex CLI, Cursor Agent CLI and GitHub Copilot CLI — were
+each asked for a canary planted in `AGENTS.md`, with instructions not to read any
+file: all four returned it, so `AGENTS.md` auto-loads into a worker's context. Those are the only two routes.
 
 #### Decision
 
