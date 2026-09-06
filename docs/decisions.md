@@ -9,6 +9,58 @@ Last updated 2026-09-06.
 
 ## Settled
 
+### 2026-09-06 — The dispatch prompt carries the acceptance row as written
+
+#### Context
+
+Probe 5 repeated the controlled round under `0.17.7`, which forbids the prompt
+from defining role dispositions. On the measured variable it worked: where the
+previous round's prompt said "if the instrument passes, return ACCEPT", this one
+said only "return exactly one role disposition", echoing this skill's own phrasing.
+One observation, one harness, a nondeterministic model — a signal, not a proof.
+
+With that defect closed, a second became visible. Control relayed the
+counterexample and corrupted it. The source required the *instrument* to reject an
+**implementation** emitting an unpadded value; Control wrote that the **script**
+must reject that value as **input**. The implementer then reasoned about its code
+rather than observing anything, and the reviewer tested the corrupted form — a
+property of shell arithmetic rather than of the candidate — and accepted.
+
+The failure mode had moved from omission to corruption. Only separating the two
+made the second visible; while Control could override the contract outright, that
+masked what it did to the evidence it passed on.
+
+This is specific to Bounded work. An implementer reads the decision record, the
+plan and the baseline, so for Architectural work the acceptance table is a file the
+worker reads and Control relays nothing. A Bounded design is approved in chat, so
+the row is real but not durable, and must pass through Control's prose.
+
+#### Decision
+
+Where the design contract states an acceptance row — its instrument, its
+counterexample, and what was observed — the prompt carries that row as written
+rather than a restatement of it. The contract check binds the sentence inside
+`### Launching a worker`, as it already does for the disposition rule.
+
+#### Consequences
+
+`0.17.7` and this change share a failure boundary — Control altering
+protocol-owned meaning while restating it into a prompt — and take different
+remedies: one forbids the prompt from defining what it does not own, the other
+requires verbatim carriage of what it must transmit.
+
+The rule binds because `### Acceptance` is unscoped: a Bounded change alters where
+the design contract is stored, not whether it has an acceptance shape. A Bounded
+design that is prose with no row is already non-conforming rather than a case this
+rule silently declines to cover.
+
+Nothing here observes Control writing a prompt. As with `0.17.7`, only a further
+probe tests this, and one probe is one observation.
+
+This decision ships in **0.17.8**.
+
+---
+
 ### 2026-09-06 — The dispatch prompt states the task, not the disposition criteria
 
 #### Context
