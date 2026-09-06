@@ -3,11 +3,61 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-05.
+Last updated 2026-09-06.
 
 ---
 
 ## Settled
+
+### 2026-09-06 — The dispatch prompt states the task, not the disposition criteria
+
+#### Context
+
+A controlled probe repeated an earlier harness round against the current protocol:
+same configuration, same brief verbatim, same task, one variable changed. The
+reviewer accepted a change whose counterexample had never been observed — the same
+failure `0.17.3`, `0.17.5` and `0.17.6` had each been written to close. They were
+not consecutive: `0.17.4` shipped between the first two and addressed something
+else.
+
+The reviewer was not at fault. Control's dispatch prompt told it: "If the
+implementation meets the requirement and the instrument passes, return role
+disposition ACCEPT." Control invented an acceptance criterion contradicting the
+protocol, and the reviewer complied with what it was given.
+
+A Spike then measured the channels to a dispatched worker. The Orca preamble has
+three sections, all Orca-authored, with no slot Dely or the project can extend;
+the only project-controlled content is the prompt Control writes. Separately, four
+harnesses — Claude Code, Codex CLI, Cursor Agent CLI and GitHub Copilot CLI — were
+each asked for a canary planted in `AGENTS.md`, with instructions not to read any
+file: all four returned it, so `AGENTS.md` auto-loads into a worker's context. Those are the only two routes.
+
+#### Decision
+
+The dispatch prompt carries the task, its scope and the evidence required. It does
+not define the role dispositions or the conditions for reaching one.
+
+The change takes neither route to the worker. It removes the contradiction at its
+source instead, and `tests/contracts.sh` pins the sentences **inside**
+`### Launching a worker` rather than anywhere in the file, because placement is the
+claim: the rule exists to be met while a prompt is being composed.
+
+#### Consequences
+
+The distinction from the three prior attempts is **addressee, not readership**.
+`## Review` was in Control's context on all of them, since the skill loads in full.
+What changed is that those regulated the reviewer while the observed failure was
+Control — and a dispatched reviewer may not have the skill loaded at all, so
+`## Review` could not reach it in any case.
+
+No instrument here can observe Control writing a prompt. This change is not
+verified by its own delivery; only a further probe tests it. The rule was reached
+by measuring a failure rather than by reasoning about one, which is the part worth
+reusing.
+
+This decision ships in **0.17.7**.
+
+---
 
 ### 2026-09-05 — The reviewer reproduces the counterexample; the dispatch-record lookup is deleted
 
