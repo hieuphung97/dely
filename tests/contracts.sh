@@ -168,7 +168,9 @@ for needle in 'plugin marketplace add' 'plugin install dely@dely' 'plugin list' 
 quickstart="$(awk '/^## Quickstart[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$root/README.md")"
 [ -n "$quickstart" ] || fail_with "README.md is missing a ## Quickstart section"
 printf '%s\n' "$quickstart" | grep -Fq 'orca orchestration run-list --json' || fail_with "README.md Quickstart does not give orca orchestration run-list --json as the confirmation command"
-awk '/6pRWkhlQSAc/{v=NR} /^## Quickstart[[:space:]]*$/{q=NR} END{exit (v&&q&&v<q)?0:1}' "$root/README.md" || fail_with "README.md YouTube id 6pRWkhlQSAc is missing or not before ## Quickstart"
+awk '/https:\/\/github.com\/user-attachments\/assets\/83ec539a-6551-4807-8517-0c73e5d171d7/{v=NR} /^## Quickstart[[:space:]]*$/{q=NR} END{exit (v&&q&&v<q)?0:1}' "$root/README.md" || fail_with "README.md GitHub demo asset URL is missing or not before ## Quickstart"
+grep -Fq 'img.youtube.com' "$root/README.md" && fail_with "README.md must not contain img.youtube.com" || true
+grep -Fq 'https://www.youtube.com/watch?v=6pRWkhlQSAc' "$root/README.md" || fail_with "README.md is missing https://www.youtube.com/watch?v=6pRWkhlQSAc"
 contents="$(awk '/^## Contents[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$root/README.md")"
 [ -n "$contents" ] || fail_with "README.md is missing a ## Contents section"
 for h in '#quickstart' '#project-setup' '#install' '#troubleshooting'; do printf '%s\n' "$contents" | grep -Fq "]($h)" || fail_with "README.md Contents is missing link: $h"; done

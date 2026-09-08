@@ -10,7 +10,9 @@
 Ask for a change; Dely takes it through design approval, implementation,
 independent review, and a pull request you merge.
 
-[![Dely demo](https://img.youtube.com/vi/6pRWkhlQSAc/maxresdefault.jpg)](https://www.youtube.com/watch?v=6pRWkhlQSAc)
+https://github.com/user-attachments/assets/83ec539a-6551-4807-8517-0c73e5d171d7
+
+[YouTube](https://www.youtube.com/watch?v=6pRWkhlQSAc)
 
 ## Contents
 
