@@ -168,6 +168,20 @@ for needle in 'plugin marketplace add' 'plugin install dely@dely' 'plugin list' 
 quickstart="$(awk '/^## Quickstart[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$root/README.md")"
 [ -n "$quickstart" ] || fail_with "README.md is missing a ## Quickstart section"
 printf '%s\n' "$quickstart" | grep -Fq 'orca orchestration run-list --json' || fail_with "README.md Quickstart does not give orca orchestration run-list --json as the confirmation command"
+awk '/6pRWkhlQSAc/{v=NR} /^## Quickstart[[:space:]]*$/{q=NR} END{exit (v&&q&&v<q)?0:1}' "$root/README.md" || fail_with "README.md YouTube id 6pRWkhlQSAc is missing or not before ## Quickstart"
+contents="$(awk '/^## Contents[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$root/README.md")"
+[ -n "$contents" ] || fail_with "README.md is missing a ## Contents section"
+for h in '#quickstart' '#project-setup' '#install' '#troubleshooting'; do printf '%s\n' "$contents" | grep -Fq "]($h)" || fail_with "README.md Contents is missing link: $h"; done
+for u in 'https://www.onorca.dev/docs/install' 'https://www.onorca.dev/docs/cli/overview' 'https://www.onorca.dev/docs/cli/orchestration'; do grep -Fq "$u" "$root/README.md" || fail_with "README.md is missing: $u"; done
+grep -Fq 'brew install --cask' "$root/README.md" && fail_with "README.md must not contain brew install --cask" || true
+ps="$(awk '/^## Project setup[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$root/README.md")"
+[ -n "$ps" ] || fail_with "README.md is missing a ## Project setup section"
+printf '%s\n' "$ps" | grep -Fq 'Claude Code does not read' && fail_with "README.md Project setup must not contain: Claude Code does not read" || true
+printf '%s\n' "$ps" | grep -Fq 'coordinator' && fail_with "README.md Project setup must not contain: coordinator" || true
+how="$(awk '/^## How Dely works[[:space:]]*$/{p=1;next} p && /^## /{exit} p' "$root/README.md")"
+[ -n "$how" ] || fail_with "README.md is missing a ## How Dely works section"
+printf '%s\n' "$how" | grep -Fq 'END OF HANDOFF' && fail_with "README.md How Dely works must not contain: END OF HANDOFF" || true
+printf '%s\n' "$how" | grep -Fq 'NEEDS_REPLAN' && fail_with "README.md How Dely works must not contain: NEEDS_REPLAN" || true
 
 # Plan template's acceptance header: the four named columns must all be present.
 plan_template="$root/skills/delivery/templates/plan.md"
