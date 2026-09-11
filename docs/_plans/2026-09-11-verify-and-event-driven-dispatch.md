@@ -2,7 +2,7 @@
 
 Decision record: `docs/decisions.md#2026-09-11--workers-acknowledge-control-sleeps-until-an-event-and-delyverify-proves-the-path-before-the-first-dispatch`
 
-**Baseline:**
+**Baseline:** `22bb184`
 
 ## Goal
 
