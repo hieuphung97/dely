@@ -304,6 +304,38 @@ It fails when a pin's sentence is weakened or relocated.
 **Document impact.** The delivery skill owns the dispatch contract; the harness
 reference owns the table.
 
+**Remediation, by Control amendment after task 3's review.** The review found two
+Important defects:
+
+- the new pins pass when their sentences are inverted;
+- in nudge mode `SILENT` and `DEADLINE` never reach the recovery route, and nothing
+  stops a silent dispatch.
+
+The second is a runtime defect from tasks 1 and 1b, and task 3's remediation owns it:
+
+- `dely wait` and `dely collect` stop a silent dispatch with `worker-stop` before
+  they report `SILENT <id> <s>` (exit 6). A fresh dispatch then never inherits the
+  old one's silence.
+- `dely collect --run <run> --repo <path>`:
+  - reports a silent dispatch by its own silence check, and `DEADLINE` (exit 7)
+    when a dispatch has run longer than the deadline;
+  - on `WAITING`, makes sure exactly one sidecar for the Run is live, and opens one
+    only when none is.
+- The deadline is measured from the dispatch's Orca `dispatchedAt`, not from the
+  start of a wait or sidecar process.
+- The skill's nudge mode runs only `dely collect`; Control never opens a sidecar by
+  hand. The skill also:
+  - states each command's usage;
+  - routes `ERROR`, and a `SETTLED` batch that holds only `question` or `escalation`;
+  - matches `SETTLED` lines to the dispatch id that `DISPATCHED` printed;
+  - sends a second `REFUSED` right after a verify PASS to the human.
+- The pins in `tests/contracts.sh` match the operative phrases on the flattened
+  section.
+
+Remediation files: `skills/delivery/SKILL.md`, `tests/contracts.sh`,
+`skills/delivery/scripts/dely.js`, `tests/scripts.test.js`,
+`tests/fixtures/fake-orca.js`.
+
 ### 4. The package, its gates and its record ship the change
 
 **Behaviour.**
@@ -321,6 +353,8 @@ reference owns the table.
   - **N2:** an error thrown after a launch stops and releases every launched
     dispatch, closes any sidecar, removes `.dely-verify/` and records a FAIL
     verdict before restoring the Run.
+- Added from task 3's review (out of scope there): an adopted launch whose
+  `worker-start` returns a state other than `ready` closes the terminal it created.
 
   The re-review returned the disposition word `APPROVED`, which is outside the
   protocol's set. The human ruled it `ACCEPT`.
@@ -362,6 +396,11 @@ reuse the existing cleanup and verdict paths.
 | `dely.cmd` resolves the same runtimes on Windows | No executable instrument in CI; a human reads the diff | None | n/a |
 | Delivery skill pins the refusal rule, the nudge-command prohibition and the removal of same-terminal retry | `bash tests/contracts.sh` | The rule moved outside `### Launching a worker`, or the old retry sentence kept | |
 | README Kiro install includes `--skill verify` | `bash tests/contracts.sh` | README still installing only `delivery` and `setup` | |
+| Pins reject an inverted sentence (task 3 remediation) | `bash tests/contracts.sh` against each of: the nudge's quoted check command run; a human asked before `dely:verify`; a live terminal re-engaged; `NO_ACK`/`SILENT`/`FAILED` sent straight to the human | The `d6635b3` token pins, which pass all four | `review-3` |
+| A silent dispatch is stopped before `SILENT` is reported (task 3 remediation) | `node --test` cases for `wait` and `collect`: stale output after ACK; assert `worker-stop --dispatch <id>` before exit 6, and a following `collect` does not report it again | The `d6635b3` runtime: wait exits `SILENT` with no stop, collect drains the wake and prints `WAITING` | `review-3` scratch driver |
+| Collect reports `DEADLINE` from the dispatch's `dispatchedAt` (task 3 remediation) | `node --test` case: `dispatchedAt` older than the deadline, output fresh, a new collect process; assert exit 7 | A deadline measured from the start of the collect, wait or sidecar process | |
+| Collect keeps exactly one sidecar per Run (task 3 remediation) | `node --test` cases: a live sidecar terminal listed means no `terminal create`; none listed means exactly one | A collect that opens a sidecar on every `WAITING`, or never | |
+| An adopt `worker-start` that is not `ready` closes its terminal (task 4) | `node --test` case: adopt, `worker-start` returns `failed`; assert `terminal close` for the created handle | The `d6635b3` adopt path, which closes only on readiness timeout and `NO_ACK` | `review-3` |
 | After a failed launch, verify start launches no further pin (task 4, N1) | `node --test` case: first pin gets no ACK; assert exactly one `worker-start` | A start that launches every pin before checking for a failed launch | |
 | A throw after a launch cleans up and records FAIL before restoring (task 4, N2) | `node --test` case: `state.json` write fails after one launch; assert `worker-stop` for that dispatch, a FAIL verdict, and `run-use --id <prev>` last | A catch that only restores the Run | |
 | Live verify proves both Control wake modes on this repository | Live `dely verify run` (Claude Code Control) and `dely verify start` / `collect` (Codex Control); report quoted with RESULT and wake count | None executable offline; a human reads the quoted live reports | n/a |
@@ -375,6 +414,9 @@ reuse the existing cleanup and verdict paths.
 - Orca nudge reliability across Orca versions.
 - Quota exhaustion in a live run.
 - Grok and Kiro verify outcomes.
+- A same-terminal retry reworded to avoid every pinned phrase. The pins are lexical.
+- `adoptedPermission` off macOS: Orca's data path there is unmeasured, and it falls
+  back to the table's permission cell.
 
 ## Stop conditions
 
