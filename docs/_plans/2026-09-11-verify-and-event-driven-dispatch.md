@@ -238,6 +238,12 @@ Setup then runs verify.
 **Direction.** Reuse task 1's dispatch, wait, sidecar and collect code paths. The
 verdict is written only after every dispatch settled and the report was produced.
 
+`orchestration run-create` rebinds the calling Control terminal to the new Run, and a
+later `worker-start --run <delivery run>` then fails with "worker-start requires the
+coordinator terminal currently bound to the Task Run" (observed 2026-09-11). Verify
+records the bound Run from `orchestration run-current` before creating its own, and
+restores it with `orchestration run-use --id <that run>` on every exit path.
+
 **Files.** `skills/verify/SKILL.md`, `skills/setup/SKILL.md`,
 `skills/delivery/scripts/dely.js`, `tests/scripts.test.js`,
 `tests/fixtures/fake-orca.js`.

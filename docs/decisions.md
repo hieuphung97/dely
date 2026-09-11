@@ -123,6 +123,9 @@ Measurements that shaped the decision, all on macOS, 2026-09-11:
      with the reported fix on FAIL or BLOCKED.
    - A PASS lapses when the key changes, and after any delivery escalation caused by
      the environment.
+   - Verify restores the Control terminal's previously bound Run when it finishes,
+     because creating a Run rebinds the caller and a delivery's `worker-start` then
+     refuses to run.
 3. **Workers acknowledge.** `dely dispatch` appends the acknowledgement instruction
    to the spec and waits 120 s by default. It observes the ACK only through
    `check --peek`, as a heartbeat from that dispatch's terminal, and never consumes
