@@ -23,6 +23,9 @@ const SILENCE_S = numEnv("DELY_SILENCE_S", 90);
 const DEADLINE_S = numEnv("DELY_DEADLINE_S", 3600);
 const QUIET_S = numEnv("DELY_QUIET_S", 3);
 const QUIET_MIN_S = numEnv("DELY_QUIET_MIN_S", 5);
+const VERIFY_DEADLINE_S = numEnv("DELY_VERIFY_DEADLINE_S", 300);
+
+let restoreOnExit = null;
 
 function numEnv(name, fallback) {
   const raw = process.env[name];
@@ -75,7 +78,16 @@ function result(r) {
   return r && r.json && r.json.result ? r.json.result : {};
 }
 
+function restorePrev(prev) {
+  if (!prev) return;
+  orca(["orchestration", "run-use", "--id", prev, "--json"]);
+}
+
 function finish(code, line) {
+  if (restoreOnExit) {
+    restorePrev(restoreOnExit);
+    restoreOnExit = null;
+  }
   process.stdout.write(String(line) + "\n");
   process.exit(code);
 }
@@ -109,6 +121,7 @@ function parseHarnessTable(md) {
       launch: stripTicks(rec.Launch),
       modelPin: rec["Model pin"] || "",
       wake: (rec["Control wake"] || "").trim(),
+      setup: (rec.Setup || "").trim(),
     };
     if (name) by[name] = entry;
     if (agent) by[agent] = entry;
@@ -518,8 +531,20 @@ function cmdDispatch(flags) {
   if (!pin) finish(5, `FAILED unknown phase ${phase}`);
   const entry = harnesses[pin.harness];
   if (!entry) finish(5, `FAILED unknown harness ${pin.harness}`);
-  const spec = buildSpec(flags["spec-file"]);
-  const title = flags.title || `dely-${phase}`;
+  const out = launchDispatch({
+    repo,
+    run: flags.run,
+    phase,
+    specFile: flags["spec-file"],
+    title: flags.title || `dely-${phase}`,
+    pin,
+    entry,
+  });
+  finish(out.code, out.line);
+}
+
+function launchDispatch({ repo, run, phase, specFile, title, pin, entry }) {
+  const spec = buildSpec(specFile);
   const kind = launchKind(entry, pin.model);
   let created = false;
   let handle = "";
@@ -540,18 +565,18 @@ function cmdDispatch(flags) {
       "--json",
     ]);
     handle = result(createdTerm).terminal && result(createdTerm).terminal.handle;
-    if (!handle) finish(5, "FAILED terminal create");
+    if (!handle) return { code: 5, line: "FAILED terminal create" };
     created = true;
     if (!waitQuiet(handle, launchedAt)) {
       const secs = Math.max(1, Math.floor((Date.now() - launchedAt) / 1000));
       orca(["terminal", "close", "--terminal", handle, "--json"]);
-      finish(5, `FAILED readiness timeout after ${secs}s`);
+      return { code: 5, line: `FAILED readiness timeout after ${secs}s` };
     }
-    const args = workerStartBase({ spec, repo, run: flags.run, title });
+    const args = workerStartBase({ spec, repo, run, title });
     args.push("--terminal", handle, "--timeout-ms", "60000");
     started = startReceipt(orca(args));
   } else {
-    const args = workerStartBase({ spec, repo, run: flags.run, title });
+    const args = workerStartBase({ spec, repo, run, title });
     args.push("--agent", entry.agent, "--timeout-ms", "90000");
     addOrcaModelFlags(args, entry, entry.agent, pin.model, pin.effort);
     started = startReceipt(orca(args));
@@ -559,48 +584,72 @@ function cmdDispatch(flags) {
   const dispatchId = started.dispatchId;
   handle = workerHandle(dispatchId, handle || started.handle);
   if (started.state !== "ready") {
-    finish(5, `FAILED ${lastFailure(dispatchId, started)}`);
+    return { code: 5, line: `FAILED ${lastFailure(dispatchId, started)}`, dispatchId, handle, created };
   }
-  const ack = waitForAck(flags.run, handle, Date.now());
+  const ack = waitForAck(run, handle, Date.now());
   if (ack == null) {
     if (dispatchId) orca(["orchestration", "worker-stop", "--dispatch", dispatchId, "--json"]);
     if (created && handle) orca(["terminal", "close", "--terminal", handle, "--json"]);
-    finish(4, `NO_ACK ${dispatchId || "-"} ${classify(handle)}`);
+    return {
+      code: 4,
+      line: `NO_ACK ${dispatchId || "-"} ${classify(handle)}`,
+      dispatchId,
+      handle,
+      created,
+    };
   }
-  finish(0, `DISPATCHED ${dispatchId} ${handle} ack=${Math.floor(ack)}`);
+  return {
+    code: 0,
+    line: `DISPATCHED ${dispatchId} ${handle} ack=${Math.floor(ack)}`,
+    dispatchId,
+    handle,
+    created,
+    adopted: created,
+    ack,
+  };
+}
+
+function waitStep(run, startedAt, seen, deadlineS) {
+  const r = orca([
+    "orchestration",
+    "check",
+    "--wait",
+    "--run",
+    run,
+    "--types",
+    "heartbeat,worker_done,escalation,question",
+    "--timeout-ms",
+    String(Math.max(1, Math.floor(POLL_MS))),
+    "--json",
+  ]);
+  const id = deliveryId(r);
+  if (id) {
+    const messages = messagesOf(r);
+    const acked = ackDelivery(run, id);
+    if (!acked.ok) return { type: "error", reason: `ack failed: ${acked.reason}` };
+    markHeartbeats(messages, seen);
+    if (hasSettle(messages)) {
+      return { type: "settled", messages, types: uniqueTypes(messages) };
+    }
+  }
+  const elapsed = (Date.now() - startedAt) / 1000;
+  if (elapsed > deadlineS) return { type: "deadline", seconds: Math.floor(elapsed) };
+  const silent = checkSilent(run, seen);
+  if (silent) return { type: "silent", dispatchId: silent.dispatchId, seconds: silent.seconds };
+  return { type: "idle" };
 }
 
 function cmdWait(flags) {
-  const run = flags.run;
   const startedAt = Date.now();
   const seen = new Set();
   for (;;) {
-    const r = orca([
-      "orchestration",
-      "check",
-      "--wait",
-      "--run",
-      run,
-      "--types",
-      "heartbeat,worker_done,escalation,question",
-      "--timeout-ms",
-      String(Math.max(1, Math.floor(POLL_MS))),
-      "--json",
-    ]);
-    const id = deliveryId(r);
-    if (id) {
-      const messages = messagesOf(r);
-      const acked = ackDelivery(run, id);
-      if (!acked.ok) finish(9, `ERROR ack failed: ${acked.reason}`);
-      markHeartbeats(messages, seen);
-      if (hasSettle(messages)) {
-        finish(0, `SETTLED ${uniqueTypes(messages).join(",")} ${JSON.stringify(messages)}`);
-      }
+    const step = waitStep(flags.run, startedAt, seen, DEADLINE_S);
+    if (step.type === "settled") {
+      finish(0, `SETTLED ${step.types.join(",")} ${JSON.stringify(step.messages)}`);
     }
-    const elapsed = (Date.now() - startedAt) / 1000;
-    if (elapsed > DEADLINE_S) finish(7, `DEADLINE ${Math.floor(elapsed)}`);
-    const silent = checkSilent(run, seen);
-    if (silent) finish(6, `SILENT ${silent.dispatchId} ${silent.seconds}`);
+    if (step.type === "deadline") finish(7, `DEADLINE ${step.seconds}`);
+    if (step.type === "silent") finish(6, `SILENT ${step.dispatchId} ${step.seconds}`);
+    if (step.type === "error") finish(9, `ERROR ${step.reason}`);
   }
 }
 
@@ -671,44 +720,627 @@ function cmdSidecar(flags) {
   }
 }
 
-function cmdCollect(flags) {
-  const run = flags.run;
+function messageIdentity(m, index, deliveryId) {
+  if (m && m.id != null && String(m.id) !== "") return "id:" + m.id;
+  const dv = deliveryId || (m && (m.deliveryId || m.delivery_id)) || "";
+  if (dv) return "dv:" + dv + ":" + index;
+  return "pos:" + index;
+}
+
+function deliveryIndex(messages, i) {
+  const dv = (messages[i] && (messages[i].deliveryId || messages[i].delivery_id)) || "";
+  let n = 0;
+  for (let j = 0; j < i; j++) {
+    const other = (messages[j] && (messages[j].deliveryId || messages[j].delivery_id)) || "";
+    if (other === dv) n++;
+  }
+  return n;
+}
+
+function collectSettles(run, opts) {
+  const print = !opts || opts.print !== false;
   const listed = workerList(run);
-  if (!listed.ok) finish(9, `ERROR worker-list failed: ${listed.reason}`);
+  if (!listed.ok) return { ok: false, reason: `worker-list failed: ${listed.reason}` };
   const byHandle = new Map();
   for (const worker of listed.workers) {
     if (worker.agentTerminalHandle) byHandle.set(worker.agentTerminalHandle, worker.dispatchId);
   }
   const all = orca(["orchestration", "check", "--all", "--run", run, "--json"]);
-  if (orcaFailed(all)) finish(9, `ERROR check --all failed: ${orcaReason(all, "check failed")}`);
+  if (orcaFailed(all)) return { ok: false, reason: `check --all failed: ${orcaReason(all, "check failed")}` };
   const printed = new Set();
-  function report(m) {
+  const settles = [];
+  function report(list, i) {
+    const m = list[i];
     if (!hasSettle([m])) return;
     const dispatchId = messageDispatchId(m) || byHandle.get(m.from_handle) || "-";
-    const key = m.id;
+    const key = messageIdentity(m, deliveryIndex(list, i), m.deliveryId || m.delivery_id);
     if (printed.has(key)) return;
     printed.add(key);
-    process.stdout.write(`SETTLED ${dispatchId} ${m.type} ${m.body || ""}\n`);
+    const line = `SETTLED ${dispatchId} ${m.type} ${m.body || ""}`;
+    settles.push({ dispatchId, type: m.type, body: m.body || "", message: m, line });
+    if (print) process.stdout.write(line + "\n");
   }
-  for (const m of messagesOf(all)) report(m);
+  const history = messagesOf(all);
+  for (let i = 0; i < history.length; i++) report(history, i);
   for (;;) {
     const r = orca(["orchestration", "check", "--run", run, "--json"]);
-    if (orcaFailed(r)) finish(9, `ERROR check failed: ${orcaReason(r, "check failed")}`);
+    if (orcaFailed(r)) return { ok: false, reason: `check failed: ${orcaReason(r, "check failed")}` };
     const id = deliveryId(r);
     if (!id) break;
     const acked = ackDelivery(run, id);
-    if (!acked.ok) finish(9, `ERROR ack failed: ${acked.reason}`);
-    for (const m of messagesOf(r)) report(m);
+    if (!acked.ok) return { ok: false, reason: `ack failed: ${acked.reason}` };
+    const batch = messagesOf(r);
+    for (let i = 0; i < batch.length; i++) report(batch, i);
   }
   const open = listed.workers.filter((w) => w.dispatchStatus === "dispatched").map((w) => w.dispatchId);
-  if (open.length) finish(2, `WAITING ${open.join(" ")}`);
+  return { ok: true, settles, open, workers: listed.workers };
+}
+
+function cmdCollect(flags) {
+  const collected = collectSettles(flags.run);
+  if (!collected.ok) finish(9, `ERROR ${collected.reason}`);
+  if (collected.open.length) finish(2, `WAITING ${collected.open.join(" ")}`);
   process.exit(0);
 }
 
+function pinGroups(pins, harnesses) {
+  const groups = [];
+  const seen = new Map();
+  for (const phase of ["implement", "review"]) {
+    const pin = pins[phase];
+    if (!pin) continue;
+    const entry = harnesses[pin.harness];
+    const agent = entry ? entry.agent : "unknown";
+    const k = agent + "|" + pin.model + "|" + pin.effort;
+    if (seen.has(k)) {
+      seen.get(k).phases.push(phase);
+      continue;
+    }
+    const g = { phases: [phase], pin, entry, agent, status: "", reason: "", ack: null, done: null };
+    seen.set(k, g);
+    groups.push(g);
+  }
+  return groups;
+}
+
+function groupForPhase(groups, phase) {
+  return groups.find((g) => g.phases.indexOf(phase) >= 0);
+}
+
+function readHomeJson(rel, jsonc) {
+  const file = path.join(os.homedir(), rel);
+  try {
+    let text = fs.readFileSync(file, "utf8");
+    if (jsonc) text = text.replace(/^\s*\/\/.*$/gm, "");
+    return JSON.parse(text);
+  } catch (_) {
+    return null;
+  }
+}
+
+function cursorTrusted(repo) {
+  const root = path.join(os.homedir(), ".cursor", "projects");
+  try {
+    for (const name of fs.readdirSync(root)) {
+      const file = path.join(root, name, ".workspace-trusted");
+      try {
+        if (!fs.statSync(file).isFile()) continue;
+        const data = JSON.parse(fs.readFileSync(file, "utf8"));
+        if (data && data.workspacePath === repo) return true;
+      } catch (_) {
+        /* next */
+      }
+    }
+  } catch (_) {
+    /* missing */
+  }
+  const slug = String(repo).replace(/^\//, "").replace(/\//g, "-");
+  return fs.existsSync(path.join(root, slug, ".workspace-trusted"));
+}
+
+function installedCodexVersion() {
+  if (process.env.DELY_CODEX_VERSION) return String(process.env.DELY_CODEX_VERSION);
+  const r = spawnSync("codex", ["--version"], { encoding: "utf8" });
+  const text = String(r.stdout || "").trim();
+  const parts = text.split(/\s+/);
+  return parts[1] || parts[0] || "";
+}
+
+function codexUpdatePending() {
+  const data = readHomeJson(path.join(".codex", "version.json"));
+  if (!data) return "";
+  const latest = data.latest_version || "";
+  if (!latest) return "";
+  const installed = installedCodexVersion();
+  const dismissed = data.dismissed_version || "";
+  if (latest !== installed && latest !== dismissed) return latest;
+  return "";
+}
+
+function preflightAgent(agent, repo) {
+  const binary = BINARY[agent] || agent;
+  const trustFix = `open ${binary} once in ${repo} and accept its trust dialog`;
+  switch (agent) {
+    case "claude": {
+      const data = readHomeJson(".claude.json");
+      const ok =
+        data &&
+        data.projects &&
+        data.projects[repo] &&
+        data.projects[repo].hasTrustDialogAccepted === true;
+      if (!ok) {
+        return { ok: false, reason: `workspace not trusted for Claude Code; fix: ${trustFix}` };
+      }
+      return { ok: true };
+    }
+    case "antigravity": {
+      const data = readHomeJson(path.join(".gemini", "antigravity-cli", "settings.json"));
+      const list = data && data.trustedWorkspaces;
+      if (!(Array.isArray(list) && list.indexOf(repo) >= 0)) {
+        return { ok: false, reason: `workspace not trusted for Antigravity CLI; fix: ${trustFix}` };
+      }
+      return { ok: true };
+    }
+    case "copilot": {
+      const data = readHomeJson(path.join(".copilot", "config.json"), true);
+      const list = data && data.trustedFolders;
+      if (!(Array.isArray(list) && list.indexOf(repo) >= 0)) {
+        return { ok: false, reason: `workspace not trusted for GitHub Copilot CLI; fix: ${trustFix}` };
+      }
+      return { ok: true };
+    }
+    case "cursor": {
+      if (cursorTrusted(repo)) return { ok: true };
+      return { ok: false, reason: `workspace not trusted for Cursor Agent CLI; fix: ${trustFix}` };
+    }
+    case "codex": {
+      const pending = codexUpdatePending();
+      if (pending) {
+        return { ok: false, reason: `Codex update ${pending} pending; fix: update Codex between plans` };
+      }
+      return { ok: true };
+    }
+    default:
+      return { ok: true };
+  }
+}
+
+function gitPorcelain(repo) {
+  const r = spawnSync("git", ["-C", repo, "status", "--porcelain"], { encoding: "utf8" });
+  return r.stdout || "";
+}
+
+function boundRunId() {
+  const r = orca(["orchestration", "run-current", "--json"]);
+  const res = result(r);
+  return (res.run && res.run.id) || res.id || "";
+}
+
+function workerOutcome(m) {
+  if (!m) return "";
+  if (m.outcome) return m.outcome;
+  if (m.payload && m.payload.outcome) return m.payload.outcome;
+  return "";
+}
+
+function verifyPassMessage(m) {
+  return (
+    Boolean(m) &&
+    m.type === "worker_done" &&
+    workerOutcome(m) === "succeeded" &&
+    String(m.body || "").startsWith("dely verify ok")
+  );
+}
+
+function writeVerifyTask(repo, phase) {
+  const dir = path.join(repo, ".dely-verify");
+  fs.mkdirSync(dir, { recursive: true });
+  const rel = `.dely-verify/TASK-${phase}.md`;
+  const body =
+    `# Dely verify (${phase})\n` +
+    "This is a verify dispatch. Do exactly these steps and nothing else.\n" +
+    "1. Run `mkdir -p .dely-verify && echo ok > .dely-verify/write-" +
+    phase +
+    ".txt && cat .dely-verify/write-" +
+    phase +
+    ".txt && rm .dely-verify/write-" +
+    phase +
+    ".txt`.\n" +
+    "2. Run `git rev-parse --short HEAD`.\n" +
+    "3. Send `worker_done --outcome succeeded` with the body `dely verify ok phase=" +
+    phase +
+    " head=<hash> write=<ok or the error>`, or `--outcome failed` if a step failed.\n" +
+    "4. Do not edit, stage or commit anything else.\n";
+  fs.writeFileSync(path.join(repo, rel), body);
+  return rel;
+}
+
+function applySettled(groups, messages) {
+  for (const m of messages || []) {
+    const g =
+      groups.find((x) => x.handle && m.from_handle === x.handle) ||
+      groups.find((x) => x.dispatchId && messageDispatchId(m) === x.dispatchId);
+    if (!g || g.status) continue;
+    if (m.type === "worker_done") {
+      g.done = Math.floor((Date.now() - (g.t0 || Date.now())) / 1000);
+      if (verifyPassMessage(m)) {
+        g.status = "PASS";
+        g.reason = m.body || "";
+      } else {
+        g.status = "FAIL";
+        g.reason = m.body || "worker_done not dely verify ok";
+      }
+    } else if (m.type === "escalation" || m.type === "question") {
+      g.status = "FAIL";
+      g.reason = m.type + ": " + String(m.body || "").slice(0, 200);
+    }
+  }
+}
+
+function consumeVerify(run, groups, startedAt, deadlineS) {
+  const seen = new Set();
+  function pending() {
+    return groups.some((g) => g.dispatchId && !g.status);
+  }
+  while (pending()) {
+    const step = waitStep(run, startedAt, seen, deadlineS);
+    if (step.type === "error") return step;
+    if (step.type === "settled") {
+      applySettled(groups, step.messages);
+      continue;
+    }
+    if (step.type === "silent") {
+      for (const g of groups) {
+        if (!g.status && g.dispatchId === step.dispatchId) {
+          g.status = "SILENT";
+          g.reason = `no terminal output for ${step.seconds}s`;
+        }
+      }
+      continue;
+    }
+    if (step.type === "deadline") {
+      for (const g of groups) {
+        if (!g.status && g.dispatchId) {
+          g.status = "DEADLINE";
+          g.reason = `not done after ${step.seconds}s`;
+        }
+      }
+      return step;
+    }
+  }
+  return { type: "done" };
+}
+
+function coordinatorHandle(runId) {
+  const listed = listAllRuns();
+  if (listed.ok) {
+    const run = listed.runs.find((r) => r.id === runId);
+    if (run && run.coordinator_handle) return run.coordinator_handle;
+  }
+  return process.env.ORCA_TERMINAL_HANDLE || "";
+}
+
+function launcherPath() {
+  return path.resolve(__dirname, "dely");
+}
+
+function startVerifySidecar(repo, verifyRun, controlHandle, launcher) {
+  const command = `${launcher} sidecar --run ${verifyRun} --control-handle ${controlHandle}`;
+  const created = orca([
+    "terminal",
+    "create",
+    "--worktree",
+    `path:${repo}`,
+    "--title",
+    "dely-verify-sidecar",
+    "--command",
+    command,
+    "--json",
+  ]);
+  return (result(created).terminal && result(created).terminal.handle) || "";
+}
+
+function sidecarAlive(handle) {
+  if (!handle) return false;
+  const shown = orca(["terminal", "show", "--terminal", handle, "--json"]);
+  if (orcaFailed(shown)) return false;
+  const t = result(shown).terminal || {};
+  if (t.running === false || t.closed) return false;
+  return true;
+}
+
+function writeVerdict(verifyRun, key, pass) {
+  const created = orca([
+    "orchestration",
+    "task-create",
+    "--run",
+    verifyRun,
+    "--task-title",
+    "dely-verify-verdict",
+    "--spec",
+    key,
+    "--json",
+  ]);
+  const res = result(created);
+  const taskId = (res.task && res.task.id) || res.taskId || res.id;
+  const payload = JSON.stringify({ verdict: pass ? "PASS" : "FAIL", key });
+  orca([
+    "orchestration",
+    "task-update",
+    "--id",
+    String(taskId || ""),
+    "--run",
+    verifyRun,
+    "--status",
+    "completed",
+    "--result",
+    payload,
+    "--json",
+  ]);
+}
+
+function cleanupVerify(repo, groups, sidecarHandle, run) {
+  const listed = run ? workerList(run) : { ok: false, workers: [] };
+  const open = new Set(
+    (listed.ok ? listed.workers : [])
+      .filter((w) => w.dispatchStatus === "dispatched")
+      .map((w) => w.dispatchId)
+  );
+  for (const g of groups) {
+    if (!g.dispatchId) continue;
+    if (open.has(g.dispatchId)) {
+      orca(["orchestration", "worker-stop", "--dispatch", g.dispatchId, "--json"]);
+    }
+    orca(["orchestration", "worker-release", "--dispatch", g.dispatchId, "--json"]);
+    if (g.adopted && g.handle) orca(["terminal", "close", "--terminal", g.handle, "--json"]);
+  }
+  if (sidecarHandle) orca(["terminal", "close", "--terminal", sidecarHandle, "--json"]);
+  try {
+    fs.rmSync(path.join(repo, ".dely-verify"), { recursive: true, force: true });
+  } catch (_) {
+    /* optional */
+  }
+}
+
+function phaseLine(phase, pin, g) {
+  const status = (g && g.status) || "FAIL";
+  const ack = g && g.ack != null ? g.ack : "-";
+  const done = g && g.done != null ? g.done : "-";
+  const extra = (g && g.reason) || "";
+  return `PHASE ${phase} ${pin.harness} ${pin.model} ${pin.effort} ${status} ack=${ack} done=${done} ${extra}`.trimEnd();
+}
+
+function finishVerify(ctx) {
+  cleanupVerify(ctx.repo, ctx.groups, ctx.sidecarHandle, ctx.verifyRun);
+  const nowStatus = gitPorcelain(ctx.repo);
+  const gitChanged = nowStatus !== ctx.baseline;
+  const allPass = ["implement", "review"].every((phase) => {
+    if (!ctx.pins[phase]) return true;
+    const g = groupForPhase(ctx.groups, phase);
+    return g && g.status === "PASS";
+  });
+  const pass = allPass && !gitChanged;
+  if (ctx.verifyRun) writeVerdict(ctx.verifyRun, ctx.key, pass);
+  for (const phase of ["implement", "review"]) {
+    const pin = ctx.pins[phase];
+    if (!pin) continue;
+    process.stdout.write(phaseLine(phase, pin, groupForPhase(ctx.groups, phase)) + "\n");
+  }
+  process.stdout.write((gitChanged ? "git status CHANGED" : "git status unchanged") + "\n");
+  restorePrev(ctx.prev);
+  restoreOnExit = null;
+  process.stdout.write((pass ? "RESULT PASS" : "RESULT FAIL") + "\n");
+  process.exit(pass ? 0 : 1);
+}
+
+function prepareVerify(flags) {
+  const repo = absRepo(flags.repo);
+  const harnesses = loadHarnesses();
+  const pins = loadPins(repo);
+  const key = makeKey(repo, flags.control, harnesses, pins);
+  const control = harnesses[flags.control];
+  const wake = control ? control.wake : "unknown";
+  const groups = pinGroups(pins, harnesses);
+  if (wake === "unsupported") {
+    for (const g of groups) {
+      g.status = "BLOCKED";
+      g.reason = `control ${flags.control} is unsupported`;
+    }
+  } else {
+    for (const g of groups) {
+      if (!g.entry) {
+        g.status = "BLOCKED";
+        g.reason = `unknown harness ${g.pin && g.pin.harness}`;
+        continue;
+      }
+      const pf = preflightAgent(g.agent, repo);
+      if (!pf.ok) {
+        g.status = "BLOCKED";
+        g.reason = pf.reason;
+      }
+    }
+  }
+  const prev = boundRunId();
+  restoreOnExit = prev || null;
+  const baseline = gitPorcelain(repo);
+  const created = orca(["orchestration", "run-create", "--objective", objectiveFor(key), "--json"]);
+  if (orcaFailed(created)) {
+    return { error: orcaReason(created, "run-create failed"), prev, repo, key, pins, groups, baseline };
+  }
+  const verifyRun = (result(created).run && result(created).run.id) || result(created).id;
+  return { repo, harnesses, pins, key, groups, prev, baseline, verifyRun, controlAgent: flags.control };
+}
+
+function dispatchVerifyGroups(ctx) {
+  for (const g of ctx.groups) {
+    if (g.status) continue;
+    const phase = g.phases[0];
+    const specFile = writeVerifyTask(ctx.repo, phase);
+    g.t0 = Date.now();
+    const out = launchDispatch({
+      repo: ctx.repo,
+      run: ctx.verifyRun,
+      phase,
+      specFile,
+      title: `dely-verify-${phase}`,
+      pin: g.pin,
+      entry: g.entry,
+    });
+    g.adopted = Boolean(out.adopted);
+    g.dispatchId = out.dispatchId || "";
+    g.handle = out.handle || "";
+    g.ack = out.ack != null ? Math.floor(out.ack) : null;
+    if (out.code === 4) {
+      g.status = "NO_ACK";
+      g.reason = String(out.line || "").replace(/^NO_ACK \S+\s*/, "");
+      continue;
+    }
+    if (out.code !== 0) {
+      g.status = "FAIL";
+      g.reason = out.line;
+    }
+  }
+}
+
+function writeVerifyState(ctx) {
+  const dir = path.join(ctx.repo, ".dely-verify");
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, "state.json"),
+    JSON.stringify({
+      prev: ctx.prev,
+      verifyRun: ctx.verifyRun,
+      key: ctx.key,
+      repo: ctx.repo,
+      pins: ctx.pins,
+      groups: ctx.groups,
+      baseline: ctx.baseline,
+      startTime: Date.now(),
+      sidecarHandle: ctx.sidecarHandle,
+      controlHandle: ctx.controlHandle,
+      launcher: ctx.launcher,
+    })
+  );
+}
+
+function cmdVerifyRun(flags) {
+  const ctx = prepareVerify(flags);
+  if (ctx.error) finish(9, `ERROR ${ctx.error}`);
+  dispatchVerifyGroups(ctx);
+  if (ctx.groups.some((g) => g.dispatchId && !g.status)) {
+    const waitRes = consumeVerify(ctx.verifyRun, ctx.groups, Date.now(), VERIFY_DEADLINE_S);
+    if (waitRes.type === "error") finish(9, `ERROR ${waitRes.reason}`);
+  }
+  finishVerify(ctx);
+}
+
+function cmdVerifyStart(flags) {
+  const ctx = prepareVerify(flags);
+  if (ctx.error) finish(9, `ERROR ${ctx.error}`);
+  dispatchVerifyGroups(ctx);
+  const anyOpen = ctx.groups.some((g) => g.dispatchId && !g.status);
+  const failedLaunch = ctx.groups.some((g) => g.status === "NO_ACK" || g.status === "FAIL");
+  if (!anyOpen || failedLaunch) {
+    if (anyOpen) {
+      const waitRes = consumeVerify(ctx.verifyRun, ctx.groups, Date.now(), VERIFY_DEADLINE_S);
+      if (waitRes.type === "error") finish(9, `ERROR ${waitRes.reason}`);
+    }
+    finishVerify(ctx);
+    return;
+  }
+  const launcher = launcherPath();
+  ctx.launcher = launcher;
+  ctx.controlHandle = coordinatorHandle(ctx.verifyRun);
+  ctx.sidecarHandle = startVerifySidecar(ctx.repo, ctx.verifyRun, ctx.controlHandle, launcher);
+  writeVerifyState(ctx);
+  const peek = orca(["orchestration", "check", "--peek", "--run", ctx.verifyRun, "--json"]);
+  const collectCmd = `${launcher} verify collect --repo ${ctx.repo}`;
+  restoreOnExit = null;
+  if (hasSettle(messagesOf(peek))) {
+    process.stdout.write(`COLLECT_NOW ${collectCmd}\n`);
+  } else {
+    process.stdout.write(`SLEEP end your turn; when Orca wakes you, run: ${collectCmd}\n`);
+  }
+  process.exit(0);
+}
+
+function cmdVerifyCollect(flags) {
+  const repo = absRepo(flags.repo);
+  const stateFile = path.join(repo, ".dely-verify", "state.json");
+  let saved;
+  try {
+    saved = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  } catch (e) {
+    finish(9, `ERROR missing verify state: ${e.message}`);
+  }
+  restoreOnExit = saved.prev || null;
+  const collected = collectSettles(saved.verifyRun);
+  if (!collected.ok) finish(9, `ERROR ${collected.reason}`);
+  applySettled(saved.groups, collected.settles.map((s) => s.message));
+  const startedAt = saved.startTime || Date.now();
+  const elapsed = (Date.now() - startedAt) / 1000;
+  const seen = new Set();
+  for (const g of saved.groups) {
+    if (g.ack == null) continue;
+    if (g.dispatchId) seen.add(g.dispatchId);
+    if (g.handle) seen.add(g.handle);
+  }
+  const silent = checkSilent(saved.verifyRun, seen);
+  if (silent) {
+    for (const g of saved.groups) {
+      if (!g.status && g.dispatchId === silent.dispatchId) {
+        g.status = "SILENT";
+        g.reason = `no terminal output for ${silent.seconds}s`;
+      }
+    }
+  }
+  if (elapsed > VERIFY_DEADLINE_S) {
+    for (const g of saved.groups) {
+      if (!g.status && g.dispatchId) {
+        g.status = "DEADLINE";
+        g.reason = `not done after ${Math.floor(elapsed)}s`;
+      }
+    }
+  }
+  const limitHit = Boolean(silent) || elapsed > VERIFY_DEADLINE_S;
+  const stillOpen = collected.open.length && saved.groups.some((g) => g.dispatchId && !g.status);
+  if (stillOpen && !limitHit) {
+    if (!sidecarAlive(saved.sidecarHandle)) {
+      saved.sidecarHandle = startVerifySidecar(
+        repo,
+        saved.verifyRun,
+        saved.controlHandle,
+        saved.launcher || launcherPath()
+      );
+      fs.writeFileSync(stateFile, JSON.stringify(saved));
+    }
+    restoreOnExit = null;
+    finish(
+      2,
+      `WAITING ${collected.open.join(" ")}; end your turn; when Orca wakes you, run the same collect command`
+    );
+  }
+  finishVerify({
+    repo,
+    prev: saved.prev,
+    verifyRun: saved.verifyRun,
+    key: saved.key,
+    groups: saved.groups,
+    pins: saved.pins,
+    sidecarHandle: saved.sidecarHandle,
+    baseline: saved.baseline,
+  });
+}
+
 function parseArgs(argv) {
-  const cmd = argv[0];
+  let cmd = argv[0];
+  let i = 1;
+  if (cmd === "verify") {
+    cmd = argv[1] ? "verify:" + argv[1] : "verify";
+    i = argv[1] ? 2 : 1;
+  }
   const flags = {};
-  for (let i = 1; i < argv.length; i++) {
+  for (; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--") continue;
     if (a.startsWith("--")) {
@@ -747,8 +1379,17 @@ function main(argv) {
     case "collect":
       if (!flags.run) finish(2, "usage: dely collect --run <runId>");
       return cmdCollect(flags);
+    case "verify:run":
+      if (!flags.repo || !flags.control) finish(2, "usage: dely verify run --repo <path> --control <agent>");
+      return cmdVerifyRun(flags);
+    case "verify:start":
+      if (!flags.repo || !flags.control) finish(2, "usage: dely verify start --repo <path> --control <agent>");
+      return cmdVerifyStart(flags);
+    case "verify:collect":
+      if (!flags.repo) finish(2, "usage: dely verify collect --repo <path>");
+      return cmdVerifyCollect(flags);
     default:
-      finish(2, "usage: dely status|dispatch|wait|sidecar|collect");
+      finish(2, "usage: dely status|dispatch|wait|sidecar|collect|verify");
   }
 }
 

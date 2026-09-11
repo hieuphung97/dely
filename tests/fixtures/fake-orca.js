@@ -28,6 +28,7 @@ function publicMessage(m) {
     if (k === "acked" || k === "uid" || k === "groupId") return;
     out[k] = m[k];
   });
+  if (out.deliveryId == null && m.groupId) out.deliveryId = m.groupId;
   return out;
 }
 
@@ -37,13 +38,18 @@ function seedMessages(list, acked, startUid) {
   for (const d of list || []) {
     const groupId = d.deliveryId || null;
     for (const m of d.messages || []) {
-      out.push(
-        Object.assign(clone(m), {
-          acked: Boolean(acked),
-          uid: uid++,
-          groupId,
-        })
-      );
+      const copy = Object.assign(clone(m), {
+        acked: Boolean(acked),
+        uid: uid,
+        groupId,
+      });
+      if (m.id === false || m.id === null) {
+        delete copy.id;
+      } else if (copy.id == null || copy.id === "") {
+        copy.id = "msg_" + uid;
+      }
+      uid++;
+      out.push(copy);
     }
   }
   return { messages: out, nextUid: uid };
@@ -72,6 +78,12 @@ function loadState() {
         terminalCreatedAt: null,
         stopped: {},
         acked: [],
+        boundRun: scenario.currentRun || null,
+        createdRuns: [],
+        dynamicWorkers: [],
+        workerStartCount: 0,
+        tasks: [],
+        released: [],
       },
       mailbox
     );
@@ -142,7 +154,11 @@ function lastOutputAt(state) {
 }
 
 function workers(state) {
-  return (scenario.workers || []).map((w) => {
+  const base = (scenario.workers || []).map((w) => Object.assign({}, w));
+  const extra = (state.dynamicWorkers || []).filter(
+    (w) => !base.some((b) => b.dispatchId === w.dispatchId)
+  );
+  return base.concat(extra).map((w) => {
     const copy = Object.assign({}, w);
     if (state.stopped[w.dispatchId]) copy.dispatchStatus = "stopped";
     return copy;
@@ -166,7 +182,7 @@ if (group === "orchestration" && cmd === "run-list") {
     saveState(state);
     reply({ ok: false, error: { message: scenario.runListFailReason || "run-list failed" } }, 1);
   }
-  const all = scenario.runs || [];
+  const all = (scenario.runs || []).concat(state.createdRuns || []);
   const limit = Number(flags.limit || 100);
   const offset = flags.cursor ? Number(flags.cursor) || 0 : 0;
   const slice = all.slice(offset, offset + limit);
@@ -176,17 +192,87 @@ if (group === "orchestration" && cmd === "run-list") {
 }
 
 if (group === "orchestration" && cmd === "task-list") {
-  const run = (scenario.runs || []).find((r) => r.id === flags.run) || {};
+  const run =
+    (scenario.runs || []).find((r) => r.id === flags.run) ||
+    (state.createdRuns || []).find((r) => r.id === flags.run) ||
+    {};
+  const tasks = (run.tasks || []).concat(
+    (state.tasks || []).filter((t) => !flags.run || t.runId === flags.run || !t.runId)
+  );
   saveState(state);
-  ok({ runId: flags.run, tasks: run.tasks || [], count: (run.tasks || []).length });
+  ok({ runId: flags.run, tasks, count: tasks.length });
+}
+
+if (group === "orchestration" && cmd === "run-current") {
+  saveState(state);
+  ok({ run: state.boundRun ? { id: state.boundRun } : null });
+}
+
+if (group === "orchestration" && cmd === "run-create") {
+  const id = scenario.createdRunId || "run_verify";
+  state.boundRun = id;
+  const run = {
+    id,
+    objective: flags.objective || "",
+    created_at: "2026-09-11T10:00:00Z",
+    coordinator_handle: scenario.coordinatorHandle || "term_ctrl",
+    tasks: [],
+  };
+  state.createdRuns = (state.createdRuns || []).concat([run]);
+  saveState(state);
+  ok({ run: { id, objective: run.objective, coordinator_handle: run.coordinator_handle }, id });
+}
+
+if (group === "orchestration" && cmd === "run-use") {
+  state.boundRun = flags.id || null;
+  saveState(state);
+  ok({ run: state.boundRun ? { id: state.boundRun } : null });
+}
+
+if (group === "orchestration" && cmd === "task-create") {
+  const id = "task_verdict";
+  const task = {
+    id,
+    taskId: id,
+    task_title: flags["task-title"] || "",
+    spec: flags.spec || "",
+    runId: flags.run || "",
+    status: "pending",
+    result: null,
+  };
+  state.tasks = (state.tasks || []).concat([task]);
+  saveState(state);
+  ok({ task: { id }, taskId: id, id });
+}
+
+if (group === "orchestration" && cmd === "task-update") {
+  const task = (state.tasks || []).find((t) => t.id === flags.id) || {
+    id: flags.id,
+  };
+  task.status = flags.status || task.status;
+  task.result = flags.result != null ? flags.result : task.result;
+  task.runId = flags.run || task.runId;
+  state.tasks = (state.tasks || []).filter((t) => t.id !== flags.id).concat([task]);
+  saveState(state);
+  ok({ task });
+}
+
+if (group === "orchestration" && cmd === "worker-release") {
+  state.released = (state.released || []).concat([flags.dispatch]);
+  saveState(state);
+  ok({ dispatchId: flags.dispatch, state: "released" });
 }
 
 if (group === "orchestration" && cmd === "worker-start") {
-  const ws = scenario.workerStart || {
-    dispatchId: "disp_1",
-    state: "ready",
-    handle: "term_w",
-  };
+  const queue = scenario.workerStarts || (scenario.workerStart ? [scenario.workerStart] : null);
+  const ws = (queue && queue[state.workerStartCount || 0]) ||
+    (queue && queue[queue.length - 1]) || {
+      dispatchId: "disp_1",
+      state: "ready",
+      handle: "term_w",
+    };
+  state.workerStartCount = (state.workerStartCount || 0) + 1;
+  const handle = ws.handle || flags.terminal || "term_w";
   if (ws.state !== "ready") {
     saveState(state);
     reply(
@@ -195,18 +281,26 @@ if (group === "orchestration" && cmd === "worker-start") {
         result: {
           dispatchId: ws.dispatchId || "",
           state: ws.state,
-          worker: { agentTerminalHandle: ws.handle || "" },
+          worker: { agentTerminalHandle: handle },
         },
         error: { message: ws.reason || ws.state },
       },
       1
     );
   }
+  state.dynamicWorkers = (state.dynamicWorkers || []).concat([
+    {
+      dispatchId: ws.dispatchId,
+      dispatchStatus: "dispatched",
+      agentTerminalHandle: handle,
+      lastHeartbeatAt: null,
+    },
+  ]);
   saveState(state);
   ok({
     dispatchId: ws.dispatchId,
     state: "ready",
-    worker: { agentTerminalHandle: ws.handle || flags.terminal || "term_w" },
+    worker: { agentTerminalHandle: handle },
   });
 }
 
@@ -379,17 +473,19 @@ if (group === "orchestration" && cmd === "check") {
 }
 
 if (group === "orchestration" && cmd === "send") {
+  const uid = state.nextUid || 1;
   const msg = {
+    id: "msg_" + uid,
     type: flags.type || "status",
     from_handle: flags.from || "",
     subject: flags.subject || "",
     body: flags.body || "",
     acked: false,
-    uid: state.nextUid || 1,
+    uid,
     groupId: null,
   };
   if (flags["dispatch-id"]) msg.dispatchId = flags["dispatch-id"];
-  state.nextUid = (state.nextUid || 1) + 1;
+  state.nextUid = uid + 1;
   state.arrived = (state.arrived || []).concat([msg]);
   saveState(state);
   ok({ ok: true, subject: flags.subject || "" });
@@ -397,12 +493,23 @@ if (group === "orchestration" && cmd === "send") {
 
 if (group === "terminal" && cmd === "create") {
   state.terminalCreatedAt = nowMs();
-  const handle = scenario.terminalHandle || "term_w";
+  const handle =
+    flags.title === "dely-verify-sidecar"
+      ? scenario.sidecarHandle || "term_sidecar"
+      : scenario.terminalHandle || "term_w";
+  state.createdTerminals = (state.createdTerminals || []).concat([
+    { handle, title: flags.title || "", command: flags.command || "" },
+  ]);
   saveState(state);
   ok({ terminal: { handle } });
 }
 
 if (group === "terminal" && cmd === "show") {
+  const sidecar = scenario.sidecarHandle || "term_sidecar";
+  if (scenario.sidecarGone && flags.terminal === sidecar) {
+    saveState(state);
+    reply({ ok: false, error: { message: "terminal not found" } }, 1);
+  }
   if (scenario.terminalShow === "fail") {
     saveState(state);
     reply({ ok: false, error: { message: scenario.terminalShowReason || "terminal show failed" } }, 1);
@@ -413,7 +520,7 @@ if (group === "terminal" && cmd === "show") {
     process.exit(0);
   }
   saveState(state);
-  ok({ terminal: { handle: flags.terminal, lastOutputAt: lastOutputAt(state) } });
+  ok({ terminal: { handle: flags.terminal, lastOutputAt: lastOutputAt(state), running: true } });
 }
 
 if (group === "terminal" && cmd === "wait") {

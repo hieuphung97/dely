@@ -2,7 +2,7 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { spawnSync } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
@@ -87,6 +87,8 @@ function runDely(args, ctx, extraEnv) {
     DELY_DEADLINE_S: extraEnv.DELY_DEADLINE_S != null ? String(extraEnv.DELY_DEADLINE_S) : "30",
     DELY_QUIET_S: extraEnv.DELY_QUIET_S != null ? String(extraEnv.DELY_QUIET_S) : "0.05",
     DELY_QUIET_MIN_S: extraEnv.DELY_QUIET_MIN_S != null ? String(extraEnv.DELY_QUIET_MIN_S) : "0.05",
+    DELY_VERIFY_DEADLINE_S:
+      extraEnv.DELY_VERIFY_DEADLINE_S != null ? String(extraEnv.DELY_VERIFY_DEADLINE_S) : "30",
   });
   delete env.SPAWN_TIMEOUT_MS;
   return spawnSync(process.execPath, [DELY_JS, ...args], {
@@ -990,6 +992,289 @@ test("collect keeps distinct settling messages that share dispatch type and body
         messages: [
           { id: "m1", type: "worker_done", from_handle: "term_w", dispatchId: "disp_1", body: "done" },
           { id: "m2", type: "worker_done", from_handle: "term_w", dispatchId: "disp_1", body: "done" },
+        ],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_w",
+      },
+    ],
+  });
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(r.stdout, "SETTLED disp_1 worker_done done\nSETTLED disp_1 worker_done done\n");
+});
+
+function gitInit(repo) {
+  const r = spawnSync("git", ["init"], { cwd: repo, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+}
+
+function trustCursor(home, repo) {
+  const slug = repo.replace(/^\//, "").replace(/\//g, "-");
+  write(
+    path.join(home, ".cursor", "projects", slug, ".workspace-trusted"),
+    JSON.stringify({ workspacePath: repo })
+  );
+}
+
+function bindingCalls(log) {
+  return log.filter((argv) => argv[0] === "orchestration" && (argv[1] === "run-create" || argv[1] === "run-use"));
+}
+
+function lastBinding(log) {
+  const calls = bindingCalls(log);
+  return calls[calls.length - 1];
+}
+
+function hasVerdictWrite(log) {
+  return log.some(
+    (argv) =>
+      argv[0] === "orchestration" &&
+      argv[1] === "task-create" &&
+      hasFlagPair(argv, "--task-title", "dely-verify-verdict")
+  );
+}
+
+function verifyOk(phase) {
+  return {
+    type: "worker_done",
+    outcome: "succeeded",
+    body: `dely verify ok phase=${phase} head=abc write=ok`,
+  };
+}
+
+function defaultVerifyScenario(repo, extra) {
+  extra = extra || {};
+  return Object.assign(
+    {
+      currentRun: "run_delivery",
+      createdRunId: "run_verify",
+      coordinatorHandle: "term_ctrl",
+      workerStarts: [
+        { dispatchId: "disp_impl", state: "ready", handle: "term_impl" },
+        { dispatchId: "disp_rev", state: "ready", handle: "term_rev" },
+      ],
+      lastOutputAt: "now",
+      deliveries: [
+        {
+          deliveryId: "dv_verify",
+          messages: [
+            { type: "heartbeat", from_handle: "term_impl", subject: "ack", dispatchId: "disp_impl" },
+            { type: "heartbeat", from_handle: "term_rev", subject: "ack", dispatchId: "disp_rev" },
+            Object.assign(verifyOk("implement"), { from_handle: "term_impl", dispatchId: "disp_impl" }),
+            Object.assign(verifyOk("review"), { from_handle: "term_rev", dispatchId: "disp_rev" }),
+          ],
+        },
+      ],
+    },
+    extra
+  );
+}
+
+function setupVerify(agents, scenarioFn) {
+  const ctx = setup(agents, scenarioFn);
+  gitInit(ctx.repo);
+  trustCursor(ctx.home, ctx.repo);
+  return ctx;
+}
+
+function waitUntil(fn, ms) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (fn()) return true;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+  }
+  return false;
+}
+
+function spawnDely(args, ctx, extraEnv) {
+  extraEnv = extraEnv || {};
+  const env = Object.assign({}, process.env, extraEnv, {
+    ORCA_CLI_COMMAND: FAKE,
+    FAKE_ORCA_SCENARIO: ctx.scenarioPath,
+    FAKE_ORCA_LOG: ctx.logPath,
+    FAKE_ORCA_STATE: ctx.statePath,
+    HOME: ctx.home,
+    DELY_POLL_MS: extraEnv.DELY_POLL_MS != null ? String(extraEnv.DELY_POLL_MS) : "20",
+    DELY_ACK_S: extraEnv.DELY_ACK_S != null ? String(extraEnv.DELY_ACK_S) : "1",
+    DELY_SILENCE_S: extraEnv.DELY_SILENCE_S != null ? String(extraEnv.DELY_SILENCE_S) : "60",
+    DELY_DEADLINE_S: extraEnv.DELY_DEADLINE_S != null ? String(extraEnv.DELY_DEADLINE_S) : "30",
+    DELY_VERIFY_DEADLINE_S: extraEnv.DELY_VERIFY_DEADLINE_S != null ? String(extraEnv.DELY_VERIFY_DEADLINE_S) : "30",
+  });
+  return spawn(process.execPath, [DELY_JS, ...args], { encoding: "utf8", env });
+}
+
+test("verdict is written only after every dispatch settled, with the full key", { timeout: 8000 }, () => {
+  const ctx = setupVerify(DEFAULT_AGENTS, (repo) =>
+    defaultVerifyScenario(repo, {
+      deliveries: [
+        {
+          deliveryId: "dv_one",
+          messages: [
+            { type: "heartbeat", from_handle: "term_impl", subject: "ack", dispatchId: "disp_impl" },
+            { type: "heartbeat", from_handle: "term_rev", subject: "ack", dispatchId: "disp_rev" },
+            Object.assign(verifyOk("implement"), { from_handle: "term_impl", dispatchId: "disp_impl" }),
+          ],
+        },
+      ],
+    })
+  );
+  const child = spawnDely(["verify", "run", "--repo", ctx.repo, "--control", "cursor"], ctx, {
+    DELY_VERIFY_DEADLINE_S: "30",
+  });
+  try {
+    const ready = waitUntil(() => {
+      const log = readLog(ctx.logPath);
+      const starts = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "worker-start");
+      const acks = log.filter(
+        (argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--ack")
+      );
+      return starts.length >= 2 && acks.length >= 1;
+    }, 4000);
+    assert.ok(ready, "verify did not dispatch and settle the first worker");
+    assert.equal(hasVerdictWrite(readLog(ctx.logPath)), false);
+  } finally {
+    child.kill("SIGTERM");
+    child.unref();
+  }
+});
+
+test("verify restores the Control terminal's previously bound Run", () => {
+  const ctx = setupVerify(DEFAULT_AGENTS, (repo) => defaultVerifyScenario(repo));
+  const pass = runDely(["verify", "run", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  assert.equal(pass.status, 0, pass.stdout + pass.stderr);
+  assert.match(pass.stdout, /RESULT PASS/);
+  const passLast = lastBinding(readLog(ctx.logPath));
+  assert.ok(passLast);
+  assert.equal(passLast[1], "run-use");
+  assert.ok(hasFlagPair(passLast, "--id", "run_delivery"));
+
+  const failCtx = setupVerify(DEFAULT_AGENTS, (repo) =>
+    defaultVerifyScenario(repo, {
+      deliveries: [
+        {
+          deliveryId: "dv_fail",
+          messages: [
+            { type: "heartbeat", from_handle: "term_impl", subject: "ack", dispatchId: "disp_impl" },
+            { type: "heartbeat", from_handle: "term_rev", subject: "ack", dispatchId: "disp_rev" },
+            {
+              type: "worker_done",
+              from_handle: "term_impl",
+              dispatchId: "disp_impl",
+              outcome: "failed",
+              body: "nope",
+            },
+            Object.assign(verifyOk("review"), { from_handle: "term_rev", dispatchId: "disp_rev" }),
+          ],
+        },
+      ],
+    })
+  );
+  const fail = runDely(["verify", "run", "--repo", failCtx.repo, "--control", "cursor"], failCtx);
+  assert.equal(fail.status, 1, fail.stdout + fail.stderr);
+  assert.match(fail.stdout, /RESULT FAIL/);
+  const failLast = lastBinding(readLog(failCtx.logPath));
+  assert.equal(failLast[1], "run-use");
+  assert.ok(hasFlagPair(failLast, "--id", "run_delivery"));
+
+  const claudeAgents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Claude Code | default | default |
+| \`review\` | Claude Code | default | default |
+`;
+  const blockedCtx = setup(claudeAgents, () => ({
+    currentRun: "run_delivery",
+    createdRunId: "run_verify",
+    coordinatorHandle: "term_ctrl",
+  }));
+  gitInit(blockedCtx.repo);
+  const blocked = runDely(["verify", "run", "--repo", blockedCtx.repo, "--control", "cursor"], blockedCtx);
+  assert.equal(blocked.status, 1, blocked.stdout + blocked.stderr);
+  assert.match(blocked.stdout, /RESULT FAIL/);
+  const blockedLast = lastBinding(readLog(blockedCtx.logPath));
+  assert.equal(blockedLast[1], "run-use");
+  assert.ok(hasFlagPair(blockedLast, "--id", "run_delivery"));
+});
+
+test("BLOCKED preflight makes no worker-start call and records a FAIL verdict", () => {
+  const agents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Claude Code | default | default |
+| \`review\` | Claude Code | default | default |
+`;
+  const ctx = setup(agents, () => ({
+    currentRun: "run_delivery",
+    createdRunId: "run_verify",
+    coordinatorHandle: "term_ctrl",
+  }));
+  gitInit(ctx.repo);
+  write(
+    path.join(ctx.home, ".claude.json"),
+    JSON.stringify({ projects: { [ctx.repo]: { hasTrustDialogAccepted: false } } })
+  );
+  const r = runDely(["verify", "run", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /BLOCKED /);
+  assert.match(r.stdout, /RESULT FAIL/);
+  const log = readLog(ctx.logPath);
+  assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start"));
+  assert.ok(hasVerdictWrite(log));
+  const update = log.find((argv) => argv[0] === "orchestration" && argv[1] === "task-update");
+  assert.ok(update);
+  const resultJson = update[update.indexOf("--result") + 1];
+  assert.match(resultJson, /"verdict":"FAIL"/);
+  assert.ok(hasFlagPair(lastBinding(log), "--id", "run_delivery"));
+});
+
+test("verify start then collect restarts a missing sidecar when one dispatch is still open", () => {
+  const ctx = setupVerify(DEFAULT_AGENTS, (repo) =>
+    defaultVerifyScenario(repo, {
+      deliveries: [
+        {
+          deliveryId: "dv_ack",
+          messages: [
+            { type: "heartbeat", from_handle: "term_impl", subject: "ack", dispatchId: "disp_impl" },
+            { type: "heartbeat", from_handle: "term_rev", subject: "ack", dispatchId: "disp_rev" },
+          ],
+        },
+      ],
+    })
+  );
+  const started = runDely(["verify", "start", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  assert.equal(started.status, 0, started.stdout + started.stderr);
+  assert.match(started.stdout, /SLEEP end your turn; when Orca wakes you, run: /);
+  const afterStart = readLog(ctx.logPath).filter(
+    (argv) => argv[0] === "terminal" && argv[1] === "create" && hasFlagPair(argv, "--title", "dely-verify-sidecar")
+  );
+  assert.equal(afterStart.length, 1);
+  const scenario = JSON.parse(fs.readFileSync(ctx.scenarioPath, "utf8"));
+  scenario.sidecarGone = true;
+  write(ctx.scenarioPath, JSON.stringify(scenario, null, 2));
+  const collected = runDely(["verify", "collect", "--repo", ctx.repo], ctx);
+  assert.equal(collected.status, 2, collected.stdout + collected.stderr);
+  assert.match(collected.stdout, /WAITING /);
+  const sidecars = readLog(ctx.logPath).filter(
+    (argv) => argv[0] === "terminal" && argv[1] === "create" && hasFlagPair(argv, "--title", "dely-verify-sidecar")
+  );
+  assert.ok(sidecars.length >= 2, "collect did not restart a missing sidecar");
+});
+
+test("two id-less worker_done messages print two SETTLED lines", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      {
+        deliveryId: "dv_noid",
+        messages: [
+          { id: false, type: "worker_done", from_handle: "term_w", dispatchId: "disp_1", body: "done" },
+          { id: false, type: "worker_done", from_handle: "term_w", dispatchId: "disp_1", body: "done" },
         ],
       },
     ],
