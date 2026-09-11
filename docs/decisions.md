@@ -592,7 +592,13 @@ it, and it changed the design:
    split that route across two typed errors; a later measurement found the
    plane does not distinguish them, and the single route is what every
    recovery actually performed. It enumerates no vendor's dialogs, so it does
-   not go stale when a vendor ships a new one.
+   not go stale when a vendor ships a new one. Amended 2026-09-11: the retry
+   into the same terminal is withdrawn. A live re-review retried into a reused
+   Codex terminal left its prompt unsubmitted and its model drifted, and a
+   later probe did observe `agent_prompt_blocked`. Recovery is now one fresh
+   start with the pins named again. See `2026-09-11 — Workers acknowledge,
+   Control sleeps until an event, and dely:verify proves the path before the
+   first dispatch`.
 4. The prompt and the handoff stay files inside the worktree. Messages carry a
    short body and a `payload.reportPath`. The reason is this skill's own rule:
    a task spec and a message body are shell arguments, and prompts do not go in
@@ -996,7 +1002,10 @@ retrying into it rather than by an enumerated per-harness answer. This note
 first attributed that routing to a typed `agent_prompt_blocked`; a later probe
 never observed that code, so the route does not depend on it. See
 `2026-09-04 — Orca orchestration is the execution plane, and Dely stops
-hand-rolling dispatch`.
+hand-rolling dispatch`. Amended 2026-09-11: a later probe did observe that code, and the retry into
+the same terminal is withdrawn in favour of one fresh start. No screen reading
+routes recovery. See `2026-09-11 — Workers acknowledge, Control sleeps until an
+event, and dely:verify proves the path before the first dispatch`.
 #### Context
 
 `skills/delivery/references/harnesses.md` already records a per-harness
