@@ -161,6 +161,33 @@ function nowMs() {
   return Date.now();
 }
 
+function utcStamp(ms) {
+  const d = new Date(ms == null ? Date.now() : ms);
+  const p = (n) => String(n).padStart(2, "0");
+  return (
+    d.getUTCFullYear() +
+    "-" +
+    p(d.getUTCMonth() + 1) +
+    "-" +
+    p(d.getUTCDate()) +
+    " " +
+    p(d.getUTCHours()) +
+    ":" +
+    p(d.getUTCMinutes()) +
+    ":" +
+    p(d.getUTCSeconds())
+  );
+}
+
+function dispatchedAtOf(w, state) {
+  if (w && w.dispatchedAt) return w.dispatchedAt;
+  if (scenario.dispatchedAt) return scenario.dispatchedAt;
+  const id = (w && w.dispatchId) || "";
+  state.dispatchedAt = state.dispatchedAt || {};
+  if (!state.dispatchedAt[id]) state.dispatchedAt[id] = utcStamp();
+  return state.dispatchedAt[id];
+}
+
 function lastOutputAt(state) {
   const busy = scenario.changeLastOutputForMs || 0;
   if (busy) {
@@ -329,12 +356,14 @@ if (group === "orchestration" && cmd === "worker-show") {
   const id = flags.dispatch;
   const w = workers(state).find((row) => row.dispatchId === id) || {};
   const ws = scenario.workerStart || {};
+  const dispatchedAt = dispatchedAtOf(w, state);
   saveState(state);
   ok({
     dispatch: {
       id,
       lastFailure: w.lastFailure || ws.lastFailure || null,
       lastHeartbeatAt: w.lastHeartbeatAt || null,
+      dispatchedAt,
       status: w.dispatchStatus || "dispatched",
     },
     worker: {
@@ -516,12 +545,31 @@ if (group === "orchestration" && cmd === "send") {
   ok({ ok: true, subject: flags.subject || "" });
 }
 
+if (group === "terminal" && cmd === "list") {
+  const seeded = scenario.terminals || [];
+  const created = state.createdTerminals || [];
+  const byHandle = new Map();
+  for (const t of seeded.concat(created)) {
+    byHandle.set(t.handle, {
+      handle: t.handle,
+      title: t.title || "",
+      running: t.running !== false,
+      closed: Boolean(t.closed),
+    });
+  }
+  saveState(state);
+  ok({ terminals: Array.from(byHandle.values()) });
+}
+
 if (group === "terminal" && cmd === "create") {
   state.terminalCreatedAt = nowMs();
+  const title = flags.title || "";
   const handle =
-    flags.title === "dely-verify-sidecar"
+    title === "dely-verify-sidecar"
       ? scenario.sidecarHandle || "term_sidecar"
-      : scenario.terminalHandle || "term_w";
+      : title.indexOf("dely-sidecar ") === 0
+        ? scenario.sidecarHandle || "term_dely_sidecar"
+        : scenario.terminalHandle || "term_w";
   state.createdTerminals = (state.createdTerminals || []).concat([
     { handle, title: flags.title || "", command: flags.command || "" },
   ]);

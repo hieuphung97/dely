@@ -136,6 +136,14 @@ The launcher is `scripts/dely` relative to this skill. `--control` is the
 Orca agent id of Control's own harness. Control's wake mode is that
 harness's `Control wake` cell in `references/harnesses.md`.
 
+Usage as the launcher prints it:
+
+- `dely dispatch --repo <path> --run <runId> --phase <implement|review> --spec-file <path> --control <agent>`
+- `dely wait --run <runId>`
+- `dely collect --run <runId> --repo <path>`
+
+`--spec-file` is the worktree-relative prompt file.
+
 Write the prompt to an untracked file **inside the worktree**. Never inline
 it in a shell argument: prompts carry backticks, quotes and newlines, and a
 shell argument mangles them. A path outside the workspace can trigger a
@@ -156,9 +164,9 @@ restatement of it.
 
 **Every dispatch goes through `dely dispatch`.** Control does not compose a
 worker launch or call `worker-start` by hand. The runtime reads the pins
-from `AGENTS.md` and the launch path, model pin and acknowledgement from
-the harness table. The `worker-start` receipt records `launch.requested`
-and `launch.effective`; it does not establish that the worker can serve
+from `AGENTS.md` and the launch path and model pin from the harness table.
+The runtime appends the acknowledgement instruction. The `worker-start`
+receipt records `launch.requested` and `launch.effective`; it does not establish that the worker can serve
 the request or that it cannot. The runtime carries the execution plane's
 configured permission default onto composed argv and does not add a
 sandbox the project did not pin.
@@ -170,21 +178,23 @@ identical to one that pinned the same value deliberately.
 
 **Refusal:** when `dely dispatch` prints `REFUSED`, Control runs `dely:verify`
 at once, with no human gate, then dispatches again. On FAIL or BLOCKED,
-Control stops and relays the printed fix to the human.
+Control stops and relays the printed fix to the human. A second `REFUSED`
+right after a verify PASS goes to the human.
 
 **Sleep and wake after `DISPATCHED`, by wake mode:**
 
 - **background:** run `dely wait --run <run>` as a background command and
   end the turn. `SETTLED` hands over the whole batch.
-- **nudge:** run `dely collect --run <run>` once. If it settles the
-  dispatch, handle that now. On `WAITING`, open
-  `dely sidecar --run <run> --control-handle <handle>` in its own Orca
-  terminal and end the turn. The handle is the Run's `coordinator_handle`,
-  or `ORCA_TERMINAL_HANDLE`. On every Orca nudge, run only `dely collect`,
-  never the `orca orchestration check` command quoted in the nudge text,
-  because it would consume the message. On `WAITING` again, open a new
-  sidecar and end the turn.
+- **nudge:** after `DISPATCHED`, and on every Orca nudge, run only
+  `dely collect --run <run> --repo <path>`, never the `orca orchestration check`
+  command quoted in the nudge text, because it would consume the message.
+  On `WAITING`, end the turn. Control never opens a sidecar by hand.
 - **unsupported:** that harness cannot be Control.
+
+Control acts only on `SETTLED` lines whose dispatch id matches the one
+`DISPATCHED` printed. After a `SETTLED` batch that holds only `question` or
+`escalation`, Control answers or escalates, then sleeps again by wake mode.
+`ERROR` (exit 9) goes to the human.
 
 **Recovery:** `NO_ACK`, `SILENT` or `FAILED` is recovered by one fresh
 `dely dispatch` with the same prompt file. Never retry into the same terminal,
@@ -384,6 +394,7 @@ from an ambiguous, missing, or merely transport-level outcome.
 | Idempotent release step is interrupted | Verify Git and pull-request state, then resume |
 | `NO_ACK`, `SILENT` or `FAILED` | One fresh `dely dispatch` with the same prompt file; a second failure on the same input goes to the human |
 | `DEADLINE` | Ask the human |
+| `ERROR` (exit 9) | Ask the human |
 
 ## Changing this skill
 

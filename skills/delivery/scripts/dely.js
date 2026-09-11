@@ -476,6 +476,34 @@ function hasSettle(messages) {
   );
 }
 
+function stopDispatch(id) {
+  if (!id) return;
+  orca(["orchestration", "worker-stop", "--dispatch", id, "--json"]);
+}
+
+function parseDispatchedAt(raw) {
+  if (raw == null || raw === "") return null;
+  const m = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return null;
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+}
+
+function checkDeadline(run) {
+  const listed = workerList(run);
+  if (!listed.ok) return null;
+  for (const worker of listed.workers) {
+    if (worker.dispatchStatus !== "dispatched") continue;
+    const shown = orca(["orchestration", "worker-show", "--dispatch", worker.dispatchId, "--json"]);
+    const at = parseDispatchedAt((result(shown).dispatch || {}).dispatchedAt);
+    if (at == null) continue;
+    const seconds = (Date.now() - at) / 1000;
+    if (seconds > DEADLINE_S) {
+      return { dispatchId: worker.dispatchId, seconds: Math.floor(seconds) };
+    }
+  }
+  return null;
+}
+
 function waitForAck(run, handle, startedAt) {
   while ((Date.now() - startedAt) / 1000 <= ACK_S) {
     const r = orca(["orchestration", "check", "--peek", "--run", run, "--json"]);
@@ -665,16 +693,19 @@ function waitStep(run, startedAt, seen, deadlineS) {
 }
 
 function cmdWait(flags) {
-  const startedAt = Date.now();
   const seen = new Set();
   for (;;) {
-    const step = waitStep(flags.run, startedAt, seen, DEADLINE_S);
+    const step = waitStep(flags.run, Date.now(), seen, Number.POSITIVE_INFINITY);
     if (step.type === "settled") {
       finish(0, `SETTLED ${step.types.join(",")} ${JSON.stringify(step.messages)}`);
     }
-    if (step.type === "deadline") finish(7, `DEADLINE ${step.seconds}`);
-    if (step.type === "silent") finish(6, `SILENT ${step.dispatchId} ${step.seconds}`);
     if (step.type === "error") finish(9, `ERROR ${step.reason}`);
+    const deadline = checkDeadline(flags.run);
+    if (deadline) finish(7, `DEADLINE ${deadline.dispatchId} ${deadline.seconds}`);
+    if (step.type === "silent") {
+      stopDispatch(step.dispatchId);
+      finish(6, `SILENT ${step.dispatchId} ${step.seconds}`);
+    }
   }
 }
 
@@ -699,7 +730,6 @@ function sendWake(run, reason) {
 function cmdSidecar(flags) {
   const run = flags.run;
   const terminal = flags["control-handle"];
-  const startedAt = Date.now();
   const seen = new Set();
   for (;;) {
     const r = orca([
@@ -727,14 +757,14 @@ function cmdSidecar(flags) {
         process.exit(0);
       }
     }
-    const elapsed = (Date.now() - startedAt) / 1000;
+    const deadline = checkDeadline(run);
     const silent = checkSilent(run, seen);
-    if (silent) {
-      sendWake(run, `SILENT ${silent.dispatchId} ${silent.seconds}`);
+    if (deadline) {
+      sendWake(run, `DEADLINE ${deadline.dispatchId} ${deadline.seconds}`);
       process.exit(0);
     }
-    if (elapsed > DEADLINE_S) {
-      sendWake(run, `DEADLINE ${Math.floor(elapsed)}`);
+    if (silent) {
+      sendWake(run, `SILENT ${silent.dispatchId} ${silent.seconds}`);
       process.exit(0);
     }
     const listed = workerList(run);
@@ -798,13 +828,25 @@ function collectSettles(run, opts) {
     for (let i = 0; i < batch.length; i++) report(batch, i);
   }
   const open = listed.workers.filter((w) => w.dispatchStatus === "dispatched").map((w) => w.dispatchId);
-  return { ok: true, settles, open, workers: listed.workers };
+  return { ok: true, settles, open, workers: listed.workers, history };
 }
 
 function cmdCollect(flags) {
   const collected = collectSettles(flags.run);
   if (!collected.ok) finish(9, `ERROR ${collected.reason}`);
-  if (collected.open.length) finish(2, `WAITING ${collected.open.join(" ")}`);
+  const seen = new Set();
+  markHeartbeats(collected.history || [], seen);
+  const silent = checkSilent(flags.run, seen);
+  if (silent) {
+    stopDispatch(silent.dispatchId);
+    finish(6, `SILENT ${silent.dispatchId} ${silent.seconds}`);
+  }
+  const deadline = checkDeadline(flags.run);
+  if (deadline) finish(7, `DEADLINE ${deadline.dispatchId} ${deadline.seconds}`);
+  if (collected.open.length) {
+    ensureRunSidecar(absRepo(flags.repo), flags.run);
+    finish(2, `WAITING ${collected.open.join(" ")}`);
+  }
   process.exit(0);
 }
 
@@ -1049,20 +1091,24 @@ function launcherPath() {
   return path.resolve(__dirname, "dely");
 }
 
-function startVerifySidecar(repo, verifyRun, controlHandle, launcher) {
-  const command = `${launcher} sidecar --run ${verifyRun} --control-handle ${controlHandle}`;
+function startSidecar(repo, run, controlHandle, launcher, title) {
+  const command = `${launcher} sidecar --run ${run} --control-handle ${controlHandle}`;
   const created = orca([
     "terminal",
     "create",
     "--worktree",
     `path:${repo}`,
     "--title",
-    "dely-verify-sidecar",
+    title,
     "--command",
     command,
     "--json",
   ]);
   return (result(created).terminal && result(created).terminal.handle) || "";
+}
+
+function startVerifySidecar(repo, verifyRun, controlHandle, launcher) {
+  return startSidecar(repo, verifyRun, controlHandle, launcher, "dely-verify-sidecar");
 }
 
 function sidecarAlive(handle) {
@@ -1072,6 +1118,19 @@ function sidecarAlive(handle) {
   const t = result(shown).terminal || {};
   if (t.running === false || t.closed) return false;
   return true;
+}
+
+function ensureRunSidecar(repo, run) {
+  const title = "dely-sidecar " + run;
+  const listed = orca(["terminal", "list", "--json"]);
+  const terminals = result(listed).terminals;
+  if (Array.isArray(terminals)) {
+    for (const t of terminals) {
+      if (!t || t.title !== title) continue;
+      if (sidecarAlive(t.handle)) return t.handle;
+    }
+  }
+  return startSidecar(repo, run, coordinatorHandle(run), launcherPath(), title);
 }
 
 function writeVerdict(verifyRun, key, pass) {
@@ -1404,7 +1463,7 @@ function main(argv) {
       }
       return cmdSidecar(flags);
     case "collect":
-      if (!flags.run) finish(2, "usage: dely collect --run <runId>");
+      if (!flags.run || !flags.repo) finish(2, "usage: dely collect --run <runId> --repo <path>");
       return cmdCollect(flags);
     case "verify:run":
       if (!flags.repo || !flags.control) finish(2, "usage: dely verify run --repo <path> --control <agent>");
