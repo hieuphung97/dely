@@ -215,20 +215,36 @@ function parseTaskResult(raw) {
   return raw;
 }
 
+function orcaFailed(r) {
+  return Boolean(r.error) || r.status !== 0 || !r.json || r.json.ok === false;
+}
+
+function orcaReason(r, fallback) {
+  if (r.error && r.error.message) return r.error.message;
+  if (r.json && r.json.error && r.json.error.message) return r.json.error.message;
+  const errText = String(r.stderr || "").trim();
+  if (errText) return errText;
+  if (!r.json) return fallback;
+  if (r.status) return `exit ${r.status}`;
+  return fallback;
+}
+
 function listAllRuns() {
   const runs = [];
   let cursor;
   for (;;) {
-    const args = ["orchestration", "run-list", "--limit", "100", "--json"];
-    if (cursor) args.splice(3, 0, "--cursor", cursor);
+    const args = ["orchestration", "run-list", "--limit", "100"];
+    if (cursor) args.push("--cursor", cursor);
+    args.push("--json");
     const r = orca(args);
-    const res = result(r);
-    const page = res.runs || [];
+    if (orcaFailed(r)) return { ok: false, reason: orcaReason(r, "run-list failed") };
+    const page = result(r).runs;
+    if (!Array.isArray(page)) return { ok: false, reason: orcaReason(r, "malformed run-list") };
     runs.push(...page);
-    cursor = res.nextCursor;
+    cursor = result(r).nextCursor;
     if (!cursor || !page.length) break;
   }
-  return runs;
+  return { ok: true, runs };
 }
 
 function newestMatchingRun(runs, objective) {
@@ -239,10 +255,12 @@ function newestMatchingRun(runs, objective) {
 
 function lookupVerdict(key) {
   const objective = objectiveFor(key);
-  const run = newestMatchingRun(listAllRuns(), objective);
+  const listed = listAllRuns();
+  if (!listed.ok) return { status: "ERROR", reason: listed.reason };
+  const run = newestMatchingRun(listed.runs, objective);
   if (!run) return { status: "NONE" };
-  const listed = orca(["orchestration", "task-list", "--run", run.id, "--json"]);
-  const tasks = result(listed).tasks || [];
+  const tasksRes = orca(["orchestration", "task-list", "--run", run.id, "--json"]);
+  const tasks = result(tasksRes).tasks || [];
   const task = tasks.find((t) => (t.task_title || t.title || t.display_name) === "dely-verify-verdict");
   if (!task) return { status: "NONE" };
   const parsed = parseTaskResult(task.result);
@@ -333,9 +351,12 @@ function messagesOf(r) {
 }
 
 function ackDelivery(run, id, terminal) {
-  const args = ["orchestration", "check", "--run", run, "--ack", id, "--json"];
-  if (terminal) args.splice(3, 0, "--terminal", terminal);
-  orca(args);
+  const args = ["orchestration", "check", "--run", run];
+  if (terminal) args.push("--terminal", terminal);
+  args.push("--ack", id, "--json");
+  const r = orca(args);
+  if (orcaFailed(r)) return { ok: false, reason: orcaReason(r, "ack rejected") };
+  return { ok: true };
 }
 
 function uniqueTypes(messages) {
@@ -358,19 +379,27 @@ function messageDispatchId(m) {
 
 function lastOutputAt(handle) {
   const shown = orca(["terminal", "show", "--terminal", handle, "--json"]);
-  const n = Number(result(shown).terminal && result(shown).terminal.lastOutputAt);
-  return Number.isFinite(n) ? n : 0;
+  if (orcaFailed(shown)) return null;
+  const raw = result(shown).terminal && result(shown).terminal.lastOutputAt;
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function waitQuiet(handle, launchedAt) {
-  const cap = Date.now() + Math.max(60000, (QUIET_MIN_S + QUIET_S) * 1000 + 1000);
+  const capS = numEnv("DELY_QUIET_CAP_S", 60);
+  const cap = launchedAt + capS * 1000;
   for (;;) {
     const now = Date.now();
+    if (now >= cap) return false;
     const lo = lastOutputAt(handle);
     const sinceLaunch = (now - launchedAt) / 1000;
-    const sinceOut = lo ? (now - lo) / 1000 : sinceLaunch;
-    if (sinceLaunch >= QUIET_MIN_S && sinceOut >= QUIET_S) return;
-    if (now >= cap) return;
+    if (lo == null) {
+      sleepMs(Math.min(200, Math.max(10, POLL_MS)));
+      continue;
+    }
+    const sinceOut = (now - lo) / 1000;
+    if (sinceLaunch >= QUIET_MIN_S && sinceOut >= QUIET_S) return true;
     sleepMs(Math.min(200, Math.max(10, POLL_MS)));
   }
 }
@@ -412,7 +441,7 @@ function waitForAck(run, handle, startedAt) {
       "--run",
       run,
       "--types",
-      "heartbeat,worker_done,escalation,question",
+      "heartbeat",
       "--timeout-ms",
       String(Math.max(1, Math.floor(POLL_MS))),
       "--json",
@@ -420,12 +449,11 @@ function waitForAck(run, handle, startedAt) {
     const id = deliveryId(r);
     if (id) {
       const messages = messagesOf(r);
-      ackDelivery(run, id);
-      const hit = messages.some((m) => {
-        if (!m || m.type !== "heartbeat") return false;
-        if (!m.from_handle) return true;
-        return m.from_handle === handle;
-      });
+      const onlyHb = messages.length > 0 && messages.every((m) => m && m.type === "heartbeat");
+      if (!onlyHb) continue;
+      const acked = ackDelivery(run, id);
+      if (!acked.ok) finish(9, `ERROR ack failed: ${acked.reason}`);
+      const hit = messages.some((m) => m && m.type === "heartbeat" && m.from_handle === handle);
       if (hit) return (Date.now() - startedAt) / 1000;
     }
   }
@@ -434,7 +462,10 @@ function waitForAck(run, handle, startedAt) {
 
 function workerList(run) {
   const r = orca(["orchestration", "worker-list", "--run", run, "--json"]);
-  return result(r).workers || [];
+  if (orcaFailed(r)) return { ok: false, reason: orcaReason(r, "worker-list failed") };
+  const rows = result(r).workers;
+  if (!Array.isArray(rows)) return { ok: false, reason: orcaReason(r, "malformed worker-list") };
+  return { ok: true, workers: rows };
 }
 
 function heartbeatSeen(worker, seen) {
@@ -446,12 +477,15 @@ function heartbeatSeen(worker, seen) {
 }
 
 function checkSilent(run, seen) {
-  for (const worker of workerList(run)) {
+  const listed = workerList(run);
+  if (!listed.ok) return null;
+  for (const worker of listed.workers) {
     if (worker.dispatchStatus !== "dispatched") continue;
     if (!heartbeatSeen(worker, seen)) continue;
     const handle = worker.agentTerminalHandle;
     if (!handle) continue;
     const lo = lastOutputAt(handle);
+    if (lo == null) continue;
     const silentFor = (Date.now() - lo) / 1000;
     if (silentFor > SILENCE_S) {
       return { dispatchId: worker.dispatchId, seconds: Math.floor(silentFor) };
@@ -475,6 +509,7 @@ function cmdStatus(flags) {
   const pins = loadPins(repo);
   const key = makeKey(repo, flags.control, harnesses, pins);
   const found = lookupVerdict(key);
+  if (found.status === "ERROR") finish(9, `ERROR run-list failed: ${found.reason}`);
   if (found.status === "PASS") finish(0, `PASS ${found.runId}`);
   finish(1, "NONE");
 }
@@ -485,6 +520,7 @@ function cmdDispatch(flags) {
   const pins = loadPins(repo);
   const key = makeKey(repo, flags.control, harnesses, pins);
   const found = lookupVerdict(key);
+  if (found.status === "ERROR") finish(9, `ERROR run-list failed: ${found.reason}`);
   if (found.status !== "PASS") {
     finish(3, `REFUSED no PASS verdict for key ${key}; run dely verify`);
   }
@@ -496,10 +532,10 @@ function cmdDispatch(flags) {
   const spec = buildSpec(flags["spec-file"]);
   const title = flags.title || `dely-${phase}`;
   const kind = launchKind(entry, pin.model);
-  const startedAt = Date.now();
   let created = false;
   let handle = "";
   let started;
+  const launchedAt = Date.now();
   if (kind === "adopt") {
     const perm = adoptedPermission(entry.agent, entry.permission);
     const command = adoptCommand(entry.agent, perm, pin.model, pin.effort);
@@ -517,7 +553,11 @@ function cmdDispatch(flags) {
     handle = result(createdTerm).terminal && result(createdTerm).terminal.handle;
     if (!handle) finish(5, "FAILED terminal create");
     created = true;
-    waitQuiet(handle, startedAt);
+    if (!waitQuiet(handle, launchedAt)) {
+      const secs = Math.max(1, Math.floor((Date.now() - launchedAt) / 1000));
+      orca(["terminal", "close", "--terminal", handle, "--json"]);
+      finish(5, `FAILED readiness timeout after ${secs}s`);
+    }
     const args = workerStartBase({ spec, repo, run: flags.run, title });
     args.push("--terminal", handle, "--timeout-ms", "60000");
     started = startReceipt(orca(args));
@@ -532,7 +572,7 @@ function cmdDispatch(flags) {
   if (started.state !== "ready") {
     finish(5, `FAILED ${lastFailure(dispatchId, started)}`);
   }
-  const ack = waitForAck(flags.run, handle, startedAt);
+  const ack = waitForAck(flags.run, handle, Date.now());
   if (ack == null) {
     if (dispatchId) orca(["orchestration", "worker-stop", "--dispatch", dispatchId, "--json"]);
     if (created && handle) orca(["terminal", "close", "--terminal", handle, "--json"]);
@@ -561,7 +601,8 @@ function cmdWait(flags) {
     const id = deliveryId(r);
     if (id) {
       const messages = messagesOf(r);
-      ackDelivery(run, id);
+      const acked = ackDelivery(run, id);
+      if (!acked.ok) finish(9, `ERROR ack failed: ${acked.reason}`);
       markHeartbeats(messages, seen);
       const types = uniqueTypes(messages);
       const onlyHb = types.length > 0 && types.every((t) => t === "heartbeat");
@@ -618,7 +659,8 @@ function cmdSidecar(flags) {
     const id = deliveryId(r);
     if (id) {
       markHeartbeats(messagesOf(r), seen);
-      ackDelivery(run, id, terminal);
+      const acked = ackDelivery(run, id, terminal);
+      if (!acked.ok) finish(9, `ERROR ack failed: ${acked.reason}`);
     }
     const elapsed = (Date.now() - startedAt) / 1000;
     const silent = checkSilent(run, seen);
@@ -630,8 +672,11 @@ function cmdSidecar(flags) {
       sent.add("deadline");
       sendWatchdog(run, `DEADLINE ${Math.floor(elapsed)}`);
     }
-    const open = workerList(run).filter((w) => w.dispatchStatus === "dispatched");
-    if (!open.length) process.exit(0);
+    const listed = workerList(run);
+    if (listed.ok) {
+      const open = listed.workers.filter((w) => w.dispatchStatus === "dispatched");
+      if (!open.length) process.exit(0);
+    }
     if (elapsed > DEADLINE_S + 120) process.exit(0);
   }
 }
@@ -643,14 +688,17 @@ function cmdCollect(flags) {
     const id = deliveryId(r);
     if (!id) break;
     const messages = messagesOf(r);
-    ackDelivery(run, id);
+    const acked = ackDelivery(run, id);
+    if (!acked.ok) finish(9, `ERROR ack failed: ${acked.reason}`);
     for (const m of messages) {
       if (!m || m.type === "heartbeat") continue;
       const dispatchId = messageDispatchId(m) || "-";
       process.stdout.write(`SETTLED ${dispatchId} ${m.type} ${m.body || ""}\n`);
     }
   }
-  const open = workerList(run).filter((w) => w.dispatchStatus === "dispatched").map((w) => w.dispatchId);
+  const listed = workerList(run);
+  if (!listed.ok) finish(9, `ERROR worker-list failed: ${listed.reason}`);
+  const open = listed.workers.filter((w) => w.dispatchStatus === "dispatched").map((w) => w.dispatchId);
   if (open.length) finish(2, `WAITING ${open.join(" ")}`);
   process.exit(0);
 }

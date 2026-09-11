@@ -73,21 +73,26 @@ function readLog(logPath) {
 }
 
 function runDely(args, ctx, extraEnv) {
+  extraEnv = extraEnv || {};
+  const timeout = extraEnv.SPAWN_TIMEOUT_MS;
+  const env = Object.assign({}, process.env, extraEnv, {
+    ORCA_CLI_COMMAND: FAKE,
+    FAKE_ORCA_SCENARIO: ctx.scenarioPath,
+    FAKE_ORCA_LOG: ctx.logPath,
+    FAKE_ORCA_STATE: ctx.statePath,
+    HOME: ctx.home,
+    DELY_POLL_MS: extraEnv.DELY_POLL_MS != null ? String(extraEnv.DELY_POLL_MS) : "20",
+    DELY_ACK_S: extraEnv.DELY_ACK_S != null ? String(extraEnv.DELY_ACK_S) : "1",
+    DELY_SILENCE_S: extraEnv.DELY_SILENCE_S != null ? String(extraEnv.DELY_SILENCE_S) : "60",
+    DELY_DEADLINE_S: extraEnv.DELY_DEADLINE_S != null ? String(extraEnv.DELY_DEADLINE_S) : "30",
+    DELY_QUIET_S: extraEnv.DELY_QUIET_S != null ? String(extraEnv.DELY_QUIET_S) : "0.05",
+    DELY_QUIET_MIN_S: extraEnv.DELY_QUIET_MIN_S != null ? String(extraEnv.DELY_QUIET_MIN_S) : "0.05",
+  });
+  delete env.SPAWN_TIMEOUT_MS;
   return spawnSync(process.execPath, [DELY_JS, ...args], {
     encoding: "utf8",
-    env: Object.assign({}, process.env, extraEnv, {
-      ORCA_CLI_COMMAND: FAKE,
-      FAKE_ORCA_SCENARIO: ctx.scenarioPath,
-      FAKE_ORCA_LOG: ctx.logPath,
-      FAKE_ORCA_STATE: ctx.statePath,
-      HOME: ctx.home,
-      DELY_POLL_MS: extraEnv && extraEnv.DELY_POLL_MS != null ? String(extraEnv.DELY_POLL_MS) : "20",
-      DELY_ACK_S: extraEnv && extraEnv.DELY_ACK_S != null ? String(extraEnv.DELY_ACK_S) : "1",
-      DELY_SILENCE_S: extraEnv && extraEnv.DELY_SILENCE_S != null ? String(extraEnv.DELY_SILENCE_S) : "60",
-      DELY_DEADLINE_S: extraEnv && extraEnv.DELY_DEADLINE_S != null ? String(extraEnv.DELY_DEADLINE_S) : "30",
-      DELY_QUIET_S: extraEnv && extraEnv.DELY_QUIET_S != null ? String(extraEnv.DELY_QUIET_S) : "0.05",
-      DELY_QUIET_MIN_S: extraEnv && extraEnv.DELY_QUIET_MIN_S != null ? String(extraEnv.DELY_QUIET_MIN_S) : "0.05",
-    }),
+    env,
+    timeout,
   });
 }
 
@@ -194,8 +199,7 @@ test("adopt starts the worker only after output quiescence", () => {
       "--title",
       "dryrun-implement",
     ],
-    ctx,
-    { DELY_ACK_S: "15" }
+    ctx
   );
   const elapsed = Date.now() - t0;
   assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -384,6 +388,19 @@ test("sidecar swallows only heartbeats on the Control handle", () => {
     assert.ok(hasFlagPair(argv, "--types", "heartbeat"));
   }
   assert.ok(!log.some((argv) => argv.includes("--ack") && hasFlagPair(argv, "--ack", "done1")));
+  const acks = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--ack"));
+  assert.ok(acks.length >= 1);
+  assert.deepEqual(acks[0], [
+    "orchestration",
+    "check",
+    "--run",
+    "run_live",
+    "--terminal",
+    "term_ctrl",
+    "--ack",
+    "hb1",
+    "--json",
+  ]);
 });
 
 test("launcher falls back to Orca's runtime when node is absent", () => {
@@ -397,7 +414,16 @@ test("launcher falls back to Orca's runtime when node is absent", () => {
   write(
     path.join(binDir, "orca"),
     `#!/bin/sh
-ROOT="$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)"
+src=$0
+while [ -L "$src" ]; do
+  dir=$(dirname "$src")
+  next=\`readlink "$src"\` || break
+  case "$next" in
+    /*) src=$next ;;
+    *) src="$dir/$next" ;;
+  esac
+done
+ROOT="$(CDPATH= cd -- "$(dirname "$src")/../../.." && pwd)"
 ELECTRON="$ROOT/Contents/MacOS/Orca"
 CLI="$ROOT/Contents/Resources/app.asar.unpacked/out/cli/index.js"
 ELECTRON_RUN_AS_NODE=1 exec "$ELECTRON" "$CLI" "$@"
@@ -429,4 +455,248 @@ ELECTRON_RUN_AS_NODE=1 exec "$ELECTRON" "$CLI" "$@"
   });
   assert.notEqual(r.status, 10, r.stdout + r.stderr);
   assert.match(r.stdout, /^NONE\n/);
+});
+
+test("sidecar surfaces a failed acknowledgement", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    rejectAck: true,
+    rejectAckReason: "Unknown command: orchestration check run_live",
+    controlDeliveries: [
+      { deliveryId: "hb1", messages: [{ type: "heartbeat", from_handle: "term_w", subject: "ack" }] },
+    ],
+    workers: [],
+    lastOutputAt: "now",
+  });
+  const r = runDely(["sidecar", "--run", "run_live", "--control-handle", "term_ctrl"], ctx);
+  assert.equal(r.status, 9, r.stdout + r.stderr);
+  assert.match(r.stdout, /^ERROR ack failed: /);
+});
+
+test("dispatch ACK wait leaves worker_done queued for collect", () => {
+  const ctx = setup(DEFAULT_AGENTS, (repo) => ({
+    runs: [passRun("run_v", defaultKey(repo, "cursor", "background"))],
+    workerStart: { dispatchId: "disp_1", state: "ready", handle: "term_w" },
+    deliveries: [
+      {
+        deliveryId: "done1",
+        messages: [{ type: "worker_done", from_handle: "term_w", dispatchId: "disp_1", body: "done" }],
+      },
+      {
+        deliveryId: "hb1",
+        messages: [{ type: "heartbeat", from_handle: "term_w", subject: "ack", dispatchId: "disp_1" }],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_w",
+        lastHeartbeatAt: "2026-09-11T09:00:00Z",
+      },
+    ],
+  }));
+  const dispatched = runDely(
+    [
+      "dispatch",
+      "--repo",
+      ctx.repo,
+      "--run",
+      "run_live",
+      "--phase",
+      "implement",
+      "--spec-file",
+      "task.md",
+      "--control",
+      "cursor",
+    ],
+    ctx
+  );
+  assert.equal(dispatched.status, 0, dispatched.stdout + dispatched.stderr);
+  assert.match(dispatched.stdout, /^DISPATCHED disp_1 term_w ack=/);
+  const collected = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(collected.status, 0, collected.stdout + collected.stderr);
+  assert.match(collected.stdout, /^SETTLED disp_1 worker_done done\n/);
+  const log = readLog(ctx.logPath);
+  const ackWaits = log.filter(
+    (argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--wait") && argv.includes("--types")
+  );
+  assert.ok(ackWaits.some((argv) => hasFlagPair(argv, "--types", "heartbeat")));
+  assert.ok(ackWaits.every((argv) => hasFlagPair(argv, "--types", "heartbeat")));
+  const acks = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--ack"));
+  const ackIds = acks.map((argv) => argv[argv.indexOf("--ack") + 1]);
+  assert.ok(ackIds.indexOf("hb1") >= 0);
+  assert.ok(ackIds.indexOf("done1") >= 0);
+  assert.ok(ackIds.indexOf("hb1") < ackIds.indexOf("done1"));
+});
+
+test("adopt readiness timeout does not start the worker", () => {
+  const agents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Antigravity CLI | default | default |
+| \`review\` | Codex CLI | gpt-5.6-sol | high |
+`;
+  const ctx = setup(agents, (repo) => ({
+    runs: [
+      passRun(
+        "run_v",
+        keyOf(repo, "cursor", "background", "antigravity/default/default", "codex/gpt-5.6-sol/high")
+      ),
+    ],
+    workerStart: { dispatchId: "disp_ag", state: "ready", handle: "term_ag" },
+    terminalHandle: "term_ag",
+    changeLastOutputForMs: 60000,
+  }));
+  const r = runDely(
+    [
+      "dispatch",
+      "--repo",
+      ctx.repo,
+      "--run",
+      "run_live",
+      "--phase",
+      "implement",
+      "--spec-file",
+      "task.md",
+      "--control",
+      "cursor",
+    ],
+    ctx,
+    { DELY_QUIET_CAP_S: "0.4" }
+  );
+  assert.equal(r.status, 5, r.stdout + r.stderr);
+  assert.match(r.stdout, /^FAILED readiness timeout after \d+s\n/);
+  const log = readLog(ctx.logPath);
+  assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start"));
+  assert.ok(log.some((argv) => argv[0] === "terminal" && argv[1] === "close" && hasFlagPair(argv, "--terminal", "term_ag")));
+});
+
+test("adopt keeps polling a failed terminal show until the cap", () => {
+  const agents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Antigravity CLI | default | default |
+| \`review\` | Codex CLI | gpt-5.6-sol | high |
+`;
+  const ctx = setup(agents, (repo) => ({
+    runs: [
+      passRun(
+        "run_v",
+        keyOf(repo, "cursor", "background", "antigravity/default/default", "codex/gpt-5.6-sol/high")
+      ),
+    ],
+    workerStart: { dispatchId: "disp_ag", state: "ready", handle: "term_ag" },
+    terminalHandle: "term_ag",
+    terminalShow: "fail",
+    terminalShowReason: "terminal not found",
+  }));
+  const t0 = Date.now();
+  const r = runDely(
+    [
+      "dispatch",
+      "--repo",
+      ctx.repo,
+      "--run",
+      "run_live",
+      "--phase",
+      "implement",
+      "--spec-file",
+      "task.md",
+      "--control",
+      "cursor",
+    ],
+    ctx,
+    { DELY_QUIET_CAP_S: "0.35" }
+  );
+  const elapsed = Date.now() - t0;
+  assert.equal(r.status, 5, r.stdout + r.stderr);
+  assert.match(r.stdout, /^FAILED readiness timeout after \d+s\n/);
+  assert.ok(elapsed >= 300, `failed show returned in ${elapsed}ms, expected to poll until the cap`);
+  const log = readLog(ctx.logPath);
+  assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start"));
+  assert.ok(log.filter((argv) => argv[0] === "terminal" && argv[1] === "show").length >= 2);
+  assert.ok(log.some((argv) => argv[0] === "terminal" && argv[1] === "close"));
+});
+
+test("status finds a PASS verdict on run-list page two", () => {
+  const ctx = setup(DEFAULT_AGENTS, (repo) => {
+    const key = defaultKey(repo, "cursor", "background");
+    const filler = [];
+    for (let i = 0; i < 100; i++) {
+      filler.push({
+        id: "run_old_" + i,
+        objective: "other " + i,
+        created_at: "2026-09-11T08:00:00Z",
+      });
+    }
+    return { runs: filler.concat([passRun("run_pass", key)]) };
+  });
+  const r = runDely(["status", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(r.stdout, "PASS run_pass\n");
+  const log = readLog(ctx.logPath);
+  const pages = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "run-list");
+  assert.ok(pages.length >= 2);
+  assert.deepEqual(pages[1], ["orchestration", "run-list", "--limit", "100", "--cursor", "100", "--json"]);
+});
+
+test("status surfaces a failed run-list page", () => {
+  const ctx = setup(DEFAULT_AGENTS, (repo) => {
+    const filler = [];
+    for (let i = 0; i < 100; i++) {
+      filler.push({ id: "run_old_" + i, objective: "other", created_at: "2026-09-11T08:00:00Z" });
+    }
+    return {
+      runs: filler.concat([passRun("run_pass", defaultKey(repo, "cursor", "background"))]),
+      runListFailCursor: "100",
+      runListFailReason: "Unknown command: orchestration run-list 100",
+    };
+  });
+  const r = runDely(["status", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  assert.equal(r.status, 9, r.stdout + r.stderr);
+  assert.match(r.stdout, /^ERROR run-list failed: /);
+  assert.notEqual(r.stdout, "NONE\n");
+});
+
+test("sidecar keeps running when worker-list fails", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    workerListError: "connection lost",
+    controlDeliveries: [],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_w",
+        lastHeartbeatAt: "2026-09-11T09:00:00Z",
+      },
+    ],
+    lastOutputAt: "now",
+  });
+  const t0 = Date.now();
+  const r = runDely(["sidecar", "--run", "run_live", "--control-handle", "term_ctrl"], ctx, {
+    SPAWN_TIMEOUT_MS: 400,
+    DELY_DEADLINE_S: "30",
+  });
+  const elapsed = Date.now() - t0;
+  assert.ok(elapsed >= 300, `sidecar exited after ${elapsed}ms, expected to keep running`);
+  assert.notEqual(r.status, 0, r.stdout + r.stderr);
+});
+
+test("collect surfaces a failed worker-list", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    workerListError: "connection lost",
+    deliveries: [],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_w",
+      },
+    ],
+  });
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 9, r.stdout + r.stderr);
+  assert.equal(r.stdout, "ERROR worker-list failed: connection lost\n");
 });

@@ -110,6 +110,17 @@ const cmd = positional[1];
 const state = loadState();
 
 if (group === "orchestration" && cmd === "run-list") {
+  if (positional.length > 2) {
+    saveState(state);
+    reply(
+      { ok: false, error: { message: `Unknown command: orchestration run-list ${positional.slice(2).join(" ")}` } },
+      1
+    );
+  }
+  if (scenario.runListFailCursor != null && String(flags.cursor || "") === String(scenario.runListFailCursor)) {
+    saveState(state);
+    reply({ ok: false, error: { message: scenario.runListFailReason || "run-list failed" } }, 1);
+  }
   const all = scenario.runs || [];
   const limit = Number(flags.limit || 100);
   const offset = flags.cursor ? Number(flags.cursor) || 0 : 0;
@@ -175,6 +186,15 @@ if (group === "orchestration" && cmd === "worker-show") {
 }
 
 if (group === "orchestration" && cmd === "worker-list") {
+  if (scenario.workerListError) {
+    saveState(state);
+    reply({ ok: false, error: { message: scenario.workerListError } }, 1);
+  }
+  if (scenario.workerListMalformed) {
+    saveState(state);
+    process.stdout.write(String(scenario.workerListMalformed) + "\n");
+    process.exit(0);
+  }
   saveState(state);
   ok({
     workers: workers(state).map((w) => ({
@@ -193,31 +213,48 @@ if (group === "orchestration" && cmd === "worker-stop") {
   ok({ dispatchId: flags.dispatch, state: "stopped" });
 }
 
+function deliveryMatches(d, types) {
+  if (!types) return true;
+  const wanted = String(types).split(",");
+  const msgs = d.messages || [];
+  if (wanted.length === 1 && wanted[0] === "heartbeat") {
+    return msgs.length > 0 && msgs.every((m) => m && m.type === "heartbeat");
+  }
+  return msgs.some((m) => m && wanted.indexOf(m.type) >= 0);
+}
+
+function nextUnacked(list, types) {
+  for (const d of list) {
+    if (state.acked.indexOf(d.deliveryId) >= 0) continue;
+    if (!deliveryMatches(d, types)) continue;
+    return d;
+  }
+  return null;
+}
+
 if (group === "orchestration" && cmd === "check") {
   const types = String(flags.types || "");
   const heartbeatOnly = types === "heartbeat";
   const controlHandle = flags.terminal;
   let list;
-  let indexKey;
   if (heartbeatOnly && controlHandle) {
     list = scenario.controlDeliveries || [];
-    indexKey = "controlIndex";
   } else if (flags.wait) {
     list = scenario.deliveries || [];
-    indexKey = "deliveryIndex";
   } else {
     list = scenario.collectDeliveries || scenario.deliveries || [];
-    indexKey = "collectIndex";
   }
   if (flags.ack) {
+    if (scenario.rejectAck) {
+      saveState(state);
+      reply({ ok: false, error: { message: scenario.rejectAckReason || "ack rejected" } }, 1);
+    }
     state.acked.push(flags.ack);
     saveState(state);
     ok({ deliveryId: null, messages: [], acknowledged: flags.ack });
   }
-  const idx = state[indexKey] || 0;
-  if (idx < list.length) {
-    const d = list[idx];
-    state[indexKey] = idx + 1;
+  const d = nextUnacked(list, types);
+  if (d) {
     saveState(state);
     ok({ deliveryId: d.deliveryId, messages: d.messages || [], count: (d.messages || []).length });
   }
@@ -242,6 +279,15 @@ if (group === "terminal" && cmd === "create") {
 }
 
 if (group === "terminal" && cmd === "show") {
+  if (scenario.terminalShow === "fail") {
+    saveState(state);
+    reply({ ok: false, error: { message: scenario.terminalShowReason || "terminal show failed" } }, 1);
+  }
+  if (scenario.terminalShow === "malformed") {
+    saveState(state);
+    process.stdout.write("{not-json\n");
+    process.exit(0);
+  }
   saveState(state);
   ok({ terminal: { handle: flags.terminal, lastOutputAt: lastOutputAt(state) } });
 }
