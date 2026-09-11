@@ -121,7 +121,7 @@ is the repository, both pins, the Control harness and its wake mode. Otherwise i
 `dely wait` holds a waiter for heartbeat and settling types. It acknowledges
 heartbeats without exiting, and exits `SETTLED`, `SILENT` or `DEADLINE`.
 
-`dely sidecar` swallows only heartbeats on the Control's handle, and wakes Control
+`dely sidecar` (superseded by task 1b) swallows only heartbeats on the Control's handle, and wakes Control
 with a `status` message on silence or deadline.
 
 `dely collect` drains and acknowledges the Run's deliveries and prints what settled.
@@ -162,6 +162,57 @@ the acceptance counterexamples below is the implementation.
 
 **Document impact.** `references/harnesses.md` owns the per-harness properties the
 runtime reads.
+
+### 1b. Consumption follows Orca's delivery semantics
+
+Added at replan, 2026-09-11. Task 1 (`718bc27`, remediated in `088e8ce`) was scoped
+re-reviewed `CHANGES_REQUESTED`. Six findings were fixed. The ACK/settlement finding
+was not, because a Delivery carries its whole FIFO batch whatever `--types` says;
+the decision record's delivery-semantics context measures it. Where task 1's
+behaviour text and interface conflict with this task, this task supersedes it.
+
+**Behaviour.**
+
+- **`dely dispatch`** observes its ACK only through `check --peek`, as a heartbeat
+  whose `from_handle` is the dispatch terminal. It never consumes or acknowledges a
+  Delivery.
+- **`dely wait`** consumes whole Deliveries. A heartbeats-only batch is acknowledged
+  and it keeps waiting. A batch with any `worker_done`, `escalation` or `question` is
+  acknowledged, printed whole as `SETTLED <types> <json>`, and exits 0. `SILENT` and
+  `DEADLINE` are unchanged.
+- **`dely sidecar --run <runId> --control-handle <handle>`** consumes whole
+  Deliveries with `--terminal <handle>`, waiting on all four types. A heartbeats-only
+  batch is acknowledged. For a batch with any settling message, or on silence or
+  deadline: acknowledge it, send one
+  `orchestration send --to run:<runId> --run <runId> --type status --priority high --subject "dely wake: <reason>"`,
+  and exit 0. It never keeps consuming after sending that message.
+- **`dely collect --run <runId>`** prints one
+  `SETTLED <dispatchId> <type> <body>` line per settling message. It finds them in
+  `check --all` history, matching `from_handle` to each Run dispatch's terminal.
+  Then it drains and acknowledges every remaining Delivery. Exit codes are
+  unchanged: 0 when no Run dispatch is still `dispatched`, `WAITING` and 2
+  otherwise, `ERROR` and 9 on Orca failure.
+- **`tests/fixtures/fake-orca.js`** models the measured rules:
+  - a consuming `check` forms its Delivery at consume time from every unread
+    message, up to 50;
+  - it replays that exact batch until acknowledged, even after newer messages
+    arrive;
+  - `--types` only decides whether a `--wait` returns before its timeout;
+  - `--peek` returns unread messages without consuming;
+  - `--all` returns history, including acknowledged messages.
+
+**Direction.** Keep every other part of the task 1 interface and all 17 existing
+cases. Existing cases that relied on the fake filtering Delivery contents are
+corrected to the measured model; each such change must still fail against its
+counterexample.
+
+**Files.** `skills/delivery/scripts/dely.js`, `tests/scripts.test.js`,
+`tests/fixtures/fake-orca.js`.
+
+**Focused verification.** `node --test tests/scripts.test.js`. It fails against
+`088e8ce` on the mixed-batch cases below.
+
+**Document impact.** None beyond the decision record, which Control amended.
 
 ### 2. `dely:verify` proves the path, and setup hands trust to the human
 
@@ -270,7 +321,12 @@ in `tests/contracts.sh` changes only by the added run line.
 | Wait swallows heartbeats and exits only on settle | `node --test` case: delivery 1 = heartbeat, delivery 2 = worker_done; assert both acked and exit `SETTLED` after the second | A wait that exits on the first delivery of any type | |
 | Wait exits `DEADLINE` while output is fresh | `node --test` case: fake `lastOutputAt` always now, no settle | A wait that uses only silence or Orca liveness | |
 | Wait exits `SILENT` when output is stale after ACK even though Orca says live | `node --test` case: liveness `live`, `lastOutputAt` older than the limit | A wait that trusts `projection.liveness` | |
-| Sidecar swallows only heartbeats on the Control handle | `node --test` case asserting `check --terminal <control> --types heartbeat` and no ack of a `worker_done` | A sidecar that waits on all types and suppresses the settling nudge | |
+| Sidecar swallows only heartbeats on the Control handle (superseded by task 1b; kept as the record of the first approved interface) | `node --test` case asserting `check --terminal <control> --types heartbeat` and no ack of a `worker_done` | A sidecar that waits on all types and suppresses the settling nudge | `718bc27` review |
+| Dispatch observes its ACK without consuming a Delivery (task 1b) | `node --test` case: one Delivery holds the ACK heartbeat and `worker_done`; dispatch returns `DISPATCHED`, records no consuming `check` or `--ack`, and a later `dely collect` prints `SETTLED ... worker_done` | The `088e8ce` ACK wait, which consumes heartbeat-typed deliveries and stalls or loses a batched settle | |
+| Wait judges a Delivery as a whole (task 1b) | `node --test` case: one Delivery holds a heartbeat and `worker_done`; wait acknowledges once and exits `SETTLED` listing both | A wait that acknowledges a heartbeat-typed batch and keeps waiting | |
+| Sidecar wakes Control once and exits when a batch carries a settle (task 1b) | `node --test` case: a mixed Delivery; assert one `--ack` with `--terminal <control>`, one `send --type status`, exit 0, and no consuming `check` after the send | A sidecar that acknowledges and keeps looping, consuming its own wake message, or one that never acknowledges a mixed batch | |
+| Collect reports settles already consumed by the sidecar (task 1b) | `node --test` case: `worker_done` present only in `--all` history (acknowledged); collect prints `SETTLED <dispatch> worker_done` and exits 0 | A collect that reports only from deliveries it consumes itself | |
+| Fake Orca replays the oldest Delivery until acknowledged (task 1b) | `node --test` case: consume without ack, send a newer message, consume again; assert the same delivery id and contents | A fake that filters Delivery contents by `--types` or forms a new batch per call | |
 | Verdict is written only after every dispatch settled, with the full key | `node --test` case: one dispatch settles PASS, one still open; assert no verdict task yet | A verify that writes PASS when dispatches start | |
 | Launcher falls back to Orca's runtime when `node` is absent | `node --test` case running `dely` with a PATH lacking `node` and a fake Orca runtime | A launcher that requires `node` on PATH | |
 | `dely.cmd` resolves the same runtimes on Windows | No executable instrument in CI; a human reads the diff | None | n/a |

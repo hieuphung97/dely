@@ -85,6 +85,23 @@ Measurements that shaped the decision, all on macOS, 2026-09-11:
 - **Runtime.** The `orca` command is Node.js run on Orca's bundled Electron runtime
   (`ELECTRON_RUN_AS_NODE`, Node v24.20.0 on macOS). Wherever Orca runs, a Node
   runtime exists.
+- **Delivery semantics.** These were measured with `status` messages after this
+  record's first approval, when a review of the first runtime found that a
+  heartbeat-only consumer is impossible. Orca's version-matched messaging guide
+  states the same rule.
+  - A consuming `check` returns the oldest FIFO Delivery, up to 50 messages. It
+    replays exactly that batch until acknowledged, even after newer messages
+    arrive.
+  - `--types` only decides when a waiter wakes: a heartbeat-typed wait timed out
+    while only `status` messages were pending.
+  - `--peek` lists every unread message without consuming anything. `--all` lists
+    the whole history, including acknowledged messages.
+  - So whoever acknowledges a Delivery consumes every message in it, heartbeats and
+    settling messages alike.
+- **Terminal reuse.** Re-engaging a settled reviewer terminal with `worker-start
+  --terminal` accepted the input but never submitted it. That Codex session had also
+  switched itself from `gpt-5.6-sol` high to `gpt-5.6-luna` medium after warning
+  that less than 10% of its weekly limit remained.
 
 #### Decision
 
@@ -107,9 +124,11 @@ Measurements that shaped the decision, all on macOS, 2026-09-11:
    - A PASS lapses when the key changes, and after any delivery escalation caused by
      the environment.
 3. **Workers acknowledge.** `dely dispatch` appends the acknowledgement instruction
-   to the spec and waits 120 s by default. No ACK stops the dispatch and reports a
-   diagnosed cause. Recovery is one fresh start, never a retry into the same
-   terminal; the same failure twice goes to the human.
+   to the spec and waits 120 s by default. It observes the ACK only through
+   `check --peek`, as a heartbeat from that dispatch's terminal, and never consumes
+   a Delivery. No ACK stops the dispatch and reports a diagnosed cause. Recovery is
+   one fresh start with the pins named again, never a retry into the same terminal
+   and never a reused settled terminal. The same failure twice goes to the human.
 4. **Launch path is a harness property, not a screen reading.**
    `references/harnesses.md` gains the columns Launch, Model pin, Control wake and
    Setup. `dely.js` reads them from that table.
@@ -126,10 +145,19 @@ Measurements that shaped the decision, all on macOS, 2026-09-11:
      never the command quoted in the nudge text, because it would consume the
      message.
    - Kiro is not supported as Control.
-   - `dely wait` swallows heartbeats and exits `SETTLED`, `SILENT` (90 s without
-     output after ACK) or `DEADLINE` (per dispatch, default 3600 s). The sidecar
-     swallows only heartbeats, and wakes Control with a `status` message on silence
-     or deadline.
+   - **One consumer per Run at a time;** every other observer only peeks.
+   - `dely wait` is that consumer in the background mode. It judges each Delivery as
+     a whole: heartbeats only, it acknowledges and keeps waiting; any settling
+     message, it acknowledges, prints the whole batch and exits `SETTLED`. It also
+     exits `SILENT` (90 s without output after ACK) or `DEADLINE` (per dispatch,
+     default 3600 s).
+   - `dely sidecar` is that consumer while a nudge-mode Control sleeps. A
+     heartbeats-only Delivery is acknowledged. A Delivery with any settling message,
+     or a silence or deadline, is acknowledged; the sidecar then sends one `status`
+     message to wake Control and exits, so it cannot consume that wake message
+     itself.
+   - `dely collect` reports settled work from `check --all` and `worker-list`, then
+     drains what remains.
 6. **Setup hands trust to the human.** `dely:setup` opens each pinned harness once in
    an Orca terminal for the human to answer that harness's own trust dialog, then
    runs `dely:verify`. Setup still never answers a dialog and never writes a harness
@@ -147,6 +175,13 @@ This decision ships in **0.18.0**.
 **Keep Control composing `orca` commands.** Rejected: it polls on harnesses that
 cannot wake on exit, it improvises keystrokes, and it has no mechanism to enforce a
 proven environment.
+
+**A sidecar that consumes only heartbeats, and a dispatch that consumes to see the
+ACK.** This was this record's first approved design. Superseded the same day: a
+Delivery carries its whole FIFO batch whatever `--types` says, so either consumer
+would acknowledge a settling message batched with a heartbeat. The dispatch would
+lose it, and the sidecar would either lose it or stall on replay. Replaced by
+peek-only ACK observation and a single whole-batch consumer.
 
 **Rely on Orca's nudge for every Control.** Rejected: measured to race, and to stay
 unsubmitted on Cursor. Harness-native background wake is used wherever it exists.
