@@ -252,8 +252,15 @@ restores it with `orchestration run-use --id <that run>` on every exit path.
 `skills/delivery/scripts/dely.js`, `tests/scripts.test.js`,
 `tests/fixtures/fake-orca.js`.
 
-**Focused verification.** `node --test tests/scripts.test.js` (verify cases), plus
-one live `dely verify run` on this repository whose report is quoted in the handoff.
+**Focused verification.** `node --test tests/scripts.test.js` (verify cases). Control,
+not the implementer, then runs one live `dely verify run` on this repository after the
+task commit and quotes its report for review. A dispatched worker that creates Runs
+and dispatches workers is nested orchestration, and creating a Run rebinds the
+calling terminal.
+
+Also carried into this task: the task 1b re-review's Minor finding. `collect`
+deduplicates by message `id`, and the fake assigns none. The fake assigns ids the
+way Orca does, and `collect` must not merge distinct messages that lack an id.
 
 **Document impact.** The setup skill owns its own "what setup will not do" list,
 which changes.
@@ -338,6 +345,7 @@ in `tests/contracts.sh` changes only by the added run line.
 | Collect reports settles already consumed by the sidecar (task 1b) | `node --test` case: `worker_done` present only in `--all` history (acknowledged); collect prints `SETTLED <dispatch> worker_done` and exits 0 | A collect that reports only from deliveries it consumes itself | |
 | Fake Orca replays the oldest Delivery until acknowledged (task 1b) | `node --test` case: consume without ack, send a newer message, consume again; assert the same delivery id and contents | A fake that filters Delivery contents by `--types` or forms a new batch per call | |
 | Verdict is written only after every dispatch settled, with the full key | `node --test` case: one dispatch settles PASS, one still open; assert no verdict task yet | A verify that writes PASS when dispatches start | |
+| Verify restores the Control terminal's previously bound Run (task 2) | `node --test` case: fake `run-current` returns a delivery Run; after `dely verify run` (PASS, FAIL and BLOCKED paths) the last Run-binding call is `run-use --id <that run>` | A verify that creates its own Run and leaves Control bound to it | |
 | Launcher falls back to Orca's runtime when `node` is absent | `node --test` case running `dely` with a PATH lacking `node` and a fake Orca runtime | A launcher that requires `node` on PATH | |
 | `dely.cmd` resolves the same runtimes on Windows | No executable instrument in CI; a human reads the diff | None | n/a |
 | Delivery skill pins the refusal rule, the nudge-command prohibition and the removal of same-terminal retry | `bash tests/contracts.sh` | The rule moved outside `### Launching a worker`, or the old retry sentence kept | |
