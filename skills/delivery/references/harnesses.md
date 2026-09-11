@@ -1,11 +1,12 @@
 # Harness launch mechanics
 
-Per-harness launch mechanics for `dely:delivery`'s worker dispatch: each
-harness's Orca agent id, permission default, forbidden headless invocation
-forms, and launch notes. `worker-start --agent` resolves these ids; the
-binary names `agy`, `kiro-cli` and `cursor-agent` return `agent_unconfigured`
-and create no terminal. `worker-start --model` supports Claude, Codex and
-Cursor ids; `--effort` requires `--model`; neither combines with `--terminal`.
+`dely.js` reads the Launch, Model pin, Control wake and Setup columns.
+An adopted harness is launched in an Orca terminal and handed to
+`worker-start --terminal` after its output goes quiet. `worker-start --agent`
+resolves these ids; the binary names `agy`, `kiro-cli` and `cursor-agent`
+return `agent_unconfigured` and create no terminal. `worker-start --model`
+supports Claude, Codex and Cursor ids; `--effort` requires `--model`; neither
+combines with `--terminal`.
 
 | Harness | Orca agent id | Permission default | Forbidden headless forms | Launch notes | Launch | Model pin | Control wake | Setup |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
