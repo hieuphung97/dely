@@ -314,13 +314,25 @@ reference owns the table.
   `node --test tests/scripts.test.js`.
 - `CONTRIBUTING.md` names it.
 - Both versioned manifests and the pin in `tests/contracts.sh` read `0.18.0`.
+- Added by human decision on 2026-09-11, from task 2's scoped re-review (two Minor
+  findings):
+  - **N1:** after a `NO_ACK` or `FAIL` launch, `dely verify start` launches no
+    further pin.
+  - **N2:** an error thrown after a launch stops and releases every launched
+    dispatch, closes any sidecar, removes `.dely-verify/` and records a FAIL
+    verdict before restoring the Run.
+
+  The re-review returned the disposition word `APPROVED`, which is outside the
+  protocol's set. The human ruled it `ACCEPT`.
 
 **Direction.** Stay within 280 lines of `tests/contracts.sh`. The workflow shape pin
-in `tests/contracts.sh` changes only by the added run line.
+in `tests/contracts.sh` changes only by the added run line. The N1 and N2 changes
+reuse the existing cleanup and verdict paths.
 
 **Files.** `README.md`, `AGENTS.md`, `.github/workflows/contracts.yml`,
 `CONTRIBUTING.md`, `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`,
-`tests/contracts.sh`.
+`tests/contracts.sh`, and for N1 and N2 `skills/delivery/scripts/dely.js`,
+`tests/scripts.test.js`, `tests/fixtures/fake-orca.js`.
 
 **Focused verification.** `bash tests/contracts.sh`, the `jq` manifest gate,
 `test "$(wc -l < tests/contracts.sh)" -le 280`.
@@ -350,6 +362,8 @@ in `tests/contracts.sh` changes only by the added run line.
 | `dely.cmd` resolves the same runtimes on Windows | No executable instrument in CI; a human reads the diff | None | n/a |
 | Delivery skill pins the refusal rule, the nudge-command prohibition and the removal of same-terminal retry | `bash tests/contracts.sh` | The rule moved outside `### Launching a worker`, or the old retry sentence kept | |
 | README Kiro install includes `--skill verify` | `bash tests/contracts.sh` | README still installing only `delivery` and `setup` | |
+| After a failed launch, verify start launches no further pin (task 4, N1) | `node --test` case: first pin gets no ACK; assert exactly one `worker-start` | A start that launches every pin before checking for a failed launch | |
+| A throw after a launch cleans up and records FAIL before restoring (task 4, N2) | `node --test` case: `state.json` write fails after one launch; assert `worker-stop` for that dispatch, a FAIL verdict, and `run-use --id <prev>` last | A catch that only restores the Run | |
 | Live verify proves both Control wake modes on this repository | Live `dely verify run` (Claude Code Control) and `dely verify start` / `collect` (Codex Control); report quoted with RESULT and wake count | None executable offline; a human reads the quoted live reports | n/a |
 
 **Cannot be observed:**
