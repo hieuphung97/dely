@@ -18,18 +18,63 @@ if (!scenarioPath) {
 const scenario = JSON.parse(fs.readFileSync(scenarioPath, "utf8"));
 const statePath = process.env.FAKE_ORCA_STATE || scenarioPath + ".state.json";
 
+function clone(x) {
+  return JSON.parse(JSON.stringify(x));
+}
+
+function publicMessage(m) {
+  const out = {};
+  Object.keys(m).forEach((k) => {
+    if (k === "acked" || k === "uid" || k === "groupId") return;
+    out[k] = m[k];
+  });
+  return out;
+}
+
+function seedMessages(list, acked, startUid) {
+  const out = [];
+  let uid = startUid;
+  for (const d of list || []) {
+    const groupId = d.deliveryId || null;
+    for (const m of d.messages || []) {
+      out.push(
+        Object.assign(clone(m), {
+          acked: Boolean(acked),
+          uid: uid++,
+          groupId,
+        })
+      );
+    }
+  }
+  return { messages: out, nextUid: uid };
+}
+
+function initialMailbox() {
+  const seeded = seedMessages(scenario.history || scenario.ackedDeliveries || [], true, 1);
+  const groups = scenario.deliveries || [];
+  const first = groups[0] ? seedMessages([groups[0]], false, seeded.nextUid) : { messages: [], nextUid: seeded.nextUid };
+  return {
+    arrived: seeded.messages.concat(first.messages),
+    pending: groups.slice(1),
+    nextUid: first.nextUid,
+    nextDeliverySeq: 1,
+    frozen: null,
+  };
+}
+
 function loadState() {
   try {
     return JSON.parse(fs.readFileSync(statePath, "utf8"));
   } catch (_) {
-    return {
-      deliveryIndex: 0,
-      controlIndex: 0,
-      collectIndex: 0,
-      terminalCreatedAt: null,
-      stopped: {},
-      acked: [],
-    };
+    const mailbox = initialMailbox();
+    return Object.assign(
+      {
+        terminalCreatedAt: null,
+        stopped: {},
+        acked: [],
+      },
+      mailbox
+    );
   }
 }
 
@@ -213,60 +258,135 @@ if (group === "orchestration" && cmd === "worker-stop") {
   ok({ dispatchId: flags.dispatch, state: "stopped" });
 }
 
-function deliveryMatches(d, types) {
-  if (!types) return true;
-  const wanted = String(types).split(",");
-  const msgs = d.messages || [];
-  if (wanted.length === 1 && wanted[0] === "heartbeat") {
-    return msgs.length > 0 && msgs.every((m) => m && m.type === "heartbeat");
+function peekMessages(st) {
+  const frozenUids = {};
+  if (st.frozen) {
+    for (const uid of st.frozen.uids || []) frozenUids[uid] = true;
   }
-  return msgs.some((m) => m && wanted.indexOf(m.type) >= 0);
+  return (st.arrived || []).filter((m) => !m.acked && !frozenUids[m.uid]);
 }
 
-function nextUnacked(list, types) {
-  for (const d of list) {
-    if (state.acked.indexOf(d.deliveryId) >= 0) continue;
-    if (!deliveryMatches(d, types)) continue;
-    return d;
-  }
-  return null;
+function unackedOf(st) {
+  return (st.arrived || []).filter((m) => !m.acked);
+}
+
+function typesMatch(messages, types) {
+  if (!types) return true;
+  const wanted = String(types)
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (!wanted.length) return true;
+  return (messages || []).some((m) => m && wanted.indexOf(m.type) >= 0);
+}
+
+function nextBatch(st) {
+  const unread = unackedOf(st);
+  if (!unread.length) return [];
+  return unread.slice(0, 50);
+}
+
+function freezeBatch(st, batch) {
+  const id = batch[0].groupId || "dv_" + st.nextDeliverySeq;
+  st.nextDeliverySeq += 1;
+  st.frozen = { deliveryId: id, uids: batch.map((m) => m.uid) };
+  return st.frozen;
+}
+
+function frozenMessages(st) {
+  if (!st.frozen) return [];
+  const byUid = {};
+  for (const m of st.arrived || []) byUid[m.uid] = m;
+  return (st.frozen.uids || []).map((uid) => byUid[uid]).filter(Boolean);
+}
+
+function releasePending(st) {
+  if (!(st.pending || []).length) return;
+  const next = st.pending.shift();
+  const seeded = seedMessages([next], false, st.nextUid || 1);
+  st.nextUid = seeded.nextUid;
+  st.arrived = (st.arrived || []).concat(seeded.messages);
+}
+
+function waitSleep() {
+  const ms = Number(flags["timeout-ms"] || 20);
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.max(1, Math.min(ms, 50)));
 }
 
 if (group === "orchestration" && cmd === "check") {
-  const types = String(flags.types || "");
-  const heartbeatOnly = types === "heartbeat";
-  const controlHandle = flags.terminal;
-  let list;
-  if (heartbeatOnly && controlHandle) {
-    list = scenario.controlDeliveries || [];
-  } else if (flags.wait) {
-    list = scenario.deliveries || [];
-  } else {
-    list = scenario.collectDeliveries || scenario.deliveries || [];
-  }
   if (flags.ack) {
     if (scenario.rejectAck) {
       saveState(state);
       reply({ ok: false, error: { message: scenario.rejectAckReason || "ack rejected" } }, 1);
     }
-    state.acked.push(flags.ack);
+    if (state.frozen && state.frozen.deliveryId === flags.ack) {
+      const uids = {};
+      for (const uid of state.frozen.uids || []) uids[uid] = true;
+      for (const m of state.arrived || []) {
+        if (uids[m.uid]) m.acked = true;
+      }
+      state.acked.push(flags.ack);
+      state.frozen = null;
+      releasePending(state);
+    } else if ((state.acked || []).indexOf(flags.ack) < 0) {
+      state.acked.push(flags.ack);
+    }
     saveState(state);
     ok({ deliveryId: null, messages: [], acknowledged: flags.ack });
   }
-  const d = nextUnacked(list, types);
-  if (d) {
+  if (flags.peek) {
+    const messages = peekMessages(state).map(publicMessage);
     saveState(state);
-    ok({ deliveryId: d.deliveryId, messages: d.messages || [], count: (d.messages || []).length });
+    ok({ deliveryId: null, messages, count: messages.length });
   }
-  if (flags.wait) {
-    const ms = Number(flags["timeout-ms"] || 20);
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.max(1, Math.min(ms, 50)));
+  if (flags.all) {
+    const messages = (state.arrived || []).map(publicMessage);
+    saveState(state);
+    ok({ deliveryId: null, messages, count: messages.length });
   }
+  let msgs;
+  if (state.frozen) {
+    msgs = frozenMessages(state);
+  } else {
+    const batch = nextBatch(state);
+    if (!batch.length) {
+      msgs = [];
+    } else if (flags.wait && !typesMatch(batch, flags.types)) {
+      waitSleep();
+      saveState(state);
+      ok({ deliveryId: null, messages: [], count: 0, timedOut: true });
+    } else {
+      freezeBatch(state, batch);
+      msgs = frozenMessages(state);
+    }
+  }
+  if (state.frozen) {
+    if (flags.wait && !typesMatch(msgs, flags.types)) {
+      waitSleep();
+      saveState(state);
+      ok({ deliveryId: null, messages: [], count: 0, timedOut: true });
+    }
+    saveState(state);
+    ok({ deliveryId: state.frozen.deliveryId, messages: msgs.map(publicMessage), count: msgs.length });
+  }
+  if (flags.wait) waitSleep();
   saveState(state);
   ok({ deliveryId: null, messages: [], count: 0, timedOut: Boolean(flags.wait) });
 }
 
 if (group === "orchestration" && cmd === "send") {
+  const msg = {
+    type: flags.type || "status",
+    from_handle: flags.from || "",
+    subject: flags.subject || "",
+    body: flags.body || "",
+    acked: false,
+    uid: state.nextUid || 1,
+    groupId: null,
+  };
+  if (flags["dispatch-id"]) msg.dispatchId = flags["dispatch-id"];
+  state.nextUid = (state.nextUid || 1) + 1;
+  state.arrived = (state.arrived || []).concat([msg]);
   saveState(state);
   ok({ ok: true, subject: flags.subject || "" });
 }

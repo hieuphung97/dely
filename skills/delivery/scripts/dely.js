@@ -432,30 +432,19 @@ function classify(handle) {
   return snippet ? `no known cause on screen; last output: ${snippet}` : "no known cause on screen";
 }
 
+function hasSettle(messages) {
+  return (messages || []).some(
+    (m) => m && (m.type === "worker_done" || m.type === "escalation" || m.type === "question")
+  );
+}
+
 function waitForAck(run, handle, startedAt) {
   while ((Date.now() - startedAt) / 1000 <= ACK_S) {
-    const r = orca([
-      "orchestration",
-      "check",
-      "--wait",
-      "--run",
-      run,
-      "--types",
-      "heartbeat",
-      "--timeout-ms",
-      String(Math.max(1, Math.floor(POLL_MS))),
-      "--json",
-    ]);
-    const id = deliveryId(r);
-    if (id) {
-      const messages = messagesOf(r);
-      const onlyHb = messages.length > 0 && messages.every((m) => m && m.type === "heartbeat");
-      if (!onlyHb) continue;
-      const acked = ackDelivery(run, id);
-      if (!acked.ok) finish(9, `ERROR ack failed: ${acked.reason}`);
-      const hit = messages.some((m) => m && m.type === "heartbeat" && m.from_handle === handle);
-      if (hit) return (Date.now() - startedAt) / 1000;
-    }
+    const r = orca(["orchestration", "check", "--peek", "--run", run, "--json"]);
+    const messages = messagesOf(r);
+    const hit = messages.some((m) => m && m.type === "heartbeat" && m.from_handle === handle);
+    if (hit) return (Date.now() - startedAt) / 1000;
+    sleepMs(Math.max(1, Math.floor(POLL_MS)));
   }
   return null;
 }
@@ -604,10 +593,8 @@ function cmdWait(flags) {
       const acked = ackDelivery(run, id);
       if (!acked.ok) finish(9, `ERROR ack failed: ${acked.reason}`);
       markHeartbeats(messages, seen);
-      const types = uniqueTypes(messages);
-      const onlyHb = types.length > 0 && types.every((t) => t === "heartbeat");
-      if (!onlyHb && types.length) {
-        finish(0, `SETTLED ${types.join(",")} ${JSON.stringify(messages)}`);
+      if (hasSettle(messages)) {
+        finish(0, `SETTLED ${uniqueTypes(messages).join(",")} ${JSON.stringify(messages)}`);
       }
     }
     const elapsed = (Date.now() - startedAt) / 1000;
@@ -617,7 +604,7 @@ function cmdWait(flags) {
   }
 }
 
-function sendWatchdog(run, reason) {
+function sendWake(run, reason) {
   orca([
     "orchestration",
     "send",
@@ -630,7 +617,7 @@ function sendWatchdog(run, reason) {
     "--priority",
     "high",
     "--subject",
-    `dely watchdog: ${reason}`,
+    `dely wake: ${reason}`,
     "--json",
   ]);
 }
@@ -640,7 +627,6 @@ function cmdSidecar(flags) {
   const terminal = flags["control-handle"];
   const startedAt = Date.now();
   const seen = new Set();
-  const sent = new Set();
   for (;;) {
     const r = orca([
       "orchestration",
@@ -651,53 +637,68 @@ function cmdSidecar(flags) {
       "--terminal",
       terminal,
       "--types",
-      "heartbeat",
+      "heartbeat,worker_done,escalation,question",
       "--timeout-ms",
       String(Math.max(1, Math.floor(POLL_MS))),
       "--json",
     ]);
     const id = deliveryId(r);
     if (id) {
-      markHeartbeats(messagesOf(r), seen);
+      const messages = messagesOf(r);
+      markHeartbeats(messages, seen);
       const acked = ackDelivery(run, id, terminal);
       if (!acked.ok) finish(9, `ERROR ack failed: ${acked.reason}`);
+      if (hasSettle(messages)) {
+        sendWake(run, uniqueTypes(messages).join(","));
+        process.exit(0);
+      }
     }
     const elapsed = (Date.now() - startedAt) / 1000;
     const silent = checkSilent(run, seen);
-    if (silent && !sent.has("silent")) {
-      sent.add("silent");
-      sendWatchdog(run, `SILENT ${silent.dispatchId} ${silent.seconds}`);
+    if (silent) {
+      sendWake(run, `SILENT ${silent.dispatchId} ${silent.seconds}`);
+      process.exit(0);
     }
-    if (elapsed > DEADLINE_S && !sent.has("deadline")) {
-      sent.add("deadline");
-      sendWatchdog(run, `DEADLINE ${Math.floor(elapsed)}`);
+    if (elapsed > DEADLINE_S) {
+      sendWake(run, `DEADLINE ${Math.floor(elapsed)}`);
+      process.exit(0);
     }
     const listed = workerList(run);
     if (listed.ok) {
       const open = listed.workers.filter((w) => w.dispatchStatus === "dispatched");
       if (!open.length) process.exit(0);
     }
-    if (elapsed > DEADLINE_S + 120) process.exit(0);
   }
 }
 
 function cmdCollect(flags) {
   const run = flags.run;
+  const listed = workerList(run);
+  if (!listed.ok) finish(9, `ERROR worker-list failed: ${listed.reason}`);
+  const byHandle = new Map();
+  for (const worker of listed.workers) {
+    if (worker.agentTerminalHandle) byHandle.set(worker.agentTerminalHandle, worker.dispatchId);
+  }
+  const all = orca(["orchestration", "check", "--all", "--run", run, "--json"]);
+  if (orcaFailed(all)) finish(9, `ERROR check --all failed: ${orcaReason(all, "check failed")}`);
+  const printed = new Set();
+  function report(m) {
+    if (!hasSettle([m])) return;
+    const dispatchId = messageDispatchId(m) || byHandle.get(m.from_handle) || "-";
+    const key = `${dispatchId}\t${m.type}\t${m.body || ""}`;
+    if (printed.has(key)) return;
+    printed.add(key);
+    process.stdout.write(`SETTLED ${dispatchId} ${m.type} ${m.body || ""}\n`);
+  }
+  for (const m of messagesOf(all)) report(m);
   for (;;) {
     const r = orca(["orchestration", "check", "--run", run, "--json"]);
     const id = deliveryId(r);
     if (!id) break;
-    const messages = messagesOf(r);
     const acked = ackDelivery(run, id);
     if (!acked.ok) finish(9, `ERROR ack failed: ${acked.reason}`);
-    for (const m of messages) {
-      if (!m || m.type === "heartbeat") continue;
-      const dispatchId = messageDispatchId(m) || "-";
-      process.stdout.write(`SETTLED ${dispatchId} ${m.type} ${m.body || ""}\n`);
-    }
+    for (const m of messagesOf(r)) report(m);
   }
-  const listed = workerList(run);
-  if (!listed.ok) finish(9, `ERROR worker-list failed: ${listed.reason}`);
   const open = listed.workers.filter((w) => w.dispatchStatus === "dispatched").map((w) => w.dispatchId);
   if (open.length) finish(2, `WAITING ${open.join(" ")}`);
   process.exit(0);

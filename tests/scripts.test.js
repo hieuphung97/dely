@@ -366,14 +366,8 @@ test("wait exits SILENT when output is stale after ACK even though Orca says liv
 
 test("sidecar swallows only heartbeats on the Control handle", () => {
   const ctx = setup(DEFAULT_AGENTS, {
-    controlDeliveries: [
-      { deliveryId: "hb1", messages: [{ type: "heartbeat", from_handle: "term_w", subject: "ack" }] },
-    ],
     deliveries: [
-      {
-        deliveryId: "done1",
-        messages: [{ type: "worker_done", from_handle: "term_w", dispatchId: "disp_1", body: "done" }],
-      },
+      { deliveryId: "hb1", messages: [{ type: "heartbeat", from_handle: "term_w", subject: "ack" }] },
     ],
     workers: [],
     lastOutputAt: "now",
@@ -385,9 +379,8 @@ test("sidecar swallows only heartbeats on the Control handle", () => {
   assert.ok(waits.length >= 1);
   for (const argv of waits) {
     assert.ok(hasFlagPair(argv, "--terminal", "term_ctrl"));
-    assert.ok(hasFlagPair(argv, "--types", "heartbeat"));
+    assert.ok(hasFlagPair(argv, "--types", "heartbeat,worker_done,escalation,question"));
   }
-  assert.ok(!log.some((argv) => argv.includes("--ack") && hasFlagPair(argv, "--ack", "done1")));
   const acks = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--ack"));
   assert.ok(acks.length >= 1);
   assert.deepEqual(acks[0], [
@@ -461,7 +454,7 @@ test("sidecar surfaces a failed acknowledgement", () => {
   const ctx = setup(DEFAULT_AGENTS, {
     rejectAck: true,
     rejectAckReason: "Unknown command: orchestration check run_live",
-    controlDeliveries: [
+    deliveries: [
       { deliveryId: "hb1", messages: [{ type: "heartbeat", from_handle: "term_w", subject: "ack" }] },
     ],
     workers: [],
@@ -478,12 +471,11 @@ test("dispatch ACK wait leaves worker_done queued for collect", () => {
     workerStart: { dispatchId: "disp_1", state: "ready", handle: "term_w" },
     deliveries: [
       {
-        deliveryId: "done1",
-        messages: [{ type: "worker_done", from_handle: "term_w", dispatchId: "disp_1", body: "done" }],
-      },
-      {
-        deliveryId: "hb1",
-        messages: [{ type: "heartbeat", from_handle: "term_w", subject: "ack", dispatchId: "disp_1" }],
+        deliveryId: "mixed1",
+        messages: [
+          { type: "heartbeat", from_handle: "term_w", subject: "ack", dispatchId: "disp_1" },
+          { type: "worker_done", from_handle: "term_w", dispatchId: "disp_1", body: "done" },
+        ],
       },
     ],
     workers: [
@@ -513,20 +505,28 @@ test("dispatch ACK wait leaves worker_done queued for collect", () => {
   );
   assert.equal(dispatched.status, 0, dispatched.stdout + dispatched.stderr);
   assert.match(dispatched.stdout, /^DISPATCHED disp_1 term_w ack=/);
+  const afterDispatch = readLog(ctx.logPath);
+  assert.ok(
+    afterDispatch.some(
+      (argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--peek")
+    )
+  );
+  assert.ok(
+    !afterDispatch.some(
+      (argv) =>
+        argv[0] === "orchestration" &&
+        argv[1] === "check" &&
+        !argv.includes("--peek") &&
+        !argv.includes("--all") &&
+        !argv.includes("--ack")
+    )
+  );
+  assert.ok(
+    !afterDispatch.some((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--ack"))
+  );
   const collected = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(collected.status, 0, collected.stdout + collected.stderr);
   assert.match(collected.stdout, /^SETTLED disp_1 worker_done done\n/);
-  const log = readLog(ctx.logPath);
-  const ackWaits = log.filter(
-    (argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--wait") && argv.includes("--types")
-  );
-  assert.ok(ackWaits.some((argv) => hasFlagPair(argv, "--types", "heartbeat")));
-  assert.ok(ackWaits.every((argv) => hasFlagPair(argv, "--types", "heartbeat")));
-  const acks = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--ack"));
-  const ackIds = acks.map((argv) => argv[argv.indexOf("--ack") + 1]);
-  assert.ok(ackIds.indexOf("hb1") >= 0);
-  assert.ok(ackIds.indexOf("done1") >= 0);
-  assert.ok(ackIds.indexOf("hb1") < ackIds.indexOf("done1"));
 });
 
 test("adopt readiness timeout does not start the worker", () => {
@@ -699,4 +699,218 @@ test("collect surfaces a failed worker-list", () => {
   const r = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(r.status, 9, r.stdout + r.stderr);
   assert.equal(r.stdout, "ERROR worker-list failed: connection lost\n");
+});
+
+function fakeOrca(ctx, args) {
+  return spawnSync(process.execPath, [FAKE, ...args], {
+    encoding: "utf8",
+    env: Object.assign({}, process.env, {
+      FAKE_ORCA_SCENARIO: ctx.scenarioPath,
+      FAKE_ORCA_LOG: ctx.logPath,
+      FAKE_ORCA_STATE: ctx.statePath,
+    }),
+  });
+}
+
+function consumingCheck(argv) {
+  return (
+    argv[0] === "orchestration" &&
+    argv[1] === "check" &&
+    !argv.includes("--peek") &&
+    !argv.includes("--all") &&
+    !argv.includes("--ack")
+  );
+}
+
+const MIXED_DELIVERY = {
+  deliveryId: "mixed1",
+  messages: [
+    { type: "heartbeat", from_handle: "term_w", subject: "ack", dispatchId: "disp_1" },
+    { type: "worker_done", from_handle: "term_w", dispatchId: "disp_1", body: "done" },
+  ],
+};
+
+test("dispatch observes its ACK without consuming a Delivery", () => {
+  const ctx = setup(DEFAULT_AGENTS, (repo) => ({
+    runs: [passRun("run_v", defaultKey(repo, "cursor", "background"))],
+    workerStart: { dispatchId: "disp_1", state: "ready", handle: "term_w" },
+    deliveries: [MIXED_DELIVERY],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_w",
+        lastHeartbeatAt: "2026-09-11T09:00:00Z",
+      },
+    ],
+  }));
+  const dispatched = runDely(
+    [
+      "dispatch",
+      "--repo",
+      ctx.repo,
+      "--run",
+      "run_live",
+      "--phase",
+      "implement",
+      "--spec-file",
+      "task.md",
+      "--control",
+      "cursor",
+    ],
+    ctx
+  );
+  assert.equal(dispatched.status, 0, dispatched.stdout + dispatched.stderr);
+  assert.match(dispatched.stdout, /^DISPATCHED disp_1 term_w ack=/);
+  const afterDispatch = readLog(ctx.logPath);
+  assert.ok(afterDispatch.some((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--peek")));
+  assert.ok(!afterDispatch.some(consumingCheck));
+  assert.ok(
+    !afterDispatch.some((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--ack"))
+  );
+  const collected = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(collected.status, 0, collected.stdout + collected.stderr);
+  assert.match(collected.stdout, /^SETTLED disp_1 worker_done done\n/);
+});
+
+test("wait judges a Delivery as a whole", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [MIXED_DELIVERY],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_w",
+        lastHeartbeatAt: "2026-09-11T09:00:00Z",
+      },
+    ],
+    lastOutputAt: "now",
+  });
+  const r = runDely(["wait", "--run", "run_live"], ctx, { DELY_DEADLINE_S: "0.2", DELY_SILENCE_S: "30" });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /^SETTLED heartbeat,worker_done /);
+  const log = readLog(ctx.logPath);
+  const acks = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--ack"));
+  assert.equal(acks.length, 1);
+  assert.ok(hasFlagPair(acks[0], "--ack", "mixed1"));
+});
+
+test("sidecar wakes Control once and exits when a batch carries a settle", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [MIXED_DELIVERY],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_w",
+        lastHeartbeatAt: "2026-09-11T09:00:00Z",
+      },
+    ],
+    lastOutputAt: "now",
+  });
+  const r = runDely(["sidecar", "--run", "run_live", "--control-handle", "term_ctrl"], ctx, {
+    SPAWN_TIMEOUT_MS: 2000,
+    DELY_DEADLINE_S: "30",
+  });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const log = readLog(ctx.logPath);
+  const acks = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--ack"));
+  assert.equal(acks.length, 1);
+  assert.ok(hasFlagPair(acks[0], "--ack", "mixed1"));
+  assert.ok(hasFlagPair(acks[0], "--terminal", "term_ctrl"));
+  const sends = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "send");
+  assert.equal(sends.length, 1);
+  assert.ok(hasFlagPair(sends[0], "--type", "status"));
+  assert.match(sends[0][sends[0].indexOf("--subject") + 1], /^dely wake: /);
+  const sendIdx = log.findIndex((argv) => argv[0] === "orchestration" && argv[1] === "send");
+  assert.ok(sendIdx >= 0);
+  assert.ok(!log.slice(sendIdx + 1).some(consumingCheck));
+});
+
+test("collect reports settles already consumed by the sidecar", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    history: [
+      {
+        deliveryId: "mixed1",
+        messages: [
+          { type: "heartbeat", from_handle: "term_w", subject: "ack" },
+          { type: "worker_done", from_handle: "term_w", body: "done" },
+        ],
+      },
+    ],
+    deliveries: [],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_w",
+      },
+    ],
+  });
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /^SETTLED disp_1 worker_done done\n/);
+  const log = readLog(ctx.logPath);
+  assert.ok(
+    log.some((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--all"))
+  );
+});
+
+test("fake Orca replays the oldest Delivery until acknowledged", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      {
+        deliveryId: "dv_old",
+        messages: [
+          { type: "status", subject: "s1" },
+          { type: "status", subject: "s2" },
+        ],
+      },
+    ],
+  });
+  const first = JSON.parse(fakeOrca(ctx, ["orchestration", "check", "--run", "run_live", "--json"]).stdout);
+  assert.equal(first.result.deliveryId, "dv_old");
+  assert.deepEqual(
+    first.result.messages.map((m) => m.subject),
+    ["s1", "s2"]
+  );
+  fakeOrca(ctx, ["orchestration", "send", "--run", "run_live", "--type", "status", "--subject", "s3", "--json"]);
+  const second = JSON.parse(fakeOrca(ctx, ["orchestration", "check", "--run", "run_live", "--json"]).stdout);
+  assert.equal(second.result.deliveryId, "dv_old");
+  assert.deepEqual(
+    second.result.messages.map((m) => m.subject),
+    ["s1", "s2"]
+  );
+  fakeOrca(ctx, ["orchestration", "check", "--run", "run_live", "--ack", "dv_old", "--json"]);
+  const third = JSON.parse(fakeOrca(ctx, ["orchestration", "check", "--run", "run_live", "--json"]).stdout);
+  assert.equal(third.result.deliveryId, "dv_2");
+  assert.deepEqual(
+    third.result.messages.map((m) => m.subject),
+    ["s3"]
+  );
+  const peeked = JSON.parse(
+    fakeOrca(ctx, ["orchestration", "check", "--peek", "--run", "run_live", "--json"]).stdout
+  );
+  assert.equal(peeked.result.deliveryId, null);
+  assert.equal(peeked.result.messages.length, 0);
+  const mixed = setup(DEFAULT_AGENTS, { deliveries: [MIXED_DELIVERY] });
+  const typed = JSON.parse(
+    fakeOrca(mixed, [
+      "orchestration",
+      "check",
+      "--wait",
+      "--run",
+      "run_live",
+      "--types",
+      "heartbeat",
+      "--timeout-ms",
+      "20",
+      "--json",
+    ]).stdout
+  );
+  assert.equal(typed.result.deliveryId, "mixed1");
+  assert.deepEqual(
+    typed.result.messages.map((m) => m.type),
+    ["heartbeat", "worker_done"]
+  );
 });
