@@ -73,8 +73,9 @@ Carried documents:
 - `.claude-plugin/marketplace.json`: it names the plugin, not its skills.
 - `skills/delivery/templates/`: the templates are unchanged.
 - `.github/ISSUE_TEMPLATE/`: the harness dropdown already lists all seven harnesses.
-- The `implement` and `review` pins in `AGENTS.md`: this is a protocol change, not a
-  deployment change.
+- The `implement` pin in `AGENTS.md`: this is a protocol change, not a deployment
+  change. The `review` pin changed once, by human decision on 2026-09-11 — see the
+  execution envelope.
 - Any file under `bin/` or `hooks/`. Their absence is a closure gate, and `verify` is
   not a restoration of `bin/delivery-doctor`.
 
@@ -91,10 +92,13 @@ Branch, base, remote and pull request:
 Resolved phase pins, from `AGENTS.md`:
 
 - `implement`: Cursor Agent CLI, `cursor-grok-4.6-high`, effort `default` (flag omitted).
-- `review`: Codex CLI, `gpt-5.6-sol`, effort `high`.
+- `review`: Claude Code, `claude-opus-5`, effort `medium`. It was Codex CLI
+  `gpt-5.6-sol` high through the review of task 1b.
 
-Codex reported `weekly 13% left` on 2026-09-11. If it runs out, Control escalates;
-it does not change the pin.
+Codex reported `weekly 13% left` on 2026-09-11. After the task 1b review its weekly
+limit was 97% used, resetting 2026-09-15, with about five reviews still ahead. On
+escalation the human changed the `review` pin to Claude Code `claude-opus-5` medium
+for the rest of this delivery, in its own commit.
 
 Frozen runtime: this delivery runs under the installed Dely `0.17.8`, per the
 self-update rule in `AGENTS.md`. The new runtime takes effect for the next delivery.
