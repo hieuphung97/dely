@@ -29,6 +29,27 @@ function publicMessage(m) {
     out[k] = m[k];
   });
   if (out.deliveryId == null && m.groupId) out.deliveryId = m.groupId;
+  const folded = {};
+  if (typeof out.payload === "string" && out.payload) {
+    try {
+      const parsed = JSON.parse(out.payload);
+      if (parsed && typeof parsed === "object") Object.assign(folded, parsed);
+    } catch (_) {
+      /* keep folded empty; payload still rewritten below if keys exist */
+    }
+  } else if (out.payload && typeof out.payload === "object") {
+    Object.assign(folded, out.payload);
+  }
+  if (out.dispatchId) folded.dispatchId = folded.dispatchId || out.dispatchId;
+  if (out.dispatch_id) folded.dispatchId = folded.dispatchId || out.dispatch_id;
+  if (out.outcome) folded.outcome = folded.outcome || out.outcome;
+  if (out.taskId) folded.taskId = folded.taskId || out.taskId;
+  delete out.dispatchId;
+  delete out.dispatch_id;
+  delete out.outcome;
+  delete out.taskId;
+  if (Object.keys(folded).length) out.payload = JSON.stringify(folded);
+  else delete out.payload;
   return out;
 }
 
@@ -484,7 +505,11 @@ if (group === "orchestration" && cmd === "send") {
     uid,
     groupId: null,
   };
-  if (flags["dispatch-id"]) msg.dispatchId = flags["dispatch-id"];
+  const payload = {};
+  if (flags["dispatch-id"]) payload.dispatchId = flags["dispatch-id"];
+  if (flags.outcome) payload.outcome = flags.outcome;
+  if (flags["task-id"]) payload.taskId = flags["task-id"];
+  if (Object.keys(payload).length) msg.payload = JSON.stringify(payload);
   state.nextUid = uid + 1;
   state.arrived = (state.arrived || []).concat([msg]);
   saveState(state);

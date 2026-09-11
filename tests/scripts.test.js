@@ -1039,12 +1039,41 @@ function hasVerdictWrite(log) {
   );
 }
 
-function verifyOk(phase) {
-  return {
+function verifyOk(phase, extra) {
+  extra = extra || {};
+  const payload = { outcome: extra.outcome || "succeeded" };
+  if (extra.dispatchId) payload.dispatchId = extra.dispatchId;
+  const msg = {
     type: "worker_done",
-    outcome: "succeeded",
-    body: `dely verify ok phase=${phase} head=abc write=ok`,
+    payload: JSON.stringify(payload),
+    body: extra.body || `dely verify ok phase=${phase} head=abc write=ok`,
   };
+  if (extra.from_handle) msg.from_handle = extra.from_handle;
+  return msg;
+}
+
+function verifyAck(handle, dispatchId) {
+  return {
+    type: "heartbeat",
+    from_handle: handle,
+    subject: "ack",
+    payload: JSON.stringify({ dispatchId }),
+  };
+}
+
+function checkWaitCalls(log) {
+  return log.filter((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--wait"));
+}
+
+function verdictFromLog(log) {
+  const update = log.find((argv) => argv[0] === "orchestration" && argv[1] === "task-update");
+  if (!update) return null;
+  const raw = update[update.indexOf("--result") + 1];
+  try {
+    return JSON.parse(raw);
+  } catch (_) {
+    return null;
+  }
 }
 
 function defaultVerifyScenario(repo, extra) {
@@ -1063,10 +1092,10 @@ function defaultVerifyScenario(repo, extra) {
         {
           deliveryId: "dv_verify",
           messages: [
-            { type: "heartbeat", from_handle: "term_impl", subject: "ack", dispatchId: "disp_impl" },
-            { type: "heartbeat", from_handle: "term_rev", subject: "ack", dispatchId: "disp_rev" },
-            Object.assign(verifyOk("implement"), { from_handle: "term_impl", dispatchId: "disp_impl" }),
-            Object.assign(verifyOk("review"), { from_handle: "term_rev", dispatchId: "disp_rev" }),
+            verifyAck("term_impl", "disp_impl"),
+            verifyAck("term_rev", "disp_rev"),
+            verifyOk("implement", { from_handle: "term_impl", dispatchId: "disp_impl" }),
+            verifyOk("review", { from_handle: "term_rev", dispatchId: "disp_rev" }),
           ],
         },
       ],
@@ -1115,9 +1144,9 @@ test("verdict is written only after every dispatch settled, with the full key", 
         {
           deliveryId: "dv_one",
           messages: [
-            { type: "heartbeat", from_handle: "term_impl", subject: "ack", dispatchId: "disp_impl" },
-            { type: "heartbeat", from_handle: "term_rev", subject: "ack", dispatchId: "disp_rev" },
-            Object.assign(verifyOk("implement"), { from_handle: "term_impl", dispatchId: "disp_impl" }),
+            verifyAck("term_impl", "disp_impl"),
+            verifyAck("term_rev", "disp_rev"),
+            verifyOk("implement", { from_handle: "term_impl", dispatchId: "disp_impl" }),
           ],
         },
       ],
@@ -1159,16 +1188,15 @@ test("verify restores the Control terminal's previously bound Run", () => {
         {
           deliveryId: "dv_fail",
           messages: [
-            { type: "heartbeat", from_handle: "term_impl", subject: "ack", dispatchId: "disp_impl" },
-            { type: "heartbeat", from_handle: "term_rev", subject: "ack", dispatchId: "disp_rev" },
+            verifyAck("term_impl", "disp_impl"),
+            verifyAck("term_rev", "disp_rev"),
             {
               type: "worker_done",
               from_handle: "term_impl",
-              dispatchId: "disp_impl",
-              outcome: "failed",
+              payload: JSON.stringify({ dispatchId: "disp_impl", outcome: "failed" }),
               body: "nope",
             },
-            Object.assign(verifyOk("review"), { from_handle: "term_rev", dispatchId: "disp_rev" }),
+            verifyOk("review", { from_handle: "term_rev", dispatchId: "disp_rev" }),
           ],
         },
       ],
@@ -1241,8 +1269,8 @@ test("verify start then collect restarts a missing sidecar when one dispatch is 
         {
           deliveryId: "dv_ack",
           messages: [
-            { type: "heartbeat", from_handle: "term_impl", subject: "ack", dispatchId: "disp_impl" },
-            { type: "heartbeat", from_handle: "term_rev", subject: "ack", dispatchId: "disp_rev" },
+            verifyAck("term_impl", "disp_impl"),
+            verifyAck("term_rev", "disp_rev"),
           ],
         },
       ],
@@ -1289,4 +1317,79 @@ test("two id-less worker_done messages print two SETTLED lines", () => {
   const r = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.equal(r.stdout, "SETTLED disp_1 worker_done done\nSETTLED disp_1 worker_done done\n");
+});
+
+test("PASS verify writes verdict PASS with the full key and status prints PASS", () => {
+  const ctx = setupVerify(DEFAULT_AGENTS, (repo) => defaultVerifyScenario(repo));
+  const key = defaultKey(ctx.repo, "cursor", "background");
+  const pass = runDely(["verify", "run", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  assert.equal(pass.status, 0, pass.stdout + pass.stderr);
+  assert.match(pass.stdout, /RESULT PASS/);
+  const verdict = verdictFromLog(readLog(ctx.logPath));
+  assert.ok(verdict);
+  assert.equal(verdict.verdict, "PASS");
+  assert.equal(verdict.key, key);
+  const status = runDely(["status", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  assert.equal(status.status, 0, status.stdout + status.stderr);
+  assert.equal(status.stdout, "PASS run_verify\n");
+});
+
+test("an error thrown mid-run restores the previously bound Run", () => {
+  const ctx = setupVerify(DEFAULT_AGENTS, (repo) => defaultVerifyScenario(repo));
+  fs.writeFileSync(path.join(ctx.repo, ".dely-verify"), "not a directory\n");
+  const r = runDely(["verify", "run", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  assert.notEqual(r.status, 0, r.stdout + r.stderr);
+  const last = lastBinding(readLog(ctx.logPath));
+  assert.ok(last);
+  assert.equal(last[1], "run-use");
+  assert.ok(hasFlagPair(last, "--id", "run_delivery"));
+});
+
+test("verify start finishes at once on NO_ACK without a consuming wait", () => {
+  const ctx = setupVerify(DEFAULT_AGENTS, (repo) =>
+    defaultVerifyScenario(repo, {
+      deliveries: [
+        {
+          deliveryId: "dv_partial",
+          messages: [verifyAck("term_impl", "disp_impl")],
+        },
+      ],
+    })
+  );
+  const t0 = Date.now();
+  const r = runDely(["verify", "start", "--repo", ctx.repo, "--control", "codex"], ctx, {
+    DELY_VERIFY_DEADLINE_S: "3",
+    DELY_ACK_S: "1",
+  });
+  const elapsed = Date.now() - t0;
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /NO_ACK/);
+  assert.match(r.stdout, /RESULT FAIL/);
+  assert.equal(checkWaitCalls(readLog(ctx.logPath)).length, 0);
+  assert.ok(elapsed < 2500, `start blocked for ${elapsed}ms`);
+});
+
+test("verify start with a BLOCKED pin does not dispatch the other pins", () => {
+  const agents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Claude Code | default | default |
+| \`review\` | Cursor Agent CLI | default | default |
+`;
+  const ctx = setup(agents, () => ({
+    currentRun: "run_delivery",
+    createdRunId: "run_verify",
+    coordinatorHandle: "term_ctrl",
+    workerStarts: [{ dispatchId: "disp_rev", state: "ready", handle: "term_rev" }],
+  }));
+  gitInit(ctx.repo);
+  trustCursor(ctx.home, ctx.repo);
+  const r = runDely(["verify", "start", "--repo", ctx.repo, "--control", "codex"], ctx);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /BLOCKED /);
+  assert.match(r.stdout, /RESULT FAIL/);
+  const log = readLog(ctx.logPath);
+  assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start"));
+  assert.equal(checkWaitCalls(log).length, 0);
 });

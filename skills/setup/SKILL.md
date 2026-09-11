@@ -171,10 +171,11 @@ After the managed block is written, for each pinned harness whose `Setup`
 column in `skills/delivery/references/harnesses.md` is `trust dialog` or
 `trust-all confirmation`, open it once for the human with
 `orca terminal create --worktree path:<repo> --command "<binary> <permission default>"`.
-Use that harness's binary and permission default from the same table. The
-human answers that harness's own dialog; setup never answers it and never
-writes a harness store. The human closes the terminal when done. `Orca
-preflight` and `none` need no step.
+The binary is `claude`, `codex`, `grok`, `agy`, `kiro-cli`, `cursor-agent`,
+or `copilot` for that harness. Take the permission default from the harness
+table. The human answers that harness's own dialog; setup never answers it
+and never writes a harness store. The human closes the terminal when done.
+`Orca preflight` and `none` need no step.
 
 ## Verify
 

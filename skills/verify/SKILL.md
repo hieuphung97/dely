@@ -21,9 +21,13 @@ Read the Control harness's `Control wake` column in
 
 - **background:** run `dely verify run --repo <path> --control <agent>` as a
   background command and end the turn.
-- **nudge:** run `dely verify start --repo <path> --control <agent>`, end the
-  turn, and on every Orca nudge run only the printed `verify collect` command,
-  never the `orca orchestration check` command quoted in the nudge text.
+- **nudge:** run `dely verify start --repo <path> --control <agent>` and end
+  the turn. If it prints `COLLECT_NOW`, run that collect at once. On every
+  Orca nudge, and when collect prints `WAITING` and exits 2, run only the
+  printed `verify collect` command and end the turn again; never the
+  `orca orchestration check` command quoted in the nudge text. While start
+  has printed `SLEEP`, Control stays bound to the verify Run and cannot
+  dispatch delivery work until collect finishes.
 - **unsupported:** cannot be Control.
 
 ## Results

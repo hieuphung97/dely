@@ -83,6 +83,22 @@ function restorePrev(prev) {
   orca(["orchestration", "run-use", "--id", prev, "--json"]);
 }
 
+function withPrevRestore(fn) {
+  try {
+    fn();
+  } catch (err) {
+    const prev = restoreOnExit;
+    restoreOnExit = null;
+    restorePrev(prev);
+    finish(1, `ERROR ${err && err.message ? err.message : err}`);
+  } finally {
+    if (restoreOnExit) {
+      restorePrev(restoreOnExit);
+      restoreOnExit = null;
+    }
+  }
+}
+
 function finish(code, line) {
   if (restoreOnExit) {
     restorePrev(restoreOnExit);
@@ -380,14 +396,23 @@ function uniqueTypes(messages) {
   return seen;
 }
 
+function payloadFields(m) {
+  if (!m) return {};
+  const raw = m.payload;
+  if (raw && typeof raw === "object") return raw;
+  if (typeof raw === "string") {
+    const parsed = parseJson(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  }
+  return {};
+}
+
 function messageDispatchId(m) {
   if (!m) return "";
   if (m.dispatchId) return m.dispatchId;
   if (m.dispatch_id) return m.dispatch_id;
-  if (m.payload && (m.payload.dispatchId || m.payload.dispatch_id)) {
-    return m.payload.dispatchId || m.payload.dispatch_id;
-  }
-  return "";
+  const payload = payloadFields(m);
+  return payload.dispatchId || payload.dispatch_id || "";
 }
 
 function lastOutputAt(handle) {
@@ -919,8 +944,8 @@ function boundRunId() {
 function workerOutcome(m) {
   if (!m) return "";
   if (m.outcome) return m.outcome;
-  if (m.payload && m.payload.outcome) return m.payload.outcome;
-  return "";
+  const payload = payloadFields(m);
+  return payload.outcome || "";
 }
 
 function verifyPassMessage(m) {
@@ -1237,14 +1262,16 @@ function cmdVerifyRun(flags) {
 function cmdVerifyStart(flags) {
   const ctx = prepareVerify(flags);
   if (ctx.error) finish(9, `ERROR ${ctx.error}`);
+  if (ctx.groups.some((g) => g.status === "BLOCKED")) {
+    finishVerify(ctx);
+    return;
+  }
   dispatchVerifyGroups(ctx);
   const anyOpen = ctx.groups.some((g) => g.dispatchId && !g.status);
-  const failedLaunch = ctx.groups.some((g) => g.status === "NO_ACK" || g.status === "FAIL");
+  const failedLaunch = ctx.groups.some(
+    (g) => g.status === "NO_ACK" || g.status === "FAIL" || g.status === "BLOCKED"
+  );
   if (!anyOpen || failedLaunch) {
-    if (anyOpen) {
-      const waitRes = consumeVerify(ctx.verifyRun, ctx.groups, Date.now(), VERIFY_DEADLINE_S);
-      if (waitRes.type === "error") finish(9, `ERROR ${waitRes.reason}`);
-    }
     finishVerify(ctx);
     return;
   }
@@ -1381,13 +1408,13 @@ function main(argv) {
       return cmdCollect(flags);
     case "verify:run":
       if (!flags.repo || !flags.control) finish(2, "usage: dely verify run --repo <path> --control <agent>");
-      return cmdVerifyRun(flags);
+      return withPrevRestore(() => cmdVerifyRun(flags));
     case "verify:start":
       if (!flags.repo || !flags.control) finish(2, "usage: dely verify start --repo <path> --control <agent>");
-      return cmdVerifyStart(flags);
+      return withPrevRestore(() => cmdVerifyStart(flags));
     case "verify:collect":
       if (!flags.repo) finish(2, "usage: dely verify collect --repo <path>");
-      return cmdVerifyCollect(flags);
+      return withPrevRestore(() => cmdVerifyCollect(flags));
     default:
       finish(2, "usage: dely status|dispatch|wait|sidecar|collect|verify");
   }
