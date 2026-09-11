@@ -344,6 +344,10 @@ if (group === "orchestration" && cmd === "check") {
     saveState(state);
     ok({ deliveryId: null, messages, count: messages.length });
   }
+  if (scenario.checkFailConsume) {
+    saveState(state);
+    reply({ ok: false, error: { message: scenario.checkFailConsume } }, 1);
+  }
   let msgs;
   if (state.frozen) {
     msgs = frozenMessages(state);
@@ -351,7 +355,7 @@ if (group === "orchestration" && cmd === "check") {
     const batch = nextBatch(state);
     if (!batch.length) {
       msgs = [];
-    } else if (flags.wait && !typesMatch(batch, flags.types)) {
+    } else if (flags.wait && !typesMatch(unackedOf(state), flags.types)) {
       waitSleep();
       saveState(state);
       ok({ deliveryId: null, messages: [], count: 0, timedOut: true });
@@ -361,7 +365,7 @@ if (group === "orchestration" && cmd === "check") {
     }
   }
   if (state.frozen) {
-    if (flags.wait && !typesMatch(msgs, flags.types)) {
+    if (flags.wait && !typesMatch(unackedOf(state), flags.types)) {
       waitSleep();
       saveState(state);
       ok({ deliveryId: null, messages: [], count: 0, timedOut: true });

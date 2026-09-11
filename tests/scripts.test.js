@@ -914,3 +914,94 @@ test("fake Orca replays the oldest Delivery until acknowledged", () => {
     ["heartbeat", "worker_done"]
   );
 });
+
+test("fake Orca typed wait wakes on a newer unread type and replays the frozen Delivery", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      {
+        deliveryId: "dv_frozen",
+        messages: [{ type: "status", subject: "s1" }],
+      },
+    ],
+  });
+  const frozen = JSON.parse(fakeOrca(ctx, ["orchestration", "check", "--run", "run_live", "--json"]).stdout);
+  assert.equal(frozen.result.deliveryId, "dv_frozen");
+  assert.deepEqual(
+    frozen.result.messages.map((m) => m.type),
+    ["status"]
+  );
+  fakeOrca(ctx, ["orchestration", "send", "--run", "run_live", "--type", "heartbeat", "--subject", "hb", "--json"]);
+  const waited = JSON.parse(
+    fakeOrca(ctx, [
+      "orchestration",
+      "check",
+      "--wait",
+      "--run",
+      "run_live",
+      "--types",
+      "heartbeat",
+      "--timeout-ms",
+      "20",
+      "--json",
+    ]).stdout
+  );
+  assert.equal(waited.result.deliveryId, "dv_frozen");
+  assert.notEqual(waited.result.timedOut, true);
+  assert.deepEqual(
+    waited.result.messages.map((m) => m.type),
+    ["status"]
+  );
+  assert.deepEqual(
+    waited.result.messages.map((m) => m.subject),
+    ["s1"]
+  );
+});
+
+test("collect surfaces a failed consuming check", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    checkFailConsume: "mailbox error",
+    deliveries: [
+      {
+        deliveryId: "dv_frozen",
+        messages: [{ type: "heartbeat", from_handle: "term_w", subject: "ack" }],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_w",
+      },
+    ],
+  });
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 9, r.stdout + r.stderr);
+  assert.equal(r.stdout, "ERROR check failed: mailbox error\n");
+  const log = readLog(ctx.logPath);
+  assert.ok(log.some((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--all")));
+  assert.ok(log.some(consumingCheck));
+});
+
+test("collect keeps distinct settling messages that share dispatch type and body", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      {
+        deliveryId: "dv_same",
+        messages: [
+          { id: "m1", type: "worker_done", from_handle: "term_w", dispatchId: "disp_1", body: "done" },
+          { id: "m2", type: "worker_done", from_handle: "term_w", dispatchId: "disp_1", body: "done" },
+        ],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_w",
+      },
+    ],
+  });
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(r.stdout, "SETTLED disp_1 worker_done done\nSETTLED disp_1 worker_done done\n");
+});

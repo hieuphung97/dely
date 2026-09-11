@@ -685,7 +685,7 @@ function cmdCollect(flags) {
   function report(m) {
     if (!hasSettle([m])) return;
     const dispatchId = messageDispatchId(m) || byHandle.get(m.from_handle) || "-";
-    const key = `${dispatchId}\t${m.type}\t${m.body || ""}`;
+    const key = m.id;
     if (printed.has(key)) return;
     printed.add(key);
     process.stdout.write(`SETTLED ${dispatchId} ${m.type} ${m.body || ""}\n`);
@@ -693,6 +693,7 @@ function cmdCollect(flags) {
   for (const m of messagesOf(all)) report(m);
   for (;;) {
     const r = orca(["orchestration", "check", "--run", run, "--json"]);
+    if (orcaFailed(r)) finish(9, `ERROR check failed: ${orcaReason(r, "check failed")}`);
     const id = deliveryId(r);
     if (!id) break;
     const acked = ackDelivery(run, id);
