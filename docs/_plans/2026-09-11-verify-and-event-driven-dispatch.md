@@ -453,6 +453,50 @@ on a scratch copy of `53484ef`:
 same amendment that routes this task; `docs/decisions.md` said collect reads liveness
 for each open dispatch, and it reads it for one that is no longer open.
 
+**Remediation, after task 3d's review.** All five rows were met, every probe of the
+previous re-review now behaves, and the fixture correction is load-bearing. Two
+Important findings stand, and Control measured both against real Orca on 2026-09-12
+rather than reasoning from the fake:
+
+| Path | After `worker-stop` | `worker-release` | Row afterwards |
+| --- | --- | --- | --- |
+| `worker-start --agent` (Orca creates the terminal) | `dispatchStatus` `failed`, `workerState` `stopped`, `terminalState` `retained` | `released`, `processAction` `none` | `failed` / `released` |
+| `worker-start --terminal` (adopt; Dely created the terminal) | `state` `stop_unknown`, `dispatchStatus` stays **`dispatched`**, `terminalState` `retained` | **refused, `ok: false`** | unchanged |
+
+An adopted dispatch is born `terminalState: retained`,
+`retainedReason: external_terminal`, `ownershipState: external`, and
+`orca orchestration worker-release --help` says release never closes a reused or
+pre-existing terminal and reports `retained` at exit 0.
+
+- **A.** "Released, so reported once" cannot rest on `terminalState === "released"`.
+  For every adopt harness — Antigravity, and Grok, Kiro or Copilot whenever the model
+  pin is argv — that value never arrives, so the dead dispatch is reported again by
+  every later `collect`, and once per poll by `wait`. That is the infinite `FAILED`
+  loop this task was split off to remove. Memory of what has been reported must be
+  Dely's own and must survive across processes, because `collect` is a fresh process
+  per nudge. Do not resolve which Orca value to trust; remove the dependency, the way
+  this task already removed the `check --all` ordering dependency.
+- **B.** "A Control-stopped dispatch is never reported `FAILED`" rests on the fake's
+  `worker-stop` setting `dispatchStatus` to `stopped`, a value real Orca does not use.
+  Measured, a stopped agent dispatch reports `failed`, so the guard does not fire and
+  the dispatch is reported as a failure; a stopped adopt dispatch stays `dispatched`,
+  so `collect` reports `WAITING` for a worker that is gone. The discriminators that
+  exist are `workerState` (`stopped`, `stop_unknown`) and `stage.detail`
+  (`process_stopped`).
+- A dispatch Dely stopped itself is known to Dely without asking Orca at all.
+- `worker-release` can refuse. The runtime must read the receipt rather than assume it
+  worked.
+
+Minor, in the same pass: `wait` misses a dead dispatch when a sibling settles in the
+same Delivery; `reportDeadLines` evaluates its second argument eagerly, costing a
+`worker-list` per idle poll; the two `worker-list` calls should be one, so a transient
+failure cannot make `wait` exit 8 with a live dispatch open; a reason with no evidence
+says so; and `SKILL.md`'s "exit 8 only when FAILED is the whole outcome" should read
+"when nothing is still open", which is what the code does.
+
+Remediation files: `skills/delivery/scripts/dely.js`, `tests/scripts.test.js`,
+`tests/fixtures/fake-orca.js`, `skills/delivery/SKILL.md`, `tests/contracts.sh`.
+
 ### 4. The package, its gates and its record ship the change
 
 **Behaviour.**
@@ -522,6 +566,9 @@ reuse the existing cleanup and verdict paths.
 | Nudge-mode collect opens no terminal (task 3c) | `node --test` case: one dispatch still open; assert `WAITING`, and no `terminal create` or `terminal list` call | The `44ffe96` collect, which opens or reuses a sidecar on every `WAITING` | `rereview-3` |
 | A failed dispatch with no message is reported (task 3c remediation) | `node --test` cases for `collect` and `wait`: one worker with `dispatchStatus` `failed` and `liveness.verdict` `exited`, no deliveries; assert a `FAILED <id> <reason>` line and a non-zero exit | The `36a5187` runtime, where collect exits 0 printing nothing and wait waits out the deadline | `review-3c` |
 | A dead dispatch is released and reported once (task 3d) | `node --test` case: two collects on the same dead dispatch; assert `worker-release` before the `FAILED` line, and no `FAILED` from the second | The `53484ef` runtime, which re-reports forever and logs no release | `rereview-3c` P2a/P2b |
+| A dead dispatch is reported once whatever Orca reports afterwards (task 3d remediation) | `node --test` cases over the measured shapes: an adopted row that stays `retained`, and one whose `worker-release` is refused; assert one `FAILED` line from the first `collect`, none from the second, and one line from `wait` across polls | The `b2a7916` filter on `terminalState === "released"`, which never clears for an adopted dispatch | `review-3d` Important 1 |
+| A dispatch Dely stopped is never reported as dead, and never waited on (task 3d remediation) | `node --test` cases over the measured shapes: agent stop (`failed`/`stopped`) and adopt stop (`dispatched`/`stop_unknown`); assert no `FAILED` line and no endless `WAITING` | The `b2a7916` guard on `dispatchStatus`, plus the fake's `stopped` value that real Orca does not use | `review-3d` Important 2, Control measurement 2026-09-12 |
+| The fake models the measured lifecycle (task 3d remediation) | `node --test` fixture review: `worker-stop` and `worker-release` behave as the two measured rows in the plan, including a refused release | A fake that releases every dispatch unconditionally and invents a `stopped` dispatch status | `review-3d` |
 | A dead dispatch never masks a live one (task 3d) | `node --test` cases: one dead and one open dispatch; assert collect prints the `FAILED` line and `WAITING`, and that `wait` goes on to settle the live dispatch | The `53484ef` runtime, where collect never returns `WAITING` and wait exits at once | `rereview-3c` P3/P11 |
 | A Control-stopped silent dispatch is never reported `FAILED` (task 3d) | `node --test` case: the pinned silence scenario, with liveness `exited` after the stop as `worker-stop` leaves it; assert the next collect does not report it | The `53484ef` runtime, which prints `FAILED disp_1 ready` | `rereview-3c` P9a/P9b |
 | `wait` checks for a dead dispatch only after consuming (task 3d) | `node --test` case: a `worker_done` queued and liveness `exited`; assert `SETTLED`, with the dead check ordered after the consume | The `53484ef` order, whose happy path rests on `check --all` returning an unconsumed message | `rereview-3c` N3 |
