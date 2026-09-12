@@ -373,6 +373,8 @@ test("wait exits SILENT when output is stale after ACK even though Orca says liv
   assert.notEqual(again.status, 6, again.stdout + again.stderr);
   assert.doesNotMatch(again.stdout, /SILENT disp_1/);
   assert.doesNotMatch(again.stdout, /WAITING disp_1/);
+  assert.notEqual(again.status, 8, again.stdout + again.stderr);
+  assert.doesNotMatch(again.stdout, /FAILED /);
 });
 
 test("launcher falls back to Orca's runtime when node is absent", () => {
@@ -890,7 +892,7 @@ test("collect surfaces a failed consuming check", () => {
   assert.ok(log.some(consumingCheck));
 });
 
-test("collect surfaces a failed acknowledgement", () => {
+test("collect surfaces a failed acknowledgement", { timeout: 5000 }, () => {
   const ctx = setup(DEFAULT_AGENTS, {
     rejectAck: true,
     rejectAckReason: "ack rejected",
@@ -988,6 +990,8 @@ test("collect stops a silent dispatch before SILENT and does not report it again
   assert.notEqual(again.status, 6, again.stdout + again.stderr);
   assert.doesNotMatch(again.stdout, /SILENT disp_1/);
   assert.doesNotMatch(again.stdout, /WAITING disp_1/);
+  assert.notEqual(again.status, 8, again.stdout + again.stderr);
+  assert.doesNotMatch(again.stdout, /FAILED /);
 });
 
 test("collect reports DEADLINE from the dispatch dispatchedAt", () => {
@@ -1067,9 +1071,11 @@ test("collect does not report FAILED for a dispatch that settled normally", () =
     workers: [
       {
         dispatchId: "disp_1",
-        dispatchStatus: "settled",
+        dispatchStatus: "failed",
         agentTerminalHandle: "term_w",
         workerState: "exited",
+        lastError: "process died",
+        terminalState: "reclaimable",
         projection: { liveness: { verdict: "exited" } },
       },
     ],
@@ -1078,6 +1084,152 @@ test("collect does not report FAILED for a dispatch that settled normally", () =
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /^SETTLED disp_1 worker_done done\n/);
   assert.doesNotMatch(r.stdout, /FAILED /);
+});
+
+test("collect releases a dead dispatch before FAILED and does not report it again", () => {
+  const ctx = setup(DEFAULT_AGENTS, deadDispatchScenario());
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 8, r.stdout + r.stderr);
+  assert.match(r.stdout, /^FAILED disp_1 /);
+  const log = readLog(ctx.logPath);
+  const releaseAt = log.findIndex(
+    (argv) =>
+      argv[0] === "orchestration" && argv[1] === "worker-release" && hasFlagPair(argv, "--dispatch", "disp_1")
+  );
+  assert.ok(releaseAt >= 0, "collect did not release the dead dispatch");
+  const again = runDely(["collect", "--run", "run_live"], ctx);
+  assert.notEqual(again.status, 8, again.stdout + again.stderr);
+  assert.doesNotMatch(again.stdout, /FAILED /);
+});
+
+test("collect reports FAILED and WAITING when one dispatch is dead and one is open", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [],
+    workers: [
+      {
+        dispatchId: "disp_dead",
+        dispatchStatus: "failed",
+        agentTerminalHandle: "term_dead",
+        workerState: "crashed",
+        lastError: "boom",
+        terminalState: "reclaimable",
+        projection: { liveness: { verdict: "exited" } },
+      },
+      {
+        dispatchId: "disp_open",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_open",
+        lastHeartbeatAt: "2026-09-11T09:00:00Z",
+        projection: { liveness: { verdict: "live" } },
+      },
+    ],
+    lastOutputAt: "now",
+    liveness: "live",
+  });
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.match(r.stdout, /FAILED disp_dead /);
+  assert.match(r.stdout, /WAITING disp_open/);
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+});
+
+test("wait settles a live dispatch after reporting a dead one", { timeout: 5000 }, () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      { deliveryId: "dv1", messages: [{ type: "heartbeat", from_handle: "term_open", dispatchId: "disp_open" }] },
+      {
+        deliveryId: "dv2",
+        messages: [{ type: "worker_done", from_handle: "term_open", dispatchId: "disp_open", body: "ok" }],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_dead",
+        dispatchStatus: "failed",
+        agentTerminalHandle: "term_dead",
+        workerState: "crashed",
+        lastError: "boom",
+        terminalState: "reclaimable",
+        projection: { liveness: { verdict: "exited" } },
+      },
+      {
+        dispatchId: "disp_open",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_open",
+        lastHeartbeatAt: "2026-09-11T09:00:00Z",
+        projection: { liveness: { verdict: "live" } },
+      },
+    ],
+    lastOutputAt: "now",
+  });
+  const r = runDely(["wait", "--run", "run_live"], ctx, {
+    DELY_DEADLINE_S: "30",
+    DELY_SILENCE_S: "60",
+    SPAWN_TIMEOUT_MS: 3000,
+  });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /FAILED disp_dead /);
+  assert.match(r.stdout, /SETTLED /);
+});
+
+test("wait checks for a dead dispatch only after consuming", { timeout: 5000 }, () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    checkAllAckedOnly: true,
+    deliveries: [
+      {
+        deliveryId: "dv_done",
+        messages: [{ type: "worker_done", from_handle: "term_w", dispatchId: "disp_1", body: "done" }],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "failed",
+        agentTerminalHandle: "term_w",
+        workerState: "exited",
+        lastError: "process died",
+        terminalState: "reclaimable",
+        projection: { liveness: { verdict: "exited" } },
+      },
+    ],
+  });
+  const r = runDely(["wait", "--run", "run_live"], ctx, {
+    DELY_DEADLINE_S: "30",
+    DELY_SILENCE_S: "60",
+    SPAWN_TIMEOUT_MS: 3000,
+  });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /SETTLED /);
+  assert.doesNotMatch(r.stdout, /FAILED /);
+  const log = readLog(ctx.logPath);
+  const waitAt = log.findIndex(
+    (argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--wait")
+  );
+  const listAt = log.findIndex((argv) => argv[0] === "orchestration" && argv[1] === "worker-list");
+  assert.ok(waitAt >= 0, "wait did not consume before judging a dead dispatch");
+  assert.ok(listAt < 0 || waitAt < listAt, "dead check ran before consume");
+});
+
+test("FAILED reason does not name a stale ready worker state as the cause", () => {
+  const ctx = setup(
+    DEFAULT_AGENTS,
+    deadDispatchScenario({
+      workers: [
+        {
+          dispatchId: "disp_f",
+          dispatchStatus: "failed",
+          agentTerminalHandle: "term_w",
+          workerState: "ready",
+          lastError: "boom",
+          terminalState: "reclaimable",
+          projection: { liveness: { verdict: "live" } },
+        },
+      ],
+    })
+  );
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 8, r.stdout + r.stderr);
+  assert.match(r.stdout, /^FAILED disp_f /);
+  assert.doesNotMatch(r.stdout, /\bready\b/);
 });
 
 test("nudge-mode collect opens no terminal when a dispatch is still open", () => {

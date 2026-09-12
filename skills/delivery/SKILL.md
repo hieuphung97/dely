@@ -185,14 +185,20 @@ right after a verify PASS goes to the human.
 
 - **background:** run `dely wait --run <run>` as a background command and
   end the turn. `SETTLED` hands over the whole batch. `FAILED <dispatchId>
-  <reason>` is a dead dispatch: recover as below.
+  <reason>` is a dead dispatch: recover as below. `wait` consumes first,
+  then releases the dead dispatch and prints `FAILED`. If another dispatch
+  is still open, it keeps waiting for it.
 - **nudge:** after `DISPATCHED`, end the turn. On every Orca nudge, run only
   `dely collect --run <run>`, never the `orca orchestration check`
   command quoted in the nudge text, because it would consume the message.
   On `WAITING`, end the turn again. On `FAILED <dispatchId> <reason>`,
-  recover as below. A worker that neither sends a message nor exits wakes
-  nobody, so a Control that has heard nothing for a long time asks the
-  human.
+  recover as below. collect releases a dead dispatch before printing
+  `FAILED`, and never reports it twice. If a live dispatch remains, it also
+  prints `WAITING`: one fresh `dely dispatch`, then end the turn. Exit 2
+  when any dispatch remains open, even if a `FAILED` line was printed;
+  exit 8 only when FAILED is the whole outcome. A worker that neither
+  sends a message nor exits wakes nobody, so a Control that has heard
+  nothing for a long time asks the human.
 - **unsupported:** that harness cannot be Control.
 
 Control acts on `SETTLED` lines whose dispatch id matches the one
@@ -205,8 +211,10 @@ Control acts on `SETTLED` lines whose dispatch id matches the one
 `dely dispatch` with the same prompt file. Never retry into the same terminal,
 and never reuse a settled terminal. A second failure on the same input goes
 to the human. `DEADLINE` goes to the human. `FAILED` from collect or wait is
-the same route: a dispatch Orca has marked failed or exited that sent no
-settling message.
+the same route: a dispatch Orca has marked failed that sent no settling
+message is released and reported once. A Control-stopped silent dispatch
+is not `FAILED`. Control acts on the `FAILED` line; exit 2 when any
+dispatch remains open, and exit 8 only when FAILED is the whole outcome.
 
 The worker reports once with `worker_done` and an `--outcome`.
 Completion comes from the worker's own `worker_done`;
@@ -400,7 +408,7 @@ from an ambiguous, missing, or merely transport-level outcome.
 | Harness fails or evidence is insufficient | Preserve the candidate, report the native outcome and role disposition |
 | Idempotent release step is interrupted | Verify Git and pull-request state, then resume |
 | `NO_ACK`, `SILENT` or `FAILED` | One fresh `dely dispatch` with the same prompt file; a second failure on the same input goes to the human |
-| `FAILED <dispatchId> <reason>` from collect or wait | One fresh `dely dispatch` with the same prompt file; a second failure on the same input goes to the human |
+| `FAILED <dispatchId> <reason>` from collect or wait | One fresh `dely dispatch` with the same prompt file; a second failure on the same input goes to the human. Exit 2 when any dispatch remains open; exit 8 only when FAILED is the whole outcome |
 | `DEADLINE` | Ask the human |
 | `ERROR` (exit 9) | Ask the human |
 

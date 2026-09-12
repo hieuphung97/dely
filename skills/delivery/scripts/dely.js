@@ -481,6 +481,17 @@ function stopDispatch(id) {
   orca(["orchestration", "worker-stop", "--dispatch", id, "--json"]);
 }
 
+function releaseDispatch(id) {
+  if (!id) return;
+  orca(["orchestration", "worker-release", "--dispatch", id, "--json"]);
+}
+
+function openDispatchIds(run) {
+  const listed = workerList(run);
+  if (!listed.ok) return [];
+  return listed.workers.filter((w) => w.dispatchStatus === "dispatched").map((w) => w.dispatchId);
+}
+
 function parseDispatchedAt(raw) {
   if (raw == null || raw === "") return null;
   const m = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
@@ -559,6 +570,13 @@ function shownLiveness(shown, worker) {
   return (fromShow && fromShow.verdict) || (fromList && fromList.verdict) || "";
 }
 
+function failureEvidenceState(state) {
+  const s = String(state || "").toLowerCase();
+  if (!s) return false;
+  if (s === "ready" || s === "idle" || s === "running" || s === "dispatched") return false;
+  return true;
+}
+
 function deadDispatchReason(shown) {
   const res = result(shown);
   const worker = res.worker || {};
@@ -567,7 +585,7 @@ function deadDispatchReason(shown) {
   const err = oneLine(worker.lastError || dispatch.lastError || "");
   const liveness = oneLine(shownLiveness(shown));
   const parts = [];
-  if (state) parts.push(state);
+  if (failureEvidenceState(state)) parts.push(state);
   if (err) parts.push(err);
   if (liveness) parts.push("liveness=" + liveness);
   return parts.join(" ") || "failed";
@@ -590,21 +608,28 @@ function settleIdsOf(run, workers, extraIds) {
   return ids;
 }
 
+function reportDeadLines(deads, exitIfLast) {
+  for (let i = 0; i < deads.length; i++) {
+    const line = `FAILED ${deads[i].dispatchId} ${deads[i].reason}`;
+    if (exitIfLast && i === deads.length - 1) finish(8, line);
+    process.stdout.write(line + "\n");
+  }
+}
+
 function checkDeadDispatch(run, extraSettleIds) {
   const listed = workerList(run);
-  if (!listed.ok) return null;
-  const suspects = listed.workers.filter((w) => w.dispatchStatus !== "dispatched");
-  if (!suspects.length) return null;
+  if (!listed.ok) return [];
   const ids = settleIdsOf(run, listed.workers, extraSettleIds);
-  for (const worker of suspects) {
+  const dead = [];
+  for (const worker of listed.workers) {
+    if (worker.terminalState === "released") continue;
+    if (worker.dispatchStatus !== "failed") continue;
     if (ids.has(worker.dispatchId)) continue;
     const shown = orca(["orchestration", "worker-show", "--dispatch", worker.dispatchId, "--json"]);
-    const status = worker.dispatchStatus || (result(shown).dispatch && result(shown).dispatch.status) || "";
-    const liveness = shownLiveness(shown, worker);
-    if (status !== "failed" && liveness !== "exited") continue;
-    return { dispatchId: worker.dispatchId, reason: deadDispatchReason(shown) };
+    releaseDispatch(worker.dispatchId);
+    dead.push({ dispatchId: worker.dispatchId, reason: deadDispatchReason(shown) });
   }
-  return null;
+  return dead;
 }
 
 function markHeartbeats(messages, seen) {
@@ -753,13 +778,13 @@ function waitStep(run, startedAt, seen, deadlineS) {
 function cmdWait(flags) {
   const seen = new Set();
   for (;;) {
-    const dead = checkDeadDispatch(flags.run);
-    if (dead) finish(8, `FAILED ${dead.dispatchId} ${dead.reason}`);
     const step = waitStep(flags.run, Date.now(), seen, Number.POSITIVE_INFINITY);
     if (step.type === "settled") {
       finish(0, `SETTLED ${step.types.join(",")} ${JSON.stringify(step.messages)}`);
     }
     if (step.type === "error") finish(9, `ERROR ${step.reason}`);
+    const deads = checkDeadDispatch(flags.run);
+    reportDeadLines(deads, openDispatchIds(flags.run).length === 0);
     const deadline = checkDeadline(flags.run);
     if (deadline) finish(7, `DEADLINE ${deadline.dispatchId} ${deadline.seconds}`);
     if (step.type === "silent") {
@@ -811,11 +836,14 @@ function collectSettles(run, opts) {
   }
   const history = messagesOf(all);
   for (let i = 0; i < history.length; i++) report(history, i);
+  const seenIds = new Set();
   for (;;) {
     const r = orca(["orchestration", "check", "--run", run, "--json"]);
     if (orcaFailed(r)) return { ok: false, reason: `check failed: ${orcaReason(r, "check failed")}` };
     const id = deliveryId(r);
     if (!id) break;
+    if (seenIds.has(id)) return { ok: false, reason: `ack failed: repeated delivery ${id}` };
+    seenIds.add(id);
     const acked = ackDelivery(run, id);
     if (!acked.ok) return { ok: false, reason: `ack failed: ${acked.reason}` };
     const batch = messagesOf(r);
@@ -837,11 +865,11 @@ function cmdCollect(flags) {
   }
   const deadline = checkDeadline(flags.run);
   if (deadline) finish(7, `DEADLINE ${deadline.dispatchId} ${deadline.seconds}`);
-  const dead = checkDeadDispatch(
+  const deads = checkDeadDispatch(
     flags.run,
     collected.settles.map((s) => s.dispatchId).filter(Boolean)
   );
-  if (dead) finish(8, `FAILED ${dead.dispatchId} ${dead.reason}`);
+  reportDeadLines(deads, collected.open.length === 0);
   if (collected.open.length) {
     finish(2, `WAITING ${collected.open.join(" ")}`);
   }

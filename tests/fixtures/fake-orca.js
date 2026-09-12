@@ -208,7 +208,17 @@ function workers(state) {
   );
   return base.concat(extra).map((w) => {
     const copy = Object.assign({}, w);
-    if (state.stopped[w.dispatchId]) copy.dispatchStatus = "stopped";
+    if (state.stopped[w.dispatchId]) {
+      copy.dispatchStatus = "stopped";
+      copy.projection = Object.assign({}, copy.projection, {
+        liveness: { verdict: "exited" },
+      });
+    }
+    if ((state.released || []).indexOf(w.dispatchId) >= 0) {
+      copy.terminalState = "released";
+    } else if (!copy.terminalState && copy.dispatchStatus === "failed") {
+      copy.terminalState = "reclaimable";
+    }
     return copy;
   });
 }
@@ -395,6 +405,7 @@ if (group === "orchestration" && cmd === "worker-list") {
       dispatchStatus: w.dispatchStatus,
       agentTerminalHandle: w.agentTerminalHandle,
       lastHeartbeatAt: w.lastHeartbeatAt || null,
+      terminalState: w.terminalState,
       projection: w.projection || { liveness: { verdict: scenario.liveness || "live" } },
     })),
   });
@@ -488,7 +499,8 @@ if (group === "orchestration" && cmd === "check") {
     ok({ deliveryId: null, messages, count: messages.length });
   }
   if (flags.all) {
-    const messages = (state.arrived || []).map(publicMessage);
+    const raw = (state.arrived || []).filter((m) => !scenario.checkAllAckedOnly || m.acked);
+    const messages = raw.map(publicMessage);
     saveState(state);
     ok({ deliveryId: null, messages, count: messages.length });
   }
