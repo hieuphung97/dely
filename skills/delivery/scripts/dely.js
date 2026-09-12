@@ -859,11 +859,12 @@ function launchDispatch({ repo, run, phase, specFile, title, pin, entry }) {
   if (started.state !== "ready") {
     const line = `FAILED ${lastFailure(dispatchId, started)}`;
     if (handle) orca(["terminal", "close", "--terminal", handle, "--json"]);
+    remember(run, "reported", dispatchId);
     return { code: 5, line, dispatchId, handle, created };
   }
   const ack = waitForAck(run, handle, Date.now());
   if (ack == null) {
-    if (dispatchId) orca(["orchestration", "worker-stop", "--dispatch", dispatchId, "--json"]);
+    if (dispatchId) stopDispatch(dispatchId, run);
     if (handle) orca(["terminal", "close", "--terminal", handle, "--json"]);
     return {
       code: 4,

@@ -1248,6 +1248,118 @@ function runFake(ctx, argv) {
   });
 }
 
+function gitRunMemory(ctx, run) {
+  const file = path.join(ctx.repo, ".git", "dely", "runs", run + ".json");
+  if (!fs.existsSync(file)) return null;
+  return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function memoryHolds(memory, id) {
+  if (!memory) return false;
+  return (memory.stopped || []).indexOf(id) >= 0 || (memory.reported || []).indexOf(id) >= 0;
+}
+
+function keepWorkerStateReady(ctx, workers) {
+  const scenario = JSON.parse(fs.readFileSync(ctx.scenarioPath, "utf8"));
+  scenario.workers = workers;
+  write(ctx.scenarioPath, JSON.stringify(scenario, null, 2));
+  if (!fs.existsSync(ctx.statePath)) return;
+  const state = JSON.parse(fs.readFileSync(ctx.statePath, "utf8"));
+  state.stopped = {};
+  fs.writeFileSync(ctx.statePath, JSON.stringify(state));
+}
+
+test("NO_ACK enters the run memory so a later collect does not name it FAILED", () => {
+  const ctx = setup(DEFAULT_AGENTS, (repo) => ({
+    runs: [passRun("run_v", defaultKey(repo, "cursor", "background"))],
+    workerStart: { dispatchId: "disp_na", state: "ready", handle: "term_w" },
+    deliveries: [],
+    screenTail: ["still starting"],
+  }));
+  const dispatched = runDely(
+    [
+      "dispatch",
+      "--repo",
+      ctx.repo,
+      "--run",
+      "run_live",
+      "--phase",
+      "implement",
+      "--spec-file",
+      "task.md",
+      "--control",
+      "cursor",
+    ],
+    ctx,
+    { DELY_ACK_S: "0.15" }
+  );
+  assert.equal(dispatched.status, 4, dispatched.stdout + dispatched.stderr);
+  assert.match(dispatched.stdout, /^NO_ACK disp_na /);
+  keepWorkerStateReady(ctx, [
+    {
+      dispatchId: "disp_na",
+      dispatchStatus: "failed",
+      agentTerminalHandle: "term_w",
+      workerState: "ready",
+      lastError: "no ack",
+      projection: { liveness: { verdict: "exited" } },
+    },
+  ]);
+  const listed = JSON.parse(runFake(ctx, ["orchestration", "worker-list", "--run", "run_live", "--json"]).stdout);
+  const row = listed.result.workers.find((w) => w.dispatchId === "disp_na");
+  assert.equal(row.workerState, "ready");
+  assert.equal(row.dispatchStatus, "failed");
+  const memory = gitRunMemory(ctx, "run_live");
+  const collected = runDely(["collect", "--run", "run_live"], ctx);
+  assert.ok(memoryHolds(memory, "disp_na"), "memory=" + JSON.stringify(memory) + " collect=" + collected.status + " " + collected.stdout);
+  assert.doesNotMatch(collected.stdout, /FAILED /);
+  assert.notEqual(collected.status, 8, collected.stdout + collected.stderr);
+});
+
+test("a launch that never reached ready enters the run memory so a later collect does not name it FAILED", () => {
+  const ctx = setup(DEFAULT_AGENTS, (repo) => ({
+    runs: [passRun("run_v", defaultKey(repo, "cursor", "background"))],
+    workerStart: { dispatchId: "disp_fl", state: "failed", handle: "term_w", reason: "agent_readiness: timeout" },
+  }));
+  const dispatched = runDely(
+    [
+      "dispatch",
+      "--repo",
+      ctx.repo,
+      "--run",
+      "run_live",
+      "--phase",
+      "implement",
+      "--spec-file",
+      "task.md",
+      "--control",
+      "cursor",
+    ],
+    ctx
+  );
+  assert.equal(dispatched.status, 5, dispatched.stdout + dispatched.stderr);
+  assert.match(dispatched.stdout, /^FAILED /);
+  keepWorkerStateReady(ctx, [
+    {
+      dispatchId: "disp_fl",
+      dispatchStatus: "failed",
+      agentTerminalHandle: "term_w",
+      workerState: "ready",
+      lastError: "agent_readiness",
+      projection: { liveness: { verdict: "exited" } },
+    },
+  ]);
+  const listed = JSON.parse(runFake(ctx, ["orchestration", "worker-list", "--run", "run_live", "--json"]).stdout);
+  const row = listed.result.workers.find((w) => w.dispatchId === "disp_fl");
+  assert.equal(row.workerState, "ready");
+  assert.equal(row.dispatchStatus, "failed");
+  const memory = gitRunMemory(ctx, "run_live");
+  const collected = runDely(["collect", "--run", "run_live"], ctx);
+  assert.ok(memoryHolds(memory, "disp_fl"), "memory=" + JSON.stringify(memory) + " collect=" + collected.status + " " + collected.stdout);
+  assert.doesNotMatch(collected.stdout, /FAILED /);
+  assert.notEqual(collected.status, 8, collected.stdout + collected.stderr);
+});
+
 function adoptedFailedWorker(extra) {
   return Object.assign(
     {
