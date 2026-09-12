@@ -399,8 +399,11 @@ sidecar alternative is recorded as superseded.
   - **N2:** an error thrown after a launch stops and releases every launched
     dispatch, closes any sidecar, removes `.dely-verify/` and records a FAIL
     verdict before restoring the Run.
-- Added from task 3's review (out of scope there): an adopted launch whose
-  `worker-start` returns a state other than `ready` closes the terminal it created.
+- Added from task 3's review (out of scope there): a launch whose `worker-start`
+  returns a state other than `ready` closes the terminal it created. Measured again on
+  2026-09-12 on the `--agent` path, not only on adopt: a shell update prompt ate the
+  first keystroke of the launch command, the dispatch failed with
+  `agent_readiness: timeout`, and Orca listed the created terminal as residual.
 
   The re-review returned the disposition word `APPROVED`, which is outside the
   protocol's set. The human ruled it `ACCEPT`.
@@ -448,7 +451,7 @@ reuse the existing cleanup and verdict paths.
 | Nudge-mode collect opens no terminal (task 3c) | `node --test` case: one dispatch still open; assert `WAITING`, and no `terminal create` or `terminal list` call | The `44ffe96` collect, which opens or reuses a sidecar on every `WAITING` | `rereview-3` |
 | The runtime has no sidecar command (task 3c) | `node --test` case: `dely sidecar --run r --control-handle h` prints the usage line and exits 2 | A runtime that keeps the command while the skill stops naming it | |
 | Verify sleeps and collects without a sidecar (task 3c) | `node --test` cases: `verify start` prints `SLEEP` and records no `terminal create`; `verify collect` with one dispatch open prints `WAITING` and records none either | The `44ffe96` verify, which starts a sidecar and restarts a missing one | |
-| An adopt `worker-start` that is not `ready` closes its terminal (task 4) | `node --test` case: adopt, `worker-start` returns `failed`; assert `terminal close` for the created handle | The `d6635b3` adopt path, which closes only on readiness timeout and `NO_ACK` | `review-3` |
+| A `worker-start` that is not `ready` closes the terminal it created (task 4) | `node --test` cases on both paths: adopt, and `--agent`, each returning `failed`; assert `terminal close` for the created handle | The `d6635b3` paths, which close only on readiness timeout and `NO_ACK` | `review-3`, and a live `agent_readiness: timeout` on 2026-09-12 |
 | After a failed launch, verify start launches no further pin (task 4, N1) | `node --test` case: first pin gets no ACK; assert exactly one `worker-start` | A start that launches every pin before checking for a failed launch | |
 | A throw after a launch cleans up and records FAIL before restoring (task 4, N2) | `node --test` case: `state.json` write fails after one launch; assert `worker-stop` for that dispatch, a FAIL verdict, and `run-use --id <prev>` last | A catch that only restores the Run | |
 | Live verify proves both Control wake modes on this repository | Live `dely verify run` (Claude Code Control) and `dely verify start` / `collect` (Codex Control); report quoted with RESULT and wake count | None executable offline; a human reads the quoted live reports | n/a |
