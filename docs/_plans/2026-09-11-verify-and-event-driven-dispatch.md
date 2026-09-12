@@ -586,6 +586,24 @@ reuse the existing cleanup and verdict paths.
 
 **Document impact.** README, CONTRIBUTING, AGENTS and CI own the paths they change.
 
+**Remediation, after task 4's review.** The four rows hold and every gate is green. One
+Important finding stands, and it is the most serious of the delivery:
+
+- `withPrevRestore`'s catch calls `finishVerify(ctx)` and returns, so the thrown message
+  is never printed. Worse, `finishVerify` recomputes the verdict from the group statuses,
+  so when every group already carries `PASS` — the normal state of `dely verify collect`
+  after the last `worker_done` — a throw writes a **PASS** verdict and exits 0 where the
+  baseline printed `ERROR` and exited 1. `dely dispatch` refuses unless Orca holds a PASS
+  verdict for the key, so a verify that dies mid-run can mint the verdict that unlocks
+  dispatch. N2 asks for a FAIL; on this branch it records the opposite.
+- The fix is at the one place the catch already owns: carry the error into the ctx so a
+  throw always prints its message and always lands FAIL, whatever the group statuses say.
+- Minor, same pass: a pin N1 never launched prints `FAIL` with no reason; the `NO_ACK`
+  close still guards on `created` while the not-ready close no longer does; and
+  `const prev = (ctx && ctx.prev) || restoreOnExit;` is dead in the ctx branch.
+
+Remediation files: `skills/delivery/scripts/dely.js`, `tests/scripts.test.js`.
+
 ## Acceptance
 
 | Requirement | Instrument | Counterexample | Observed red |
@@ -629,6 +647,7 @@ reuse the existing cleanup and verdict paths.
 | A `worker-start` that is not `ready` closes the terminal it created (task 4) | `node --test` cases on both paths: adopt, and `--agent`, each returning `failed`; assert `terminal close` for the created handle | The `d6635b3` paths, which close only on readiness timeout and `NO_ACK` | `review-3`, and a live `agent_readiness: timeout` on 2026-09-12 |
 | After a failed launch, verify start launches no further pin (task 4, N1) | `node --test` case: first pin gets no ACK; assert exactly one `worker-start` | A start that launches every pin before checking for a failed launch | |
 | A throw after a launch cleans up and records FAIL before restoring (task 4, N2) | `node --test` case: `state.json` write fails after one launch; assert `worker-stop` for that dispatch, a FAIL verdict, and `run-use --id <prev>` last | A catch that only restores the Run | |
+| A throw always reports its error and never records PASS (task 4 remediation) | `node --test` case: a throw injected after every group reached `PASS`; assert the thrown message appears, a `FAIL` verdict is recorded, and the exit is non-zero | The `486a14b` catch, which calls `finishVerify` and lets the recomputed `PASS` stand | `review-4` |
 | Live verify proves both Control wake modes on this repository | Live `dely verify run` (Claude Code Control) and `dely verify start` / `collect` (Codex Control); report quoted with RESULT and wake count | None executable offline; a human reads the quoted live reports | n/a |
 
 **Cannot be observed:**
@@ -646,6 +665,11 @@ reuse the existing cleanup and verdict paths.
   `DELY_VERIFY_DEADLINE_S`, so a dead verify pin ends at `DEADLINE` rather than never.
 - The window between claiming a dispatch id and printing its `FAILED` line. A crash
   there loses that report permanently; only a human notices.
+- `AGENTS.md`'s gate list is not pinned to the workflow. `tests/contracts.sh` pins the
+  workflow's run lines against its own literal list, so deleting a gate block from
+  `AGENTS.md` alone leaves the gate green.
+- The report-once guard is held twice, by the memory read and by `remember()`'s return.
+  Removing either alone keeps every test green.
 - A worker that neither sends a message nor exits leaves a nudge-mode Control asleep.
   Nothing offline can observe that, and after task 3c a human ends that wait. Measured
   in this delivery: 0 of 17 dispatches.
