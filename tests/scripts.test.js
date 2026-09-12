@@ -287,6 +287,7 @@ test("NO_ACK stops the dispatch and never retries into the same terminal", () =>
   assert.match(r.stdout, /^NO_ACK disp_1 /);
   const log = readLog(ctx.logPath);
   assert.ok(log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-stop" && hasFlagPair(argv, "--dispatch", "disp_1")));
+  assert.ok(log.some((argv) => argv[0] === "terminal" && argv[1] === "close" && hasFlagPair(argv, "--terminal", "term_w")));
   assert.ok(
     !log.some(
       (argv) =>
@@ -1655,6 +1656,44 @@ function verdictFromLog(log) {
   }
 }
 
+function writeThrowInject(repo) {
+  const file = path.join(repo, "inject-throw.cjs");
+  const needle = [
+    '    if (waitRes.type === "error") finish(9, `ERROR ${waitRes.reason}`);',
+    "  }",
+    "  finishVerify(ctx);",
+  ].join("\n");
+  const inserted = [
+    '    if (waitRes.type === "error") finish(9, `ERROR ${waitRes.reason}`);',
+    "  }",
+    '  throw new Error("injected internal error");',
+    "  finishVerify(ctx);",
+  ].join("\n");
+  fs.writeFileSync(
+    file,
+    [
+      '"use strict";',
+      'const fs = require("fs");',
+      'const Module = require("module");',
+      'const orig = Module._extensions[".js"];',
+      "const target = " + JSON.stringify(DELY_JS) + ";",
+      "const needle = " + JSON.stringify(needle) + ";",
+      "const inserted = " + JSON.stringify(inserted) + ";",
+      'Module._extensions[".js"] = function (module, filename) {',
+      "  if (filename === target) {",
+      '    const src = fs.readFileSync(filename, "utf8");',
+      '    if (!src.includes(needle)) throw new Error("inject needle missing in dely.js");',
+      "    module._compile(src.replace(needle, inserted), filename);",
+      "    return;",
+      "  }",
+      "  return orig.call(this, module, filename);",
+      "};",
+      "",
+    ].join("\n")
+  );
+  return file;
+}
+
 function defaultVerifyScenario(repo, extra) {
   extra = extra || {};
   return Object.assign(
@@ -2065,6 +2104,7 @@ test("after a failed launch, verify start launches no further pin", () => {
   });
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.match(r.stdout, /NO_ACK/);
+  assert.match(r.stdout, /PHASE review Codex CLI gpt-5.6-sol high FAIL ack=- done=- not launched/);
   const starts = readLog(ctx.logPath).filter((argv) => argv[0] === "orchestration" && argv[1] === "worker-start");
   assert.equal(starts.length, 1, `expected one worker-start, got ${starts.length}`);
 });
@@ -2100,4 +2140,18 @@ test("a throw after a launch cleans up and records FAIL before restoring", () =>
   assert.ok(last);
   assert.equal(last[1], "run-use");
   assert.ok(hasFlagPair(last, "--id", "run_delivery"));
+});
+
+test("a throw after every group reached PASS reports the error and records FAIL", () => {
+  const ctx = setupVerify(DEFAULT_AGENTS, (repo) => defaultVerifyScenario(repo));
+  const preload = writeThrowInject(ctx.repo);
+  const r = runDely(["verify", "run", "--repo", ctx.repo, "--control", "cursor"], ctx, {
+    NODE_OPTIONS: "--require " + preload,
+  });
+  assert.notEqual(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /injected internal error/);
+  assert.match(r.stdout, /RESULT FAIL/);
+  const verdict = verdictFromLog(readLog(ctx.logPath));
+  assert.ok(verdict);
+  assert.equal(verdict.verdict, "FAIL");
 });

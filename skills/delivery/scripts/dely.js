@@ -89,13 +89,15 @@ function withPrevRestore(fn) {
     fn();
   } catch (err) {
     const ctx = verifyOnError;
-    const prev = (ctx && ctx.prev) || restoreOnExit;
     verifyOnError = null;
-    restoreOnExit = null;
     if (ctx) {
+      restoreOnExit = null;
+      ctx.err = err;
       finishVerify(ctx);
       return;
     }
+    const prev = restoreOnExit;
+    restoreOnExit = null;
     restorePrev(prev);
     finish(1, `ERROR ${err && err.message ? err.message : err}`);
   } finally {
@@ -862,7 +864,7 @@ function launchDispatch({ repo, run, phase, specFile, title, pin, entry }) {
   const ack = waitForAck(run, handle, Date.now());
   if (ack == null) {
     if (dispatchId) orca(["orchestration", "worker-stop", "--dispatch", dispatchId, "--json"]);
-    if (created && handle) orca(["terminal", "close", "--terminal", handle, "--json"]);
+    if (handle) orca(["terminal", "close", "--terminal", handle, "--json"]);
     return {
       code: 4,
       line: `NO_ACK ${dispatchId || "-"} ${classify(handle)}`,
@@ -1321,8 +1323,13 @@ function finishVerify(ctx) {
     const g = groupForPhase(ctx.groups, phase);
     return g && g.status === "PASS";
   });
-  const pass = allPass && !gitChanged;
+  const errMsg = ctx.err && (ctx.err.message || String(ctx.err));
+  const pass = allPass && !gitChanged && !ctx.err;
   if (ctx.verifyRun) writeVerdict(ctx.verifyRun, ctx.key, pass);
+  for (const g of ctx.groups) {
+    if (!g.status && !g.dispatchId && !g.reason) g.reason = "not launched";
+    else if (errMsg && !g.reason) g.reason = errMsg;
+  }
   for (const phase of ["implement", "review"]) {
     const pin = ctx.pins[phase];
     if (!pin) continue;
@@ -1331,6 +1338,7 @@ function finishVerify(ctx) {
   process.stdout.write((gitChanged ? "git status CHANGED" : "git status unchanged") + "\n");
   restorePrev(ctx.prev);
   restoreOnExit = null;
+  if (errMsg) process.stdout.write(`ERROR ${errMsg}\n`);
   process.stdout.write((pass ? "RESULT PASS" : "RESULT FAIL") + "\n");
   process.exit(pass ? 0 : 1);
 }
