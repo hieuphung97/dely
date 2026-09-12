@@ -500,16 +500,22 @@ Remediation files: `skills/delivery/scripts/dely.js`, `tests/scripts.test.js`,
 **Second remediation, by human decision on 2026-09-12.** The scoped re-review confirmed
 every earlier finding fixed, with discriminating counterexamples, and found one new
 Important: the dead-dispatch memory is anchored to `git rev-parse --git-dir` in the
-process's working directory. Outside a git repository, or where that directory cannot be
-written, `runMemoryPath` returns empty, the write is a silent no-op, and the infinite
-`FAILED` loop returns in full — probed three times, exit 8 each. `dely collect` and
+process's working directory. Outside a git repository `runMemoryPath` returns empty, the
+write is a silent no-op, and the infinite `FAILED` loop returns in full — probed three
+times, exit 8 each.
+
+Corrected on 2026-09-12 after the scoped re-review: an unwritable git directory is a
+different mechanism and is **not** covered by this fallback. There `gitDir()` resolves,
+`runMemoryPath` returns the git path, and the write fails instead of being skipped. It is
+recorded below as deferred. `dely collect` and
 `dely wait` take no `--repo`, and `skills/delivery/SKILL.md` never says where Control runs
 them from.
 
 The scope is capped to one change and its test:
 
-- when `gitDir()` is empty, fall back to `~/.dely/runs`. `AGENTS.md` already treats
-  `~/.dely` as this machine's local, untracked state.
+- when `gitDir()` is empty — the working directory is not a git repository — fall back to
+  `~/.dely/runs`. `AGENTS.md` already treats `~/.dely` as this machine's local, untracked
+  state.
 - Nothing else. No `--repo` flag, no new command, no refactor.
 
 Recorded as deferred, not fixed in this delivery:
@@ -526,6 +532,15 @@ Recorded as deferred, not fixed in this delivery:
   nothing open exits 0.
 - `dely wait` on a Run with nothing open spins until killed. Unchanged from before this
   task.
+- A git directory that resolves but cannot be written. `gitDir()` is non-empty, so the
+  fallback does not apply: the lock cannot be taken, `mutateRunMemory` returns in-process
+  data, nothing is written, and every later `collect` reports the same dead dispatch
+  again. Measured on the candidate, three collects, exit 8 each — identical to the
+  behaviour before the fallback.
+- A `.git` that is readable but not writable. `fs.mkdirSync` runs before any `try`, so the
+  process dies with an uncaught `EACCES` at exit 1 and reports nothing at all. Pre-existing
+  and the same root as the case above; one change would close both, and that change is
+  outside the human's cap for this pass.
 
 Adopted as the contract, not a regression: a `failed` dispatch that sent no settling
 message is reported once whatever its `terminalState` says, including `released`. The
@@ -601,7 +616,7 @@ reuse the existing cleanup and verdict paths.
 | A failed dispatch with no message is reported (task 3c remediation) | `node --test` cases for `collect` and `wait`: one worker with `dispatchStatus` `failed` and `liveness.verdict` `exited`, no deliveries; assert a `FAILED <id> <reason>` line and a non-zero exit | The `36a5187` runtime, where collect exits 0 printing nothing and wait waits out the deadline | `review-3c` |
 | A dead dispatch is released and reported once (task 3d) | `node --test` case: two collects on the same dead dispatch; assert `worker-release` before the `FAILED` line, and no `FAILED` from the second | The `53484ef` runtime, which re-reports forever and logs no release | `rereview-3c` P2a/P2b |
 | A dead dispatch is reported once whatever Orca reports afterwards (task 3d remediation) | `node --test` cases over the measured shapes: an adopted row that stays `retained`, and one whose `worker-release` is refused; assert one `FAILED` line from the first `collect`, none from the second, and one line from `wait` across polls | The `b2a7916` filter on `terminalState === "released"`, which never clears for an adopted dispatch | `review-3d` Important 1 |
-| The dead-dispatch memory works outside a git repository (task 3d, second remediation) | `node --test` case: three `collect` processes with a working directory that is not a git repository, and one with an unwritable git directory; assert one `FAILED` line and then silence | The `0717e84` runtime, where `runMemoryPath` returns empty and every collect exits 8 with the same line | `rereview-3d` Important A |
+| The dead-dispatch memory works outside a git repository (task 3d, second remediation) | `node --test` case: three `collect` processes with a working directory that is not a git repository; assert one `FAILED` line and then silence | The `0717e84` runtime, where `runMemoryPath` returns empty and every collect exits 8 with the same line | `rereview-3d` Important A |
 | A dispatch Dely stopped is never reported as dead, and never waited on (task 3d remediation) | `node --test` cases over the measured shapes: agent stop (`failed`/`stopped`) and adopt stop (`dispatched`/`stop_unknown`); assert no `FAILED` line and no endless `WAITING` | The `b2a7916` guard on `dispatchStatus`, plus the fake's `stopped` value that real Orca does not use | `review-3d` Important 2, Control measurement 2026-09-12 |
 | The fake models the measured lifecycle (task 3d remediation) | `node --test` fixture review: `worker-stop` and `worker-release` behave as the two measured rows in the plan, including a refused release | A fake that releases every dispatch unconditionally and invents a `stopped` dispatch status | `review-3d` |
 | A dead dispatch never masks a live one (task 3d) | `node --test` cases: one dead and one open dispatch; assert collect prints the `FAILED` line and `WAITING`, and that `wait` goes on to settle the live dispatch | The `53484ef` runtime, where collect never returns `WAITING` and wait exits at once | `rereview-3c` P3/P11 |
