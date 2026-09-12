@@ -497,6 +497,40 @@ says so; and `SKILL.md`'s "exit 8 only when FAILED is the whole outcome" should 
 Remediation files: `skills/delivery/scripts/dely.js`, `tests/scripts.test.js`,
 `tests/fixtures/fake-orca.js`, `skills/delivery/SKILL.md`, `tests/contracts.sh`.
 
+**Second remediation, by human decision on 2026-09-12.** The scoped re-review confirmed
+every earlier finding fixed, with discriminating counterexamples, and found one new
+Important: the dead-dispatch memory is anchored to `git rev-parse --git-dir` in the
+process's working directory. Outside a git repository, or where that directory cannot be
+written, `runMemoryPath` returns empty, the write is a silent no-op, and the infinite
+`FAILED` loop returns in full — probed three times, exit 8 each. `dely collect` and
+`dely wait` take no `--repo`, and `skills/delivery/SKILL.md` never says where Control runs
+them from.
+
+The scope is capped to one change and its test:
+
+- when `gitDir()` is empty, fall back to `~/.dely/runs`. `AGENTS.md` already treats
+  `~/.dely` as this machine's local, untracked state.
+- Nothing else. No `--repo` flag, no new command, no refactor.
+
+Recorded as deferred, not fixed in this delivery:
+
+- The id is claimed before the line is printed, so a crash in that window loses the
+  report. At-most-once is the deliberate trade; a lost report is bounded by the human
+  route the skill already states.
+- `releaseDispatch` parses the release receipt into two lines that do nothing. The system
+  requirement is met by not depending on the receipt at all.
+- The fake puts `stage`, `ownershipState` and `retainedReason` at the top level, where
+  real Orca puts them under `projection` and `resource`. The runtime reads both shapes;
+  only the fake's shape is covered by a test.
+- `SKILL.md`'s "exit 8 when nothing is still open" over-claims: a fully settled batch with
+  nothing open exits 0.
+- `dely wait` on a Run with nothing open spins until killed. Unchanged from before this
+  task.
+
+Adopted as the contract, not a regression: a `failed` dispatch that sent no settling
+message is reported once whatever its `terminalState` says, including `released`. The
+memory, not Orca's terminal bookkeeping, is what makes it once.
+
 ### 4. The package, its gates and its record ship the change
 
 **Behaviour.**
@@ -567,6 +601,7 @@ reuse the existing cleanup and verdict paths.
 | A failed dispatch with no message is reported (task 3c remediation) | `node --test` cases for `collect` and `wait`: one worker with `dispatchStatus` `failed` and `liveness.verdict` `exited`, no deliveries; assert a `FAILED <id> <reason>` line and a non-zero exit | The `36a5187` runtime, where collect exits 0 printing nothing and wait waits out the deadline | `review-3c` |
 | A dead dispatch is released and reported once (task 3d) | `node --test` case: two collects on the same dead dispatch; assert `worker-release` before the `FAILED` line, and no `FAILED` from the second | The `53484ef` runtime, which re-reports forever and logs no release | `rereview-3c` P2a/P2b |
 | A dead dispatch is reported once whatever Orca reports afterwards (task 3d remediation) | `node --test` cases over the measured shapes: an adopted row that stays `retained`, and one whose `worker-release` is refused; assert one `FAILED` line from the first `collect`, none from the second, and one line from `wait` across polls | The `b2a7916` filter on `terminalState === "released"`, which never clears for an adopted dispatch | `review-3d` Important 1 |
+| The dead-dispatch memory works outside a git repository (task 3d, second remediation) | `node --test` case: three `collect` processes with a working directory that is not a git repository, and one with an unwritable git directory; assert one `FAILED` line and then silence | The `0717e84` runtime, where `runMemoryPath` returns empty and every collect exits 8 with the same line | `rereview-3d` Important A |
 | A dispatch Dely stopped is never reported as dead, and never waited on (task 3d remediation) | `node --test` cases over the measured shapes: agent stop (`failed`/`stopped`) and adopt stop (`dispatched`/`stop_unknown`); assert no `FAILED` line and no endless `WAITING` | The `b2a7916` guard on `dispatchStatus`, plus the fake's `stopped` value that real Orca does not use | `review-3d` Important 2, Control measurement 2026-09-12 |
 | The fake models the measured lifecycle (task 3d remediation) | `node --test` fixture review: `worker-stop` and `worker-release` behave as the two measured rows in the plan, including a refused release | A fake that releases every dispatch unconditionally and invents a `stopped` dispatch status | `review-3d` |
 | A dead dispatch never masks a live one (task 3d) | `node --test` cases: one dead and one open dispatch; assert collect prints the `FAILED` line and `WAITING`, and that `wait` goes on to settle the live dispatch | The `53484ef` runtime, where collect never returns `WAITING` and wait exits at once | `rereview-3c` P3/P11 |
@@ -594,6 +629,8 @@ reuse the existing cleanup and verdict paths.
   3d removes the dependency by ordering, rather than settling the question.
 - `dely verify collect` shares the dead-dispatch blind spot, bounded by
   `DELY_VERIFY_DEADLINE_S`, so a dead verify pin ends at `DEADLINE` rather than never.
+- The window between claiming a dispatch id and printing its `FAILED` line. A crash
+  there loses that report permanently; only a human notices.
 - A worker that neither sends a message nor exits leaves a nudge-mode Control asleep.
   Nothing offline can observe that, and after task 3c a human ends that wait. Measured
   in this delivery: 0 of 17 dispatches.
