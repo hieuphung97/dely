@@ -152,10 +152,11 @@ Measurements that shaped the decision, all on macOS, 2026-09-11:
      a whole: heartbeats only, it acknowledges and keeps waiting; any settling
      message, it acknowledges, prints the whole batch and exits `SETTLED`. It also
      exits `SILENT` (90 s without output after ACK) or `DEADLINE` (per dispatch,
-     default 3600 s).
+     default 3600 s). It reports a dead dispatch as `collect` does, after consuming.
    - `dely collect` is that consumer in nudge mode. It reports settled work from
-     `check --all` and `worker-list`, drains what remains, reads each open dispatch's
-     Orca liveness, and checks silence and the deadline.
+     `check --all` and `worker-list`, drains what remains, and checks silence and the
+     deadline. A dispatch Orca has marked dead — no longer open, and it sent no
+     settling message — is released and reported once as `FAILED`.
    - **Amended 2026-09-12.** A `dely sidecar` process was this record's watchdog for a
      nudge-mode Control. It is removed. Orca already reports a dead worker
      (`liveness.verdict` `exited`, `dispatchStatus` `failed`), a sidecar terminal

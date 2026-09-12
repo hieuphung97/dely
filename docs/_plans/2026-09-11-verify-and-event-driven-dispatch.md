@@ -408,6 +408,51 @@ Remediation files: `skills/delivery/scripts/dely.js`, `tests/scripts.test.js`,
 `tests/fixtures/fake-orca.js`, `skills/delivery/SKILL.md`, `skills/verify/SKILL.md`,
 `tests/contracts.sh`.
 
+### 3d. A dead dispatch is released, reported once, and forgotten
+
+**Why.** Task 3c's remediation made `collect` and `wait` report a dispatch Orca has
+marked dead. Its scoped re-review accepted that, and found the reporting has no
+lifecycle: nothing releases or remembers the dead dispatch, and its suspect filter is
+`dispatchStatus !== "dispatched"`, which no action can clear. Measured by the reviewer
+on a scratch copy of `53484ef`:
+
+- a second `collect` on the same Run reports the same dead dispatch again, with no
+  `worker-release` logged;
+- with one dead and one live dispatch, `collect` never returns `WAITING` and `wait`
+  exits at the top of its first loop, so the fresh dispatch the skill prescribes can
+  never be waited on. The recovery row the same commit added is unreachable;
+- a dispatch Control itself stopped on `SILENT` is reported as `FAILED` on the next
+  collect, because `worker-stop` leaves liveness `exited`;
+- the reason line can print a stale worker state, for example `ready`, as the cause.
+
+**Behaviour.**
+
+- `collect` and `wait` release a dead dispatch before reporting it, and never report
+  it twice. Orca's own `nextAction` for a failed dispatch is `worker-release`.
+  Measured live on 2026-09-12: after release, `worker-list` reports
+  `terminalState: released` while `dispatchStatus` stays `failed`, and an unreleased
+  one reads `reclaimable` or `retained`. The filter must rest on something release
+  actually changes.
+- A dead dispatch never masks a live one. Settles and `WAITING` are still reported,
+  and `wait` keeps waiting for a dispatch that is still open.
+- A dispatch Control stopped — the `SILENT` path — is never reported as `FAILED`.
+- `wait` runs the dead check after it consumes, as `collect` does, so the ordinary
+  completion path cannot depend on what `check --all` returns for a message that is
+  not yet consumed.
+- The reason never presents a stale worker state as the cause.
+- The ack-failure test added for Minor D fails as an assertion, not as an unbounded
+  hang.
+
+**Files.** `skills/delivery/scripts/dely.js`, `tests/scripts.test.js`,
+`tests/fixtures/fake-orca.js`, `skills/delivery/SKILL.md`, `tests/contracts.sh`.
+
+**Focused verification.** `node --test tests/scripts.test.js` with the rows below, and
+`bash tests/contracts.sh`.
+
+**Document impact.** Decision 5's `collect` and `wait` bullets are corrected in the
+same amendment that routes this task; `docs/decisions.md` said collect reads liveness
+for each open dispatch, and it reads it for one that is no longer open.
+
 ### 4. The package, its gates and its record ship the change
 
 **Behaviour.**
@@ -476,6 +521,11 @@ reuse the existing cleanup and verdict paths.
 | Collect reports `DEADLINE` from the dispatch's `dispatchedAt` (task 3 remediation) | `node --test` case: `dispatchedAt` older than the deadline, output fresh, a new collect process; assert exit 7 | A deadline measured from the start of the collect, wait or sidecar process | |
 | Nudge-mode collect opens no terminal (task 3c) | `node --test` case: one dispatch still open; assert `WAITING`, and no `terminal create` or `terminal list` call | The `44ffe96` collect, which opens or reuses a sidecar on every `WAITING` | `rereview-3` |
 | A failed dispatch with no message is reported (task 3c remediation) | `node --test` cases for `collect` and `wait`: one worker with `dispatchStatus` `failed` and `liveness.verdict` `exited`, no deliveries; assert a `FAILED <id> <reason>` line and a non-zero exit | The `36a5187` runtime, where collect exits 0 printing nothing and wait waits out the deadline | `review-3c` |
+| A dead dispatch is released and reported once (task 3d) | `node --test` case: two collects on the same dead dispatch; assert `worker-release` before the `FAILED` line, and no `FAILED` from the second | The `53484ef` runtime, which re-reports forever and logs no release | `rereview-3c` P2a/P2b |
+| A dead dispatch never masks a live one (task 3d) | `node --test` cases: one dead and one open dispatch; assert collect prints the `FAILED` line and `WAITING`, and that `wait` goes on to settle the live dispatch | The `53484ef` runtime, where collect never returns `WAITING` and wait exits at once | `rereview-3c` P3/P11 |
+| A Control-stopped silent dispatch is never reported `FAILED` (task 3d) | `node --test` case: the pinned silence scenario, with liveness `exited` after the stop as `worker-stop` leaves it; assert the next collect does not report it | The `53484ef` runtime, which prints `FAILED disp_1 ready` | `rereview-3c` P9a/P9b |
+| `wait` checks for a dead dispatch only after consuming (task 3d) | `node --test` case: a `worker_done` queued and liveness `exited`; assert `SETTLED`, with the dead check ordered after the consume | The `53484ef` order, whose happy path rests on `check --all` returning an unconsumed message | `rereview-3c` N3 |
+| The reason never presents a stale worker state as the cause (task 3d) | `node --test` case: a failed dispatch whose `worker-show` still says `ready`; assert the line does not name `ready` as the cause | The `53484ef` reason line, which prints whatever `worker.state` holds | `rereview-3c` P8 |
 | The statement of the lost behaviour is pinned in both skills (task 3c remediation) | `bash tests/contracts.sh` after deleting the sentence from each skill in turn | The `36a5187` pins, which stay green when it is deleted from both | `review-3c` |
 | The runtime has no sidecar command (task 3c) | `node --test` case: `dely sidecar --run r --control-handle h` prints the usage line and exits 2 | A runtime that keeps the command while the skill stops naming it | |
 | Verify sleeps and collects without a sidecar (task 3c) | `node --test` cases: `verify start` prints `SLEEP` and records no `terminal create`; `verify collect` with one dispatch open prints `WAITING` and records none either | The `44ffe96` verify, which starts a sidecar and restarts a missing one | |
@@ -493,6 +543,10 @@ reuse the existing cleanup and verdict paths.
 - Orca nudge reliability across Orca versions.
 - Quota exhaustion in a live run.
 - Grok and Kiro verify outcomes.
+- Whether real Orca's `check --all` returns a message that is not yet consumed. Task
+  3d removes the dependency by ordering, rather than settling the question.
+- `dely verify collect` shares the dead-dispatch blind spot, bounded by
+  `DELY_VERIFY_DEADLINE_S`, so a dead verify pin ends at `DEADLINE` rather than never.
 - A worker that neither sends a message nor exits leaves a nudge-mode Control asleep.
   Nothing offline can observe that, and after task 3c a human ends that wait. Measured
   in this delivery: 0 of 17 dispatches.
