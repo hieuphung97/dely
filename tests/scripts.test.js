@@ -94,6 +94,7 @@ function runDely(args, ctx, extraEnv) {
   return spawnSync(process.execPath, [DELY_JS, ...args], {
     encoding: "utf8",
     env,
+    cwd: ctx.repo,
     timeout,
   });
 }
@@ -114,6 +115,7 @@ function setup(agents, scenarioFn) {
   };
   const scenario = typeof scenarioFn === "function" ? scenarioFn(repo) : scenarioFn;
   write(ctx.scenarioPath, JSON.stringify(scenario, null, 2));
+  gitInit(repo);
   return ctx;
 }
 
@@ -1232,6 +1234,295 @@ test("FAILED reason does not name a stale ready worker state as the cause", () =
   assert.doesNotMatch(r.stdout, /\bready\b/);
 });
 
+function runFake(ctx, argv) {
+  return spawnSync(process.execPath, [FAKE, ...argv], {
+    encoding: "utf8",
+    env: Object.assign({}, process.env, {
+      FAKE_ORCA_SCENARIO: ctx.scenarioPath,
+      FAKE_ORCA_STATE: ctx.statePath,
+      FAKE_ORCA_LOG: ctx.logPath,
+    }),
+  });
+}
+
+function adoptedFailedWorker(extra) {
+  return Object.assign(
+    {
+      dispatchId: "disp_adopted",
+      dispatchStatus: "failed",
+      agentTerminalHandle: "term_a",
+      workerState: "exited",
+      lastError: "boom",
+      terminalState: "retained",
+      retainedReason: "external_terminal",
+      ownershipState: "external",
+      projection: { liveness: { verdict: "exited" } },
+    },
+    extra || {}
+  );
+}
+
+test("collect reports a retained adopted dispatch once even when worker-release is refused", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [],
+    workers: [adoptedFailedWorker()],
+  });
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 8, r.stdout + r.stderr);
+  assert.equal((r.stdout.match(/^FAILED disp_adopted /gm) || []).length, 1, r.stdout);
+  const again = runDely(["collect", "--run", "run_live"], ctx);
+  assert.notEqual(again.status, 8, again.stdout + again.stderr);
+  assert.doesNotMatch(again.stdout, /FAILED /);
+});
+
+test("collect reports once when worker-release returns retained without releasing", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "failed",
+        agentTerminalHandle: "term_w",
+        workerState: "exited",
+        lastError: "boom",
+        terminalState: "reclaimable",
+        releaseReceipt: "retained",
+        projection: { liveness: { verdict: "exited" } },
+      },
+    ],
+  });
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 8, r.stdout + r.stderr);
+  assert.equal((r.stdout.match(/^FAILED disp_1 /gm) || []).length, 1, r.stdout);
+  const again = runDely(["collect", "--run", "run_live"], ctx);
+  assert.notEqual(again.status, 8, again.stdout + again.stderr);
+  assert.doesNotMatch(again.stdout, /FAILED /);
+});
+
+test("wait prints one FAILED line across polls for a retained adopted dispatch", { timeout: 5000 }, () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      { deliveryId: "dv1", messages: [{ type: "heartbeat", from_handle: "term_open", dispatchId: "disp_open" }] },
+      { deliveryId: "dv2", messages: [{ type: "heartbeat", from_handle: "term_open", dispatchId: "disp_open" }] },
+      { deliveryId: "dv3", messages: [{ type: "heartbeat", from_handle: "term_open", dispatchId: "disp_open" }] },
+      {
+        deliveryId: "dv4",
+        messages: [{ type: "worker_done", from_handle: "term_open", dispatchId: "disp_open", body: "ok" }],
+      },
+    ],
+    workers: [
+      adoptedFailedWorker(),
+      {
+        dispatchId: "disp_open",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_open",
+        lastHeartbeatAt: "2026-09-11T09:00:00Z",
+        projection: { liveness: { verdict: "live" } },
+      },
+    ],
+    lastOutputAt: "now",
+  });
+  const r = runDely(["wait", "--run", "run_live"], ctx, {
+    DELY_DEADLINE_S: "30",
+    DELY_SILENCE_S: "60",
+    SPAWN_TIMEOUT_MS: 3000,
+  });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal((r.stdout.match(/^FAILED disp_adopted /gm) || []).length, 1, r.stdout);
+  assert.match(r.stdout, /SETTLED /);
+});
+
+test("collect does not report FAILED or WAITING for a Dely-stopped agent dispatch", () => {
+  const ctx = setup(
+    DEFAULT_AGENTS,
+    waitingCollectScenario({
+      lastOutputAt: "stale",
+      staleMs: 200000,
+    })
+  );
+  const silent = runDely(["collect", "--run", "run_live"], ctx, {
+    DELY_SILENCE_S: "0.15",
+    DELY_DEADLINE_S: "30",
+  });
+  assert.equal(silent.status, 6, silent.stdout + silent.stderr);
+  const listed = JSON.parse(runFake(ctx, ["orchestration", "worker-list", "--run", "run_live", "--json"]).stdout);
+  const row = listed.result.workers.find((w) => w.dispatchId === "disp_1");
+  assert.equal(row.dispatchStatus, "failed");
+  assert.equal(row.workerState, "stopped");
+  assert.equal(row.stage && row.stage.detail, "process_stopped");
+  const again = runDely(["collect", "--run", "run_live"], ctx, {
+    DELY_SILENCE_S: "0.15",
+    DELY_DEADLINE_S: "30",
+  });
+  assert.doesNotMatch(again.stdout, /FAILED /);
+  assert.doesNotMatch(again.stdout, /WAITING disp_1/);
+  assert.notEqual(again.status, 8, again.stdout + again.stderr);
+  assert.notEqual(again.status, 2, again.stdout + again.stderr);
+});
+
+test("collect does not WAITING for a Dely-stopped adopted dispatch", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [],
+    workers: [
+      {
+        dispatchId: "disp_adopt",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_a",
+        lastHeartbeatAt: "2026-09-11T09:00:00Z",
+        terminalState: "retained",
+        retainedReason: "external_terminal",
+        ownershipState: "external",
+        projection: { liveness: { verdict: "live" } },
+      },
+    ],
+    lastOutputAt: "stale",
+    staleMs: 200000,
+  });
+  const silent = runDely(["collect", "--run", "run_live"], ctx, {
+    DELY_SILENCE_S: "0.15",
+    DELY_DEADLINE_S: "30",
+  });
+  assert.equal(silent.status, 6, silent.stdout + silent.stderr);
+  const listed = JSON.parse(runFake(ctx, ["orchestration", "worker-list", "--run", "run_live", "--json"]).stdout);
+  const row = listed.result.workers.find((w) => w.dispatchId === "disp_adopt");
+  assert.equal(row.dispatchStatus, "dispatched");
+  assert.equal(row.workerState, "stop_unknown");
+  const again = runDely(["collect", "--run", "run_live"], ctx, {
+    DELY_SILENCE_S: "0.15",
+    DELY_DEADLINE_S: "30",
+  });
+  assert.notEqual(again.status, 6, again.stdout + again.stderr);
+  assert.doesNotMatch(again.stdout, /SILENT /);
+  assert.doesNotMatch(again.stdout, /FAILED /);
+  assert.doesNotMatch(again.stdout, /WAITING disp_adopt/);
+  assert.notEqual(again.status, 2, again.stdout + again.stderr);
+});
+
+test("fake worker-stop and worker-release match the measured agent and adopt rows", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    workers: [
+      { dispatchId: "disp_agent", dispatchStatus: "dispatched", agentTerminalHandle: "term_g" },
+      {
+        dispatchId: "disp_adopt",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_a",
+        terminalState: "retained",
+        retainedReason: "external_terminal",
+        ownershipState: "external",
+      },
+    ],
+  });
+  const stopAgent = JSON.parse(
+    runFake(ctx, ["orchestration", "worker-stop", "--dispatch", "disp_agent", "--json"]).stdout
+  );
+  assert.equal(stopAgent.ok, true);
+  assert.equal(stopAgent.result.state, "stopped");
+  const afterAgentStop = JSON.parse(
+    runFake(ctx, ["orchestration", "worker-list", "--run", "run_live", "--json"]).stdout
+  );
+  const agent = afterAgentStop.result.workers.find((w) => w.dispatchId === "disp_agent");
+  assert.equal(agent.dispatchStatus, "failed");
+  assert.equal(agent.workerState, "stopped");
+  assert.equal(agent.stage.detail, "process_stopped");
+  assert.equal(agent.terminalState, "retained");
+  const releaseAgent = JSON.parse(
+    runFake(ctx, ["orchestration", "worker-release", "--dispatch", "disp_agent", "--json"]).stdout
+  );
+  assert.equal(releaseAgent.ok, true);
+  assert.equal(releaseAgent.result.state, "released");
+  assert.equal(releaseAgent.result.processAction, "none");
+  const afterAgentRelease = JSON.parse(
+    runFake(ctx, ["orchestration", "worker-list", "--run", "run_live", "--json"]).stdout
+  );
+  const agentReleased = afterAgentRelease.result.workers.find((w) => w.dispatchId === "disp_agent");
+  assert.equal(agentReleased.dispatchStatus, "failed");
+  assert.equal(agentReleased.terminalState, "released");
+
+  const stopAdopt = JSON.parse(
+    runFake(ctx, ["orchestration", "worker-stop", "--dispatch", "disp_adopt", "--json"]).stdout
+  );
+  assert.equal(stopAdopt.ok, true);
+  assert.equal(stopAdopt.result.state, "stop_unknown");
+  const afterAdoptStop = JSON.parse(
+    runFake(ctx, ["orchestration", "worker-list", "--run", "run_live", "--json"]).stdout
+  );
+  const adopted = afterAdoptStop.result.workers.find((w) => w.dispatchId === "disp_adopt");
+  assert.equal(adopted.dispatchStatus, "dispatched");
+  assert.equal(adopted.workerState, "stop_unknown");
+  assert.equal(adopted.terminalState, "retained");
+  const releaseAdopt = JSON.parse(
+    runFake(ctx, ["orchestration", "worker-release", "--dispatch", "disp_adopt", "--json"]).stdout
+  );
+  assert.equal(releaseAdopt.ok, false);
+  const afterAdoptRelease = JSON.parse(
+    runFake(ctx, ["orchestration", "worker-list", "--run", "run_live", "--json"]).stdout
+  );
+  const adoptedAfter = afterAdoptRelease.result.workers.find((w) => w.dispatchId === "disp_adopt");
+  assert.equal(adoptedAfter.dispatchStatus, "dispatched");
+  assert.equal(adoptedAfter.terminalState, "retained");
+});
+
+test("wait reports a dead sibling when another dispatch settles in the same wait", { timeout: 5000 }, () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      {
+        deliveryId: "dv_done",
+        messages: [{ type: "worker_done", from_handle: "term_new", dispatchId: "disp_new", body: "done" }],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_dead",
+        dispatchStatus: "failed",
+        agentTerminalHandle: "term_dead",
+        workerState: "crashed",
+        lastError: "boom",
+        terminalState: "reclaimable",
+        projection: { liveness: { verdict: "exited" } },
+      },
+      {
+        dispatchId: "disp_new",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_new",
+        lastHeartbeatAt: "2026-09-11T09:00:00Z",
+        projection: { liveness: { verdict: "live" } },
+      },
+    ],
+    lastOutputAt: "now",
+  });
+  const r = runDely(["wait", "--run", "run_live"], ctx, {
+    DELY_DEADLINE_S: "30",
+    DELY_SILENCE_S: "60",
+    SPAWN_TIMEOUT_MS: 3000,
+  });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /FAILED disp_dead /);
+  assert.match(r.stdout, /SETTLED /);
+});
+
+test("FAILED reason falls back when no lastError and the worker state is not evidence", () => {
+  const ctx = setup(
+    DEFAULT_AGENTS,
+    deadDispatchScenario({
+      workers: [
+        {
+          dispatchId: "disp_f",
+          dispatchStatus: "failed",
+          agentTerminalHandle: "term_w",
+          workerState: "ready",
+          terminalState: "reclaimable",
+          projection: { liveness: { verdict: "live" } },
+        },
+      ],
+    })
+  );
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 8, r.stdout + r.stderr);
+  assert.match(r.stdout, /^FAILED disp_f /);
+  assert.doesNotMatch(r.stdout, /^FAILED disp_f liveness=/);
+  assert.match(r.stdout, /\bfailed\b|\bno evidence\b/);
+});
+
 test("nudge-mode collect opens no terminal when a dispatch is still open", () => {
   const ctx = setup(DEFAULT_AGENTS, waitingCollectScenario());
   const r = runDely(["collect", "--run", "run_live"], ctx);
@@ -1381,7 +1672,7 @@ function spawnDely(args, ctx, extraEnv) {
     DELY_DEADLINE_S: extraEnv.DELY_DEADLINE_S != null ? String(extraEnv.DELY_DEADLINE_S) : "30",
     DELY_VERIFY_DEADLINE_S: extraEnv.DELY_VERIFY_DEADLINE_S != null ? String(extraEnv.DELY_VERIFY_DEADLINE_S) : "30",
   });
-  return spawn(process.execPath, [DELY_JS, ...args], { encoding: "utf8", env });
+  return spawn(process.execPath, [DELY_JS, ...args], { encoding: "utf8", env, cwd: ctx.repo });
 }
 
 test("verdict is written only after every dispatch settled, with the full key", { timeout: 8000 }, () => {

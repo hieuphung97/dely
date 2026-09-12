@@ -201,6 +201,10 @@ function lastOutputAt(state) {
   return nowMs();
 }
 
+function isAdopted(w) {
+  return Boolean(w && (w.ownershipState === "external" || w.retainedReason === "external_terminal"));
+}
+
 function workers(state) {
   const base = (scenario.workers || []).map((w) => Object.assign({}, w));
   const extra = (state.dynamicWorkers || []).filter(
@@ -208,8 +212,18 @@ function workers(state) {
   );
   return base.concat(extra).map((w) => {
     const copy = Object.assign({}, w);
-    if (state.stopped[w.dispatchId]) {
-      copy.dispatchStatus = "stopped";
+    const stopKind = state.stopped[w.dispatchId];
+    if (stopKind === "adopt") {
+      copy.workerState = "stop_unknown";
+      copy.terminalState = "retained";
+      copy.projection = Object.assign({}, copy.projection, {
+        liveness: { verdict: "exited" },
+      });
+    } else if (stopKind) {
+      copy.dispatchStatus = "failed";
+      copy.workerState = "stopped";
+      copy.stage = { detail: "process_stopped" };
+      copy.terminalState = "retained";
       copy.projection = Object.assign({}, copy.projection, {
         liveness: { verdict: "exited" },
       });
@@ -316,9 +330,19 @@ if (group === "orchestration" && cmd === "task-update") {
 }
 
 if (group === "orchestration" && cmd === "worker-release") {
+  const current = workers(state).find((row) => row.dispatchId === flags.dispatch) || {};
+  const refuseIds = scenario.releaseRefuseIds || [];
+  if (isAdopted(current) || refuseIds.indexOf(flags.dispatch) >= 0) {
+    saveState(state);
+    reply({ ok: false, error: { message: "worker-release refused" } }, 1);
+  }
+  if (current.releaseReceipt === "retained" || scenario.releaseState === "retained") {
+    saveState(state);
+    ok({ dispatchId: flags.dispatch, state: "retained", processAction: "none" });
+  }
   state.released = (state.released || []).concat([flags.dispatch]);
   saveState(state);
-  ok({ dispatchId: flags.dispatch, state: "released" });
+  ok({ dispatchId: flags.dispatch, state: "released", processAction: "none" });
 }
 
 if (group === "orchestration" && cmd === "worker-start") {
@@ -346,12 +370,16 @@ if (group === "orchestration" && cmd === "worker-start") {
       1
     );
   }
+  const adopted = Boolean(flags.terminal);
   state.dynamicWorkers = (state.dynamicWorkers || []).concat([
     {
       dispatchId: ws.dispatchId,
       dispatchStatus: "dispatched",
       agentTerminalHandle: handle,
       lastHeartbeatAt: null,
+      terminalState: adopted ? "retained" : undefined,
+      retainedReason: adopted ? "external_terminal" : undefined,
+      ownershipState: adopted ? "external" : undefined,
     },
   ]);
   saveState(state);
@@ -406,15 +434,21 @@ if (group === "orchestration" && cmd === "worker-list") {
       agentTerminalHandle: w.agentTerminalHandle,
       lastHeartbeatAt: w.lastHeartbeatAt || null,
       terminalState: w.terminalState,
+      retainedReason: w.retainedReason,
+      ownershipState: w.ownershipState,
+      workerState: w.workerState,
+      stage: w.stage,
       projection: w.projection || { liveness: { verdict: scenario.liveness || "live" } },
     })),
   });
 }
 
 if (group === "orchestration" && cmd === "worker-stop") {
-  state.stopped[flags.dispatch] = true;
+  const current = workers(state).find((row) => row.dispatchId === flags.dispatch) || {};
+  const adopted = isAdopted(current);
+  state.stopped[flags.dispatch] = adopted ? "adopt" : "agent";
   saveState(state);
-  ok({ dispatchId: flags.dispatch, state: "stopped" });
+  ok({ dispatchId: flags.dispatch, state: adopted ? "stop_unknown" : "stopped" });
 }
 
 function peekMessages(st) {

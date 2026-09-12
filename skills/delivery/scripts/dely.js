@@ -476,20 +476,137 @@ function hasSettle(messages) {
   );
 }
 
-function stopDispatch(id) {
+function emptyMemory() {
+  return { reported: [], stopped: [] };
+}
+
+function gitDir() {
+  const r = spawnSync("git", ["rev-parse", "--git-dir"], { encoding: "utf8" });
+  if (r.status !== 0) return "";
+  const dir = String(r.stdout || "").trim();
+  return dir ? path.resolve(dir) : "";
+}
+
+function runMemoryPath(run) {
+  const dir = gitDir();
+  if (!dir || !run) return "";
+  const safe = String(run).replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 120) || "run";
+  return path.join(dir, "dely", "runs", safe + ".json");
+}
+
+function normalizeMemory(raw) {
+  const data = emptyMemory();
+  if (!raw || typeof raw !== "object") return data;
+  if (Array.isArray(raw.reported)) data.reported = raw.reported.filter((x) => typeof x === "string");
+  if (Array.isArray(raw.stopped)) data.stopped = raw.stopped.filter((x) => typeof x === "string");
+  return data;
+}
+
+function readRunMemory(run) {
+  const file = runMemoryPath(run);
+  if (!file) return emptyMemory();
+  try {
+    return normalizeMemory(JSON.parse(fs.readFileSync(file, "utf8")));
+  } catch (_) {
+    return emptyMemory();
+  }
+}
+
+function mutateRunMemory(run, fn) {
+  const file = runMemoryPath(run);
+  if (!file) {
+    const data = emptyMemory();
+    fn(data);
+    return data;
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const lock = file + ".lock";
+  const until = Date.now() + 1000;
+  let fd;
+  while (!fd) {
+    try {
+      fd = fs.openSync(lock, "wx");
+    } catch (e) {
+      if (e.code !== "EEXIST" || Date.now() >= until) {
+        try {
+          fd = fs.openSync(lock, "w");
+        } catch (_) {
+          const data = readRunMemory(run);
+          fn(data);
+          return data;
+        }
+      } else {
+        sleepMs(10);
+      }
+    }
+  }
+  try {
+    const data = readRunMemory(run);
+    fn(data);
+    const tmp = file + ".tmp." + process.pid;
+    fs.writeFileSync(tmp, JSON.stringify({
+      reported: Array.from(new Set(data.reported)),
+      stopped: Array.from(new Set(data.stopped)),
+    }));
+    fs.renameSync(tmp, file);
+    return data;
+  } finally {
+    try {
+      fs.closeSync(fd);
+    } catch (_) {
+      /* lock fd */
+    }
+    try {
+      fs.unlinkSync(lock);
+    } catch (_) {
+      /* lock file */
+    }
+  }
+}
+
+function remember(run, kind, id) {
+  if (!run || !id) return false;
+  let added = false;
+  mutateRunMemory(run, (data) => {
+    if (data[kind].indexOf(id) >= 0) return;
+    data[kind].push(id);
+    added = true;
+  });
+  return added;
+}
+
+function asText(v) {
+  if (v == null) return "";
+  if (typeof v === "object") return oneLine(v.detail || v.name || v.state || "");
+  return oneLine(v);
+}
+
+function stoppedByDely(worker, memory) {
+  if (!worker) return false;
+  if (memory && memory.stopped.indexOf(worker.dispatchId) >= 0) return true;
+  const ws = String(worker.workerState || "").toLowerCase();
+  if (ws === "stopped" || ws === "stop_unknown") return true;
+  const detail = asText(worker.stage || (worker.projection && worker.projection.stage));
+  return detail === "process_stopped";
+}
+
+function openDispatchIdsFrom(workers, memory) {
+  return (workers || [])
+    .filter((w) => w.dispatchStatus === "dispatched" && !stoppedByDely(w, memory))
+    .map((w) => w.dispatchId);
+}
+
+function stopDispatch(id, run) {
   if (!id) return;
+  remember(run, "stopped", id);
   orca(["orchestration", "worker-stop", "--dispatch", id, "--json"]);
 }
 
 function releaseDispatch(id) {
   if (!id) return;
-  orca(["orchestration", "worker-release", "--dispatch", id, "--json"]);
-}
-
-function openDispatchIds(run) {
-  const listed = workerList(run);
-  if (!listed.ok) return [];
-  return listed.workers.filter((w) => w.dispatchStatus === "dispatched").map((w) => w.dispatchId);
+  const r = orca(["orchestration", "worker-release", "--dispatch", id, "--json"]);
+  const state = String(result(r).state || "");
+  if (orcaFailed(r) || state === "retained" || state === "release_pending") return;
 }
 
 function parseDispatchedAt(raw) {
@@ -502,8 +619,10 @@ function parseDispatchedAt(raw) {
 function checkDeadline(run) {
   const listed = workerList(run);
   if (!listed.ok) return null;
+  const memory = readRunMemory(run);
   for (const worker of listed.workers) {
     if (worker.dispatchStatus !== "dispatched") continue;
+    if (stoppedByDely(worker, memory)) continue;
     const shown = orca(["orchestration", "worker-show", "--dispatch", worker.dispatchId, "--json"]);
     const at = parseDispatchedAt((result(shown).dispatch || {}).dispatchedAt);
     if (at == null) continue;
@@ -545,8 +664,10 @@ function heartbeatSeen(worker, seen) {
 function checkSilent(run, seen) {
   const listed = workerList(run);
   if (!listed.ok) return null;
+  const memory = readRunMemory(run);
   for (const worker of listed.workers) {
     if (worker.dispatchStatus !== "dispatched") continue;
+    if (stoppedByDely(worker, memory)) continue;
     if (!heartbeatSeen(worker, seen)) continue;
     const handle = worker.agentTerminalHandle;
     if (!handle) continue;
@@ -581,12 +702,14 @@ function deadDispatchReason(shown) {
   const res = result(shown);
   const worker = res.worker || {};
   const dispatch = res.dispatch || {};
-  const state = oneLine(worker.state || worker.stage || dispatch.stage || "");
+  const state = asText(worker.state || worker.stage || dispatch.stage || "");
   const err = oneLine(worker.lastError || dispatch.lastError || "");
   const liveness = oneLine(shownLiveness(shown));
+  const status = oneLine(dispatch.status || "");
   const parts = [];
   if (failureEvidenceState(state)) parts.push(state);
   if (err) parts.push(err);
+  if (!parts.length) parts.push(status || "no evidence");
   if (liveness) parts.push("liveness=" + liveness);
   return parts.join(" ") || "failed";
 }
@@ -616,17 +739,21 @@ function reportDeadLines(deads, exitIfLast) {
   }
 }
 
-function checkDeadDispatch(run, extraSettleIds) {
-  const listed = workerList(run);
-  if (!listed.ok) return [];
-  const ids = settleIdsOf(run, listed.workers, extraSettleIds);
+function checkDeadDispatch(run, extraSettleIds, listed) {
+  const rows = listed || workerList(run);
+  if (!rows.ok) return [];
+  const memory = readRunMemory(run);
+  const ids = settleIdsOf(run, rows.workers, extraSettleIds);
   const dead = [];
-  for (const worker of listed.workers) {
-    if (worker.terminalState === "released") continue;
+  for (const worker of rows.workers) {
+    if (!worker.dispatchId) continue;
+    if (memory.reported.indexOf(worker.dispatchId) >= 0) continue;
+    if (stoppedByDely(worker, memory)) continue;
     if (worker.dispatchStatus !== "failed") continue;
     if (ids.has(worker.dispatchId)) continue;
     const shown = orca(["orchestration", "worker-show", "--dispatch", worker.dispatchId, "--json"]);
     releaseDispatch(worker.dispatchId);
+    if (!remember(run, "reported", worker.dispatchId)) continue;
     dead.push({ dispatchId: worker.dispatchId, reason: deadDispatchReason(shown) });
   }
   return dead;
@@ -779,16 +906,20 @@ function cmdWait(flags) {
   const seen = new Set();
   for (;;) {
     const step = waitStep(flags.run, Date.now(), seen, Number.POSITIVE_INFINITY);
+    if (step.type === "error") finish(9, `ERROR ${step.reason}`);
+    const listed = workerList(flags.run);
+    const deads = checkDeadDispatch(flags.run, null, listed);
     if (step.type === "settled") {
+      reportDeadLines(deads, false);
       finish(0, `SETTLED ${step.types.join(",")} ${JSON.stringify(step.messages)}`);
     }
-    if (step.type === "error") finish(9, `ERROR ${step.reason}`);
-    const deads = checkDeadDispatch(flags.run);
-    reportDeadLines(deads, openDispatchIds(flags.run).length === 0);
+    const memory = readRunMemory(flags.run);
+    const open = listed.ok ? openDispatchIdsFrom(listed.workers, memory) : [];
+    if (deads.length) reportDeadLines(deads, open.length === 0);
     const deadline = checkDeadline(flags.run);
     if (deadline) finish(7, `DEADLINE ${deadline.dispatchId} ${deadline.seconds}`);
     if (step.type === "silent") {
-      stopDispatch(step.dispatchId);
+      stopDispatch(step.dispatchId, flags.run);
       finish(6, `SILENT ${step.dispatchId} ${step.seconds}`);
     }
   }
@@ -849,7 +980,8 @@ function collectSettles(run, opts) {
     const batch = messagesOf(r);
     for (let i = 0; i < batch.length; i++) report(batch, i);
   }
-  const open = listed.workers.filter((w) => w.dispatchStatus === "dispatched").map((w) => w.dispatchId);
+  const memory = readRunMemory(run);
+  const open = openDispatchIdsFrom(listed.workers, memory);
   return { ok: true, settles, open, workers: listed.workers, history };
 }
 
@@ -860,14 +992,15 @@ function cmdCollect(flags) {
   markHeartbeats(collected.history || [], seen);
   const silent = checkSilent(flags.run, seen);
   if (silent) {
-    stopDispatch(silent.dispatchId);
+    stopDispatch(silent.dispatchId, flags.run);
     finish(6, `SILENT ${silent.dispatchId} ${silent.seconds}`);
   }
   const deadline = checkDeadline(flags.run);
   if (deadline) finish(7, `DEADLINE ${deadline.dispatchId} ${deadline.seconds}`);
   const deads = checkDeadDispatch(
     flags.run,
-    collected.settles.map((s) => s.dispatchId).filter(Boolean)
+    collected.settles.map((s) => s.dispatchId).filter(Boolean),
+    { ok: true, workers: collected.workers || [] }
   );
   reportDeadLines(deads, collected.open.length === 0);
   if (collected.open.length) {
