@@ -488,10 +488,11 @@ function gitDir() {
 }
 
 function runMemoryPath(run) {
-  const dir = gitDir();
-  if (!dir || !run) return "";
+  if (!run) return "";
   const safe = String(run).replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 120) || "run";
-  return path.join(dir, "dely", "runs", safe + ".json");
+  const dir = gitDir();
+  if (dir) return path.join(dir, "dely", "runs", safe + ".json");
+  return path.join(os.homedir(), ".dely", "runs", safe + ".json");
 }
 
 function normalizeMemory(raw) {

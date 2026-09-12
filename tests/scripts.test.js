@@ -75,6 +75,7 @@ function readLog(logPath) {
 function runDely(args, ctx, extraEnv) {
   extraEnv = extraEnv || {};
   const timeout = extraEnv.SPAWN_TIMEOUT_MS;
+  const cwd = extraEnv.CWD || ctx.repo;
   const env = Object.assign({}, process.env, extraEnv, {
     ORCA_CLI_COMMAND: FAKE,
     FAKE_ORCA_SCENARIO: ctx.scenarioPath,
@@ -91,10 +92,11 @@ function runDely(args, ctx, extraEnv) {
       extraEnv.DELY_VERIFY_DEADLINE_S != null ? String(extraEnv.DELY_VERIFY_DEADLINE_S) : "30",
   });
   delete env.SPAWN_TIMEOUT_MS;
+  delete env.CWD;
   return spawnSync(process.execPath, [DELY_JS, ...args], {
     encoding: "utf8",
     env,
-    cwd: ctx.repo,
+    cwd,
     timeout,
   });
 }
@@ -1273,6 +1275,45 @@ test("collect reports a retained adopted dispatch once even when worker-release 
   const again = runDely(["collect", "--run", "run_live"], ctx);
   assert.notEqual(again.status, 8, again.stdout + again.stderr);
   assert.doesNotMatch(again.stdout, /FAILED /);
+});
+
+test("collect reports a dead dispatch once outside a git repository", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [],
+    workers: [adoptedFailedWorker()],
+  });
+  const outside = tmpDir();
+  const realRuns = path.join(os.homedir(), ".dely", "runs");
+  const beforeReal = fs.existsSync(realRuns) ? fs.readdirSync(realRuns).sort() : [];
+  const r1 = runDely(["collect", "--run", "run_live"], ctx, { CWD: outside });
+  const r2 = runDely(["collect", "--run", "run_live"], ctx, { CWD: outside });
+  const r3 = runDely(["collect", "--run", "run_live"], ctx, { CWD: outside });
+  const gitRepo = tmpDir();
+  gitInit(gitRepo);
+  const gitDirPath = path.join(gitRepo, ".git");
+  fs.chmodSync(gitDirPath, 0);
+  let r4;
+  try {
+    r4 = runDely(["collect", "--run", "run_live"], ctx, { CWD: gitRepo });
+  } finally {
+    try {
+      fs.chmodSync(gitDirPath, 0o755);
+    } catch (_) {
+      /* restore so the temp tree can be removed */
+    }
+  }
+  assert.equal(r1.status, 8, r1.stdout + r1.stderr);
+  assert.equal((r1.stdout.match(/^FAILED disp_adopted /gm) || []).length, 1, r1.stdout);
+  assert.notEqual(r2.status, 8, r2.stdout + r2.stderr);
+  assert.doesNotMatch(r2.stdout, /FAILED /);
+  assert.notEqual(r3.status, 8, r3.stdout + r3.stderr);
+  assert.doesNotMatch(r3.stdout, /FAILED /);
+  assert.notEqual(r4.status, 8, r4.stdout + r4.stderr);
+  assert.doesNotMatch(r4.stdout, /FAILED /);
+  assert.equal(fs.existsSync(path.join(ctx.home, ".dely", "runs", "run_live.json")), true);
+  assert.equal(fs.existsSync(path.join(outside, ".dely")), false);
+  const afterReal = fs.existsSync(realRuns) ? fs.readdirSync(realRuns).sort() : [];
+  assert.deepEqual(afterReal, beforeReal);
 });
 
 test("collect reports once when worker-release returns retained without releasing", () => {
