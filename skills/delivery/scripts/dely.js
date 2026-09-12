@@ -709,72 +709,6 @@ function cmdWait(flags) {
   }
 }
 
-function sendWake(run, reason) {
-  orca([
-    "orchestration",
-    "send",
-    "--to",
-    `run:${run}`,
-    "--run",
-    run,
-    "--type",
-    "status",
-    "--priority",
-    "high",
-    "--subject",
-    `dely wake: ${reason}`,
-    "--json",
-  ]);
-}
-
-function cmdSidecar(flags) {
-  const run = flags.run;
-  const terminal = flags["control-handle"];
-  const seen = new Set();
-  for (;;) {
-    const r = orca([
-      "orchestration",
-      "check",
-      "--wait",
-      "--run",
-      run,
-      "--terminal",
-      terminal,
-      "--types",
-      "heartbeat,worker_done,escalation,question",
-      "--timeout-ms",
-      String(Math.max(1, Math.floor(POLL_MS))),
-      "--json",
-    ]);
-    const id = deliveryId(r);
-    if (id) {
-      const messages = messagesOf(r);
-      markHeartbeats(messages, seen);
-      const acked = ackDelivery(run, id, terminal);
-      if (!acked.ok) finish(9, `ERROR ack failed: ${acked.reason}`);
-      if (hasSettle(messages)) {
-        sendWake(run, uniqueTypes(messages).join(","));
-        process.exit(0);
-      }
-    }
-    const deadline = checkDeadline(run);
-    const silent = checkSilent(run, seen);
-    if (deadline) {
-      sendWake(run, `DEADLINE ${deadline.dispatchId} ${deadline.seconds}`);
-      process.exit(0);
-    }
-    if (silent) {
-      sendWake(run, `SILENT ${silent.dispatchId} ${silent.seconds}`);
-      process.exit(0);
-    }
-    const listed = workerList(run);
-    if (listed.ok) {
-      const open = listed.workers.filter((w) => w.dispatchStatus === "dispatched");
-      if (!open.length) process.exit(0);
-    }
-  }
-}
-
 function messageIdentity(m, index, deliveryId) {
   if (m && m.id != null && String(m.id) !== "") return "id:" + m.id;
   const dv = deliveryId || (m && (m.deliveryId || m.delivery_id)) || "";
@@ -844,7 +778,6 @@ function cmdCollect(flags) {
   const deadline = checkDeadline(flags.run);
   if (deadline) finish(7, `DEADLINE ${deadline.dispatchId} ${deadline.seconds}`);
   if (collected.open.length) {
-    ensureRunSidecar(absRepo(flags.repo), flags.run);
     finish(2, `WAITING ${collected.open.join(" ")}`);
   }
   process.exit(0);
@@ -1078,59 +1011,8 @@ function consumeVerify(run, groups, startedAt, deadlineS) {
   return { type: "done" };
 }
 
-function coordinatorHandle(runId) {
-  const listed = listAllRuns();
-  if (listed.ok) {
-    const run = listed.runs.find((r) => r.id === runId);
-    if (run && run.coordinator_handle) return run.coordinator_handle;
-  }
-  return process.env.ORCA_TERMINAL_HANDLE || "";
-}
-
 function launcherPath() {
   return path.resolve(__dirname, "dely");
-}
-
-function startSidecar(repo, run, controlHandle, launcher, title) {
-  const command = `${launcher} sidecar --run ${run} --control-handle ${controlHandle}`;
-  const created = orca([
-    "terminal",
-    "create",
-    "--worktree",
-    `path:${repo}`,
-    "--title",
-    title,
-    "--command",
-    command,
-    "--json",
-  ]);
-  return (result(created).terminal && result(created).terminal.handle) || "";
-}
-
-function startVerifySidecar(repo, verifyRun, controlHandle, launcher) {
-  return startSidecar(repo, verifyRun, controlHandle, launcher, "dely-verify-sidecar");
-}
-
-function sidecarAlive(handle) {
-  if (!handle) return false;
-  const shown = orca(["terminal", "show", "--terminal", handle, "--json"]);
-  if (orcaFailed(shown)) return false;
-  const t = result(shown).terminal || {};
-  if (t.running === false || t.closed) return false;
-  return true;
-}
-
-function ensureRunSidecar(repo, run) {
-  const title = "dely-sidecar " + run;
-  const listed = orca(["terminal", "list", "--json"]);
-  const terminals = result(listed).terminals;
-  if (Array.isArray(terminals)) {
-    for (const t of terminals) {
-      if (!t || t.title !== title) continue;
-      if (sidecarAlive(t.handle)) return t.handle;
-    }
-  }
-  return startSidecar(repo, run, coordinatorHandle(run), launcherPath(), title);
 }
 
 function writeVerdict(verifyRun, key, pass) {
@@ -1163,7 +1045,7 @@ function writeVerdict(verifyRun, key, pass) {
   ]);
 }
 
-function cleanupVerify(repo, groups, sidecarHandle, run) {
+function cleanupVerify(repo, groups, run) {
   const listed = run ? workerList(run) : { ok: false, workers: [] };
   const open = new Set(
     (listed.ok ? listed.workers : [])
@@ -1178,7 +1060,6 @@ function cleanupVerify(repo, groups, sidecarHandle, run) {
     orca(["orchestration", "worker-release", "--dispatch", g.dispatchId, "--json"]);
     if (g.adopted && g.handle) orca(["terminal", "close", "--terminal", g.handle, "--json"]);
   }
-  if (sidecarHandle) orca(["terminal", "close", "--terminal", sidecarHandle, "--json"]);
   try {
     fs.rmSync(path.join(repo, ".dely-verify"), { recursive: true, force: true });
   } catch (_) {
@@ -1195,7 +1076,7 @@ function phaseLine(phase, pin, g) {
 }
 
 function finishVerify(ctx) {
-  cleanupVerify(ctx.repo, ctx.groups, ctx.sidecarHandle, ctx.verifyRun);
+  cleanupVerify(ctx.repo, ctx.groups, ctx.verifyRun);
   const nowStatus = gitPorcelain(ctx.repo);
   const gitChanged = nowStatus !== ctx.baseline;
   const allPass = ["implement", "review"].every((phase) => {
@@ -1300,9 +1181,6 @@ function writeVerifyState(ctx) {
       groups: ctx.groups,
       baseline: ctx.baseline,
       startTime: Date.now(),
-      sidecarHandle: ctx.sidecarHandle,
-      controlHandle: ctx.controlHandle,
-      launcher: ctx.launcher,
     })
   );
 }
@@ -1334,13 +1212,9 @@ function cmdVerifyStart(flags) {
     finishVerify(ctx);
     return;
   }
-  const launcher = launcherPath();
-  ctx.launcher = launcher;
-  ctx.controlHandle = coordinatorHandle(ctx.verifyRun);
-  ctx.sidecarHandle = startVerifySidecar(ctx.repo, ctx.verifyRun, ctx.controlHandle, launcher);
   writeVerifyState(ctx);
   const peek = orca(["orchestration", "check", "--peek", "--run", ctx.verifyRun, "--json"]);
-  const collectCmd = `${launcher} verify collect --repo ${ctx.repo}`;
+  const collectCmd = `${launcherPath()} verify collect --repo ${ctx.repo}`;
   restoreOnExit = null;
   if (hasSettle(messagesOf(peek))) {
     process.stdout.write(`COLLECT_NOW ${collectCmd}\n`);
@@ -1391,15 +1265,6 @@ function cmdVerifyCollect(flags) {
   const limitHit = Boolean(silent) || elapsed > VERIFY_DEADLINE_S;
   const stillOpen = collected.open.length && saved.groups.some((g) => g.dispatchId && !g.status);
   if (stillOpen && !limitHit) {
-    if (!sidecarAlive(saved.sidecarHandle)) {
-      saved.sidecarHandle = startVerifySidecar(
-        repo,
-        saved.verifyRun,
-        saved.controlHandle,
-        saved.launcher || launcherPath()
-      );
-      fs.writeFileSync(stateFile, JSON.stringify(saved));
-    }
     restoreOnExit = null;
     finish(
       2,
@@ -1413,7 +1278,6 @@ function cmdVerifyCollect(flags) {
     key: saved.key,
     groups: saved.groups,
     pins: saved.pins,
-    sidecarHandle: saved.sidecarHandle,
     baseline: saved.baseline,
   });
 }
@@ -1457,13 +1321,8 @@ function main(argv) {
     case "wait":
       if (!flags.run) finish(2, "usage: dely wait --run <runId>");
       return cmdWait(flags);
-    case "sidecar":
-      if (!flags.run || !flags["control-handle"]) {
-        finish(2, "usage: dely sidecar --run <runId> --control-handle <handle>");
-      }
-      return cmdSidecar(flags);
     case "collect":
-      if (!flags.run || !flags.repo) finish(2, "usage: dely collect --run <runId> --repo <path>");
+      if (!flags.run) finish(2, "usage: dely collect --run <runId>");
       return cmdCollect(flags);
     case "verify:run":
       if (!flags.repo || !flags.control) finish(2, "usage: dely verify run --repo <path> --control <agent>");
@@ -1475,7 +1334,7 @@ function main(argv) {
       if (!flags.repo) finish(2, "usage: dely verify collect --repo <path>");
       return withPrevRestore(() => cmdVerifyCollect(flags));
     default:
-      finish(2, "usage: dely status|dispatch|wait|sidecar|collect|verify");
+      finish(2, "usage: dely status|dispatch|wait|collect|verify");
   }
 }
 

@@ -27,7 +27,9 @@ Read the Control harness's `Control wake` column in
   printed `verify collect` command and end the turn again; never the
   `orca orchestration check` command quoted in the nudge text. While start
   has printed `SLEEP`, Control stays bound to the verify Run and cannot
-  dispatch delivery work until collect finishes.
+  dispatch delivery work until collect finishes. A worker that neither
+  sends a message nor exits wakes nobody, so a Control that has heard
+  nothing for a long time asks the human.
 - **unsupported:** cannot be Control.
 
 ## Results

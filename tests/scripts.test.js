@@ -369,42 +369,10 @@ test("wait exits SILENT when output is stale after ACK even though Orca says liv
     (argv) => argv[0] === "orchestration" && argv[1] === "worker-stop" && hasFlagPair(argv, "--dispatch", "disp_1")
   );
   assert.ok(stopAt >= 0, "wait did not stop the silent dispatch");
-  const again = runDely(["collect", "--run", "run_live", "--repo", ctx.repo], ctx);
+  const again = runDely(["collect", "--run", "run_live"], ctx);
   assert.notEqual(again.status, 6, again.stdout + again.stderr);
   assert.doesNotMatch(again.stdout, /SILENT disp_1/);
   assert.doesNotMatch(again.stdout, /WAITING disp_1/);
-});
-
-test("sidecar swallows only heartbeats on the Control handle", () => {
-  const ctx = setup(DEFAULT_AGENTS, {
-    deliveries: [
-      { deliveryId: "hb1", messages: [{ type: "heartbeat", from_handle: "term_w", subject: "ack" }] },
-    ],
-    workers: [],
-    lastOutputAt: "now",
-  });
-  const r = runDely(["sidecar", "--run", "run_live", "--control-handle", "term_ctrl"], ctx);
-  assert.equal(r.status, 0, r.stdout + r.stderr);
-  const log = readLog(ctx.logPath);
-  const waits = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--wait"));
-  assert.ok(waits.length >= 1);
-  for (const argv of waits) {
-    assert.ok(hasFlagPair(argv, "--terminal", "term_ctrl"));
-    assert.ok(hasFlagPair(argv, "--types", "heartbeat,worker_done,escalation,question"));
-  }
-  const acks = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--ack"));
-  assert.ok(acks.length >= 1);
-  assert.deepEqual(acks[0], [
-    "orchestration",
-    "check",
-    "--run",
-    "run_live",
-    "--terminal",
-    "term_ctrl",
-    "--ack",
-    "hb1",
-    "--json",
-  ]);
 });
 
 test("launcher falls back to Orca's runtime when node is absent", () => {
@@ -459,21 +427,6 @@ ELECTRON_RUN_AS_NODE=1 exec "$ELECTRON" "$CLI" "$@"
   });
   assert.notEqual(r.status, 10, r.stdout + r.stderr);
   assert.match(r.stdout, /^NONE\n/);
-});
-
-test("sidecar surfaces a failed acknowledgement", () => {
-  const ctx = setup(DEFAULT_AGENTS, {
-    rejectAck: true,
-    rejectAckReason: "Unknown command: orchestration check run_live",
-    deliveries: [
-      { deliveryId: "hb1", messages: [{ type: "heartbeat", from_handle: "term_w", subject: "ack" }] },
-    ],
-    workers: [],
-    lastOutputAt: "now",
-  });
-  const r = runDely(["sidecar", "--run", "run_live", "--control-handle", "term_ctrl"], ctx);
-  assert.equal(r.status, 9, r.stdout + r.stderr);
-  assert.match(r.stdout, /^ERROR ack failed: /);
 });
 
 test("dispatch ACK wait leaves worker_done queued for collect", () => {
@@ -535,7 +488,7 @@ test("dispatch ACK wait leaves worker_done queued for collect", () => {
   assert.ok(
     !afterDispatch.some((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--ack"))
   );
-  const collected = runDely(["collect", "--run", "run_live", "--repo", ctx.repo], ctx);
+  const collected = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(collected.status, 0, collected.stdout + collected.stderr);
   assert.match(collected.stdout, /^SETTLED disp_1 worker_done done\n/);
 });
@@ -671,30 +624,6 @@ test("status surfaces a failed run-list page", () => {
   assert.notEqual(r.stdout, "NONE\n");
 });
 
-test("sidecar keeps running when worker-list fails", () => {
-  const ctx = setup(DEFAULT_AGENTS, {
-    workerListError: "connection lost",
-    controlDeliveries: [],
-    workers: [
-      {
-        dispatchId: "disp_1",
-        dispatchStatus: "dispatched",
-        agentTerminalHandle: "term_w",
-        lastHeartbeatAt: "2026-09-11T09:00:00Z",
-      },
-    ],
-    lastOutputAt: "now",
-  });
-  const t0 = Date.now();
-  const r = runDely(["sidecar", "--run", "run_live", "--control-handle", "term_ctrl"], ctx, {
-    SPAWN_TIMEOUT_MS: 400,
-    DELY_DEADLINE_S: "30",
-  });
-  const elapsed = Date.now() - t0;
-  assert.ok(elapsed >= 300, `sidecar exited after ${elapsed}ms, expected to keep running`);
-  assert.notEqual(r.status, 0, r.stdout + r.stderr);
-});
-
 test("collect surfaces a failed worker-list", () => {
   const ctx = setup(DEFAULT_AGENTS, {
     workerListError: "connection lost",
@@ -707,7 +636,7 @@ test("collect surfaces a failed worker-list", () => {
       },
     ],
   });
-  const r = runDely(["collect", "--run", "run_live", "--repo", ctx.repo], ctx);
+  const r = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(r.status, 9, r.stdout + r.stderr);
   assert.equal(r.stdout, "ERROR worker-list failed: connection lost\n");
 });
@@ -779,7 +708,7 @@ test("dispatch observes its ACK without consuming a Delivery", () => {
   assert.ok(
     !afterDispatch.some((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--ack"))
   );
-  const collected = runDely(["collect", "--run", "run_live", "--repo", ctx.repo], ctx);
+  const collected = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(collected.status, 0, collected.stdout + collected.stderr);
   assert.match(collected.stdout, /^SETTLED disp_1 worker_done done\n/);
 });
@@ -806,38 +735,6 @@ test("wait judges a Delivery as a whole", () => {
   assert.ok(hasFlagPair(acks[0], "--ack", "mixed1"));
 });
 
-test("sidecar wakes Control once and exits when a batch carries a settle", () => {
-  const ctx = setup(DEFAULT_AGENTS, {
-    deliveries: [MIXED_DELIVERY],
-    workers: [
-      {
-        dispatchId: "disp_1",
-        dispatchStatus: "dispatched",
-        agentTerminalHandle: "term_w",
-        lastHeartbeatAt: "2026-09-11T09:00:00Z",
-      },
-    ],
-    lastOutputAt: "now",
-  });
-  const r = runDely(["sidecar", "--run", "run_live", "--control-handle", "term_ctrl"], ctx, {
-    SPAWN_TIMEOUT_MS: 2000,
-    DELY_DEADLINE_S: "30",
-  });
-  assert.equal(r.status, 0, r.stdout + r.stderr);
-  const log = readLog(ctx.logPath);
-  const acks = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "check" && argv.includes("--ack"));
-  assert.equal(acks.length, 1);
-  assert.ok(hasFlagPair(acks[0], "--ack", "mixed1"));
-  assert.ok(hasFlagPair(acks[0], "--terminal", "term_ctrl"));
-  const sends = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "send");
-  assert.equal(sends.length, 1);
-  assert.ok(hasFlagPair(sends[0], "--type", "status"));
-  assert.match(sends[0][sends[0].indexOf("--subject") + 1], /^dely wake: /);
-  const sendIdx = log.findIndex((argv) => argv[0] === "orchestration" && argv[1] === "send");
-  assert.ok(sendIdx >= 0);
-  assert.ok(!log.slice(sendIdx + 1).some(consumingCheck));
-});
-
 test("collect reports settles already consumed by the sidecar", () => {
   const ctx = setup(DEFAULT_AGENTS, {
     history: [
@@ -858,7 +755,7 @@ test("collect reports settles already consumed by the sidecar", () => {
       },
     ],
   });
-  const r = runDely(["collect", "--run", "run_live", "--repo", ctx.repo], ctx);
+  const r = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /^SETTLED disp_1 worker_done done\n/);
   const log = readLog(ctx.logPath);
@@ -985,7 +882,7 @@ test("collect surfaces a failed consuming check", () => {
       },
     ],
   });
-  const r = runDely(["collect", "--run", "run_live", "--repo", ctx.repo], ctx);
+  const r = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(r.status, 9, r.stdout + r.stderr);
   assert.equal(r.stdout, "ERROR check failed: mailbox error\n");
   const log = readLog(ctx.logPath);
@@ -1012,7 +909,7 @@ test("collect keeps distinct settling messages that share dispatch type and body
       },
     ],
   });
-  const r = runDely(["collect", "--run", "run_live", "--repo", ctx.repo], ctx);
+  const r = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.equal(r.stdout, "SETTLED disp_1 worker_done done\nSETTLED disp_1 worker_done done\n");
 });
@@ -1020,7 +917,6 @@ test("collect keeps distinct settling messages that share dispatch type and body
 function waitingCollectScenario(extra) {
   return Object.assign(
     {
-      runs: [{ id: "run_live", coordinator_handle: "term_ctrl" }],
       deliveries: [],
       workers: [
         {
@@ -1046,7 +942,7 @@ test("collect stops a silent dispatch before SILENT and does not report it again
       staleMs: 200000,
     })
   );
-  const r = runDely(["collect", "--run", "run_live", "--repo", ctx.repo], ctx, {
+  const r = runDely(["collect", "--run", "run_live"], ctx, {
     DELY_SILENCE_S: "0.15",
     DELY_DEADLINE_S: "30",
   });
@@ -1059,7 +955,7 @@ test("collect stops a silent dispatch before SILENT and does not report it again
     ),
     "collect did not stop the silent dispatch"
   );
-  const again = runDely(["collect", "--run", "run_live", "--repo", ctx.repo], ctx, {
+  const again = runDely(["collect", "--run", "run_live"], ctx, {
     DELY_SILENCE_S: "0.15",
     DELY_DEADLINE_S: "30",
   });
@@ -1084,7 +980,7 @@ test("collect reports DEADLINE from the dispatch dispatchedAt", () => {
       ],
     })
   );
-  const r = runDely(["collect", "--run", "run_live", "--repo", ctx.repo], ctx, {
+  const r = runDely(["collect", "--run", "run_live"], ctx, {
     DELY_DEADLINE_S: "30",
     DELY_SILENCE_S: "60",
   });
@@ -1092,33 +988,27 @@ test("collect reports DEADLINE from the dispatch dispatchedAt", () => {
   assert.match(r.stdout, /^DEADLINE disp_1 /);
 });
 
-test("collect reuses a live sidecar listed for the Run", () => {
-  const ctx = setup(
-    DEFAULT_AGENTS,
-    waitingCollectScenario({
-      terminals: [{ handle: "term_sc", title: "dely-sidecar run_live", running: true }],
-    })
-  );
-  const r = runDely(["collect", "--run", "run_live", "--repo", ctx.repo], ctx);
+test("nudge-mode collect opens no terminal when a dispatch is still open", () => {
+  const ctx = setup(DEFAULT_AGENTS, waitingCollectScenario());
+  const r = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(r.status, 2, r.stdout + r.stderr);
   assert.match(r.stdout, /^WAITING disp_1/);
-  const creates = readLog(ctx.logPath).filter(
-    (argv) => argv[0] === "terminal" && argv[1] === "create" && hasFlagPair(argv, "--title", "dely-sidecar run_live")
+  const log = readLog(ctx.logPath);
+  assert.ok(
+    !log.some((argv) => argv[0] === "terminal" && argv[1] === "create"),
+    "collect opened a terminal"
   );
-  assert.equal(creates.length, 0, "collect opened a sidecar while one was listed");
+  assert.ok(
+    !log.some((argv) => argv[0] === "terminal" && argv[1] === "list"),
+    "collect listed terminals"
+  );
 });
 
-test("collect opens exactly one sidecar when none is listed", () => {
-  const ctx = setup(DEFAULT_AGENTS, waitingCollectScenario());
-  const r = runDely(["collect", "--run", "run_live", "--repo", ctx.repo], ctx);
+test("the runtime has no sidecar command", () => {
+  const ctx = setup(DEFAULT_AGENTS, { workers: [], lastOutputAt: "now" });
+  const r = runDely(["sidecar", "--run", "r", "--control-handle", "h"], ctx);
   assert.equal(r.status, 2, r.stdout + r.stderr);
-  assert.match(r.stdout, /^WAITING disp_1/);
-  const creates = readLog(ctx.logPath).filter(
-    (argv) => argv[0] === "terminal" && argv[1] === "create" && hasFlagPair(argv, "--title", "dely-sidecar run_live")
-  );
-  assert.equal(creates.length, 1, "collect did not open exactly one sidecar");
-  assert.ok(hasFlagPair(creates[0], "--worktree", "path:" + ctx.repo));
-  assert.match(creates[0][creates[0].indexOf("--command") + 1], /sidecar --run run_live --control-handle term_ctrl/);
+  assert.equal(r.stdout, "usage: dely status|dispatch|wait|collect|verify\n");
 });
 
 function gitInit(repo) {
@@ -1375,37 +1265,48 @@ test("BLOCKED preflight makes no worker-start call and records a FAIL verdict", 
   assert.ok(hasFlagPair(lastBinding(log), "--id", "run_delivery"));
 });
 
-test("verify start then collect restarts a missing sidecar when one dispatch is still open", () => {
+test("verify start prints SLEEP and records no terminal create", () => {
   const ctx = setupVerify(DEFAULT_AGENTS, (repo) =>
     defaultVerifyScenario(repo, {
       deliveries: [
         {
           deliveryId: "dv_ack",
-          messages: [
-            verifyAck("term_impl", "disp_impl"),
-            verifyAck("term_rev", "disp_rev"),
-          ],
+          messages: [verifyAck("term_impl", "disp_impl"), verifyAck("term_rev", "disp_rev")],
         },
       ],
     })
   );
   const started = runDely(["verify", "start", "--repo", ctx.repo, "--control", "cursor"], ctx);
   assert.equal(started.status, 0, started.stdout + started.stderr);
-  assert.match(started.stdout, /SLEEP end your turn; when Orca wakes you, run: /);
-  const afterStart = readLog(ctx.logPath).filter(
-    (argv) => argv[0] === "terminal" && argv[1] === "create" && hasFlagPair(argv, "--title", "dely-verify-sidecar")
+  assert.match(started.stdout, /^SLEEP /);
+  const log = readLog(ctx.logPath);
+  assert.ok(
+    !log.some((argv) => argv[0] === "terminal" && argv[1] === "create"),
+    "verify start opened a terminal"
   );
-  assert.equal(afterStart.length, 1);
-  const scenario = JSON.parse(fs.readFileSync(ctx.scenarioPath, "utf8"));
-  scenario.sidecarGone = true;
-  write(ctx.scenarioPath, JSON.stringify(scenario, null, 2));
+});
+
+test("verify collect with one dispatch open prints WAITING and records no terminal create", () => {
+  const ctx = setupVerify(DEFAULT_AGENTS, (repo) =>
+    defaultVerifyScenario(repo, {
+      deliveries: [
+        {
+          deliveryId: "dv_ack",
+          messages: [verifyAck("term_impl", "disp_impl"), verifyAck("term_rev", "disp_rev")],
+        },
+      ],
+    })
+  );
+  const started = runDely(["verify", "start", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  assert.equal(started.status, 0, started.stdout + started.stderr);
   const collected = runDely(["verify", "collect", "--repo", ctx.repo], ctx);
   assert.equal(collected.status, 2, collected.stdout + collected.stderr);
   assert.match(collected.stdout, /WAITING /);
-  const sidecars = readLog(ctx.logPath).filter(
-    (argv) => argv[0] === "terminal" && argv[1] === "create" && hasFlagPair(argv, "--title", "dely-verify-sidecar")
+  const log = readLog(ctx.logPath);
+  assert.ok(
+    !log.some((argv) => argv[0] === "terminal" && argv[1] === "create"),
+    "verify collect opened a terminal"
   );
-  assert.ok(sidecars.length >= 2, "collect did not restart a missing sidecar");
 });
 
 test("two id-less worker_done messages print two SETTLED lines", () => {
@@ -1427,7 +1328,7 @@ test("two id-less worker_done messages print two SETTLED lines", () => {
       },
     ],
   });
-  const r = runDely(["collect", "--run", "run_live", "--repo", ctx.repo], ctx);
+  const r = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.equal(r.stdout, "SETTLED disp_1 worker_done done\nSETTLED disp_1 worker_done done\n");
 });

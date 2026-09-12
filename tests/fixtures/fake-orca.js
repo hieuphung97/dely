@@ -545,44 +545,14 @@ if (group === "orchestration" && cmd === "send") {
   ok({ ok: true, subject: flags.subject || "" });
 }
 
-if (group === "terminal" && cmd === "list") {
-  const seeded = scenario.terminals || [];
-  const created = state.createdTerminals || [];
-  const byHandle = new Map();
-  for (const t of seeded.concat(created)) {
-    byHandle.set(t.handle, {
-      handle: t.handle,
-      title: t.title || "",
-      running: t.running !== false,
-      closed: Boolean(t.closed),
-    });
-  }
-  saveState(state);
-  ok({ terminals: Array.from(byHandle.values()) });
-}
-
 if (group === "terminal" && cmd === "create") {
   state.terminalCreatedAt = nowMs();
-  const title = flags.title || "";
-  const handle =
-    title === "dely-verify-sidecar"
-      ? scenario.sidecarHandle || "term_sidecar"
-      : title.indexOf("dely-sidecar ") === 0
-        ? scenario.sidecarHandle || "term_dely_sidecar"
-        : scenario.terminalHandle || "term_w";
-  state.createdTerminals = (state.createdTerminals || []).concat([
-    { handle, title: flags.title || "", command: flags.command || "" },
-  ]);
+  const handle = scenario.terminalHandle || "term_w";
   saveState(state);
   ok({ terminal: { handle } });
 }
 
 if (group === "terminal" && cmd === "show") {
-  const sidecar = scenario.sidecarHandle || "term_sidecar";
-  if (scenario.sidecarGone && flags.terminal === sidecar) {
-    saveState(state);
-    reply({ ok: false, error: { message: "terminal not found" } }, 1);
-  }
   if (scenario.terminalShow === "fail") {
     saveState(state);
     reply({ ok: false, error: { message: scenario.terminalShowReason || "terminal show failed" } }, 1);

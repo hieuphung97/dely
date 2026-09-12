@@ -140,7 +140,7 @@ Usage as the launcher prints it:
 
 - `dely dispatch --repo <path> --run <runId> --phase <implement|review> --spec-file <path> --control <agent>`
 - `dely wait --run <runId>`
-- `dely collect --run <runId> --repo <path>`
+- `dely collect --run <runId>`
 
 `--spec-file` is the worktree-relative prompt file.
 
@@ -185,10 +185,12 @@ right after a verify PASS goes to the human.
 
 - **background:** run `dely wait --run <run>` as a background command and
   end the turn. `SETTLED` hands over the whole batch.
-- **nudge:** after `DISPATCHED`, and on every Orca nudge, run only
-  `dely collect --run <run> --repo <path>`, never the `orca orchestration check`
+- **nudge:** after `DISPATCHED`, end the turn. On every Orca nudge, run only
+  `dely collect --run <run>`, never the `orca orchestration check`
   command quoted in the nudge text, because it would consume the message.
-  On `WAITING`, end the turn. Control never opens a sidecar by hand.
+  On `WAITING`, end the turn again. A worker that neither sends a message
+  nor exits wakes nobody, so a Control that has heard nothing for a long
+  time asks the human.
 - **unsupported:** that harness cannot be Control.
 
 Control acts only on `SETTLED` lines whose dispatch id matches the one
