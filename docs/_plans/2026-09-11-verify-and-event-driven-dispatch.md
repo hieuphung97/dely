@@ -382,6 +382,32 @@ and more simply, because `collect` is that consumer in nudge mode.
 **Document impact.** Decision 5 of the 2026-09-11 record is amended in place, and its
 sidecar alternative is recorded as superseded.
 
+**Remediation, after task 3c's review.** The review accepted the removal itself — no
+orphaned helper, no dead state, every deleted test dead — and raised two Important
+findings:
+
+- **A.** The record justifies the deletion by saying `collect` reads Orca's
+  dead-worker report, and it does not. Every branch of `collect` filters on
+  `dispatchStatus === "dispatched"`, so a dispatch Orca has marked `failed` whose
+  worker died before sending anything makes `collect` exit 0 printing nothing, and the
+  skill gives Control no row for that. The fix is the code, not the claim: `collect`
+  and `wait` report such a dispatch as `FAILED <id> <reason>` on a distinct exit code,
+  taking the reason from Orca's own `liveness` and `lastError`. `wait` shares the
+  blind spot, and without it a background Control waits out the full deadline.
+  The skill routes that line like any other failed launch: one fresh dispatch, then
+  the human.
+- **B.** The sentence stating what the removal costs — a worker that neither sends a
+  message nor exits wakes nobody — is unpinned in both skills. Deleting it from both
+  leaves `tests/contracts.sh` green. `skills/verify/SKILL.md` has no pin at all.
+
+Minor, in the same pass: a surviving test still named for the sidecar, and an orphaned
+`rejectAck` fixture branch whose only consumer was deleted — wire it to one of the two
+uncovered ack-failure paths or drop it.
+
+Remediation files: `skills/delivery/scripts/dely.js`, `tests/scripts.test.js`,
+`tests/fixtures/fake-orca.js`, `skills/delivery/SKILL.md`, `skills/verify/SKILL.md`,
+`tests/contracts.sh`.
+
 ### 4. The package, its gates and its record ship the change
 
 **Behaviour.**
@@ -397,8 +423,8 @@ sidecar alternative is recorded as superseded.
   - **N1:** after a `NO_ACK` or `FAIL` launch, `dely verify start` launches no
     further pin.
   - **N2:** an error thrown after a launch stops and releases every launched
-    dispatch, closes any sidecar, removes `.dely-verify/` and records a FAIL
-    verdict before restoring the Run.
+    dispatch, removes `.dely-verify/` and records a FAIL verdict before restoring
+    the Run. The clause about closing a sidecar is void: task 3c removed it.
 - Added from task 3's review (out of scope there): a launch whose `worker-start`
   returns a state other than `ready` closes the terminal it created. Measured again on
   2026-09-12 on the `--agent` path, not only on adopt: a shell update prompt ate the
@@ -449,6 +475,8 @@ reuse the existing cleanup and verdict paths.
 | A silent dispatch is stopped before `SILENT` is reported (task 3 remediation) | `node --test` cases for `wait` and `collect`: stale output after ACK; assert `worker-stop --dispatch <id>` before exit 6, and a following `collect` does not report it again | The `d6635b3` runtime: wait exits `SILENT` with no stop, collect drains the wake and prints `WAITING` | `review-3` scratch driver |
 | Collect reports `DEADLINE` from the dispatch's `dispatchedAt` (task 3 remediation) | `node --test` case: `dispatchedAt` older than the deadline, output fresh, a new collect process; assert exit 7 | A deadline measured from the start of the collect, wait or sidecar process | |
 | Nudge-mode collect opens no terminal (task 3c) | `node --test` case: one dispatch still open; assert `WAITING`, and no `terminal create` or `terminal list` call | The `44ffe96` collect, which opens or reuses a sidecar on every `WAITING` | `rereview-3` |
+| A failed dispatch with no message is reported (task 3c remediation) | `node --test` cases for `collect` and `wait`: one worker with `dispatchStatus` `failed` and `liveness.verdict` `exited`, no deliveries; assert a `FAILED <id> <reason>` line and a non-zero exit | The `36a5187` runtime, where collect exits 0 printing nothing and wait waits out the deadline | `review-3c` |
+| The statement of the lost behaviour is pinned in both skills (task 3c remediation) | `bash tests/contracts.sh` after deleting the sentence from each skill in turn | The `36a5187` pins, which stay green when it is deleted from both | `review-3c` |
 | The runtime has no sidecar command (task 3c) | `node --test` case: `dely sidecar --run r --control-handle h` prints the usage line and exits 2 | A runtime that keeps the command while the skill stops naming it | |
 | Verify sleeps and collects without a sidecar (task 3c) | `node --test` cases: `verify start` prints `SLEEP` and records no `terminal create`; `verify collect` with one dispatch open prints `WAITING` and records none either | The `44ffe96` verify, which starts a sidecar and restarts a missing one | |
 | A `worker-start` that is not `ready` closes the terminal it created (task 4) | `node --test` cases on both paths: adopt, and `--agent`, each returning `failed`; assert `terminal close` for the created handle | The `d6635b3` paths, which close only on readiness timeout and `NO_ACK` | `review-3`, and a live `agent_readiness: timeout` on 2026-09-12 |
