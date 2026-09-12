@@ -1983,3 +1983,121 @@ test("verify start with a BLOCKED pin does not dispatch the other pins", () => {
   assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start"));
   assert.equal(checkWaitCalls(log).length, 0);
 });
+
+test("a worker-start that is not ready closes the adopted terminal it created", () => {
+  const agents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Antigravity CLI | default | default |
+| \`review\` | Codex CLI | gpt-5.6-sol | high |
+`;
+  const ctx = setup(agents, (repo) => ({
+    runs: [
+      passRun(
+        "run_v",
+        keyOf(repo, "cursor", "background", "antigravity/default/default", "codex/gpt-5.6-sol/high")
+      ),
+    ],
+    workerStart: { dispatchId: "disp_ag", state: "failed", handle: "term_ag", reason: "agent_readiness: timeout" },
+    terminalHandle: "term_ag",
+    changeLastOutputForMs: 1,
+  }));
+  const r = runDely(
+    [
+      "dispatch",
+      "--repo",
+      ctx.repo,
+      "--run",
+      "run_live",
+      "--phase",
+      "implement",
+      "--spec-file",
+      "task.md",
+      "--control",
+      "cursor",
+    ],
+    ctx
+  );
+  assert.equal(r.status, 5, r.stdout + r.stderr);
+  assert.match(r.stdout, /^FAILED /);
+  const log = readLog(ctx.logPath);
+  assert.ok(log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start"));
+  assert.ok(log.some((argv) => argv[0] === "terminal" && argv[1] === "close" && hasFlagPair(argv, "--terminal", "term_ag")));
+});
+
+test("a worker-start that is not ready closes the --agent terminal it created", () => {
+  const ctx = setup(DEFAULT_AGENTS, (repo) => ({
+    runs: [passRun("run_v", defaultKey(repo, "cursor", "background"))],
+    workerStart: { dispatchId: "disp_1", state: "failed", handle: "term_w", reason: "agent_readiness: timeout" },
+  }));
+  const r = runDely(
+    [
+      "dispatch",
+      "--repo",
+      ctx.repo,
+      "--run",
+      "run_live",
+      "--phase",
+      "implement",
+      "--spec-file",
+      "task.md",
+      "--control",
+      "cursor",
+    ],
+    ctx
+  );
+  assert.equal(r.status, 5, r.stdout + r.stderr);
+  assert.match(r.stdout, /^FAILED /);
+  const log = readLog(ctx.logPath);
+  assert.ok(log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start" && argv.includes("--agent")));
+  assert.ok(log.some((argv) => argv[0] === "terminal" && argv[1] === "close" && hasFlagPair(argv, "--terminal", "term_w")));
+});
+
+test("after a failed launch, verify start launches no further pin", () => {
+  const ctx = setupVerify(DEFAULT_AGENTS, (repo) =>
+    defaultVerifyScenario(repo, {
+      deliveries: [],
+    })
+  );
+  const r = runDely(["verify", "start", "--repo", ctx.repo, "--control", "codex"], ctx, {
+    DELY_ACK_S: "1",
+  });
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /NO_ACK/);
+  const starts = readLog(ctx.logPath).filter((argv) => argv[0] === "orchestration" && argv[1] === "worker-start");
+  assert.equal(starts.length, 1, `expected one worker-start, got ${starts.length}`);
+});
+
+test("a throw after a launch cleans up and records FAIL before restoring", () => {
+  const agents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Cursor Agent CLI | cursor-grok-4.6-high | default |
+| \`review\` | Cursor Agent CLI | cursor-grok-4.6-high | default |
+`;
+  const ctx = setupVerify(agents, (repo) =>
+    defaultVerifyScenario(repo, {
+      workerStarts: [{ dispatchId: "disp_impl", state: "ready", handle: "term_impl" }],
+      deliveries: [
+        {
+          deliveryId: "dv_ack",
+          messages: [verifyAck("term_impl", "disp_impl")],
+        },
+      ],
+    })
+  );
+  fs.mkdirSync(path.join(ctx.repo, ".dely-verify", "state.json"), { recursive: true });
+  const r = runDely(["verify", "start", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  assert.notEqual(r.status, 0, r.stdout + r.stderr);
+  const log = readLog(ctx.logPath);
+  assert.ok(log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-stop" && hasFlagPair(argv, "--dispatch", "disp_impl")));
+  const verdict = verdictFromLog(log);
+  assert.ok(verdict);
+  assert.equal(verdict.verdict, "FAIL");
+  const last = lastBinding(log);
+  assert.ok(last);
+  assert.equal(last[1], "run-use");
+  assert.ok(hasFlagPair(last, "--id", "run_delivery"));
+});

@@ -26,6 +26,7 @@ const QUIET_MIN_S = numEnv("DELY_QUIET_MIN_S", 5);
 const VERIFY_DEADLINE_S = numEnv("DELY_VERIFY_DEADLINE_S", 300);
 
 let restoreOnExit = null;
+let verifyOnError = null;
 
 function numEnv(name, fallback) {
   const raw = process.env[name];
@@ -87,8 +88,14 @@ function withPrevRestore(fn) {
   try {
     fn();
   } catch (err) {
-    const prev = restoreOnExit;
+    const ctx = verifyOnError;
+    const prev = (ctx && ctx.prev) || restoreOnExit;
+    verifyOnError = null;
     restoreOnExit = null;
+    if (ctx) {
+      finishVerify(ctx);
+      return;
+    }
     restorePrev(prev);
     finish(1, `ERROR ${err && err.message ? err.message : err}`);
   } finally {
@@ -848,7 +855,9 @@ function launchDispatch({ repo, run, phase, specFile, title, pin, entry }) {
   const dispatchId = started.dispatchId;
   handle = workerHandle(dispatchId, handle || started.handle);
   if (started.state !== "ready") {
-    return { code: 5, line: `FAILED ${lastFailure(dispatchId, started)}`, dispatchId, handle, created };
+    const line = `FAILED ${lastFailure(dispatchId, started)}`;
+    if (handle) orca(["terminal", "close", "--terminal", handle, "--json"]);
+    return { code: 5, line, dispatchId, handle, created };
   }
   const ack = waitForAck(run, handle, Date.now());
   if (ack == null) {
@@ -1303,6 +1312,7 @@ function phaseLine(phase, pin, g) {
 }
 
 function finishVerify(ctx) {
+  verifyOnError = null;
   cleanupVerify(ctx.repo, ctx.groups, ctx.verifyRun);
   const nowStatus = gitPorcelain(ctx.repo);
   const gitChanged = nowStatus !== ctx.baseline;
@@ -1385,11 +1395,12 @@ function dispatchVerifyGroups(ctx) {
     if (out.code === 4) {
       g.status = "NO_ACK";
       g.reason = String(out.line || "").replace(/^NO_ACK \S+\s*/, "");
-      continue;
+      return;
     }
     if (out.code !== 0) {
       g.status = "FAIL";
       g.reason = out.line;
+      return;
     }
   }
 }
@@ -1415,6 +1426,7 @@ function writeVerifyState(ctx) {
 function cmdVerifyRun(flags) {
   const ctx = prepareVerify(flags);
   if (ctx.error) finish(9, `ERROR ${ctx.error}`);
+  verifyOnError = ctx;
   dispatchVerifyGroups(ctx);
   if (ctx.groups.some((g) => g.dispatchId && !g.status)) {
     const waitRes = consumeVerify(ctx.verifyRun, ctx.groups, Date.now(), VERIFY_DEADLINE_S);
@@ -1426,6 +1438,7 @@ function cmdVerifyRun(flags) {
 function cmdVerifyStart(flags) {
   const ctx = prepareVerify(flags);
   if (ctx.error) finish(9, `ERROR ${ctx.error}`);
+  verifyOnError = ctx;
   if (ctx.groups.some((g) => g.status === "BLOCKED")) {
     finishVerify(ctx);
     return;
@@ -1461,6 +1474,15 @@ function cmdVerifyCollect(flags) {
     finish(9, `ERROR missing verify state: ${e.message}`);
   }
   restoreOnExit = saved.prev || null;
+  verifyOnError = {
+    repo,
+    prev: saved.prev,
+    verifyRun: saved.verifyRun,
+    key: saved.key,
+    groups: saved.groups,
+    pins: saved.pins,
+    baseline: saved.baseline,
+  };
   const collected = collectSettles(saved.verifyRun);
   if (!collected.ok) finish(9, `ERROR ${collected.reason}`);
   applySettled(saved.groups, collected.settles.map((s) => s.message));

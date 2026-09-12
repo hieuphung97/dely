@@ -20,8 +20,8 @@ skill="$root/skills/delivery/SKILL.md"
 claude_version="$(jq -r .version "$claude_manifest" 2>/dev/null)"
 codex_version="$(jq -r .version "$codex_manifest" 2>/dev/null)"
 
-if [ "$claude_version" != "0.17.8" ] || [ "$codex_version" != "0.17.8" ]; then
-  fail_with "manifest versions must both be 0.17.8 (claude=$claude_version codex=$codex_version)"
+if [ "$claude_version" != "0.18.0" ] || [ "$codex_version" != "0.18.0" ]; then
+  fail_with "manifest versions must both be 0.18.0 (claude=$claude_version codex=$codex_version)"
 fi
 
 root_name="$(jq -r .name "$root_manifest" 2>/dev/null)"
@@ -147,7 +147,7 @@ readme_section() { awk "/^### ${1}[[:space:]]*\$/{p=1;next} p && /^#{2,3} /{exit
 kiro_section="$(readme_section 'Kiro CLI')"
 [ -n "$kiro_section" ] || fail_with "README.md is missing a ### Kiro CLI section"
 printf '%s\n' "$kiro_section" | grep -Eiq 'copy (the |both )?skills? (files? )?(manually|by hand)' && fail_with "README.md Kiro CLI section instructs manual copying instead of npx skills" || true
-for needle in 'npx skills add' 'npx skills update' 'npx skills remove' '--agent kiro-cli' '--global' '--skill delivery' '--skill setup' '/delivery' '/setup'; do
+for needle in 'npx skills add' 'npx skills update' 'npx skills remove' '--agent kiro-cli' '--global' '--skill delivery' '--skill setup' '--skill verify' '/delivery' '/setup' '/verify'; do
   printf '%s\n' "$kiro_section" | grep -Fq -- "$needle" || fail_with "README.md Kiro CLI section is missing: $needle"
 done
 cursor_section="$(readme_section 'Cursor Agent CLI')"
@@ -215,7 +215,7 @@ done
 
 # One CI entry point: the workflow must exist, parse as YAML, and match the
 # approved shape exactly: name, triggers, top-level permissions, the sole
-# "contracts" job id, its runner, its sole action, and every literal
+# "contracts" job id, its runner, checkout plus setup-node, and every literal
 # AGENTS.md closure command present as a whole normalized run line, never a
 # substring. A heredoc keeps the required lines' own quoting literal.
 workflow="$root/.github/workflows/contracts.yml"
@@ -246,14 +246,14 @@ if jobs.is_a?(Hash) && jobs.keys == ["contracts"]
   errs << "bad-runner" unless job["runs-on"] == "ubuntu-latest"
   steps = job["steps"] || []
   uses_steps = steps.select { |s| s.key?("uses") }
-  unless uses_steps.length == 1 && uses_steps.first["uses"] == "actions/checkout@v4"
+  unless uses_steps.map { |s| s["uses"] } == ["actions/checkout@v4", "actions/setup-node@v4"] && uses_steps[1].dig("with", "node-version").to_s.to_i >= 18
     errs << "bad-checkout-step"
   end
   run_lines = steps.flat_map { |s| (s["run"] || "").split("\n") }.map(&:strip).reject(&:empty?)
   required = [
     'git diff --check', 'bash -n tests/contracts.sh',
     'jq -e . plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json .cursor-plugin/plugin.json >/dev/null',
-    'bash tests/contracts.sh', 'test "$(wc -l < tests/contracts.sh)" -le 280',
+    'bash tests/contracts.sh', 'node --test tests/scripts.test.js', 'test "$(wc -l < tests/contracts.sh)" -le 280',
     'test ! -e git-hooks/pre-push', 'test ! -e docs/delivery-log.md', 'test ! -e docs/findings.md',
     'test ! -e docs/harness-surface.md', 'test ! -e docs/options.md',
     'test ! -e docs/_plans/2026-08-24-automation-first-dely-design.md',

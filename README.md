@@ -66,7 +66,8 @@ harness and that harness's defaults.
 The plugin is `dely`, from the `dely` marketplace at
 `https://github.com/hieuphung97/dely.git`. The skill name is `delivery`;
 invoke it as `dely:delivery`. Kiro CLI has no plugin verb; use
-`### Kiro CLI` below.
+`### Kiro CLI` below. The runtime needs Node 18 or newer on PATH, or
+Orca's bundled runtime.
 
 ### Claude Code
 
@@ -169,14 +170,14 @@ copilot plugin marketplace remove dely  # removes the marketplace, not the plugi
 ### Kiro CLI
 
 ```bash
-npx skills add hieuphung97/dely --agent kiro-cli --global --skill delivery --skill setup
+npx skills add hieuphung97/dely --agent kiro-cli --global --skill delivery --skill setup --skill verify
 
 npx skills list --agent kiro-cli --global    # verify it is installed
 npx skills update --global                   # update
-npx skills remove --agent kiro-cli --global --skill delivery --skill setup  # uninstall
+npx skills remove --agent kiro-cli --global --skill delivery --skill setup --skill verify  # uninstall
 ```
 
-Invoke the skills in a Kiro CLI session as `/delivery` and `/setup`.
+Invoke the skills in a Kiro CLI session as `/delivery`, `/setup` and `/verify`.
 
 ### Checked versions
 
@@ -199,6 +200,13 @@ against — observations, not a promised minimum:
 Ask for a change. Approve the design when asked. Dely implements, a
 different session reviews, then opens a PR. You merge. A Spike investigates
 only — no delivery run.
+
+`dely:verify` proves the dispatch path for this repository, these pins and
+this Control harness: a read-only preflight, one dispatch per distinct pin,
+and a PASS or FAIL verdict for that exact key. Delivery runs it automatically
+when `dely dispatch` prints `REFUSED`. It also runs at the end of
+`dely:setup`, and whenever a human asks after an account, harness or quota
+change.
 
 The workflow contract is [`skills/delivery/SKILL.md`](skills/delivery/SKILL.md).
 

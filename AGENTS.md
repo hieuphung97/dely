@@ -81,6 +81,10 @@ bash tests/contracts.sh
 ```
 
 ```bash
+node --test tests/scripts.test.js
+```
+
+```bash
 test "$(wc -l < tests/contracts.sh)" -le 280
 ```
 
