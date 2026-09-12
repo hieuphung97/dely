@@ -252,11 +252,34 @@ Rejected:
   a human ends that wait. Measured across this delivery's 17 dispatches: no wake
   depended on a watchdog, and both failures were Control's own stop and terminal
   close.
-- **Three residual failures are known and unfixed.** A git directory that resolves but
-  cannot be written makes the memory a silent no-op, so the `FAILED` line repeats; a
-  `.git` that is readable but not writable dies with an uncaught `EACCES` before
-  reporting anything; and a throw raised inside `finishVerify` after the verdict is
-  written cannot change that verdict. Each needs a human to notice.
+- **The known residual failures, none of them fixed.** Each was measured during this
+  delivery, and each needs a human to notice:
+  - A git directory that resolves but cannot be written makes the dead-dispatch memory a
+    silent no-op, so the `FAILED` line repeats on every collect.
+  - A `.git` that is readable but not writable dies with an uncaught `EACCES` before
+    reporting anything at all.
+  - A throw raised inside `finishVerify` after the verdict is written cannot change that
+    verdict.
+  - The window between claiming a dispatch id and printing its `FAILED` line: a crash
+    there loses that report permanently. At-most-once is the deliberate trade against
+    duplicating the line.
+  - `dely collect` on a Run whose only dispatch is dead and already reported exits 0 with
+    no line, the same code a fully settled batch uses.
+  - `dely wait` on a Run with nothing open spins until killed.
+  - `collectSettles` turns a repeated delivery id into `ERROR ack failed`. That is the
+    right bound for an ack-failure hang; whether real Orca ever reissues an id is unknown.
+  - `skills/delivery/SKILL.md`'s "exit 8 when nothing is still open" over-claims: a fully
+    settled batch with nothing open exits 0.
+  - `releaseDispatch` parses the release receipt into two lines that do nothing. The
+    contract holds by not depending on the receipt, not by those lines.
+  - The report-once guard is held twice, by the memory read and by `remember()`'s return
+    value; removing either alone keeps every test green.
+  - `tests/fixtures/fake-orca.js` puts `stage`, `ownershipState` and `retainedReason` at
+    the top level, where real Orca nests them under `projection` and `resource`. The
+    runtime reads both shapes; only the fake's is covered by a test.
+  - `dely collect` accepts and ignores `--repo`.
+  - `skills/verify/SKILL.md`'s prohibition on the nudge's quoted `check` command is
+    unpinned, as is `AGENTS.md`'s gate list.
 - **`AGENTS.md`'s gate list is not pinned to the workflow.** `tests/contracts.sh` pins
   the workflow's run lines against its own literal list, so deleting a gate block from
   `AGENTS.md` alone leaves the gate green.
