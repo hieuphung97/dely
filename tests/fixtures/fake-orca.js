@@ -357,6 +357,7 @@ if (group === "orchestration" && cmd === "worker-show") {
   const w = workers(state).find((row) => row.dispatchId === id) || {};
   const ws = scenario.workerStart || {};
   const dispatchedAt = dispatchedAtOf(w, state);
+  const lastError = w.lastError || null;
   saveState(state);
   ok({
     dispatch: {
@@ -365,9 +366,12 @@ if (group === "orchestration" && cmd === "worker-show") {
       lastHeartbeatAt: w.lastHeartbeatAt || null,
       dispatchedAt,
       status: w.dispatchStatus || "dispatched",
+      lastError,
     },
     worker: {
-      state: w.workerState || "ready",
+      state: w.workerState || w.state || "ready",
+      stage: w.stage || "",
+      lastError,
       agentTerminalHandle: w.agentTerminalHandle || ws.handle || "",
     },
     projection: w.projection || { liveness: { verdict: scenario.liveness || "live" } },

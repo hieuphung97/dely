@@ -735,7 +735,7 @@ test("wait judges a Delivery as a whole", () => {
   assert.ok(hasFlagPair(acks[0], "--ack", "mixed1"));
 });
 
-test("collect reports settles already consumed by the sidecar", () => {
+test("collect reports settles already present in check --all history", () => {
   const ctx = setup(DEFAULT_AGENTS, {
     history: [
       {
@@ -890,6 +890,32 @@ test("collect surfaces a failed consuming check", () => {
   assert.ok(log.some(consumingCheck));
 });
 
+test("collect surfaces a failed acknowledgement", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    rejectAck: true,
+    rejectAckReason: "ack rejected",
+    deliveries: [
+      {
+        deliveryId: "dv1",
+        messages: [{ type: "heartbeat", from_handle: "term_w", subject: "ack" }],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_w",
+        lastHeartbeatAt: "2026-09-11T09:00:00Z",
+        projection: { liveness: { verdict: "live" } },
+      },
+    ],
+    lastOutputAt: "now",
+  });
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 9, r.stdout + r.stderr);
+  assert.equal(r.stdout, "ERROR ack failed: ack rejected\n");
+});
+
 test("collect keeps distinct settling messages that share dispatch type and body", () => {
   const ctx = setup(DEFAULT_AGENTS, {
     deliveries: [
@@ -986,6 +1012,72 @@ test("collect reports DEADLINE from the dispatch dispatchedAt", () => {
   });
   assert.equal(r.status, 7, r.stdout + r.stderr);
   assert.match(r.stdout, /^DEADLINE disp_1 /);
+});
+
+function deadDispatchScenario(extra) {
+  return Object.assign(
+    {
+      deliveries: [],
+      workers: [
+        {
+          dispatchId: "disp_1",
+          dispatchStatus: "failed",
+          agentTerminalHandle: "term_w",
+          workerState: "exited",
+          stage: "stopped",
+          lastError: "process died",
+          projection: { liveness: { verdict: "exited" } },
+        },
+      ],
+    },
+    extra || {}
+  );
+}
+
+test("collect reports a failed dispatch that sent no message", () => {
+  const ctx = setup(DEFAULT_AGENTS, deadDispatchScenario());
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 8, r.stdout + r.stderr);
+  assert.equal(r.stdout, "FAILED disp_1 exited process died liveness=exited\n");
+});
+
+test("wait reports a failed dispatch that sent no message", { timeout: 5000 }, () => {
+  const ctx = setup(DEFAULT_AGENTS, deadDispatchScenario());
+  const r = runDely(["wait", "--run", "run_live"], ctx, {
+    DELY_DEADLINE_S: "30",
+    DELY_SILENCE_S: "60",
+    SPAWN_TIMEOUT_MS: 3000,
+  });
+  assert.equal(r.status, 8, r.stdout + r.stderr);
+  assert.equal(r.stdout, "FAILED disp_1 exited process died liveness=exited\n");
+});
+
+test("collect does not report FAILED for a dispatch that settled normally", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    history: [
+      {
+        deliveryId: "mixed1",
+        messages: [
+          { type: "heartbeat", from_handle: "term_w", subject: "ack" },
+          { type: "worker_done", from_handle: "term_w", body: "done" },
+        ],
+      },
+    ],
+    deliveries: [],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_w",
+        workerState: "exited",
+        projection: { liveness: { verdict: "exited" } },
+      },
+    ],
+  });
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /^SETTLED disp_1 worker_done done\n/);
+  assert.doesNotMatch(r.stdout, /FAILED /);
 });
 
 test("nudge-mode collect opens no terminal when a dispatch is still open", () => {

@@ -549,6 +549,64 @@ function checkSilent(run, seen) {
   return null;
 }
 
+function oneLine(s) {
+  return String(s || "").replace(/\s+/g, " ").trim();
+}
+
+function shownLiveness(shown, worker) {
+  const fromShow = result(shown).projection && result(shown).projection.liveness;
+  const fromList = worker && worker.projection && worker.projection.liveness;
+  return (fromShow && fromShow.verdict) || (fromList && fromList.verdict) || "";
+}
+
+function deadDispatchReason(shown) {
+  const res = result(shown);
+  const worker = res.worker || {};
+  const dispatch = res.dispatch || {};
+  const state = oneLine(worker.state || worker.stage || dispatch.stage || "");
+  const err = oneLine(worker.lastError || dispatch.lastError || "");
+  const liveness = oneLine(shownLiveness(shown));
+  const parts = [];
+  if (state) parts.push(state);
+  if (err) parts.push(err);
+  if (liveness) parts.push("liveness=" + liveness);
+  return parts.join(" ") || "failed";
+}
+
+function settleIdsOf(run, workers, extraIds) {
+  const ids = new Set(extraIds || []);
+  if (ids.size) return ids;
+  const byHandle = new Map();
+  for (const worker of workers || []) {
+    if (worker.agentTerminalHandle) byHandle.set(worker.agentTerminalHandle, worker.dispatchId);
+  }
+  const all = orca(["orchestration", "check", "--all", "--run", run, "--json"]);
+  if (orcaFailed(all)) return ids;
+  for (const m of messagesOf(all)) {
+    if (!hasSettle([m])) continue;
+    const id = messageDispatchId(m) || byHandle.get(m.from_handle);
+    if (id) ids.add(id);
+  }
+  return ids;
+}
+
+function checkDeadDispatch(run, extraSettleIds) {
+  const listed = workerList(run);
+  if (!listed.ok) return null;
+  const suspects = listed.workers.filter((w) => w.dispatchStatus !== "dispatched");
+  if (!suspects.length) return null;
+  const ids = settleIdsOf(run, listed.workers, extraSettleIds);
+  for (const worker of suspects) {
+    if (ids.has(worker.dispatchId)) continue;
+    const shown = orca(["orchestration", "worker-show", "--dispatch", worker.dispatchId, "--json"]);
+    const status = worker.dispatchStatus || (result(shown).dispatch && result(shown).dispatch.status) || "";
+    const liveness = shownLiveness(shown, worker);
+    if (status !== "failed" && liveness !== "exited") continue;
+    return { dispatchId: worker.dispatchId, reason: deadDispatchReason(shown) };
+  }
+  return null;
+}
+
 function markHeartbeats(messages, seen) {
   for (const m of messages) {
     if (!m || m.type !== "heartbeat") continue;
@@ -695,6 +753,8 @@ function waitStep(run, startedAt, seen, deadlineS) {
 function cmdWait(flags) {
   const seen = new Set();
   for (;;) {
+    const dead = checkDeadDispatch(flags.run);
+    if (dead) finish(8, `FAILED ${dead.dispatchId} ${dead.reason}`);
     const step = waitStep(flags.run, Date.now(), seen, Number.POSITIVE_INFINITY);
     if (step.type === "settled") {
       finish(0, `SETTLED ${step.types.join(",")} ${JSON.stringify(step.messages)}`);
@@ -777,6 +837,11 @@ function cmdCollect(flags) {
   }
   const deadline = checkDeadline(flags.run);
   if (deadline) finish(7, `DEADLINE ${deadline.dispatchId} ${deadline.seconds}`);
+  const dead = checkDeadDispatch(
+    flags.run,
+    collected.settles.map((s) => s.dispatchId).filter(Boolean)
+  );
+  if (dead) finish(8, `FAILED ${dead.dispatchId} ${dead.reason}`);
   if (collected.open.length) {
     finish(2, `WAITING ${collected.open.join(" ")}`);
   }
