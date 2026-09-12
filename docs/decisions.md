@@ -157,6 +157,12 @@ Measurements that shaped the decision, all on macOS, 2026-09-11:
      `check --all` and `worker-list`, drains what remains, and checks silence and the
      deadline. A dispatch Orca has marked dead — no longer open, and it sent no
      settling message — is released and reported once as `FAILED`.
+   - **Reported once is Dely's own memory, not Orca's bookkeeping.** The dispatch ids
+     already reported, and those Dely stopped itself, live in
+     `<git-dir>/dely/runs/<run>.json`, falling back to `~/.dely/runs` when the working
+     directory is not a git repository. Orca's `terminalState` cannot carry it: an
+     adopted dispatch is born `retained`, and `worker-release` can report success while
+     releasing nothing.
    - **Amended 2026-09-12.** A `dely sidecar` process was this record's watchdog for a
      nudge-mode Control. It is removed. Orca already reports a dead worker
      (`liveness.verdict` `exited`, `dispatchStatus` `failed`), a sidecar terminal
@@ -246,6 +252,14 @@ Rejected:
   a human ends that wait. Measured across this delivery's 17 dispatches: no wake
   depended on a watchdog, and both failures were Control's own stop and terminal
   close.
+- **Three residual failures are known and unfixed.** A git directory that resolves but
+  cannot be written makes the memory a silent no-op, so the `FAILED` line repeats; a
+  `.git` that is readable but not writable dies with an uncaught `EACCES` before
+  reporting anything; and a throw raised inside `finishVerify` after the verdict is
+  written cannot change that verdict. Each needs a human to notice.
+- **`AGENTS.md`'s gate list is not pinned to the workflow.** `tests/contracts.sh` pins
+  the workflow's run lines against its own literal list, so deleting a gate block from
+  `AGENTS.md` alone leaves the gate green.
 - **A verify run costs one short worker session per distinct pin,** about one to two
   minutes for `implement` and `review` together.
 - **Setup becomes more than pin selection,** and needs a human present for trust.
