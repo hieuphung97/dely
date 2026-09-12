@@ -3,7 +3,7 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-11.
+Last updated 2026-09-12.
 
 ---
 
@@ -143,10 +143,9 @@ Measurements that shaped the decision, all on macOS, 2026-09-11:
      diagnosis.
 5. **Control sleeps by its harness's wake mode.**
    - Claude Code and Cursor Agent CLI run `dely wait` as a background command.
-   - Codex, Copilot, Antigravity and Grok start `dely sidecar`, confirm nothing has
-     already settled, and end their turn. When nudged they run only `dely collect`,
-     never the command quoted in the nudge text, because it would consume the
-     message.
+   - Codex, Copilot, Antigravity and Grok end their turn after dispatching. When
+     nudged they run only `dely collect`, never the command quoted in the nudge text,
+     because it would consume the message.
    - Kiro is not supported as Control.
    - **One consumer per Run at a time;** every other observer only peeks.
    - `dely wait` is that consumer in the background mode. It judges each Delivery as
@@ -154,13 +153,15 @@ Measurements that shaped the decision, all on macOS, 2026-09-11:
      message, it acknowledges, prints the whole batch and exits `SETTLED`. It also
      exits `SILENT` (90 s without output after ACK) or `DEADLINE` (per dispatch,
      default 3600 s).
-   - `dely sidecar` is that consumer while a nudge-mode Control sleeps. A
-     heartbeats-only Delivery is acknowledged. A Delivery with any settling message,
-     or a silence or deadline, is acknowledged; the sidecar then sends one `status`
-     message to wake Control and exits, so it cannot consume that wake message
-     itself.
-   - `dely collect` reports settled work from `check --all` and `worker-list`, then
-     drains what remains.
+   - `dely collect` is that consumer in nudge mode. It reports settled work from
+     `check --all` and `worker-list`, drains what remains, reads each open dispatch's
+     Orca liveness, and checks silence and the deadline.
+   - **Amended 2026-09-12.** A `dely sidecar` process was this record's watchdog for a
+     nudge-mode Control. It is removed. Orca already reports a dead worker
+     (`liveness.verdict` `exited`, `dispatchStatus` `failed`), a sidecar terminal
+     cannot be recognised by title because the shell rewrites it, and its liveness
+     needs fields Orca does not send. What the sidecar alone covered — a worker that
+     neither sends a message nor exits — now goes to the human.
 6. **Setup hands trust to the human.** `dely:setup` opens each pinned harness once in
    an Orca terminal for the human to answer that harness's own trust dialog, then
    runs `dely:verify`. Setup still never answers a dialog and never writes a harness
@@ -188,6 +189,18 @@ peek-only ACK observation and a single whole-batch consumer.
 
 **Rely on Orca's nudge for every Control.** Rejected: measured to race, and to stay
 unsubmitted on Cursor. Harness-native background wake is used wherever it exists.
+
+**A sidecar that wakes a sleeping nudge-mode Control on silence or deadline.**
+Shipped, then superseded on 2026-09-12 after its re-review and a round of probes. As
+an Orca terminal it cannot be found again: the shell rewrites the title, and
+`terminal show` sends no field that says whether it still runs, so `collect` either
+opens one per wake and leaks shells or never reopens one. As a detached process it
+survives and can wake Control, but the detach command differs per operating system —
+macOS has no `setsid` — and Orca cannot see or reclaim it. `orca automations` is
+agent-backed, hourly at finest, and creates a worktree per run. Worker heartbeats run
+1.5 to 15 minutes apart and are the agent's, not a clock. What remains is what Orca
+already answers on the next wake: liveness, silence and the deadline, all read by
+`dely collect`.
 
 **Clear gates by screen signatures on every dispatch.** A prototype handled every
 harness, but needed five fix iterations. Grok and Cursor updated themselves in the
@@ -227,8 +240,11 @@ Rejected:
   newer.
 - **Only macOS is measured live.** Linux runs the tests in CI. Windows is designed,
   not measured.
-- **Nudge-mode Controls still depend on Orca delivering the nudge.** The sidecar
-  bounds that dependency by deadline; it does not remove it.
+- **Nudge-mode Controls depend on Orca delivering the nudge, and on the worker
+  speaking at all.** A worker that neither sends a message nor exits wakes nobody, and
+  a human ends that wait. Measured across this delivery's 17 dispatches: no wake
+  depended on a watchdog, and both failures were Control's own stop and terminal
+  close.
 - **A verify run costs one short worker session per distinct pin,** about one to two
   minutes for `implement` and `review` together.
 - **Setup becomes more than pin selection,** and needs a human present for trust.

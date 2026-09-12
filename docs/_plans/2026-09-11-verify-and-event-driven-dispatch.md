@@ -184,7 +184,8 @@ behaviour text and interface conflict with this task, this task supersedes it.
   and it keeps waiting. A batch with any `worker_done`, `escalation` or `question` is
   acknowledged, printed whole as `SETTLED <types> <json>`, and exits 0. `SILENT` and
   `DEADLINE` are unchanged.
-- **`dely sidecar --run <runId> --control-handle <handle>`** consumes whole
+- **`dely sidecar --run <runId> --control-handle <handle>`** (removed by task 3c)
+  consumes whole
   Deliveries with `--terminal <handle>`, waiting on all four types. A heartbeats-only
   batch is acknowledged. For a batch with any settling message, or on silence or
   deadline: acknowledge it, send one
@@ -273,8 +274,7 @@ which changes.
 - an automatic `dely verify` when dispatch refuses;
 - a stop with the reported fix on FAIL or BLOCKED;
 - after ACK, Control sleeps by its harness's wake mode — `dely wait` in the
-  background, or `dely sidecar` plus ending the turn — and on a nudge runs only
-  `dely collect`;
+  background, or ending the turn — and on a nudge runs only `dely collect`;
 - recovery from NO_ACK or SILENT is one fresh start, never a retry into the same
   terminal; a second failure on the same input goes to the human.
 
@@ -319,12 +319,9 @@ The second is a runtime defect from tasks 1 and 1b, and task 3's remediation own
 - `dely collect --run <run> --repo <path>`:
   - reports a silent dispatch by its own silence check, and `DEADLINE` (exit 7)
     when a dispatch has run longer than the deadline;
-  - on `WAITING`, makes sure exactly one sidecar for the Run is live, and opens one
-    only when none is.
 - The deadline is measured from the dispatch's Orca `dispatchedAt`, not from the
   start of a wait or sidecar process.
-- The skill's nudge mode runs only `dely collect`; Control never opens a sidecar by
-  hand. The skill also:
+- The skill's nudge mode runs only `dely collect`. The skill also:
   - states each command's usage;
   - routes `ERROR`, and a `SETTLED` batch that holds only `question` or `escalation`;
   - matches `SETTLED` lines to the dispatch id that `DISPATCHED` printed;
@@ -335,6 +332,55 @@ The second is a runtime defect from tasks 1 and 1b, and task 3's remediation own
 Remediation files: `skills/delivery/SKILL.md`, `tests/contracts.sh`,
 `skills/delivery/scripts/dely.js`, `tests/scripts.test.js`,
 `tests/fixtures/fake-orca.js`.
+
+The remediation shipped as `44ffe96`. Its scoped re-review accepted both Important
+fixes but rejected the single-sidecar part: the lookup finds the sidecar by a title
+the shell rewrites, and judges liveness by `terminal show` fields real Orca does not
+send. That routed to `REPLAN_OR_SPLIT`, and task 3c is the human's replan.
+
+### 3c. The sidecar is removed
+
+**Behaviour.** Nudge-mode Control dispatches and ends its turn. Every nudge runs only
+`dely collect --run <run>`, which reports what settled, asks Orca for each open
+dispatch's liveness, and checks silence and the deadline. Nothing else watches, and
+Dely opens no terminal of its own.
+
+Removed from `skills/delivery/scripts/dely.js`: the `sidecar` command, `cmdSidecar`,
+`startSidecar`, `startVerifySidecar`, `sidecarAlive`, `ensureRunSidecar`,
+`coordinatorHandle`, the `sidecarHandle` state and cleanup, and `collect --repo`,
+which only the sidecar needed. `dely verify start` sleeps with no sidecar, and
+`dely verify collect` restarts none.
+
+**Why, measured on 2026-09-11 and 2026-09-12.**
+
+- Orca already knows a dead worker: `projection.liveness.verdict` is `exited`,
+  `dispatchStatus` is `failed`, and `nextAction` names `worker-release`. No watchdog
+  discovers that; `collect` reads it.
+- Only a message wakes a nudge-mode Control, and the sender's handle does not matter:
+  a message carrying Control's own handle nudged it, and so did one from another
+  terminal.
+- A sidecar terminal cannot be identified by title: the shell rewrites it. Judging it
+  live needs fields Orca does not send.
+- `orca automations` cannot be the watchdog: it is agent-backed, hourly at finest, and
+  creates a worktree per run.
+- Worker heartbeats are not a clock: measured 1.5 to 15 minutes apart across 16
+  dispatches, sent by the agent rather than by Orca.
+- In this delivery's 17 dispatches, no wake depended on a watchdog. Both failures were
+  Control's own `worker-stop` and terminal close, each of which Control already knew.
+
+**Direction.** Delete rather than replace. The wake modes stay: background Control
+runs `dely wait`; nudge Control runs `dely collect`. One consumer per Run still holds,
+and more simply, because `collect` is that consumer in nudge mode.
+
+**Files.** `skills/delivery/scripts/dely.js`, `tests/scripts.test.js`,
+`tests/fixtures/fake-orca.js`, `skills/delivery/SKILL.md`, `skills/verify/SKILL.md`,
+`tests/contracts.sh`.
+
+**Focused verification.** `node --test tests/scripts.test.js` plus
+`bash tests/contracts.sh`, with the acceptance rows below.
+
+**Document impact.** Decision 5 of the 2026-09-11 record is amended in place, and its
+sidecar alternative is recorded as superseded.
 
 ### 4. The package, its gates and its record ship the change
 
@@ -387,7 +433,7 @@ reuse the existing cleanup and verdict paths.
 | Sidecar swallows only heartbeats on the Control handle (superseded by task 1b; kept as the record of the first approved interface) | `node --test` case asserting `check --terminal <control> --types heartbeat` and no ack of a `worker_done` | A sidecar that waits on all types and suppresses the settling nudge | `718bc27` review |
 | Dispatch observes its ACK without consuming a Delivery (task 1b) | `node --test` case: one Delivery holds the ACK heartbeat and `worker_done`; dispatch returns `DISPATCHED`, records no consuming `check` or `--ack`, and a later `dely collect` prints `SETTLED ... worker_done` | The `088e8ce` ACK wait, which consumes heartbeat-typed deliveries and stalls or loses a batched settle | |
 | Wait judges a Delivery as a whole (task 1b) | `node --test` case: one Delivery holds a heartbeat and `worker_done`; wait acknowledges once and exits `SETTLED` listing both | A wait that acknowledges a heartbeat-typed batch and keeps waiting | |
-| Sidecar wakes Control once and exits when a batch carries a settle (task 1b) | `node --test` case: a mixed Delivery; assert one `--ack` with `--terminal <control>`, one `send --type status`, exit 0, and no consuming `check` after the send | A sidecar that acknowledges and keeps looping, consuming its own wake message, or one that never acknowledges a mixed batch | |
+| Sidecar wakes Control once and exits when a batch carries a settle (task 1b; superseded by task 3c, kept as the record of the shipped interface) | `node --test` case: a mixed Delivery; assert one `--ack` with `--terminal <control>`, one `send --type status`, exit 0, and no consuming `check` after the send | A sidecar that acknowledges and keeps looping, consuming its own wake message, or one that never acknowledges a mixed batch | |
 | Collect reports settles already consumed by the sidecar (task 1b) | `node --test` case: `worker_done` present only in `--all` history (acknowledged); collect prints `SETTLED <dispatch> worker_done` and exits 0 | A collect that reports only from deliveries it consumes itself | |
 | Fake Orca replays the oldest Delivery until acknowledged (task 1b) | `node --test` case: consume without ack, send a newer message, consume again; assert the same delivery id and contents | A fake that filters Delivery contents by `--types` or forms a new batch per call | |
 | Verdict is written only after every dispatch settled, with the full key | `node --test` case: one dispatch settles PASS, one still open; assert no verdict task yet | A verify that writes PASS when dispatches start | |
@@ -399,7 +445,9 @@ reuse the existing cleanup and verdict paths.
 | Pins reject an inverted sentence (task 3 remediation) | `bash tests/contracts.sh` against each of: the nudge's quoted check command run; a human asked before `dely:verify`; a live terminal re-engaged; `NO_ACK`/`SILENT`/`FAILED` sent straight to the human | The `d6635b3` token pins, which pass all four | `review-3` |
 | A silent dispatch is stopped before `SILENT` is reported (task 3 remediation) | `node --test` cases for `wait` and `collect`: stale output after ACK; assert `worker-stop --dispatch <id>` before exit 6, and a following `collect` does not report it again | The `d6635b3` runtime: wait exits `SILENT` with no stop, collect drains the wake and prints `WAITING` | `review-3` scratch driver |
 | Collect reports `DEADLINE` from the dispatch's `dispatchedAt` (task 3 remediation) | `node --test` case: `dispatchedAt` older than the deadline, output fresh, a new collect process; assert exit 7 | A deadline measured from the start of the collect, wait or sidecar process | |
-| Collect keeps exactly one sidecar per Run (task 3 remediation) | `node --test` cases: a live sidecar terminal listed means no `terminal create`; none listed means exactly one | A collect that opens a sidecar on every `WAITING`, or never | |
+| Nudge-mode collect opens no terminal (task 3c) | `node --test` case: one dispatch still open; assert `WAITING`, and no `terminal create` or `terminal list` call | The `44ffe96` collect, which opens or reuses a sidecar on every `WAITING` | `rereview-3` |
+| The runtime has no sidecar command (task 3c) | `node --test` case: `dely sidecar --run r --control-handle h` prints the usage line and exits 2 | A runtime that keeps the command while the skill stops naming it | |
+| Verify sleeps and collects without a sidecar (task 3c) | `node --test` cases: `verify start` prints `SLEEP` and records no `terminal create`; `verify collect` with one dispatch open prints `WAITING` and records none either | The `44ffe96` verify, which starts a sidecar and restarts a missing one | |
 | An adopt `worker-start` that is not `ready` closes its terminal (task 4) | `node --test` case: adopt, `worker-start` returns `failed`; assert `terminal close` for the created handle | The `d6635b3` adopt path, which closes only on readiness timeout and `NO_ACK` | `review-3` |
 | After a failed launch, verify start launches no further pin (task 4, N1) | `node --test` case: first pin gets no ACK; assert exactly one `worker-start` | A start that launches every pin before checking for a failed launch | |
 | A throw after a launch cleans up and records FAIL before restoring (task 4, N2) | `node --test` case: `state.json` write fails after one launch; assert `worker-stop` for that dispatch, a FAIL verdict, and `run-use --id <prev>` last | A catch that only restores the Run | |
@@ -414,6 +462,9 @@ reuse the existing cleanup and verdict paths.
 - Orca nudge reliability across Orca versions.
 - Quota exhaustion in a live run.
 - Grok and Kiro verify outcomes.
+- A worker that neither sends a message nor exits leaves a nudge-mode Control asleep.
+  Nothing offline can observe that, and after task 3c a human ends that wait. Measured
+  in this delivery: 0 of 17 dispatches.
 - A same-terminal retry reworded to avoid every pinned phrase. The pins are lexical.
 - `adoptedPermission` off macOS: Orca's data path there is unmeasured, and it falls
   back to the table's permission cell.
