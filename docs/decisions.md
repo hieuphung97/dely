@@ -3,7 +3,7 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-12.
+Last updated 2026-09-13.
 
 ---
 
@@ -142,8 +142,9 @@ Measurements that shaped the decision, all on macOS, 2026-09-11:
    - No screen signature decides a route. Screen and log text only phrase the
      diagnosis.
 5. **Control sleeps by its harness's wake mode.**
-   - Claude Code and Cursor Agent CLI run `dely wait` as a background command.
-   - Codex, Copilot, Antigravity and Grok end their turn after dispatching. When
+   - Claude Code, Cursor Agent CLI and GitHub Copilot CLI run `dely wait` as a
+     background command.
+   - Codex, Antigravity and Grok end their turn after dispatching. When
      nudged they run only `dely collect`, never the command quoted in the nudge text,
      because it would consume the message.
    - Kiro is not supported as Control.
@@ -178,6 +179,39 @@ Measurements that shaped the decision, all on macOS, 2026-09-11:
 8. **Amended in place.** The 2026-09-04 record's recovery route (retry into the same
    terminal) and its claim that `agent_prompt_blocked` was never observed are
    corrected. So is the 2026-08-29 trust record's superseding note.
+9. **Amended 2026-09-13, after a live probe of 0.18.0 before merge.** Every harness
+   was pinned to the candidate. Five deliveries in fresh repositories rotated Claude
+   Code, Codex, Cursor, Copilot and Antigravity through Control, implement and
+   review. All five reviews returned `ACCEPT` and pushed correct code, and injected
+   faults held (`FAILED` exit 8 in 1 s for a killed worker, `SILENT` exit 6 at 93 s,
+   report-once). Controls still stalled where the runtime left them a choice:
+   - Claude Code invented a run id, and Copilot dispatched on the verify Run that
+     `dely status` printed. So `dely open` creates and binds the delivery Run and
+     prints it, `dely dispatch` refuses a Run that is not the one bound to Control,
+     and `dely status` prints no run id.
+   - Codex and Copilot, in nudge mode, ran the background form of verify. Codex then
+     slept after a PASS with nothing left to wake it. So one `dely verify` picks the
+     form from the Control wake column, and `dely wait` refuses a nudge-mode Control.
+   - Copilot's nudge stayed unsubmitted in its composer after its TUI reloaded.
+     Copilot 1.0.83 resumed on its own when a detached shell it started exited, so its
+     wake mode is background.
+   - Settled workers were never released, leaving two to four live harness sessions
+     per delivery. `wait` and `collect` now release a dispatch after its
+     `worker_done`, and close an adopted terminal, which `worker-release` retains.
+   - Any unexplained `NO_ACK` was blamed on Antigravity quota, because diagnosis read
+     the three oldest Antigravity logs for every harness. It now reads Antigravity's
+     newest log only for an Antigravity worker.
+   - Codex and Copilot also load `~/.agents/skills`, where a stale 0.17.8 copy from
+     `npx skills add` shadowed the 0.18.0 plugin while `codex plugin list` reported
+     0.18.0. Install guidance now covers that directory.
+   - Smaller fixes: Kiro's adopted argv needs `chat`; `dely wait` with nothing open
+     exits; a group skipped because another is BLOCKED reads `SKIPPED`; an
+     unregistered repository names `orca repo add`; verify opens no Run when every pin
+     is BLOCKED.
+
+   The nudge's quoted `check` command was run by both nudge-mode Controls and lost
+   nothing, because an unacknowledged Delivery is replayed; that prohibition is kept
+   but no longer carries the delivery.
 
 This decision ships in **0.18.0**.
 
@@ -265,7 +299,6 @@ Rejected:
     duplicating the line.
   - `dely collect` on a Run whose only dispatch is dead and already reported exits 0 with
     no line, the same code a fully settled batch uses.
-  - `dely wait` on a Run with nothing open spins until killed.
   - `collectSettles` turns a repeated delivery id into `ERROR ack failed`. That is the
     right bound for an ack-failure hang; whether real Orca ever reissues an id is unknown.
   - `skills/delivery/SKILL.md`'s "exit 8 when nothing is still open" over-claims: a fully
