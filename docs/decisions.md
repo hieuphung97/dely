@@ -330,6 +330,10 @@ Rejected:
     A verify Run from another key, or a Run missing from `run-list`, passes that check.
   - An adopted terminal is closed only when the run memory that recorded its launch is
     found. `wait` or `collect` run from another working directory leaves it open.
+  - That close also needs the dispatch's `worker-list` row: when the list fails or omits
+    the row, a Dely-created terminal is left open.
+  - Only `user_owned` stops the close. A Dely-created terminal Orca retains as
+    `user_requested` with `external` ownership is still closed.
   - `dely wait` decides `NOTHING_OPEN` after peeking for a pending settle. Whether live
     Orca moves `dispatchStatus` before the `worker_done` is delivered, and whether a
     settle can show in `--peek` yet never reach this consumer's `check --wait`, are
