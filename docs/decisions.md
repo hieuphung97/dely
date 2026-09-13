@@ -121,8 +121,10 @@ Measurements that shaped the decision, all on macOS, 2026-09-11:
    - `dely dispatch` refuses when Orca holds no PASS verdict for the current key.
      Delivery then runs verify automatically, with no extra human gate, and stops
      with the reported fix on FAIL or BLOCKED.
-   - A PASS lapses when the key changes, and after any delivery escalation caused by
-     the environment.
+   - A PASS lapses when the key changes. **Amended 2026-09-13:** it does not lapse on an
+     environment escalation, which this record first said. Nothing implements that, and
+     the next dispatch's ACK re-checks the environment; a quota or sign-in failure then
+     reports `NO_ACK`, and the same failure twice goes to the human.
    - Verify restores the Control terminal's previously bound Run when it finishes,
      because creating a Run rebinds the caller and a delivery's `worker-start` then
      refuses to run.
@@ -334,6 +336,12 @@ Rejected:
     the row, a Dely-created terminal is left open.
   - Only `user_owned` stops the close. A Dely-created terminal Orca retains as
     `user_requested` with `external` ownership is still closed.
+  - Two closes sit outside that rule. A launch that never reaches `ready` or never
+    acknowledges closes its handle even when Orca created it. Verify's cleanup closes
+    its adopted terminals without the `user_owned` guard.
+  - Orca fences `check --run <id>` to the Run the caller is bound to
+    (`consumer_fenced`). The fake does not model it, so ordering between binding and
+    consuming is untested.
   - `dely wait` decides `NOTHING_OPEN` after peeking for a pending settle. Whether live
     Orca moves `dispatchStatus` before the `worker_done` is delivered, and whether a
     settle can show in `--peek` yet never reach this consumer's `check --wait`, are
