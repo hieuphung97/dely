@@ -138,9 +138,9 @@ harness's `Control wake` cell in `references/harnesses.md`.
 
 Usage as the launcher prints it:
 
-- `dely open --repo <path> --objective <text>`
+- `dely open --repo <path> --objective <text>` prints `RUN <runId>` (exit 0, 9 on error)
 - `dely dispatch --repo <path> --run <runId> --phase <implement|review> --spec-file <path> --control <agent>`
-- `dely wait --run <runId> --control <agent>`
+- `dely wait --run <runId> --control <agent>` exits 3 `REFUSED` for a Control that is not in background mode
 - `dely collect --run <runId>`
 - `dely verify --repo <path> --control <agent>`
 
@@ -181,10 +181,11 @@ default is an unpinned environment: it lives in the harness's own config, it
 changes without announcing itself, and the dispatch that relies on it looks
 identical to one that pinned the same value deliberately.
 
-**Refusal:** when `dely dispatch` prints `REFUSED`, Control runs `dely:verify`
-at once, with no human gate, then dispatches again. On FAIL or BLOCKED,
-Control stops and relays the printed fix to the human. A second `REFUSED`
-right after a verify PASS goes to the human.
+**Refusal:** when `dely dispatch` prints `REFUSED`, route by the text, with no
+human gate: a missing PASS verdict runs `dely:verify` at once, then dispatches
+again; `is not the Run bound to Control` runs `dely open` and dispatches on the
+printed Run. On FAIL or BLOCKED, Control stops and relays the printed fix to
+the human. A second `REFUSED` right after a verify PASS goes to the human.
 
 **Sleep and wake after `DISPATCHED`, by wake mode:**
 
@@ -192,8 +193,8 @@ right after a verify PASS goes to the human.
   end the turn. `SETTLED` hands over the whole batch. `FAILED <dispatchId>
   <reason>` is a dead dispatch: recover as below. `wait` consumes first,
   then releases the dead dispatch and prints `FAILED`. If another dispatch
-  is still open, it keeps waiting for it. `NOTHING_OPEN` means the Run has
-  no open dispatch, including one already reported. After a `worker_done`,
+  is still open, it keeps waiting for it. `NOTHING_OPEN exits 0` when the Run
+  has no open dispatch, including one already reported. After a `worker_done`,
   `wait` and `collect` release that dispatch and close its terminal when it
   was adopted; a batch holding only `question` or `escalation` releases
   nothing.

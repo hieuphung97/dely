@@ -18,12 +18,13 @@ account, a harness update or a quota reset.
 
 Read the Control harness's `Control wake` column in
 `../delivery/references/harnesses.md`. Open the delivery Run with
-`dely open --repo <path> --objective <text>` before the first dispatch and
-never pass the verify Run. After dispatch, a background Control runs
-`dely wait --run <runId> --control <agent>`; `NOTHING_OPEN` means nothing is
-still open, including a dispatch already reported. After a `worker_done`,
-`wait` and `collect` release that dispatch; a batch holding only `question`
-or `escalation` releases nothing.
+`dely open --repo <path> --objective <text>` before the first dispatch — it
+prints `RUN <runId>` — and never pass the verify Run. After dispatch, a
+background Control runs `dely wait --run <runId> --control <agent>`; `wait`
+exits 3 `REFUSED` for a non-background Control. `NOTHING_OPEN exits 0` when
+nothing is still open, including a dispatch already reported. After a
+`worker_done`, `wait` and `collect` release that dispatch; a batch holding
+only `question` or `escalation` releases nothing.
 
 One `dely verify --repo <path> --control <agent>` picks the form from that
 wake cell.

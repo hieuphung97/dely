@@ -642,7 +642,15 @@ function releaseDispatch(id) {
 }
 
 function isAdoptedWorker(w) {
-  return Boolean(w && (w.ownershipState === "external" || w.retainedReason === "external_terminal"));
+  if (!w) return false;
+  const resource = w.resource || {};
+  return (
+    w.ownershipState === "external" ||
+    w.retainedReason === "external_terminal" ||
+    resource.ownershipState === "external" ||
+    resource.retainedReason === "external_terminal" ||
+    w.terminalState === "retained"
+  );
 }
 
 function releaseWorkerDone(messages, workers) {
@@ -813,6 +821,9 @@ function checkDeadDispatch(run, extraSettleIds, listed) {
     if (ids.has(worker.dispatchId)) continue;
     const shown = orca(["orchestration", "worker-show", "--dispatch", worker.dispatchId, "--json"]);
     releaseDispatch(worker.dispatchId);
+    if (isAdoptedWorker(worker) && worker.agentTerminalHandle) {
+      orca(["terminal", "close", "--terminal", worker.agentTerminalHandle, "--json"]);
+    }
     if (!remember(run, "reported", worker.dispatchId)) continue;
     dead.push({ dispatchId: worker.dispatchId, reason: deadDispatchReason(shown) });
   }
@@ -852,6 +863,12 @@ function cmdDispatch(flags) {
   const bound = boundRunId();
   if (String(flags.run) !== String(bound)) {
     finish(3, `REFUSED run ${flags.run} is not the Run bound to Control; fix: dely open`);
+  }
+  const listed = listAllRuns();
+  if (!listed.ok) finish(9, `ERROR run-list failed: ${listed.reason}`);
+  const target = listed.runs.find((r) => r && String(r.id) === String(flags.run));
+  if (target && target.objective === objectiveFor(key)) {
+    finish(3, `REFUSED run ${flags.run} is a verify Run; fix: dely open`);
   }
   const phase = flags.phase;
   const pin = pins[phase];
@@ -1520,7 +1537,7 @@ function cmdVerifyRun(flags) {
   const ctx = prepareVerify(flags);
   if (ctx.error) finish(9, `ERROR ${ctx.error}`);
   verifyOnError = ctx;
-  if (!ctx.verifyRun) {
+  if (!ctx.verifyRun || ctx.groups.some((g) => g.status === "BLOCKED")) {
     finishVerify(ctx);
     return;
   }

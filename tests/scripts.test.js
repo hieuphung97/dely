@@ -138,6 +138,10 @@ function hasClose(log, handle) {
   return log.some((argv) => argv[0] === "terminal" && argv[1] === "close" && hasFlagPair(argv, "--terminal", handle));
 }
 
+function liveAdoptedResource() {
+  return { ownershipState: "external", retainedReason: "external_terminal" };
+}
+
 function adoptedWorkerDoneScenario() {
   return {
     deliveries: [
@@ -151,9 +155,8 @@ function adoptedWorkerDoneScenario() {
         dispatchId: "disp_ag",
         dispatchStatus: "settled",
         agentTerminalHandle: "term_ag",
-        ownershipState: "external",
-        retainedReason: "external_terminal",
         terminalState: "retained",
+        resource: liveAdoptedResource(),
       },
     ],
   };
@@ -1402,8 +1405,7 @@ function adoptedFailedWorker(extra) {
       workerState: "exited",
       lastError: "boom",
       terminalState: "retained",
-      retainedReason: "external_terminal",
-      ownershipState: "external",
+      resource: liveAdoptedResource(),
       projection: { liveness: { verdict: "exited" } },
     },
     extra || {}
@@ -1418,6 +1420,7 @@ test("collect reports a retained adopted dispatch once even when worker-release 
   const r = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(r.status, 8, r.stdout + r.stderr);
   assert.equal((r.stdout.match(/^FAILED disp_adopted /gm) || []).length, 1, r.stdout);
+  assert.ok(hasClose(readLog(ctx.logPath), "term_a"), "collect did not close the dead adopted terminal");
   const again = runDely(["collect", "--run", "run_live"], ctx);
   assert.notEqual(again.status, 8, again.stdout + again.stderr);
   assert.doesNotMatch(again.stdout, /FAILED /);
@@ -2373,6 +2376,22 @@ test("dispatch refuses a Run that is not bound to Control", () => {
   assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start"));
 });
 
+test("dispatch refuses a verify Run", () => {
+  const ctx = setup(DEFAULT_AGENTS, (repo) => {
+    const key = defaultKey(repo, "cursor", "background");
+    return {
+      currentRun: "run_verify",
+      runs: [passRun("run_verify", key)],
+      workerStart: { dispatchId: "disp_x", state: "ready", handle: "term_w" },
+    };
+  });
+  const r = runDely(dispatchArgs(ctx.repo, "run_verify", "implement", "cursor"), ctx);
+  assert.equal(r.status, 3, r.stdout + r.stderr);
+  assert.equal(r.stdout, "REFUSED run run_verify is a verify Run; fix: dely open\n");
+  const log = readLog(ctx.logPath);
+  assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start"));
+});
+
 test("status prints PASS with no run id", () => {
   const ctx = setup(DEFAULT_AGENTS, (repo) => ({
     runs: [passRun("run_hidden", defaultKey(repo, "cursor", "background"))],
@@ -2531,9 +2550,8 @@ test("collect releases a worker_done when a dead sibling forces exit 8", () => {
         dispatchId: "disp_new",
         dispatchStatus: "settled",
         agentTerminalHandle: "term_new",
-        ownershipState: "external",
-        retainedReason: "external_terminal",
         terminalState: "retained",
+        resource: liveAdoptedResource(),
       },
       {
         dispatchId: "disp_dead",
@@ -2737,6 +2755,31 @@ test("a group skipped because another is BLOCKED reads SKIPPED", () => {
   gitInit(ctx.repo);
   trustCursor(ctx.home, ctx.repo);
   const r = runDely(["verify", "--repo", ctx.repo, "--control", "codex"], ctx);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /BLOCKED /);
+  assert.match(r.stdout, /SKIPPED /);
+  assert.doesNotMatch(r.stdout, /FAIL not launched/);
+  const log = readLog(ctx.logPath);
+  assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start"));
+});
+
+test("a group skipped because another is BLOCKED reads SKIPPED under background Control", () => {
+  const agents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Claude Code | default | default |
+| \`review\` | Cursor Agent CLI | default | default |
+`;
+  const ctx = setup(agents, () => ({
+    currentRun: "run_delivery",
+    createdRunId: "run_verify",
+    coordinatorHandle: "term_ctrl",
+    workerStarts: [{ dispatchId: "disp_rev", state: "ready", handle: "term_rev" }],
+  }));
+  gitInit(ctx.repo);
+  trustCursor(ctx.home, ctx.repo);
+  const r = runDely(["verify", "--repo", ctx.repo, "--control", "claude"], ctx);
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.match(r.stdout, /BLOCKED /);
   assert.match(r.stdout, /SKIPPED /);

@@ -197,7 +197,7 @@ against — observations, not a promised minimum:
 | Antigravity CLI | 1.1.19 |
 | Kiro CLI | 2.16.2 |
 | Cursor Agent CLI | 2026.08.25-3e8eec8 |
-| GitHub Copilot CLI | 1.0.82 |
+| GitHub Copilot CLI | 1.0.83 |
 | Orca | 1.4.196 |
 
 ## How Dely works
@@ -209,9 +209,10 @@ only — no delivery run.
 `dely:verify` proves the dispatch path for this repository, these pins and
 this Control harness: a read-only preflight, one dispatch per distinct pin,
 and a PASS or FAIL verdict for that exact key. Delivery runs it automatically
-when `dely dispatch` prints `REFUSED`. It also runs at the end of
-`dely:setup`, and whenever a human asks after an account, harness or quota
-change.
+when `dely dispatch` prints `REFUSED` with no PASS verdict. When the text is
+`is not the Run bound to Control`, run `dely open` and dispatch on the
+printed Run. It also runs at the end of `dely:setup`, and whenever a human
+asks after an account, harness or quota change.
 
 The workflow contract is [`skills/delivery/SKILL.md`](skills/delivery/SKILL.md).
 

@@ -202,7 +202,14 @@ function lastOutputAt(state) {
 }
 
 function isAdopted(w) {
-  return Boolean(w && (w.ownershipState === "external" || w.retainedReason === "external_terminal"));
+  const resource = (w && w.resource) || {};
+  return Boolean(
+    w &&
+      (w.ownershipState === "external" ||
+        w.retainedReason === "external_terminal" ||
+        resource.ownershipState === "external" ||
+        resource.retainedReason === "external_terminal")
+  );
 }
 
 function workers(state) {
@@ -440,6 +447,7 @@ if (group === "orchestration" && cmd === "worker-list") {
       terminalState: w.terminalState,
       retainedReason: w.retainedReason,
       ownershipState: w.ownershipState,
+      resource: w.resource,
       workerState: w.workerState,
       stage: w.stage,
       projection: w.projection || { liveness: { verdict: scenario.liveness || "live" } },
