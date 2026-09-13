@@ -210,8 +210,8 @@ only — no delivery run.
 this Control harness: a read-only preflight, one dispatch per distinct pin,
 and a PASS or FAIL verdict for that exact key. Delivery runs it automatically
 when `dely dispatch` prints `REFUSED` with no PASS verdict. When the text is
-`is not the Run bound to Control`, run `dely open` and dispatch on the
-printed Run. It also runs at the end of `dely:setup`, and whenever a human
+`is not the Run bound to Control` or `is a verify Run`, run `dely open` and
+dispatch on the printed Run. It also runs at the end of `dely:setup`, and whenever a human
 asks after an account, harness or quota change.
 
 The workflow contract is [`skills/delivery/SKILL.md`](skills/delivery/SKILL.md).

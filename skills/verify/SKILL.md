@@ -10,7 +10,7 @@ trust dialog and never writes a harness store.
 
 ## When it runs
 
-Automatically when `dely dispatch` prints `REFUSED`; at the end of
+Automatically when `dely dispatch` prints `REFUSED` with no PASS verdict; at the end of
 `dely:setup`; and whenever a human asks, for example after switching an
 account, a harness update or a quota reset.
 

@@ -183,9 +183,10 @@ identical to one that pinned the same value deliberately.
 
 **Refusal:** when `dely dispatch` prints `REFUSED`, route by the text, with no
 human gate: a missing PASS verdict runs `dely:verify` at once, then dispatches
-again; `is not the Run bound to Control` runs `dely open` and dispatches on the
-printed Run. On FAIL or BLOCKED, Control stops and relays the printed fix to
-the human. A second `REFUSED` right after a verify PASS goes to the human.
+again; `is not the Run bound to Control` or `is a verify Run` runs `dely open`
+and dispatches on the printed Run. On FAIL or BLOCKED, Control stops and relays
+the printed fix to the human. A second `REFUSED` right after a verify PASS goes
+to the human.
 
 **Sleep and wake after `DISPATCHED`, by wake mode:**
 

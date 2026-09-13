@@ -2098,6 +2098,36 @@ test("verify collect with one dispatch open prints WAITING and records no termin
   );
 });
 
+test("verify collect after SLEEP restores the previously bound Run", () => {
+  const ctx = setupVerify(DEFAULT_AGENTS, (repo) =>
+    defaultVerifyScenario(repo, {
+      deliveries: [
+        {
+          deliveryId: "dv_ack",
+          messages: [verifyAck("term_impl", "disp_impl"), verifyAck("term_rev", "disp_rev")],
+        },
+        {
+          deliveryId: "dv_done",
+          messages: [
+            verifyOk("implement", { from_handle: "term_impl", dispatchId: "disp_impl" }),
+            verifyOk("review", { from_handle: "term_rev", dispatchId: "disp_rev" }),
+          ],
+        },
+      ],
+    })
+  );
+  const started = runDely(["verify", "--repo", ctx.repo, "--control", "codex"], ctx);
+  assert.equal(started.status, 0, started.stdout + started.stderr);
+  assert.match(started.stdout, /^SLEEP /);
+  const collected = runDely(["verify", "collect", "--repo", ctx.repo], ctx);
+  assert.equal(collected.status, 0, collected.stdout + collected.stderr);
+  assert.match(collected.stdout, /RESULT PASS/);
+  const last = lastBinding(readLog(ctx.logPath));
+  assert.ok(last);
+  assert.equal(last[1], "run-use");
+  assert.ok(hasFlagPair(last, "--id", "run_delivery"));
+});
+
 test("two id-less worker_done messages print two SETTLED lines", () => {
   const ctx = setup(DEFAULT_AGENTS, {
     deliveries: [
@@ -2500,6 +2530,29 @@ test("wait with nothing open prints NOTHING_OPEN", { timeout: 5000 }, () => {
   assert.ok(elapsed < 1500, `wait looped for ${elapsed}ms`);
 });
 
+test("wait does not print NOTHING_OPEN when worker-list fails while a worker is live", { timeout: 5000 }, () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    workerListError: "connection lost",
+    deliveries: [],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_w",
+        lastHeartbeatAt: "2026-09-11T09:00:00Z",
+        projection: { liveness: { verdict: "live" } },
+      },
+    ],
+    lastOutputAt: "now",
+  });
+  const r = runDely(["wait", "--run", "run_live", "--control", "cursor"], ctx, {
+    DELY_DEADLINE_S: "30",
+    DELY_POLL_MS: "20",
+    SPAWN_TIMEOUT_MS: 800,
+  });
+  assert.doesNotMatch(r.stdout || "", /NOTHING_OPEN/);
+});
+
 test("wait consumes a pending worker_done when worker-list shows nothing open", { timeout: 5000 }, () => {
   const ctx = setup(DEFAULT_AGENTS, {
     deliveries: [
@@ -2566,6 +2619,38 @@ test("wait and collect release a worker_done dispatch only", { timeout: 5000 }, 
     "released on a question batch"
   );
   assert.ok(!askLog.some((argv) => argv[0] === "terminal" && argv[1] === "close"));
+});
+
+test("collect releases only the worker_done sender when a sibling question shares the batch", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      {
+        deliveryId: "dv_mixed",
+        messages: [
+          { type: "worker_done", from_handle: "term_a", dispatchId: "disp_a", body: "done" },
+          { type: "question", from_handle: "term_b", dispatchId: "disp_b", body: "need a choice" },
+        ],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_a",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_a",
+      },
+      {
+        dispatchId: "disp_b",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_b",
+      },
+    ],
+  });
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.match(r.stdout, /SETTLED disp_a worker_done /);
+  assert.match(r.stdout, /SETTLED disp_b question /);
+  const log = readLog(ctx.logPath);
+  assert.ok(hasRelease(log, "disp_a"), "did not release the worker_done dispatch");
+  assert.ok(!hasRelease(log, "disp_b"), "released the question dispatch");
 });
 
 test("collect releases a worker_done when a dead sibling forces exit 8", () => {
