@@ -307,9 +307,14 @@ Rejected:
     contract holds by not depending on the receipt, not by those lines.
   - The report-once guard is held twice, by the memory read and by `remember()`'s return
     value; removing either alone keeps every test green.
-  - `tests/fixtures/fake-orca.js` puts `stage`, `ownershipState` and `retainedReason` at
-    the top level, where real Orca nests them under `projection` and `resource`. The
-    runtime reads both shapes; only the fake's is covered by a test.
+  - `tests/fixtures/fake-orca.js` puts `stage` at the top level, where real Orca nests it
+    under `projection`; the runtime reads both, and only the fake's shape is tested. For
+    `ownershipState` and `retainedReason` the fake now emits real Orca's `resource`
+    nesting, after an integration review found the runtime read only the fake's
+    top-level copy and so never closed an adopted terminal against real Orca.
+  - While a nudge-mode verify is asleep, a Control that dispatches anyway, is refused,
+    and runs `dely open` has that new binding overwritten when `verify collect`
+    restores the Run saved before verify.
   - `dely collect` accepts and ignores `--repo`.
   - `dely open` requires `--repo` and does not use it.
   - `dely collect` re-reads the whole Run history, so every call releases, and closes
