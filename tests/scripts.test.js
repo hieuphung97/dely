@@ -1295,6 +1295,34 @@ function memoryHolds(memory, id) {
   return (memory.stopped || []).indexOf(id) >= 0 || (memory.reported || []).indexOf(id) >= 0;
 }
 
+function createdHolds(memory, dispatchId, handle) {
+  if (!memory || !Array.isArray(memory.created)) return false;
+  return memory.created.some((x) => x && x.dispatchId === dispatchId && x.handle === handle);
+}
+
+function writeCreated(ctx, run, created) {
+  const file = path.join(ctx.repo, ".git", "dely", "runs", run + ".json");
+  const existing = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
+  write(
+    file,
+    JSON.stringify({
+      reported: existing.reported || [],
+      stopped: existing.stopped || [],
+      created,
+    })
+  );
+}
+
+function agyAgents() {
+  return `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Antigravity CLI | default | default |
+| \`review\` | Codex CLI | gpt-5.6-sol | high |
+`;
+}
+
 function keepWorkerStateReady(ctx, workers) {
   const scenario = JSON.parse(fs.readFileSync(ctx.scenarioPath, "utf8"));
   scenario.workers = workers;
@@ -1417,6 +1445,7 @@ test("collect reports a retained adopted dispatch once even when worker-release 
     deliveries: [],
     workers: [adoptedFailedWorker()],
   });
+  writeCreated(ctx, "run_live", [{ dispatchId: "disp_adopted", handle: "term_a" }]);
   const r = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(r.status, 8, r.stdout + r.stderr);
   assert.equal((r.stdout.match(/^FAILED disp_adopted /gm) || []).length, 1, r.stdout);
@@ -2494,6 +2523,7 @@ test("wait consumes a pending worker_done when worker-list shows nothing open", 
 
 test("wait and collect release a worker_done dispatch only", { timeout: 5000 }, () => {
   const doneCtx = setup(DEFAULT_AGENTS, adoptedWorkerDoneScenario());
+  writeCreated(doneCtx, "run_live", [{ dispatchId: "disp_ag", handle: "term_ag" }]);
   const collected = runDely(["collect", "--run", "run_live"], doneCtx);
   assert.equal(collected.status, 0, collected.stdout + collected.stderr);
   const doneLog = readLog(doneCtx.logPath);
@@ -2501,6 +2531,7 @@ test("wait and collect release a worker_done dispatch only", { timeout: 5000 }, 
   assert.ok(hasClose(doneLog, "term_ag"));
 
   const waited = setup(DEFAULT_AGENTS, adoptedWorkerDoneScenario());
+  writeCreated(waited, "run_live", [{ dispatchId: "disp_ag", handle: "term_ag" }]);
   const waitR = runDely(["wait", "--run", "run_live", "--control", "cursor"], waited, {
     DELY_DEADLINE_S: "30",
     DELY_SILENCE_S: "60",
@@ -2564,6 +2595,7 @@ test("collect releases a worker_done when a dead sibling forces exit 8", () => {
       },
     ],
   });
+  writeCreated(ctx, "run_live", [{ dispatchId: "disp_new", handle: "term_new" }]);
   const r = runDely(["collect", "--run", "run_live"], ctx);
   assert.equal(r.status, 8, r.stdout + r.stderr);
   assert.match(r.stdout, /SETTLED disp_new worker_done done/);
@@ -2571,6 +2603,161 @@ test("collect releases a worker_done when a dead sibling forces exit 8", () => {
   const log = readLog(ctx.logPath);
   assert.ok(hasRelease(log, "disp_new"), "collect did not release the worker_done dispatch");
   assert.ok(hasClose(log, "term_new"), "collect did not close the adopted terminal");
+});
+
+test("adopt-path dispatch records the created handle and a worker-start launch does not", () => {
+  const adopt = setup(agyAgents(), (repo) => ({
+    runs: [
+      passRun(
+        "run_v",
+        keyOf(repo, "cursor", "background", "antigravity/default/default", "codex/gpt-5.6-sol/high")
+      ),
+    ],
+    workerStart: { dispatchId: "disp_ag", state: "ready", handle: "term_ag" },
+    terminalHandle: "term_ag",
+    changeLastOutputForMs: 1,
+    deliveries: [
+      {
+        deliveryId: "dv_ack",
+        messages: [{ type: "heartbeat", from_handle: "term_ag", subject: "ack", dispatchId: "disp_ag" }],
+      },
+    ],
+  }));
+  const adoptOut = runDely(dispatchArgs(adopt.repo, "run_live", "implement", "cursor"), adopt);
+  assert.equal(adoptOut.status, 0, adoptOut.stdout + adoptOut.stderr);
+  assert.ok(
+    createdHolds(gitRunMemory(adopt, "run_live"), "disp_ag", "term_ag"),
+    JSON.stringify(gitRunMemory(adopt, "run_live"))
+  );
+
+  const started = setup(DEFAULT_AGENTS, (repo) => ({
+    runs: [passRun("run_v", defaultKey(repo, "cursor", "background"))],
+    workerStart: { dispatchId: "disp_ws", state: "ready", handle: "term_ws" },
+    deliveries: [
+      {
+        deliveryId: "dv_ack",
+        messages: [{ type: "heartbeat", from_handle: "term_ws", subject: "ack", dispatchId: "disp_ws" }],
+      },
+    ],
+  }));
+  const startOut = runDely(dispatchArgs(started.repo, "run_live", "implement", "cursor"), started);
+  assert.equal(startOut.status, 0, startOut.stdout + startOut.stderr);
+  assert.ok(
+    !createdHolds(gitRunMemory(started, "run_live"), "disp_ws", "term_ws"),
+    JSON.stringify(gitRunMemory(started, "run_live"))
+  );
+});
+
+test("collect does not close a user_takeover retained row without a memory entry", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      {
+        deliveryId: "dv_done",
+        messages: [{ type: "worker_done", from_handle: "term_ag", dispatchId: "disp_ag", body: "ok" }],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_ag",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_ag",
+        terminalState: "retained",
+        resource: { ownershipState: "user_owned", retainedReason: "user_takeover" },
+      },
+    ],
+  });
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const log = readLog(ctx.logPath);
+  assert.ok(hasRelease(log, "disp_ag"), "collect did not release the worker_done dispatch");
+  assert.ok(!hasClose(log, "term_ag"), "closed a user_takeover terminal with no memory entry");
+});
+
+test("collect closes a remembered adopted terminal from nested resource ownership", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      {
+        deliveryId: "dv_done",
+        messages: [{ type: "worker_done", from_handle: "term_ag", dispatchId: "disp_ag", body: "ok" }],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_ag",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_ag",
+        terminalState: "retained",
+        resource: liveAdoptedResource(),
+      },
+    ],
+  });
+  writeCreated(ctx, "run_live", [{ dispatchId: "disp_ag", handle: "term_ag" }]);
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const log = readLog(ctx.logPath);
+  assert.ok(hasRelease(log, "disp_ag"));
+  assert.ok(hasClose(log, "term_ag"), "did not close the nested-resource adopted terminal");
+});
+
+test("collect does not close a remembered terminal after user takeover", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      {
+        deliveryId: "dv_done",
+        messages: [{ type: "worker_done", from_handle: "term_ag", dispatchId: "disp_ag", body: "ok" }],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_ag",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_ag",
+        terminalState: "retained",
+        resource: { ownershipState: "user_owned", retainedReason: "user_takeover" },
+      },
+    ],
+  });
+  writeCreated(ctx, "run_live", [{ dispatchId: "disp_ag", handle: "term_ag" }]);
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const log = readLog(ctx.logPath);
+  assert.ok(hasRelease(log, "disp_ag"));
+  assert.ok(!hasClose(log, "term_ag"), "closed a user_owned terminal that was in memory");
+});
+
+test("dead dispatch closes a remembered adopted terminal and not a user_takeover row", () => {
+  const remembered = setup(DEFAULT_AGENTS, {
+    deliveries: [],
+    workers: [adoptedFailedWorker()],
+  });
+  writeCreated(remembered, "run_live", [{ dispatchId: "disp_adopted", handle: "term_a" }]);
+  const closed = runDely(["collect", "--run", "run_live"], remembered);
+  assert.equal(closed.status, 8, closed.stdout + closed.stderr);
+  assert.ok(hasClose(readLog(remembered.logPath), "term_a"), "did not close the remembered dead adopted terminal");
+
+  const takeover = setup(DEFAULT_AGENTS, {
+    deliveries: [],
+    workers: [
+      adoptedFailedWorker({
+        resource: { ownershipState: "user_owned", retainedReason: "user_takeover" },
+      }),
+    ],
+  });
+  const skipped = runDely(["collect", "--run", "run_live"], takeover);
+  assert.equal(skipped.status, 8, skipped.stdout + skipped.stderr);
+  assert.ok(!hasClose(readLog(takeover.logPath), "term_a"), "closed a dead user_takeover row with no memory entry");
+});
+
+test("collect from another git dir does not close an external row", () => {
+  const ctx = setup(DEFAULT_AGENTS, adoptedWorkerDoneScenario());
+  writeCreated(ctx, "run_live", [{ dispatchId: "disp_ag", handle: "term_ag" }]);
+  const other = tmpDir();
+  gitInit(other);
+  const r = runDely(["collect", "--run", "run_live"], ctx, { CWD: other });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const log = readLog(ctx.logPath);
+  assert.ok(hasRelease(log, "disp_ag"));
+  assert.ok(!hasClose(log, "term_ag"), "fell back to row shape when git-dir memory was absent");
 });
 
 test("classify reads Antigravity logs only for an Antigravity worker", () => {

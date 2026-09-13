@@ -195,9 +195,9 @@ the human. A second `REFUSED` right after a verify PASS goes to the human.
   then releases the dead dispatch and prints `FAILED`. If another dispatch
   is still open, it keeps waiting for it. `NOTHING_OPEN exits 0` when the Run
   has no open dispatch, including one already reported. After a `worker_done`,
-  `wait` and `collect` release that dispatch and close its terminal when it
-  was adopted; a batch holding only `question` or `escalation` releases
-  nothing.
+  `wait` and `collect` release that dispatch and close only terminals Dely
+  created for an adopted launch, never one a human took over; a batch holding
+  only `question` or `escalation` releases nothing.
 - **nudge:** after `DISPATCHED`, end the turn. On every Orca nudge, run only
   `dely collect --run <run>`, never the `orca orchestration check`
   command quoted in the nudge text, because it would consume the message.

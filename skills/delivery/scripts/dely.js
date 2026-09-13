@@ -508,7 +508,7 @@ function hasSettle(messages) {
 }
 
 function emptyMemory() {
-  return { reported: [], stopped: [] };
+  return { reported: [], stopped: [], created: [] };
 }
 
 function gitDir() {
@@ -531,6 +531,11 @@ function normalizeMemory(raw) {
   if (!raw || typeof raw !== "object") return data;
   if (Array.isArray(raw.reported)) data.reported = raw.reported.filter((x) => typeof x === "string");
   if (Array.isArray(raw.stopped)) data.stopped = raw.stopped.filter((x) => typeof x === "string");
+  if (Array.isArray(raw.created)) {
+    data.created = raw.created.filter(
+      (x) => x && typeof x.dispatchId === "string" && typeof x.handle === "string"
+    );
+  }
   return data;
 }
 
@@ -579,6 +584,7 @@ function mutateRunMemory(run, fn) {
     fs.writeFileSync(tmp, JSON.stringify({
       reported: Array.from(new Set(data.reported)),
       stopped: Array.from(new Set(data.stopped)),
+      created: data.created || [],
     }));
     fs.renameSync(tmp, file);
     return data;
@@ -605,6 +611,14 @@ function remember(run, kind, id) {
     added = true;
   });
   return added;
+}
+
+function rememberCreated(run, dispatchId, handle) {
+  if (!run || !dispatchId || !handle) return;
+  mutateRunMemory(run, (data) => {
+    data.created = (data.created || []).filter((x) => x.dispatchId !== dispatchId);
+    data.created.push({ dispatchId, handle });
+  });
 }
 
 function asText(v) {
@@ -641,19 +655,26 @@ function releaseDispatch(id) {
   if (orcaFailed(r) || state === "retained" || state === "release_pending") return;
 }
 
-function isAdoptedWorker(w) {
-  if (!w) return false;
-  const resource = w.resource || {};
-  return (
-    w.ownershipState === "external" ||
-    w.retainedReason === "external_terminal" ||
-    resource.ownershipState === "external" ||
-    resource.retainedReason === "external_terminal" ||
-    w.terminalState === "retained"
-  );
+function createdHandle(memory, dispatchId) {
+  if (!memory || !Array.isArray(memory.created) || !dispatchId) return "";
+  const hit = memory.created.find((x) => x && x.dispatchId === dispatchId);
+  return hit && hit.handle ? hit.handle : "";
 }
 
-function releaseWorkerDone(messages, workers) {
+function rowOwnership(w) {
+  if (!w) return "";
+  const resource = w.resource || {};
+  return String(resource.ownershipState || w.ownershipState || "");
+}
+
+function closeCreatedTerminal(run, worker) {
+  const handle = createdHandle(readRunMemory(run), worker && worker.dispatchId);
+  if (!handle) return;
+  if (rowOwnership(worker) === "user_owned") return;
+  orca(["terminal", "close", "--terminal", handle, "--json"]);
+}
+
+function releaseWorkerDone(messages, workers, run) {
   const list = messages || [];
   if (!list.some((m) => m && m.type === "worker_done")) return;
   const byHandle = new Map();
@@ -670,10 +691,7 @@ function releaseWorkerDone(messages, workers) {
     if (!id || id === "-" || seen.has(id)) continue;
     seen.add(id);
     releaseDispatch(id);
-    const w = byId.get(id) || from;
-    if (isAdoptedWorker(w) && w.agentTerminalHandle) {
-      orca(["terminal", "close", "--terminal", w.agentTerminalHandle, "--json"]);
-    }
+    closeCreatedTerminal(run, byId.get(id) || from);
   }
 }
 
@@ -821,9 +839,7 @@ function checkDeadDispatch(run, extraSettleIds, listed) {
     if (ids.has(worker.dispatchId)) continue;
     const shown = orca(["orchestration", "worker-show", "--dispatch", worker.dispatchId, "--json"]);
     releaseDispatch(worker.dispatchId);
-    if (isAdoptedWorker(worker) && worker.agentTerminalHandle) {
-      orca(["terminal", "close", "--terminal", worker.agentTerminalHandle, "--json"]);
-    }
+    closeCreatedTerminal(run, worker);
     if (!remember(run, "reported", worker.dispatchId)) continue;
     dead.push({ dispatchId: worker.dispatchId, reason: deadDispatchReason(shown) });
   }
@@ -927,6 +943,7 @@ function launchDispatch({ repo, run, phase, specFile, title, pin, entry }) {
   }
   const dispatchId = started.dispatchId;
   handle = workerHandle(dispatchId, handle || started.handle);
+  if (created && dispatchId && handle) rememberCreated(run, dispatchId, handle);
   if (started.state !== "ready") {
     const line = failedLaunchLine(dispatchId, started, repo);
     if (handle) orca(["terminal", "close", "--terminal", handle, "--json"]);
@@ -1002,7 +1019,7 @@ function cmdWait(flags) {
     const deads = checkDeadDispatch(flags.run, null, listed);
     if (step.type === "settled") {
       reportDeadLines(deads, false);
-      releaseWorkerDone(step.messages, listed.ok ? listed.workers : []);
+      releaseWorkerDone(step.messages, listed.ok ? listed.workers : [], flags.run);
       finish(0, `SETTLED ${step.types.join(",")} ${JSON.stringify(step.messages)}`);
     }
     const memory = readRunMemory(flags.run);
@@ -1101,7 +1118,8 @@ function cmdCollect(flags) {
   );
   releaseWorkerDone(
     collected.settles.map((s) => s.message),
-    collected.workers || []
+    collected.workers || [],
+    flags.run
   );
   reportDeadLines(deads, collected.open.length === 0);
   if (collected.open.length) {
