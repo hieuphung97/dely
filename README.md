@@ -66,7 +66,8 @@ harness and that harness's defaults.
 The plugin is `dely`, from the `dely` marketplace at
 `https://github.com/hieuphung97/dely.git`. The skill name is `delivery`;
 invoke it as `dely:delivery`. Kiro CLI has no plugin verb; use
-`### Kiro CLI` below.
+`### Kiro CLI` below. The runtime needs Node 18 or newer on PATH, or
+Orca's bundled runtime.
 
 ### Claude Code
 
@@ -169,14 +170,19 @@ copilot plugin marketplace remove dely  # removes the marketplace, not the plugi
 ### Kiro CLI
 
 ```bash
-npx skills add hieuphung97/dely --agent kiro-cli --global --skill delivery --skill setup
+npx skills add hieuphung97/dely --agent kiro-cli --global --skill delivery --skill setup --skill verify
 
 npx skills list --agent kiro-cli --global    # verify it is installed
 npx skills update --global                   # update
-npx skills remove --agent kiro-cli --global --skill delivery --skill setup  # uninstall
+npx skills remove --agent kiro-cli --global --skill delivery --skill setup --skill verify  # uninstall
 ```
 
-Invoke the skills in a Kiro CLI session as `/delivery` and `/setup`.
+`npx skills add` also writes `~/.agents/skills` (Codex and Copilot load it)
+and `~/.kiro/skills`. Update or remove both copies. Compare
+`skills/delivery/SKILL.md` by hash with the installed file before assuming
+the plugin version is the one that runs.
+
+Invoke the skills in a Kiro CLI session as `/delivery`, `/setup` and `/verify`.
 
 ### Checked versions
 
@@ -191,7 +197,7 @@ against — observations, not a promised minimum:
 | Antigravity CLI | 1.1.19 |
 | Kiro CLI | 2.16.2 |
 | Cursor Agent CLI | 2026.08.25-3e8eec8 |
-| GitHub Copilot CLI | 1.0.82 |
+| GitHub Copilot CLI | 1.0.83 |
 | Orca | 1.4.196 |
 
 ## How Dely works
@@ -200,6 +206,14 @@ Ask for a change. Approve the design when asked. Dely implements, a
 different session reviews, then opens a PR. You merge. A Spike investigates
 only — no delivery run.
 
+`dely:verify` proves the dispatch path for this repository, these pins and
+this Control harness: a read-only preflight, one dispatch per distinct pin,
+and a PASS or FAIL verdict for that exact key. Delivery runs it automatically
+when `dely dispatch` prints `REFUSED` with no PASS verdict. When the text is
+`is not the Run bound to Control` or `is a verify Run`, run `dely open` and
+dispatch on the printed Run. It also runs at the end of `dely:setup`, and whenever a human
+asks after an account, harness or quota change.
+
 The workflow contract is [`skills/delivery/SKILL.md`](skills/delivery/SKILL.md).
 
 ## Troubleshooting
@@ -207,9 +221,10 @@ The workflow contract is [`skills/delivery/SKILL.md`](skills/delivery/SKILL.md).
 - **`dely:delivery` stops immediately.** Orca is not running or a required
   capability is absent, including orchestration. Run the Quickstart
   preflight, then retry.
-- **A harness still runs the old workflow after you edited this checkout.**
-  You edited the source, not an installed copy. Reinstall or update the
-  plugin in the harness.
+- **A stale copy from `npx skills add` shadows a newer plugin.** Codex and
+  Copilot also load `~/.agents/skills`; Kiro loads `~/.kiro/skills`. Compare
+  `skills/delivery/SKILL.md` by hash with the copy in those directories,
+  then update or remove the shadowing install.
 - **Codex still behaves the same after `codex plugin marketplace upgrade`.**
   Confirm the remote has new commits. A delivery already running keeps the
   plugin version from its start; open a new session after the upgrade.

@@ -165,12 +165,30 @@ file is inert in the same sense that it is not imported. Cursor Agent CLI
 applies `CLAUDE.md` as a rule. GitHub Copilot CLI loads both `AGENTS.md`
 and `CLAUDE.md`. Grok does not expand it.
 
+## Trust
+
+After the managed block is written, for each pinned harness whose `Setup`
+column in `skills/delivery/references/harnesses.md` is `trust dialog` or
+`trust-all confirmation`, open it once for the human with
+`orca terminal create --worktree path:<repo> --command "<binary> <permission default>"`.
+The binary is `claude`, `codex`, `grok`, `agy`, `kiro-cli`, `cursor-agent`,
+or `copilot` for that harness. Take the permission default from the harness
+table. The human answers that harness's own dialog; setup never answers it
+and never writes a harness store. The human closes the terminal when done.
+`Orca preflight` and `none` need no step.
+
+## Verify
+
+Then run `dely:verify`.
+
 ## What setup will not do
 
-No plugin or skill install. No hook trust. No writes to `~/.claude`,
-`~/.codex`, `~/.grok`, `~/.gemini`, `~/.kiro`, `~/.cursor`, or `~/.copilot`.
-No custom Kiro agent creation or modification. No coordinator installation
-or field. No control or release row. No enumeration or invocation of
-project-owned workflow plugins. No model catalogue.
+No plugin or skill install. No hook trust. Setup may open a pinned harness
+in an Orca terminal so the human can answer that harness's own trust dialog;
+it still never answers the dialog and never writes a harness store
+(`~/.claude`, `~/.codex`, `~/.grok`, `~/.gemini`, `~/.kiro`, `~/.cursor`,
+or `~/.copilot`). No custom Kiro agent creation or modification. No
+coordinator installation or field. No control or release row. No enumeration
+or invocation of project-owned workflow plugins. No model catalogue.
 
 Print verified install guidance only when the human explicitly asks for it.

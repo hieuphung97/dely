@@ -24,6 +24,7 @@ issue first — a pull request is fine.
 
    ```bash
    bash tests/contracts.sh
+   node --test tests/scripts.test.js
    ```
 
    If your change touches `.claude-plugin/plugin.json` or

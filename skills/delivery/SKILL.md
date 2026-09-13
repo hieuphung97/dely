@@ -132,6 +132,23 @@ fallback of any kind.
 
 ### Launching a worker
 
+The launcher is `scripts/dely` relative to this skill. `--control` is the
+Orca agent id of Control's own harness. Control's wake mode is that
+harness's `Control wake` cell in `references/harnesses.md`.
+
+Usage as the launcher prints it:
+
+- `dely open --repo <path> --objective <text>` prints `RUN <runId>` (exit 0, 9 on error)
+- `dely dispatch --repo <path> --run <runId> --phase <implement|review> --spec-file <path> --control <agent>`
+- `dely wait --run <runId> --control <agent>` exits 3 `REFUSED` for a Control that is not in background mode
+- `dely collect --run <runId>`
+- `dely verify --repo <path> --control <agent>`
+
+Control opens the delivery Run with `dely open` before the first dispatch and
+never passes the verify Run.
+
+`--spec-file` is the worktree-relative prompt file.
+
 Write the prompt to an untracked file **inside the worktree**. Never inline
 it in a shell argument: prompts carry backticks, quotes and newlines, and a
 shell argument mangles them. A path outside the workspace can trigger a
@@ -150,53 +167,72 @@ acceptance row — its instrument, its counterexample, and what was
 observed — the prompt carries that row as written rather than a
 restatement of it.
 
-The `worker-start` receipt records `launch.requested` and `launch.effective`;
-it does not establish that the worker can serve the request or that it
-cannot. Launch a real interactive harness TUI for the phase, with the model
-and effort pinned from `AGENTS.md`. A visible shell running a headless
-harness is not a TUI;
-compose that TUI's launch using `references/harnesses.md`, this skill's
-compatibility matrix of Orca agent id, permission defaults, forbidden
-headless forms, and launch notes.
+**Every dispatch goes through `dely dispatch`.** Control does not compose a
+worker launch or call `worker-start` by hand. The runtime reads the pins
+from `AGENTS.md` and the launch path and model pin from the harness table.
+The runtime appends the acknowledgement instruction. The `worker-start`
+receipt records `launch.requested` and `launch.effective`; it does not establish that the worker can serve
+the request or that it cannot. The runtime carries the execution plane's
+configured permission default onto composed argv and does not add a
+sandbox the project did not pin.
 
 **Name the model and effort on every dispatch.** A worker left on a harness
 default is an unpinned environment: it lives in the harness's own config, it
 changes without announcing itself, and the dispatch that relies on it looks
 identical to one that pinned the same value deliberately.
 
-When composing the TUI launch argv yourself, carry the execution plane's
-configured permission default for that agent onto the composed argv;
-composing argv is not a request for a different permission posture. Do not
-add a sandbox the project did not pin.
+**Refusal:** when `dely dispatch` prints `REFUSED`, route by the text, with no
+human gate: a missing PASS verdict runs `dely:verify` at once, then dispatches
+again; `is not the Run bound to Control` or `is a verify Run` runs `dely open`
+and dispatches on the printed Run. On FAIL or BLOCKED, Control stops and relays
+the printed fix to the human. A second `REFUSED` right after a verify PASS goes
+to the human.
 
-`check --wait` on `worker_done,escalation,question` is the completion wait,
-repeated past heartbeats until a settling message arrives for that dispatch —
-a heartbeat ends one wait but settles nothing.
+**Sleep and wake after `DISPATCHED`, by wake mode:**
+
+- **background:** run `dely wait --run <run> --control <agent>` as a background command and
+  end the turn. `SETTLED` hands over the whole batch. `FAILED <dispatchId>
+  <reason>` is a dead dispatch: recover as below. `wait` consumes first,
+  then releases the dead dispatch and prints `FAILED`. If another dispatch
+  is still open, it keeps waiting for it. `NOTHING_OPEN exits 0` when the Run
+  has no open dispatch, including one already reported. After a `worker_done`,
+  `wait` and `collect` release that dispatch and close only terminals Dely
+  created for an adopted launch, never one a human took over; a batch holding
+  only `question` or `escalation` releases nothing.
+- **nudge:** after `DISPATCHED`, end the turn. On every Orca nudge, run only
+  `dely collect --run <run>`, never the `orca orchestration check`
+  command quoted in the nudge text, because it would consume the message.
+  On `WAITING`, end the turn again. On `FAILED <dispatchId> <reason>`,
+  recover as below. collect releases a dead dispatch before printing
+  `FAILED`, and never reports it twice. If a live dispatch remains, it also
+  prints `WAITING`: one fresh `dely dispatch`, then end the turn. Exit 2
+  when any dispatch remains open, even if a `FAILED` line was printed;
+  exit 8 when nothing is still open. A worker that neither
+  sends a message nor exits wakes nobody, so a Control that has heard
+  nothing for a long time asks the human.
+- **unsupported:** that harness cannot be Control.
+
+Control acts on `SETTLED` lines whose dispatch id matches the one
+`DISPATCHED` printed, and on `FAILED` lines from `dely collect` or
+`dely wait`. After a `SETTLED` batch that holds only `question` or
+`escalation`, Control answers or escalates, then sleeps again by wake mode.
+`ERROR` (exit 9) goes to the human.
+
+**Recovery:** `NO_ACK`, `SILENT` or `FAILED` is recovered by one fresh
+`dely dispatch` with the same prompt file. Never retry into the same terminal,
+and never reuse a settled terminal. A second failure on the same input goes
+to the human. `DEADLINE` goes to the human. `FAILED` from collect or wait is
+the same route: a dispatch Orca has marked failed that sent no settling
+message is released and reported once. A Control-stopped silent dispatch
+is not `FAILED`. Control acts on the `FAILED` line; exit 2 when any
+dispatch remains open, and exit 8 when nothing is still open.
+
 The worker reports once with `worker_done` and an `--outcome`.
 Completion comes from the worker's own `worker_done`;
 do not infer it from reading the worker's terminal.
-`worker-release` returns the terminal. `worker-read` is the bounded evidence
-read.
 
 Each delivery opens its own Run on the execution plane rather than reusing
-another's, so a stale report cannot settle a new wait. A wait acknowledges
-its settling message after handling it, or the plane redelivers that
-message to the next wait.
-
-A dispatch that does not reach `ready` is diagnosed by reading its terminal
-and handling what is actually there. It is retried into that same terminal
-with `--terminal` and `--retry-of` only when that read shows the worker is
-not already progressing; a `failed` receipt is not that showing. A
-`dispatched` receipt is not evidence the worker is alive any more than a
-`failed` receipt is evidence it is dead. Retry is refused while the plane
-still considers the dispatch live, whether or not the worker still is; the
-live terminal is re-engaged instead. `--model`
-and `--effort` cannot combine with `--terminal`; that is not an exception
-to naming the model and effort on every dispatch, because the terminal was
-launched pinned and the retry reuses it rather than launching an unpinned
-one. Control does not route by an enumerated vendor dialog;
-`agent_prompt_blocked` and `agent_prompt_stalled` do not distinguish
-separate recoveries.
+another's, so a stale report cannot settle a new wait.
 
 ### Investigation
 
@@ -382,6 +418,10 @@ from an ambiguous, missing, or merely transport-level outcome.
 | Orca or a required capability is unavailable | Stop; no headless fallback |
 | Harness fails or evidence is insufficient | Preserve the candidate, report the native outcome and role disposition |
 | Idempotent release step is interrupted | Verify Git and pull-request state, then resume |
+| `NO_ACK`, `SILENT` or `FAILED` | One fresh `dely dispatch` with the same prompt file; a second failure on the same input goes to the human |
+| `FAILED <dispatchId> <reason>` from collect or wait | One fresh `dely dispatch` with the same prompt file; a second failure on the same input goes to the human. Exit 2 when any dispatch remains open; exit 8 when nothing is still open |
+| `DEADLINE` | Ask the human |
+| `ERROR` (exit 9) | Ask the human |
 
 ## Changing this skill
 
