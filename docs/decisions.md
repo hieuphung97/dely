@@ -311,6 +311,15 @@ Rejected:
     the top level, where real Orca nests them under `projection` and `resource`. The
     runtime reads both shapes; only the fake's is covered by a test.
   - `dely collect` accepts and ignores `--repo`.
+  - `dely open` requires `--repo` and does not use it.
+  - `dely collect` re-reads the whole Run history, so every call releases, and closes
+    the terminal of, every past `worker_done` again. The repeats are redundant.
+  - When one verify group is BLOCKED and another launch fails, the group left
+    unlaunched reads `SKIPPED`, which blames the BLOCKED group; the result is still FAIL.
+  - `dely wait` decides `NOTHING_OPEN` after peeking for a pending settle. Whether live
+    Orca moves `dispatchStatus` before the `worker_done` is delivered, and whether a
+    settle can show in `--peek` yet never reach this consumer's `check --wait`, are
+    unmeasured.
   - `skills/verify/SKILL.md`'s prohibition on the nudge's quoted `check` command is
     unpinned, as is `AGENTS.md`'s gate list.
 - **`AGENTS.md`'s gate list is not pinned to the workflow.** `tests/contracts.sh` pins
