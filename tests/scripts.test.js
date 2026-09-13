@@ -127,6 +127,38 @@ function hasFlagPair(argv, a, b) {
   return i >= 0 && argv[i + 1] === b;
 }
 
+function hasRelease(log, dispatchId) {
+  return log.some(
+    (argv) =>
+      argv[0] === "orchestration" && argv[1] === "worker-release" && hasFlagPair(argv, "--dispatch", dispatchId)
+  );
+}
+
+function hasClose(log, handle) {
+  return log.some((argv) => argv[0] === "terminal" && argv[1] === "close" && hasFlagPair(argv, "--terminal", handle));
+}
+
+function adoptedWorkerDoneScenario() {
+  return {
+    deliveries: [
+      {
+        deliveryId: "dv_done",
+        messages: [{ type: "worker_done", from_handle: "term_ag", dispatchId: "disp_ag", body: "ok" }],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_ag",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_ag",
+        ownershipState: "external",
+        retainedReason: "external_terminal",
+        terminalState: "retained",
+      },
+    ],
+  };
+}
+
 test("dispatch refuses without a PASS verdict for the exact key", () => {
   let cursorKey = "";
   const ctx = setup(DEFAULT_AGENTS, (repo) => {
@@ -2312,6 +2344,15 @@ test("open creates a Run and binds it with run-use", () => {
   assert.ok(hasFlagPair(log[createAt], "--objective", "ship the patch"));
 });
 
+test("open reports the run-create failure when no id is returned", () => {
+  const ctx = setup(DEFAULT_AGENTS, { runCreateNoId: true, currentRun: null });
+  const r = runDely(["open", "--repo", ctx.repo, "--objective", "ship the patch"], ctx);
+  assert.equal(r.status, 9, r.stdout + r.stderr);
+  assert.match(r.stdout, /run-create failed/);
+  const log = readLog(ctx.logPath);
+  assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "run-use"));
+});
+
 test("dispatch refuses a Run that is not bound to Control", () => {
   let key = "";
   const ctx = setup(DEFAULT_AGENTS, (repo) => {
@@ -2378,6 +2419,21 @@ test("wait refuses a nudge-mode Control and requires --control", () => {
   assert.equal(missing.status, 2, missing.stdout + missing.stderr);
 });
 
+test("wait names unsupported or unknown Control wake instead of nudge", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [{ deliveryId: "dv1", messages: [{ type: "heartbeat", from_handle: "term_w" }] }],
+    workers: [{ dispatchId: "disp_1", dispatchStatus: "dispatched", agentTerminalHandle: "term_w" }],
+  });
+  const kiro = runDely(["wait", "--run", "run_live", "--control", "kiro"], ctx);
+  assert.equal(kiro.status, 3, kiro.stdout + kiro.stderr);
+  assert.match(kiro.stdout, /unsupported/);
+  assert.doesNotMatch(kiro.stdout, /wakes by nudge/);
+  const unknown = runDely(["wait", "--run", "run_live", "--control", "nosuch"], ctx);
+  assert.equal(unknown.status, 3, unknown.stdout + unknown.stderr);
+  assert.match(unknown.stdout, /unknown/);
+  assert.doesNotMatch(unknown.stdout, /wakes by nudge/);
+});
+
 test("wait with nothing open prints NOTHING_OPEN", { timeout: 5000 }, () => {
   const ctx = setup(DEFAULT_AGENTS, deadDispatchScenario());
   write(
@@ -2396,37 +2452,46 @@ test("wait with nothing open prints NOTHING_OPEN", { timeout: 5000 }, () => {
   assert.ok(elapsed < 1500, `wait looped for ${elapsed}ms`);
 });
 
-test("wait and collect release a worker_done dispatch only", () => {
-  const doneCtx = setup(DEFAULT_AGENTS, {
+test("wait consumes a pending worker_done when worker-list shows nothing open", { timeout: 5000 }, () => {
+  const ctx = setup(DEFAULT_AGENTS, {
     deliveries: [
+      { deliveryId: "dv_hb", messages: [{ type: "heartbeat", from_handle: "term_w", dispatchId: "disp_1" }] },
       {
         deliveryId: "dv_done",
-        messages: [{ type: "worker_done", from_handle: "term_ag", dispatchId: "disp_ag", body: "ok" }],
+        messages: [{ type: "worker_done", from_handle: "term_w", dispatchId: "disp_1", body: "done" }],
       },
     ],
-    workers: [
-      {
-        dispatchId: "disp_ag",
-        dispatchStatus: "settled",
-        agentTerminalHandle: "term_ag",
-        ownershipState: "external",
-        retainedReason: "external_terminal",
-        terminalState: "retained",
-      },
-    ],
+    workers: [],
   });
+  const r = runDely(["wait", "--run", "run_live", "--control", "cursor"], ctx, {
+    DELY_DEADLINE_S: "30",
+    DELY_SILENCE_S: "60",
+    SPAWN_TIMEOUT_MS: 3000,
+  });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /SETTLED /);
+  assert.doesNotMatch(r.stdout, /NOTHING_OPEN/);
+});
+
+test("wait and collect release a worker_done dispatch only", { timeout: 5000 }, () => {
+  const doneCtx = setup(DEFAULT_AGENTS, adoptedWorkerDoneScenario());
   const collected = runDely(["collect", "--run", "run_live"], doneCtx);
   assert.equal(collected.status, 0, collected.stdout + collected.stderr);
   const doneLog = readLog(doneCtx.logPath);
-  assert.ok(
-    doneLog.some(
-      (argv) =>
-        argv[0] === "orchestration" && argv[1] === "worker-release" && hasFlagPair(argv, "--dispatch", "disp_ag")
-    )
-  );
-  assert.ok(
-    doneLog.some((argv) => argv[0] === "terminal" && argv[1] === "close" && hasFlagPair(argv, "--terminal", "term_ag"))
-  );
+  assert.ok(hasRelease(doneLog, "disp_ag"));
+  assert.ok(hasClose(doneLog, "term_ag"));
+
+  const waited = setup(DEFAULT_AGENTS, adoptedWorkerDoneScenario());
+  const waitR = runDely(["wait", "--run", "run_live", "--control", "cursor"], waited, {
+    DELY_DEADLINE_S: "30",
+    DELY_SILENCE_S: "60",
+    SPAWN_TIMEOUT_MS: 3000,
+  });
+  assert.equal(waitR.status, 0, waitR.stdout + waitR.stderr);
+  assert.match(waitR.stdout, /SETTLED /);
+  const waitLog = readLog(waited.logPath);
+  assert.ok(hasRelease(waitLog, "disp_ag"), "wait did not release the worker_done dispatch");
+  assert.ok(hasClose(waitLog, "term_ag"), "wait did not close the adopted terminal");
 
   const asked = setup(DEFAULT_AGENTS, {
     deliveries: [
@@ -2451,6 +2516,43 @@ test("wait and collect release a worker_done dispatch only", () => {
     "released on a question batch"
   );
   assert.ok(!askLog.some((argv) => argv[0] === "terminal" && argv[1] === "close"));
+});
+
+test("collect releases a worker_done when a dead sibling forces exit 8", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      {
+        deliveryId: "dv_done",
+        messages: [{ type: "worker_done", from_handle: "term_new", dispatchId: "disp_new", body: "done" }],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_new",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_new",
+        ownershipState: "external",
+        retainedReason: "external_terminal",
+        terminalState: "retained",
+      },
+      {
+        dispatchId: "disp_dead",
+        dispatchStatus: "failed",
+        agentTerminalHandle: "term_dead",
+        workerState: "crashed",
+        lastError: "boom",
+        terminalState: "reclaimable",
+        projection: { liveness: { verdict: "exited" } },
+      },
+    ],
+  });
+  const r = runDely(["collect", "--run", "run_live"], ctx);
+  assert.equal(r.status, 8, r.stdout + r.stderr);
+  assert.match(r.stdout, /SETTLED disp_new worker_done done/);
+  assert.match(r.stdout, /FAILED disp_dead /);
+  const log = readLog(ctx.logPath);
+  assert.ok(hasRelease(log, "disp_new"), "collect did not release the worker_done dispatch");
+  assert.ok(hasClose(log, "term_new"), "collect did not close the adopted terminal");
 });
 
 test("classify reads Antigravity logs only for an Antigravity worker", () => {
@@ -2508,6 +2610,78 @@ test("classify reads Antigravity logs only for an Antigravity worker", () => {
   });
   assert.equal(agyOut.status, 4, agyOut.stdout + agyOut.stderr);
   assert.match(agyOut.stdout, /quota/);
+});
+
+test("an Antigravity NO_ACK whose only RESOURCE_EXHAUSTED log predates launch does not name quota", () => {
+  const agyAgents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Antigravity CLI | default | default |
+| \`review\` | Codex CLI | gpt-5.6-sol | high |
+`;
+  const agy = setup(agyAgents, (repo) => ({
+    runs: [
+      passRun(
+        "run_v",
+        keyOf(repo, "cursor", "background", "antigravity/default/default", "codex/gpt-5.6-sol/high")
+      ),
+    ],
+    workerStart: { dispatchId: "disp_ag", state: "ready", handle: "term_ag" },
+    terminalHandle: "term_ag",
+    changeLastOutputForMs: 1,
+    deliveries: [],
+    screenTail: ["waiting"],
+  }));
+  trustAntigravity(agy.home, agy.repo);
+  writeAgyLog(agy.home, "cli-old.log", "RESOURCE_EXHAUSTED\n", Date.now() - 86_400_000);
+  const agyOut = runDely(dispatchArgs(agy.repo, "run_live", "implement", "cursor"), agy, {
+    DELY_ACK_S: "0.2",
+  });
+  assert.equal(agyOut.status, 4, agyOut.stdout + agyOut.stderr);
+  assert.doesNotMatch(agyOut.stdout, /quota/);
+});
+
+test("classify recognises not authenticated on screen and in an Antigravity log", () => {
+  const screen = setup(DEFAULT_AGENTS, (repo) => ({
+    runs: [passRun("run_v", defaultKey(repo, "cursor", "background"))],
+    workerStart: { dispatchId: "disp_1", state: "ready", handle: "term_w" },
+    deliveries: [],
+    screenTail: ["not authenticated"],
+  }));
+  const screenOut = runDely(dispatchArgs(screen.repo, "run_live", "implement", "cursor"), screen, {
+    DELY_ACK_S: "0.15",
+  });
+  assert.equal(screenOut.status, 4, screenOut.stdout + screenOut.stderr);
+  assert.match(screenOut.stdout, /not authenticated/);
+
+  const agyAgents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Antigravity CLI | default | default |
+| \`review\` | Codex CLI | gpt-5.6-sol | high |
+`;
+  const agy = setup(agyAgents, (repo) => ({
+    runs: [
+      passRun(
+        "run_v",
+        keyOf(repo, "cursor", "background", "antigravity/default/default", "codex/gpt-5.6-sol/high")
+      ),
+    ],
+    workerStart: { dispatchId: "disp_ag", state: "ready", handle: "term_ag" },
+    terminalHandle: "term_ag",
+    changeLastOutputForMs: 1,
+    deliveries: [],
+    screenTail: ["waiting"],
+  }));
+  trustAntigravity(agy.home, agy.repo);
+  writeAgyLog(agy.home, "cli-auth.log", "not authenticated\n", Date.now() + 60 * 1000);
+  const agyOut = runDely(dispatchArgs(agy.repo, "run_live", "implement", "cursor"), agy, {
+    DELY_ACK_S: "0.2",
+  });
+  assert.equal(agyOut.status, 4, agyOut.stdout + agyOut.stderr);
+  assert.match(agyOut.stdout, /not authenticated/);
 });
 
 test("Kiro adopted argv puts chat before --model", () => {

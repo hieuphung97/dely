@@ -974,7 +974,8 @@ function cmdWait(flags) {
   const entry = harnesses[flags.control];
   const wake = entry ? entry.wake : "";
   if (wake !== "background") {
-    finish(3, `REFUSED ${flags.control} wakes by nudge; use dely collect`);
+    const how = wake === "nudge" ? "nudge" : wake || "unknown";
+    finish(3, `REFUSED ${flags.control} wakes by ${how}; use dely collect`);
   }
   const seen = new Set();
   for (;;) {
@@ -996,7 +997,11 @@ function cmdWait(flags) {
       stopDispatch(step.dispatchId, flags.run);
       finish(6, `SILENT ${step.dispatchId} ${step.seconds}`);
     }
-    if (listed.ok && !open.length && !deads.length) finish(0, "NOTHING_OPEN");
+    if (listed.ok && !open.length && !deads.length) {
+      const peek = orca(["orchestration", "check", "--peek", "--run", flags.run, "--json"]);
+      if (!orcaFailed(peek) && hasSettle(messagesOf(peek))) continue;
+      finish(0, "NOTHING_OPEN");
+    }
   }
 }
 
@@ -1077,11 +1082,11 @@ function cmdCollect(flags) {
     collected.settles.map((s) => s.dispatchId).filter(Boolean),
     { ok: true, workers: collected.workers || [] }
   );
-  reportDeadLines(deads, collected.open.length === 0);
   releaseWorkerDone(
     collected.settles.map((s) => s.message),
     collected.workers || []
   );
+  reportDeadLines(deads, collected.open.length === 0);
   if (collected.open.length) {
     finish(2, `WAITING ${collected.open.join(" ")}`);
   }
@@ -1627,6 +1632,7 @@ function cmdOpen(flags) {
   const created = orca(["orchestration", "run-create", "--objective", flags.objective, "--json"]);
   if (orcaFailed(created)) finish(9, `ERROR ${orcaReason(created, "run-create failed")}`);
   const id = (result(created).run && result(created).run.id) || result(created).id;
+  if (!id) finish(9, `ERROR ${orcaReason(created, "run-create failed")}`);
   const used = orca(["orchestration", "run-use", "--id", id, "--json"]);
   if (orcaFailed(used)) finish(9, `ERROR ${orcaReason(used, "run-use failed")}`);
   finish(0, `RUN ${id}`);

@@ -281,6 +281,10 @@ if (group === "orchestration" && cmd === "run-current") {
 }
 
 if (group === "orchestration" && cmd === "run-create") {
+  if (scenario.runCreateNoId) {
+    saveState(state);
+    ok({ run: {} });
+  }
   const id = scenario.createdRunId || "run_verify";
   state.boundRun = id;
   const run = {
