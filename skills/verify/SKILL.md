@@ -17,15 +17,24 @@ account, a harness update or a quota reset.
 ## How Control runs it
 
 Read the Control harness's `Control wake` column in
-`../delivery/references/harnesses.md`.
+`../delivery/references/harnesses.md`. Open the delivery Run with
+`dely open --repo <path> --objective <text>` before the first dispatch and
+never pass the verify Run. After dispatch, a background Control runs
+`dely wait --run <runId> --control <agent>`; `NOTHING_OPEN` means nothing is
+still open, including a dispatch already reported. After a `worker_done`,
+`wait` and `collect` release that dispatch; a batch holding only `question`
+or `escalation` releases nothing.
 
-- **background:** run `dely verify run --repo <path> --control <agent>` as a
+One `dely verify --repo <path> --control <agent>` picks the form from that
+wake cell.
+
+- **background:** run `dely verify --repo <path> --control <agent>` as a
   background command and end the turn.
-- **nudge:** run `dely verify start --repo <path> --control <agent>` and end
+- **nudge:** run `dely verify --repo <path> --control <agent>` and end
   the turn. If it prints `COLLECT_NOW`, run that collect at once. On every
   Orca nudge, and when collect prints `WAITING` and exits 2, run only the
   printed `verify collect` command and end the turn again; never the
-  `orca orchestration check` command quoted in the nudge text. While start
+  `orca orchestration check` command quoted in the nudge text. While verify
   has printed `SLEEP`, Control stays bound to the verify Run and cannot
   dispatch delivery work until collect finishes. A worker that neither
   sends a message nor exits wakes nobody, so a Control that has heard

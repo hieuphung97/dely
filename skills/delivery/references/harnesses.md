@@ -16,4 +16,4 @@ combines with `--terminal`.
 | Antigravity CLI | `antigravity` | `--dangerously-skip-permissions` | `agy -p`/`--print` | | adopt | argv (adopt) | nudge | trust dialog |
 | Kiro CLI | `kiro` | none; `--trust-all-tools` is forbidden on the launch argv | `kiro-cli chat --no-interactive` | | `worker-start` | argv (adopt) | unsupported | trust-all confirmation |
 | Cursor Agent CLI | `cursor` | `--force` | `cursor-agent -p`/`--print` | `--model` pin honoured; omit `--effort` when Effort is `default` | `worker-start` | Orca `--model` | background | trust dialog |
-| GitHub Copilot CLI | `copilot` | `--allow-all` | `copilot -p`/`--prompt` | | `worker-start` | argv (adopt) | nudge | trust dialog |
+| GitHub Copilot CLI | `copilot` | `--allow-all` | `copilot -p`/`--prompt` | | `worker-start` | argv (adopt) | background | trust dialog |

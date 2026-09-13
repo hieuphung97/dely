@@ -343,6 +343,7 @@ function addOrcaModelFlags(args, entry, agent, model, effort) {
 
 function adoptCommand(agent, perm, model, effort) {
   const parts = [BINARY[agent] || agent];
+  if (agent === "kiro") parts.push("chat");
   if (perm) parts.push(...String(perm).split(/\s+/).filter(Boolean));
   if (model !== "default") parts.push("--model", model);
   if (effort !== "default") parts.push("--effort", effort);
@@ -377,6 +378,14 @@ function lastFailure(dispatchId, start) {
   if (start && start.json && start.json.error && start.json.error.message) return start.json.error.message;
   if (start && start.state) return start.state;
   return "worker-start not ready";
+}
+
+function failedLaunchLine(dispatchId, start, repo) {
+  const raw = lastFailure(dispatchId, start);
+  if (/selector_not_found/.test(String(raw))) {
+    return `FAILED ${raw}; fix: register the repository with orca repo add --path ${repo}`;
+  }
+  return `FAILED ${raw}`;
 }
 
 function deliveryId(r) {
@@ -451,7 +460,7 @@ function waitQuiet(handle, launchedAt) {
   }
 }
 
-function classify(handle) {
+function classify(handle, agent, launchedAt) {
   if (!handle) return "no known cause on screen";
   const read = orca(["terminal", "read", "--terminal", handle, "--limit", "200", "--json"]);
   const tail = result(read).terminal && result(read).terminal.tail;
@@ -464,16 +473,29 @@ function classify(handle) {
   if (/usagelimit|quota|RESOURCE_EXHAUSTED|429/.test(packed)) {
     return "usage limit or quota; fix: wait for reset, switch account, or change the pin";
   }
-  if (/Signin|notloggedin/.test(packed)) return "not signed in; fix: sign in to the harness";
-  try {
-    const dir = path.join(os.homedir(), ".gemini", "antigravity-cli", "log");
-    const logs = fs.readdirSync(dir).filter((f) => f.startsWith("cli-") && f.endsWith(".log"));
-    for (const f of logs.slice(0, 3)) {
-      const body = fs.readFileSync(path.join(dir, f), "utf8");
-      if (body.indexOf("RESOURCE_EXHAUSTED") >= 0) return "Antigravity quota (RESOURCE_EXHAUSTED in its log)";
+  if (/Signin|notloggedin|notauthenticated/i.test(packed) || /not authenticated/i.test(text)) {
+    return "not authenticated; fix: sign in to the harness";
+  }
+  if (agent === "antigravity") {
+    try {
+      const dir = path.join(os.homedir(), ".gemini", "antigravity-cli", "log");
+      const logs = fs
+        .readdirSync(dir)
+        .filter((f) => f.startsWith("cli-") && f.endsWith(".log"))
+        .map((f) => {
+          const p = path.join(dir, f);
+          return { p, mtime: fs.statSync(p).mtimeMs };
+        })
+        .filter((row) => launchedAt == null || row.mtime >= launchedAt)
+        .sort((a, b) => b.mtime - a.mtime);
+      if (logs.length) {
+        const body = fs.readFileSync(logs[0].p, "utf8");
+        if (body.indexOf("RESOURCE_EXHAUSTED") >= 0) return "Antigravity quota (RESOURCE_EXHAUSTED in its log)";
+        if (/not authenticated/i.test(body)) return "not authenticated; fix: sign in to the harness";
+      }
+    } catch (_) {
+      /* optional */
     }
-  } catch (_) {
-    /* optional */
   }
   const snippet = packed.slice(-100);
   return snippet ? `no known cause on screen; last output: ${snippet}` : "no known cause on screen";
@@ -617,6 +639,34 @@ function releaseDispatch(id) {
   const r = orca(["orchestration", "worker-release", "--dispatch", id, "--json"]);
   const state = String(result(r).state || "");
   if (orcaFailed(r) || state === "retained" || state === "release_pending") return;
+}
+
+function isAdoptedWorker(w) {
+  return Boolean(w && (w.ownershipState === "external" || w.retainedReason === "external_terminal"));
+}
+
+function releaseWorkerDone(messages, workers) {
+  const list = messages || [];
+  if (!list.some((m) => m && m.type === "worker_done")) return;
+  const byHandle = new Map();
+  const byId = new Map();
+  for (const w of workers || []) {
+    if (w && w.agentTerminalHandle) byHandle.set(w.agentTerminalHandle, w);
+    if (w && w.dispatchId) byId.set(w.dispatchId, w);
+  }
+  const seen = new Set();
+  for (const m of list) {
+    if (!m || m.type !== "worker_done") continue;
+    const from = m.from_handle && byHandle.get(m.from_handle);
+    const id = messageDispatchId(m) || (from && from.dispatchId) || "";
+    if (!id || id === "-" || seen.has(id)) continue;
+    seen.add(id);
+    releaseDispatch(id);
+    const w = byId.get(id) || from;
+    if (isAdoptedWorker(w) && w.agentTerminalHandle) {
+      orca(["terminal", "close", "--terminal", w.agentTerminalHandle, "--json"]);
+    }
+  }
 }
 
 function parseDispatchedAt(raw) {
@@ -785,7 +835,7 @@ function cmdStatus(flags) {
   const key = makeKey(repo, flags.control, harnesses, pins);
   const found = lookupVerdict(key);
   if (found.status === "ERROR") finish(9, `ERROR run-list failed: ${found.reason}`);
-  if (found.status === "PASS") finish(0, `PASS ${found.runId}`);
+  if (found.status === "PASS") finish(0, "PASS");
   finish(1, "NONE");
 }
 
@@ -798,6 +848,10 @@ function cmdDispatch(flags) {
   if (found.status === "ERROR") finish(9, `ERROR run-list failed: ${found.reason}`);
   if (found.status !== "PASS") {
     finish(3, `REFUSED no PASS verdict for key ${key}; run dely verify`);
+  }
+  const bound = boundRunId();
+  if (String(flags.run) !== String(bound)) {
+    finish(3, `REFUSED run ${flags.run} is not the Run bound to Control; fix: dely open`);
   }
   const phase = flags.phase;
   const pin = pins[phase];
@@ -857,7 +911,7 @@ function launchDispatch({ repo, run, phase, specFile, title, pin, entry }) {
   const dispatchId = started.dispatchId;
   handle = workerHandle(dispatchId, handle || started.handle);
   if (started.state !== "ready") {
-    const line = `FAILED ${lastFailure(dispatchId, started)}`;
+    const line = failedLaunchLine(dispatchId, started, repo);
     if (handle) orca(["terminal", "close", "--terminal", handle, "--json"]);
     remember(run, "reported", dispatchId);
     return { code: 5, line, dispatchId, handle, created };
@@ -868,7 +922,7 @@ function launchDispatch({ repo, run, phase, specFile, title, pin, entry }) {
     if (handle) orca(["terminal", "close", "--terminal", handle, "--json"]);
     return {
       code: 4,
-      line: `NO_ACK ${dispatchId || "-"} ${classify(handle)}`,
+      line: `NO_ACK ${dispatchId || "-"} ${classify(handle, entry.agent, launchedAt)}`,
       dispatchId,
       handle,
       created,
@@ -916,6 +970,12 @@ function waitStep(run, startedAt, seen, deadlineS) {
 }
 
 function cmdWait(flags) {
+  const harnesses = loadHarnesses();
+  const entry = harnesses[flags.control];
+  const wake = entry ? entry.wake : "";
+  if (wake !== "background") {
+    finish(3, `REFUSED ${flags.control} wakes by nudge; use dely collect`);
+  }
   const seen = new Set();
   for (;;) {
     const step = waitStep(flags.run, Date.now(), seen, Number.POSITIVE_INFINITY);
@@ -924,6 +984,7 @@ function cmdWait(flags) {
     const deads = checkDeadDispatch(flags.run, null, listed);
     if (step.type === "settled") {
       reportDeadLines(deads, false);
+      releaseWorkerDone(step.messages, listed.ok ? listed.workers : []);
       finish(0, `SETTLED ${step.types.join(",")} ${JSON.stringify(step.messages)}`);
     }
     const memory = readRunMemory(flags.run);
@@ -935,6 +996,7 @@ function cmdWait(flags) {
       stopDispatch(step.dispatchId, flags.run);
       finish(6, `SILENT ${step.dispatchId} ${step.seconds}`);
     }
+    if (listed.ok && !open.length && !deads.length) finish(0, "NOTHING_OPEN");
   }
 }
 
@@ -1016,6 +1078,10 @@ function cmdCollect(flags) {
     { ok: true, workers: collected.workers || [] }
   );
   reportDeadLines(deads, collected.open.length === 0);
+  releaseWorkerDone(
+    collected.settles.map((s) => s.message),
+    collected.workers || []
+  );
   if (collected.open.length) {
     finish(2, `WAITING ${collected.open.join(" ")}`);
   }
@@ -1327,8 +1393,10 @@ function finishVerify(ctx) {
   const errMsg = ctx.err && (ctx.err.message || String(ctx.err));
   const pass = allPass && !gitChanged && !ctx.err;
   if (ctx.verifyRun) writeVerdict(ctx.verifyRun, ctx.key, pass);
+  const blocked = ctx.groups.some((g) => g.status === "BLOCKED");
   for (const g of ctx.groups) {
-    if (!g.status && !g.dispatchId && !g.reason) g.reason = "not launched";
+    if (!g.status && !g.dispatchId && blocked) g.status = "SKIPPED";
+    else if (!g.status && !g.dispatchId && !g.reason) g.reason = "not launched";
     else if (errMsg && !g.reason) g.reason = errMsg;
   }
   for (const phase of ["implement", "review"]) {
@@ -1374,6 +1442,10 @@ function prepareVerify(flags) {
   const prev = boundRunId();
   restoreOnExit = prev || null;
   const baseline = gitPorcelain(repo);
+  const allBlocked = groups.length > 0 && groups.every((g) => g.status === "BLOCKED");
+  if (allBlocked) {
+    return { repo, harnesses, pins, key, groups, prev, baseline, verifyRun: "", controlAgent: flags.control };
+  }
   const created = orca(["orchestration", "run-create", "--objective", objectiveFor(key), "--json"]);
   if (orcaFailed(created)) {
     return { error: orcaReason(created, "run-create failed"), prev, repo, key, pins, groups, baseline };
@@ -1432,10 +1504,21 @@ function writeVerifyState(ctx) {
   );
 }
 
+function cmdVerify(flags) {
+  const harnesses = loadHarnesses();
+  const entry = harnesses[flags.control];
+  if (entry && entry.wake === "nudge") return cmdVerifyStart(flags);
+  return cmdVerifyRun(flags);
+}
+
 function cmdVerifyRun(flags) {
   const ctx = prepareVerify(flags);
   if (ctx.error) finish(9, `ERROR ${ctx.error}`);
   verifyOnError = ctx;
+  if (!ctx.verifyRun) {
+    finishVerify(ctx);
+    return;
+  }
   dispatchVerifyGroups(ctx);
   if (ctx.groups.some((g) => g.dispatchId && !g.status)) {
     const waitRes = consumeVerify(ctx.verifyRun, ctx.groups, Date.now(), VERIFY_DEADLINE_S);
@@ -1448,7 +1531,7 @@ function cmdVerifyStart(flags) {
   const ctx = prepareVerify(flags);
   if (ctx.error) finish(9, `ERROR ${ctx.error}`);
   verifyOnError = ctx;
-  if (ctx.groups.some((g) => g.status === "BLOCKED")) {
+  if (!ctx.verifyRun || ctx.groups.some((g) => g.status === "BLOCKED")) {
     finishVerify(ctx);
     return;
   }
@@ -1540,12 +1623,21 @@ function cmdVerifyCollect(flags) {
   });
 }
 
+function cmdOpen(flags) {
+  const created = orca(["orchestration", "run-create", "--objective", flags.objective, "--json"]);
+  if (orcaFailed(created)) finish(9, `ERROR ${orcaReason(created, "run-create failed")}`);
+  const id = (result(created).run && result(created).run.id) || result(created).id;
+  const used = orca(["orchestration", "run-use", "--id", id, "--json"]);
+  if (orcaFailed(used)) finish(9, `ERROR ${orcaReason(used, "run-use failed")}`);
+  finish(0, `RUN ${id}`);
+}
+
 function parseArgs(argv) {
   let cmd = argv[0];
   let i = 1;
-  if (cmd === "verify") {
-    cmd = argv[1] ? "verify:" + argv[1] : "verify";
-    i = argv[1] ? 2 : 1;
+  if (cmd === "verify" && argv[1] === "collect") {
+    cmd = "verify:collect";
+    i = 2;
   }
   const flags = {};
   for (; i < argv.length; i++) {
@@ -1568,6 +1660,9 @@ function parseArgs(argv) {
 function main(argv) {
   const { cmd, flags } = parseArgs(argv);
   switch (cmd) {
+    case "open":
+      if (!flags.repo || !flags.objective) finish(2, "usage: dely open --repo <path> --objective <text>");
+      return cmdOpen(flags);
     case "status":
       if (!flags.repo || !flags.control) finish(2, "usage: dely status --repo <path> --control <agent>");
       return cmdStatus(flags);
@@ -1577,22 +1672,19 @@ function main(argv) {
       }
       return cmdDispatch(flags);
     case "wait":
-      if (!flags.run) finish(2, "usage: dely wait --run <runId>");
+      if (!flags.run || !flags.control) finish(2, "usage: dely wait --run <runId> --control <agent>");
       return cmdWait(flags);
     case "collect":
       if (!flags.run) finish(2, "usage: dely collect --run <runId>");
       return cmdCollect(flags);
-    case "verify:run":
-      if (!flags.repo || !flags.control) finish(2, "usage: dely verify run --repo <path> --control <agent>");
-      return withPrevRestore(() => cmdVerifyRun(flags));
-    case "verify:start":
-      if (!flags.repo || !flags.control) finish(2, "usage: dely verify start --repo <path> --control <agent>");
-      return withPrevRestore(() => cmdVerifyStart(flags));
+    case "verify":
+      if (!flags.repo || !flags.control) finish(2, "usage: dely verify --repo <path> --control <agent>");
+      return withPrevRestore(() => cmdVerify(flags));
     case "verify:collect":
       if (!flags.repo) finish(2, "usage: dely verify collect --repo <path>");
       return withPrevRestore(() => cmdVerifyCollect(flags));
     default:
-      finish(2, "usage: dely status|dispatch|wait|collect|verify");
+      finish(2, "usage: dely open|status|dispatch|wait|collect|verify");
   }
 }
 

@@ -177,6 +177,11 @@ npx skills update --global                   # update
 npx skills remove --agent kiro-cli --global --skill delivery --skill setup --skill verify  # uninstall
 ```
 
+`npx skills add` also writes `~/.agents/skills` (Codex and Copilot load it)
+and `~/.kiro/skills`. Update or remove both copies. Compare
+`skills/delivery/SKILL.md` by hash with the installed file before assuming
+the plugin version is the one that runs.
+
 Invoke the skills in a Kiro CLI session as `/delivery`, `/setup` and `/verify`.
 
 ### Checked versions
@@ -215,9 +220,10 @@ The workflow contract is [`skills/delivery/SKILL.md`](skills/delivery/SKILL.md).
 - **`dely:delivery` stops immediately.** Orca is not running or a required
   capability is absent, including orchestration. Run the Quickstart
   preflight, then retry.
-- **A harness still runs the old workflow after you edited this checkout.**
-  You edited the source, not an installed copy. Reinstall or update the
-  plugin in the harness.
+- **A stale copy from `npx skills add` shadows a newer plugin.** Codex and
+  Copilot also load `~/.agents/skills`; Kiro loads `~/.kiro/skills`. Compare
+  `skills/delivery/SKILL.md` by hash with the copy in those directories,
+  then update or remove the shadowing install.
 - **Codex still behaves the same after `codex plugin marketplace upgrade`.**
   Confirm the remote has new commits. A delivery already running keeps the
   plugin version from its start; open a new session after the upgrade.

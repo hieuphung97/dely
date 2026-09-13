@@ -116,6 +116,7 @@ function setup(agents, scenarioFn) {
     statePath: path.join(repo, "orca.state.json"),
   };
   const scenario = typeof scenarioFn === "function" ? scenarioFn(repo) : scenarioFn;
+  if (scenario && scenario.currentRun === undefined) scenario.currentRun = "run_live";
   write(ctx.scenarioPath, JSON.stringify(scenario, null, 2));
   gitInit(repo);
   return ctx;
@@ -318,7 +319,7 @@ test("wait swallows heartbeats and exits only on settle", () => {
     ],
     lastOutputAt: "now",
   });
-  const r = runDely(["wait", "--run", "run_live"], ctx);
+  const r = runDely(["wait", "--run", "run_live", "--control", "cursor"], ctx);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /^SETTLED worker_done /);
   assert.ok(r.stdout.indexOf("heartbeat") < 0 || r.stdout.indexOf("SETTLED heartbeat") < 0);
@@ -343,7 +344,7 @@ test("wait exits DEADLINE while output is fresh", { timeout: 5000 }, () => {
     lastOutputAt: "now",
     liveness: "live",
   });
-  const r = runDely(["wait", "--run", "run_live"], ctx, { DELY_DEADLINE_S: "0.2", DELY_SILENCE_S: "30" });
+  const r = runDely(["wait", "--run", "run_live", "--control", "cursor"], ctx, { DELY_DEADLINE_S: "0.2", DELY_SILENCE_S: "30" });
   assert.equal(r.status, 7, r.stdout + r.stderr);
   assert.match(r.stdout, /^DEADLINE /);
 });
@@ -366,7 +367,7 @@ test("wait exits SILENT when output is stale after ACK even though Orca says liv
     staleMs: 200000,
     liveness: "live",
   });
-  const r = runDely(["wait", "--run", "run_live"], ctx, { DELY_SILENCE_S: "0.15", DELY_DEADLINE_S: "30" });
+  const r = runDely(["wait", "--run", "run_live", "--control", "cursor"], ctx, { DELY_SILENCE_S: "0.15", DELY_DEADLINE_S: "30" });
   assert.equal(r.status, 6, r.stdout + r.stderr);
   assert.match(r.stdout, /^SILENT disp_1 /);
   const log = readLog(ctx.logPath);
@@ -606,7 +607,7 @@ test("status finds a PASS verdict on run-list page two", () => {
   });
   const r = runDely(["status", "--repo", ctx.repo, "--control", "cursor"], ctx);
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.equal(r.stdout, "PASS run_pass\n");
+  assert.equal(r.stdout, "PASS\n");
   const log = readLog(ctx.logPath);
   const pages = log.filter((argv) => argv[0] === "orchestration" && argv[1] === "run-list");
   assert.ok(pages.length >= 2);
@@ -733,7 +734,7 @@ test("wait judges a Delivery as a whole", () => {
     ],
     lastOutputAt: "now",
   });
-  const r = runDely(["wait", "--run", "run_live"], ctx, { DELY_DEADLINE_S: "0.2", DELY_SILENCE_S: "30" });
+  const r = runDely(["wait", "--run", "run_live", "--control", "cursor"], ctx, { DELY_DEADLINE_S: "0.2", DELY_SILENCE_S: "30" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /^SETTLED heartbeat,worker_done /);
   const log = readLog(ctx.logPath);
@@ -1052,7 +1053,7 @@ test("collect reports a failed dispatch that sent no message", () => {
 
 test("wait reports a failed dispatch that sent no message", { timeout: 5000 }, () => {
   const ctx = setup(DEFAULT_AGENTS, deadDispatchScenario());
-  const r = runDely(["wait", "--run", "run_live"], ctx, {
+  const r = runDely(["wait", "--run", "run_live", "--control", "cursor"], ctx, {
     DELY_DEADLINE_S: "30",
     DELY_SILENCE_S: "60",
     SPAWN_TIMEOUT_MS: 3000,
@@ -1166,7 +1167,7 @@ test("wait settles a live dispatch after reporting a dead one", { timeout: 5000 
     ],
     lastOutputAt: "now",
   });
-  const r = runDely(["wait", "--run", "run_live"], ctx, {
+  const r = runDely(["wait", "--run", "run_live", "--control", "cursor"], ctx, {
     DELY_DEADLINE_S: "30",
     DELY_SILENCE_S: "60",
     SPAWN_TIMEOUT_MS: 3000,
@@ -1197,7 +1198,7 @@ test("wait checks for a dead dispatch only after consuming", { timeout: 5000 }, 
       },
     ],
   });
-  const r = runDely(["wait", "--run", "run_live"], ctx, {
+  const r = runDely(["wait", "--run", "run_live", "--control", "cursor"], ctx, {
     DELY_DEADLINE_S: "30",
     DELY_SILENCE_S: "60",
     SPAWN_TIMEOUT_MS: 3000,
@@ -1476,7 +1477,7 @@ test("wait prints one FAILED line across polls for a retained adopted dispatch",
     ],
     lastOutputAt: "now",
   });
-  const r = runDely(["wait", "--run", "run_live"], ctx, {
+  const r = runDely(["wait", "--run", "run_live", "--control", "cursor"], ctx, {
     DELY_DEADLINE_S: "30",
     DELY_SILENCE_S: "60",
     SPAWN_TIMEOUT_MS: 3000,
@@ -1644,7 +1645,7 @@ test("wait reports a dead sibling when another dispatch settles in the same wait
     ],
     lastOutputAt: "now",
   });
-  const r = runDely(["wait", "--run", "run_live"], ctx, {
+  const r = runDely(["wait", "--run", "run_live", "--control", "cursor"], ctx, {
     DELY_DEADLINE_S: "30",
     DELY_SILENCE_S: "60",
     SPAWN_TIMEOUT_MS: 3000,
@@ -1697,7 +1698,7 @@ test("the runtime has no sidecar command", () => {
   const ctx = setup(DEFAULT_AGENTS, { workers: [], lastOutputAt: "now" });
   const r = runDely(["sidecar", "--run", "r", "--control-handle", "h"], ctx);
   assert.equal(r.status, 2, r.stdout + r.stderr);
-  assert.equal(r.stdout, "usage: dely status|dispatch|wait|collect|verify\n");
+  assert.equal(r.stdout, "usage: dely open|status|dispatch|wait|collect|verify\n");
 });
 
 function gitInit(repo) {
@@ -1882,7 +1883,7 @@ test("verdict is written only after every dispatch settled, with the full key", 
       ],
     })
   );
-  const child = spawnDely(["verify", "run", "--repo", ctx.repo, "--control", "cursor"], ctx, {
+  const child = spawnDely(["verify", "--repo", ctx.repo, "--control", "cursor"], ctx, {
     DELY_VERIFY_DEADLINE_S: "30",
   });
   try {
@@ -1904,7 +1905,7 @@ test("verdict is written only after every dispatch settled, with the full key", 
 
 test("verify restores the Control terminal's previously bound Run", () => {
   const ctx = setupVerify(DEFAULT_AGENTS, (repo) => defaultVerifyScenario(repo));
-  const pass = runDely(["verify", "run", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  const pass = runDely(["verify", "--repo", ctx.repo, "--control", "cursor"], ctx);
   assert.equal(pass.status, 0, pass.stdout + pass.stderr);
   assert.match(pass.stdout, /RESULT PASS/);
   const passLast = lastBinding(readLog(ctx.logPath));
@@ -1932,7 +1933,7 @@ test("verify restores the Control terminal's previously bound Run", () => {
       ],
     })
   );
-  const fail = runDely(["verify", "run", "--repo", failCtx.repo, "--control", "cursor"], failCtx);
+  const fail = runDely(["verify", "--repo", failCtx.repo, "--control", "cursor"], failCtx);
   assert.equal(fail.status, 1, fail.stdout + fail.stderr);
   assert.match(fail.stdout, /RESULT FAIL/);
   const failLast = lastBinding(readLog(failCtx.logPath));
@@ -1952,7 +1953,7 @@ test("verify restores the Control terminal's previously bound Run", () => {
     coordinatorHandle: "term_ctrl",
   }));
   gitInit(blockedCtx.repo);
-  const blocked = runDely(["verify", "run", "--repo", blockedCtx.repo, "--control", "cursor"], blockedCtx);
+  const blocked = runDely(["verify", "--repo", blockedCtx.repo, "--control", "cursor"], blockedCtx);
   assert.equal(blocked.status, 1, blocked.stdout + blocked.stderr);
   assert.match(blocked.stdout, /RESULT FAIL/);
   const blockedLast = lastBinding(readLog(blockedCtx.logPath));
@@ -1978,17 +1979,14 @@ test("BLOCKED preflight makes no worker-start call and records a FAIL verdict", 
     path.join(ctx.home, ".claude.json"),
     JSON.stringify({ projects: { [ctx.repo]: { hasTrustDialogAccepted: false } } })
   );
-  const r = runDely(["verify", "run", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  const r = runDely(["verify", "--repo", ctx.repo, "--control", "cursor"], ctx);
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.match(r.stdout, /BLOCKED /);
   assert.match(r.stdout, /RESULT FAIL/);
   const log = readLog(ctx.logPath);
   assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start"));
-  assert.ok(hasVerdictWrite(log));
-  const update = log.find((argv) => argv[0] === "orchestration" && argv[1] === "task-update");
-  assert.ok(update);
-  const resultJson = update[update.indexOf("--result") + 1];
-  assert.match(resultJson, /"verdict":"FAIL"/);
+  assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "run-create"));
+  assert.ok(!hasVerdictWrite(log));
   assert.ok(hasFlagPair(lastBinding(log), "--id", "run_delivery"));
 });
 
@@ -2003,7 +2001,7 @@ test("verify start prints SLEEP and records no terminal create", () => {
       ],
     })
   );
-  const started = runDely(["verify", "start", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  const started = runDely(["verify", "--repo", ctx.repo, "--control", "codex"], ctx);
   assert.equal(started.status, 0, started.stdout + started.stderr);
   assert.match(started.stdout, /^SLEEP /);
   const log = readLog(ctx.logPath);
@@ -2024,7 +2022,7 @@ test("verify collect with one dispatch open prints WAITING and records no termin
       ],
     })
   );
-  const started = runDely(["verify", "start", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  const started = runDely(["verify", "--repo", ctx.repo, "--control", "codex"], ctx);
   assert.equal(started.status, 0, started.stdout + started.stderr);
   const collected = runDely(["verify", "collect", "--repo", ctx.repo], ctx);
   assert.equal(collected.status, 2, collected.stdout + collected.stderr);
@@ -2063,7 +2061,7 @@ test("two id-less worker_done messages print two SETTLED lines", () => {
 test("PASS verify writes verdict PASS with the full key and status prints PASS", () => {
   const ctx = setupVerify(DEFAULT_AGENTS, (repo) => defaultVerifyScenario(repo));
   const key = defaultKey(ctx.repo, "cursor", "background");
-  const pass = runDely(["verify", "run", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  const pass = runDely(["verify", "--repo", ctx.repo, "--control", "cursor"], ctx);
   assert.equal(pass.status, 0, pass.stdout + pass.stderr);
   assert.match(pass.stdout, /RESULT PASS/);
   const verdict = verdictFromLog(readLog(ctx.logPath));
@@ -2072,13 +2070,13 @@ test("PASS verify writes verdict PASS with the full key and status prints PASS",
   assert.equal(verdict.key, key);
   const status = runDely(["status", "--repo", ctx.repo, "--control", "cursor"], ctx);
   assert.equal(status.status, 0, status.stdout + status.stderr);
-  assert.equal(status.stdout, "PASS run_verify\n");
+  assert.equal(status.stdout, "PASS\n");
 });
 
 test("an error thrown mid-run restores the previously bound Run", () => {
   const ctx = setupVerify(DEFAULT_AGENTS, (repo) => defaultVerifyScenario(repo));
   fs.writeFileSync(path.join(ctx.repo, ".dely-verify"), "not a directory\n");
-  const r = runDely(["verify", "run", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  const r = runDely(["verify", "--repo", ctx.repo, "--control", "cursor"], ctx);
   assert.notEqual(r.status, 0, r.stdout + r.stderr);
   const last = lastBinding(readLog(ctx.logPath));
   assert.ok(last);
@@ -2098,7 +2096,7 @@ test("verify start finishes at once on NO_ACK without a consuming wait", () => {
     })
   );
   const t0 = Date.now();
-  const r = runDely(["verify", "start", "--repo", ctx.repo, "--control", "codex"], ctx, {
+  const r = runDely(["verify", "--repo", ctx.repo, "--control", "codex"], ctx, {
     DELY_VERIFY_DEADLINE_S: "3",
     DELY_ACK_S: "1",
   });
@@ -2126,7 +2124,7 @@ test("verify start with a BLOCKED pin does not dispatch the other pins", () => {
   }));
   gitInit(ctx.repo);
   trustCursor(ctx.home, ctx.repo);
-  const r = runDely(["verify", "start", "--repo", ctx.repo, "--control", "codex"], ctx);
+  const r = runDely(["verify", "--repo", ctx.repo, "--control", "codex"], ctx);
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.match(r.stdout, /BLOCKED /);
   assert.match(r.stdout, /RESULT FAIL/);
@@ -2211,7 +2209,7 @@ test("after a failed launch, verify start launches no further pin", () => {
       deliveries: [],
     })
   );
-  const r = runDely(["verify", "start", "--repo", ctx.repo, "--control", "codex"], ctx, {
+  const r = runDely(["verify", "--repo", ctx.repo, "--control", "codex"], ctx, {
     DELY_ACK_S: "1",
   });
   assert.equal(r.status, 1, r.stdout + r.stderr);
@@ -2241,7 +2239,7 @@ test("a throw after a launch cleans up and records FAIL before restoring", () =>
     })
   );
   fs.mkdirSync(path.join(ctx.repo, ".dely-verify", "state.json"), { recursive: true });
-  const r = runDely(["verify", "start", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  const r = runDely(["verify", "--repo", ctx.repo, "--control", "codex"], ctx);
   assert.notEqual(r.status, 0, r.stdout + r.stderr);
   const log = readLog(ctx.logPath);
   assert.ok(log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-stop" && hasFlagPair(argv, "--dispatch", "disp_impl")));
@@ -2257,7 +2255,7 @@ test("a throw after a launch cleans up and records FAIL before restoring", () =>
 test("a throw after every group reached PASS reports the error and records FAIL", () => {
   const ctx = setupVerify(DEFAULT_AGENTS, (repo) => defaultVerifyScenario(repo));
   const preload = writeThrowInject(ctx.repo);
-  const r = runDely(["verify", "run", "--repo", ctx.repo, "--control", "cursor"], ctx, {
+  const r = runDely(["verify", "--repo", ctx.repo, "--control", "cursor"], ctx, {
     NODE_OPTIONS: "--require " + preload,
   });
   assert.notEqual(r.status, 0, r.stdout + r.stderr);
@@ -2266,4 +2264,351 @@ test("a throw after every group reached PASS reports the error and records FAIL"
   const verdict = verdictFromLog(readLog(ctx.logPath));
   assert.ok(verdict);
   assert.equal(verdict.verdict, "FAIL");
+});
+
+function dispatchArgs(repo, run, phase, control) {
+  return [
+    "dispatch",
+    "--repo",
+    repo,
+    "--run",
+    run,
+    "--phase",
+    phase,
+    "--spec-file",
+    "task.md",
+    "--control",
+    control,
+  ];
+}
+
+function writeAgyLog(home, name, body, mtimeMs) {
+  const file = path.join(home, ".gemini", "antigravity-cli", "log", name);
+  write(file, body);
+  if (mtimeMs != null) {
+    const t = mtimeMs / 1000;
+    fs.utimesSync(file, t, t);
+  }
+}
+
+function trustAntigravity(home, repo) {
+  write(
+    path.join(home, ".gemini", "antigravity-cli", "settings.json"),
+    JSON.stringify({ trustedWorkspaces: [repo] })
+  );
+}
+
+test("open creates a Run and binds it with run-use", () => {
+  const ctx = setup(DEFAULT_AGENTS, { createdRunId: "run_opened", currentRun: null });
+  const r = runDely(["open", "--repo", ctx.repo, "--objective", "ship the patch"], ctx);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(r.stdout, "RUN run_opened\n");
+  const log = readLog(ctx.logPath);
+  const createAt = log.findIndex((argv) => argv[0] === "orchestration" && argv[1] === "run-create");
+  const useAt = log.findIndex((argv) => argv[0] === "orchestration" && argv[1] === "run-use");
+  assert.ok(createAt >= 0, "open did not call run-create");
+  assert.ok(useAt > createAt, "open printed the id without run-use");
+  assert.ok(hasFlagPair(log[useAt], "--id", "run_opened"));
+  assert.ok(hasFlagPair(log[createAt], "--objective", "ship the patch"));
+});
+
+test("dispatch refuses a Run that is not bound to Control", () => {
+  let key = "";
+  const ctx = setup(DEFAULT_AGENTS, (repo) => {
+    key = defaultKey(repo, "cursor", "background");
+    return {
+      currentRun: "run_bound",
+      runs: [passRun("run_listed", key)],
+      workerStart: { dispatchId: "disp_x", state: "ready", handle: "term_w" },
+    };
+  });
+  const r = runDely(dispatchArgs(ctx.repo, "run_listed", "implement", "cursor"), ctx);
+  assert.equal(r.status, 3, r.stdout + r.stderr);
+  assert.equal(
+    r.stdout,
+    "REFUSED run run_listed is not the Run bound to Control; fix: dely open\n"
+  );
+  const log = readLog(ctx.logPath);
+  assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start"));
+});
+
+test("status prints PASS with no run id", () => {
+  const ctx = setup(DEFAULT_AGENTS, (repo) => ({
+    runs: [passRun("run_hidden", defaultKey(repo, "cursor", "background"))],
+  }));
+  const r = runDely(["status", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(r.stdout, "PASS\n");
+});
+
+test("verify picks the blocking form for background Control and SLEEP for nudge", () => {
+  const nudge = setupVerify(DEFAULT_AGENTS, (repo) =>
+    defaultVerifyScenario(repo, {
+      deliveries: [
+        {
+          deliveryId: "dv_ack",
+          messages: [verifyAck("term_impl", "disp_impl"), verifyAck("term_rev", "disp_rev")],
+        },
+      ],
+    })
+  );
+  const slept = runDely(["verify", "--repo", nudge.repo, "--control", "codex"], nudge);
+  assert.equal(slept.status, 0, slept.stdout + slept.stderr);
+  assert.match(slept.stdout, /^SLEEP /);
+  assert.equal(checkWaitCalls(readLog(nudge.logPath)).length, 0);
+
+  const blocking = setupVerify(DEFAULT_AGENTS, (repo) => defaultVerifyScenario(repo));
+  const done = runDely(["verify", "--repo", blocking.repo, "--control", "claude"], blocking);
+  assert.equal(done.status, 0, done.stdout + done.stderr);
+  assert.match(done.stdout, /RESULT PASS/);
+  assert.ok(checkWaitCalls(readLog(blocking.logPath)).length > 0);
+});
+
+test("wait refuses a nudge-mode Control and requires --control", () => {
+  const ctx = setup(DEFAULT_AGENTS, {
+    deliveries: [{ deliveryId: "dv1", messages: [{ type: "heartbeat", from_handle: "term_w" }] }],
+    workers: [{ dispatchId: "disp_1", dispatchStatus: "dispatched", agentTerminalHandle: "term_w" }],
+  });
+  const refused = runDely(["wait", "--run", "run_live", "--control", "codex"], ctx);
+  assert.equal(refused.status, 3, refused.stdout + refused.stderr);
+  assert.equal(refused.stdout, "REFUSED codex wakes by nudge; use dely collect\n");
+  const log = readLog(ctx.logPath);
+  assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "check"));
+  const missing = runDely(["wait", "--run", "run_live"], ctx);
+  assert.equal(missing.status, 2, missing.stdout + missing.stderr);
+});
+
+test("wait with nothing open prints NOTHING_OPEN", { timeout: 5000 }, () => {
+  const ctx = setup(DEFAULT_AGENTS, deadDispatchScenario());
+  write(
+    path.join(ctx.repo, ".git", "dely", "runs", "run_live.json"),
+    JSON.stringify({ reported: ["disp_1"], stopped: [] })
+  );
+  const t0 = Date.now();
+  const r = runDely(["wait", "--run", "run_live", "--control", "cursor"], ctx, {
+    DELY_DEADLINE_S: "30",
+    DELY_POLL_MS: "20",
+    SPAWN_TIMEOUT_MS: 1500,
+  });
+  const elapsed = Date.now() - t0;
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(r.stdout, "NOTHING_OPEN\n");
+  assert.ok(elapsed < 1500, `wait looped for ${elapsed}ms`);
+});
+
+test("wait and collect release a worker_done dispatch only", () => {
+  const doneCtx = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      {
+        deliveryId: "dv_done",
+        messages: [{ type: "worker_done", from_handle: "term_ag", dispatchId: "disp_ag", body: "ok" }],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_ag",
+        dispatchStatus: "settled",
+        agentTerminalHandle: "term_ag",
+        ownershipState: "external",
+        retainedReason: "external_terminal",
+        terminalState: "retained",
+      },
+    ],
+  });
+  const collected = runDely(["collect", "--run", "run_live"], doneCtx);
+  assert.equal(collected.status, 0, collected.stdout + collected.stderr);
+  const doneLog = readLog(doneCtx.logPath);
+  assert.ok(
+    doneLog.some(
+      (argv) =>
+        argv[0] === "orchestration" && argv[1] === "worker-release" && hasFlagPair(argv, "--dispatch", "disp_ag")
+    )
+  );
+  assert.ok(
+    doneLog.some((argv) => argv[0] === "terminal" && argv[1] === "close" && hasFlagPair(argv, "--terminal", "term_ag"))
+  );
+
+  const asked = setup(DEFAULT_AGENTS, {
+    deliveries: [
+      {
+        deliveryId: "dv_q",
+        messages: [{ type: "question", from_handle: "term_w", dispatchId: "disp_1", body: "need a choice" }],
+      },
+    ],
+    workers: [
+      {
+        dispatchId: "disp_1",
+        dispatchStatus: "dispatched",
+        agentTerminalHandle: "term_w",
+      },
+    ],
+  });
+  const questioned = runDely(["collect", "--run", "run_live"], asked);
+  assert.match(questioned.stdout, /SETTLED disp_1 question /);
+  const askLog = readLog(asked.logPath);
+  assert.ok(
+    !askLog.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-release"),
+    "released on a question batch"
+  );
+  assert.ok(!askLog.some((argv) => argv[0] === "terminal" && argv[1] === "close"));
+});
+
+test("classify reads Antigravity logs only for an Antigravity worker", () => {
+  const future = Date.now() + 60 * 1000;
+  const kiroAgents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Kiro CLI | default | default |
+| \`review\` | Codex CLI | gpt-5.6-sol | high |
+`;
+  const kiro = setup(kiroAgents, (repo) => ({
+    runs: [
+      passRun(
+        "run_v",
+        keyOf(repo, "cursor", "background", "kiro/default/default", "codex/gpt-5.6-sol/high")
+      ),
+    ],
+    workerStart: { dispatchId: "disp_k", state: "ready", handle: "term_k" },
+    deliveries: [],
+    screenTail: ["waiting"],
+  }));
+  writeAgyLog(kiro.home, "cli-old.log", "RESOURCE_EXHAUSTED\n", future);
+  const kiroOut = runDely(dispatchArgs(kiro.repo, "run_live", "implement", "cursor"), kiro, {
+    DELY_ACK_S: "0.15",
+  });
+  assert.equal(kiroOut.status, 4, kiroOut.stdout + kiroOut.stderr);
+  assert.doesNotMatch(kiroOut.stdout, /Antigravity/);
+
+  const agyAgents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Antigravity CLI | default | default |
+| \`review\` | Codex CLI | gpt-5.6-sol | high |
+`;
+  const agy = setup(agyAgents, (repo) => ({
+    runs: [
+      passRun(
+        "run_v",
+        keyOf(repo, "cursor", "background", "antigravity/default/default", "codex/gpt-5.6-sol/high")
+      ),
+    ],
+    workerStart: { dispatchId: "disp_ag", state: "ready", handle: "term_ag" },
+    terminalHandle: "term_ag",
+    changeLastOutputForMs: 1,
+    deliveries: [],
+    screenTail: ["waiting"],
+  }));
+  trustAntigravity(agy.home, agy.repo);
+  writeAgyLog(agy.home, "cli-old.log", "ok\n", Date.now() - 86_400_000);
+  writeAgyLog(agy.home, "cli-new.log", "RESOURCE_EXHAUSTED\n", future);
+  const agyOut = runDely(dispatchArgs(agy.repo, "run_live", "implement", "cursor"), agy, {
+    DELY_ACK_S: "0.2",
+  });
+  assert.equal(agyOut.status, 4, agyOut.stdout + agyOut.stderr);
+  assert.match(agyOut.stdout, /quota/);
+});
+
+test("Kiro adopted argv puts chat before --model", () => {
+  const agents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Kiro CLI | kiro-model | default |
+| \`review\` | Codex CLI | gpt-5.6-sol | high |
+`;
+  const ctx = setup(agents, (repo) => ({
+    runs: [
+      passRun(
+        "run_v",
+        keyOf(repo, "cursor", "background", "kiro/kiro-model/default", "codex/gpt-5.6-sol/high")
+      ),
+    ],
+    workerStart: { dispatchId: "disp_k", state: "ready", handle: "term_k" },
+    terminalHandle: "term_k",
+    changeLastOutputForMs: 1,
+    deliveries: [
+      {
+        deliveryId: "dv_ack",
+        messages: [{ type: "heartbeat", from_handle: "term_k", subject: "ack", dispatchId: "disp_k" }],
+      },
+    ],
+  }));
+  const r = runDely(dispatchArgs(ctx.repo, "run_live", "implement", "cursor"), ctx);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const created = readLog(ctx.logPath).find((argv) => argv[0] === "terminal" && argv[1] === "create");
+  assert.ok(created, "Kiro adopt did not create a terminal");
+  const command = created[created.indexOf("--command") + 1];
+  const chatAt = command.indexOf("kiro-cli chat");
+  const modelAt = command.indexOf("--model");
+  assert.ok(chatAt >= 0, command);
+  assert.ok(modelAt > chatAt, `chat was appended after the flags: ${command}`);
+});
+
+test("a group skipped because another is BLOCKED reads SKIPPED", () => {
+  const agents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Claude Code | default | default |
+| \`review\` | Cursor Agent CLI | default | default |
+`;
+  const ctx = setup(agents, () => ({
+    currentRun: "run_delivery",
+    createdRunId: "run_verify",
+    coordinatorHandle: "term_ctrl",
+    workerStarts: [{ dispatchId: "disp_rev", state: "ready", handle: "term_rev" }],
+  }));
+  gitInit(ctx.repo);
+  trustCursor(ctx.home, ctx.repo);
+  const r = runDely(["verify", "--repo", ctx.repo, "--control", "codex"], ctx);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /BLOCKED /);
+  assert.match(r.stdout, /SKIPPED /);
+  assert.doesNotMatch(r.stdout, /FAIL not launched/);
+  const log = readLog(ctx.logPath);
+  assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start"));
+});
+
+test("selector_not_found names orca repo add", () => {
+  const ctx = setup(DEFAULT_AGENTS, (repo) => ({
+    runs: [passRun("run_v", defaultKey(repo, "cursor", "background"))],
+    workerStart: {
+      dispatchId: "disp_1",
+      state: "failed",
+      handle: "term_w",
+      reason: "selector_not_found",
+    },
+  }));
+  const r = runDely(dispatchArgs(ctx.repo, "run_live", "implement", "cursor"), ctx);
+  assert.equal(r.status, 5, r.stdout + r.stderr);
+  assert.match(r.stdout, /selector_not_found/);
+  assert.match(
+    r.stdout,
+    new RegExp(`fix: register the repository with orca repo add --path ${ctx.repo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`)
+  );
+});
+
+test("verify creates no Run when every group is BLOCKED", () => {
+  const agents = `# dely
+
+| Phase | Harness | Model | Effort |
+| --- | --- | --- | --- |
+| \`implement\` | Claude Code | default | default |
+| \`review\` | Claude Code | default | default |
+`;
+  const ctx = setup(agents, () => ({
+    currentRun: "run_delivery",
+    createdRunId: "run_verify",
+    coordinatorHandle: "term_ctrl",
+  }));
+  gitInit(ctx.repo);
+  const r = runDely(["verify", "--repo", ctx.repo, "--control", "cursor"], ctx);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /BLOCKED /);
+  assert.match(r.stdout, /RESULT FAIL/);
+  const log = readLog(ctx.logPath);
+  assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "run-create"));
+  assert.ok(!log.some((argv) => argv[0] === "orchestration" && argv[1] === "worker-start"));
 });

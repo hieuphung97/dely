@@ -138,9 +138,14 @@ harness's `Control wake` cell in `references/harnesses.md`.
 
 Usage as the launcher prints it:
 
+- `dely open --repo <path> --objective <text>`
 - `dely dispatch --repo <path> --run <runId> --phase <implement|review> --spec-file <path> --control <agent>`
-- `dely wait --run <runId>`
+- `dely wait --run <runId> --control <agent>`
 - `dely collect --run <runId>`
+- `dely verify --repo <path> --control <agent>`
+
+Control opens the delivery Run with `dely open` before the first dispatch and
+never passes the verify Run.
 
 `--spec-file` is the worktree-relative prompt file.
 
@@ -183,11 +188,15 @@ right after a verify PASS goes to the human.
 
 **Sleep and wake after `DISPATCHED`, by wake mode:**
 
-- **background:** run `dely wait --run <run>` as a background command and
+- **background:** run `dely wait --run <run> --control <agent>` as a background command and
   end the turn. `SETTLED` hands over the whole batch. `FAILED <dispatchId>
   <reason>` is a dead dispatch: recover as below. `wait` consumes first,
   then releases the dead dispatch and prints `FAILED`. If another dispatch
-  is still open, it keeps waiting for it.
+  is still open, it keeps waiting for it. `NOTHING_OPEN` means the Run has
+  no open dispatch, including one already reported. After a `worker_done`,
+  `wait` and `collect` release that dispatch and close its terminal when it
+  was adopted; a batch holding only `question` or `escalation` releases
+  nothing.
 - **nudge:** after `DISPATCHED`, end the turn. On every Orca nudge, run only
   `dely collect --run <run>`, never the `orca orchestration check`
   command quoted in the nudge text, because it would consume the message.
