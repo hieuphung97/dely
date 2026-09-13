@@ -197,7 +197,14 @@ Measurements that shaped the decision, all on macOS, 2026-09-11:
      wake mode is background.
    - Settled workers were never released, leaving two to four live harness sessions
      per delivery. `wait` and `collect` now release a dispatch after its
-     `worker_done`, and close an adopted terminal, which `worker-release` retains.
+     `worker_done`, and Orca decides whether that terminal closes. Dely closes a
+     terminal itself only when it created that terminal for an adopted launch, which
+     `worker-release` retains. It knows this from its own run memory, written at
+     launch, never from Orca's row shape. It also leaves the terminal open when Orca
+     reports the terminal `user_owned`. Two readings of the row failed first: the
+     top-level `ownershipState` the fake used, which real Orca nests under
+     `resource`, and a `terminalState: retained` fallback, which also matches a
+     terminal a human took over.
    - Any unexplained `NO_ACK` was blamed on Antigravity quota, because diagnosis read
      the three oldest Antigravity logs for every harness. It now reads Antigravity's
      newest log only for an Antigravity worker.
@@ -319,8 +326,10 @@ Rejected:
   - `dely open` requires `--repo` and does not use it.
   - `dely collect` re-reads the whole Run history, so every call releases, and closes
     the terminal of, every past `worker_done` again. The repeats are redundant.
-  - When one verify group is BLOCKED and another launch fails, the group left
-    unlaunched reads `SKIPPED`, which blames the BLOCKED group; the result is still FAIL.
+  - `dely dispatch` refuses a verify Run only when its objective matches the current key.
+    A verify Run from another key, or a Run missing from `run-list`, passes that check.
+  - An adopted terminal is closed only when the run memory that recorded its launch is
+    found. `wait` or `collect` run from another working directory leaves it open.
   - `dely wait` decides `NOTHING_OPEN` after peeking for a pending settle. Whether live
     Orca moves `dispatchStatus` before the `worker_done` is delivered, and whether a
     settle can show in `--peek` yet never reach this consumer's `check --wait`, are
