@@ -39,6 +39,12 @@ HOST = {
 }
 
 
+ORCA_DISPATCH_REPLY = (
+    '{"runId": "run-fake", "dispatchId": "dispatch-fake", '
+    '"messages": [{"type": "worker_done", "outcome": "DONE"}]}'
+)
+
+
 def render(snapshot: Mapping[str, str]) -> str:
     return "".join(f"{key}={value}\n" for key, value in snapshot.items())
 
@@ -60,6 +66,9 @@ class FakeAdapter(BackendAdapter):
         fetch_fails: bool = False,
         stop_confirmed: bool = True,
         leave_residue: bool = False,
+        marker: str = "dely-cycle-marker",
+        task_writes_nothing: bool = False,
+        host_project: Path | None = None,
     ):
         self.root = Path(root)
         self.home = self.root / "home"
@@ -74,6 +83,9 @@ class FakeAdapter(BackendAdapter):
         self.fetch_fails = fetch_fails
         self.stop_confirmed = stop_confirmed
         self.leave_residue = leave_residue
+        self.marker = marker
+        self.task_writes_nothing = task_writes_nothing
+        self.host_project = host_project
         self.destroyed = False
 
     # -- lifecycle --------------------------------------------------------
@@ -107,7 +119,12 @@ class FakeAdapter(BackendAdapter):
 
     def _snapshot(self) -> str:
         if self.identity == "host":
-            return render(HOST)
+            # The counterexample: the command really did run on the host, so the
+            # probe answers with the host's own values rather than a stand-in.
+            target = str(self.host_project or self.project)
+            return proc.run(
+                probe.probe_argv(target), timeout=30, context="host"
+            ).stdout
         environment = dict(HOST)
         environment.update(
             {
@@ -136,21 +153,21 @@ class FakeAdapter(BackendAdapter):
         if probe.PROBE_SCRIPT in joined:
             self.calls.append("probe")
             return self._outcome(argv, 0, self._snapshot(), "")
-        if "worker-start" in joined or "run-create" in joined or "check" in joined and "--wait" in joined:
+        if "orchestration" in joined:
             self.calls.append("worker")
             if self.task_hangs:
                 return self._outcome(argv, None, "", "deadline reached", timed_out=True)
-            self.project.mkdir(parents=True, exist_ok=True)
-            (self.project / "evidence.txt").write_text(
-                "dely-cycle-marker", encoding="utf-8"
-            )
-            return self._outcome(argv, 0, '{"outcome":"done"}', "")
+            if not self.task_writes_nothing:
+                self.project.mkdir(parents=True, exist_ok=True)
+                (self.project / "evidence.txt").write_text(self.marker, encoding="utf-8")
+            return self._outcome(argv, 0, ORCA_DISPATCH_REPLY, "")
+        if tuple(argv[:2]) == ("orca", "status"):
+            self.calls.append("orca-status")
+            return self._outcome(argv, 0, '{"ready": true}', "")
         if "cycle-check" in joined:
             self.calls.append("check")
-            if self.check_exit_code == 0:
-                return self._outcome(argv, 0, "marker matched\n", "")
-            return self._outcome(argv, self.check_exit_code, "", "marker mismatch\n")
-        self.calls.append(f"execute:{argv[0]}")
+        else:
+            self.calls.append(f"execute:{argv[0]}")
         return proc.run(
             argv,
             timeout=timeout,

@@ -148,3 +148,33 @@ class SafeRemoveTest(unittest.TestCase):
 
     def test_removing_something_absent_is_not_an_error(self):
         cleanup.safe_remove(self.root / "absent", allowed_roots=[self.root], protected=[])
+
+
+class StopGateTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name) / "run"
+        self.adapter = FakeAdapter(self.root)
+        self.handle = self.adapter.create()
+        self.addCleanup(self._tmp.cleanup)
+
+    def test_an_unconfirmed_stop_prevents_destroy(self):
+        record = cleanup.perform(
+            adapter=self.adapter,
+            handle=self.handle,
+            export_record=export_record(status.ExportStatus.CONFIRMED),
+            stop_confirmed=False,
+        )
+        self.assertNotIn("destroy", self.adapter.calls)
+        self.assertEqual(record.status, status.CleanupStatus.RESIDUE)
+        self.assertIn("stop", record.reason.lower())
+        self.assertTrue(self.adapter.home.exists())
+
+    def test_a_confirmed_stop_lets_destroy_run(self):
+        record = cleanup.perform(
+            adapter=self.adapter,
+            handle=self.handle,
+            export_record=export_record(status.ExportStatus.CONFIRMED),
+            stop_confirmed=True,
+        )
+        self.assertEqual(record.status, status.CleanupStatus.DESTROYED)

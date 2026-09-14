@@ -76,8 +76,9 @@ def perform(
     adapter: BackendAdapter,
     handle: EnvironmentHandle,
     export_record: ExportRecord,
+    stop_confirmed: bool = True,
 ) -> CleanupRecord:
-    """Destroy per-run resources if, and only if, the export was confirmed."""
+    """Destroy per-run resources only after a confirmed export and a confirmed stop."""
     per_run = list(handle.per_run_resources)
     shared = list(handle.shared_resources)
     assert_declarations_disjoint(per_run=per_run, shared=shared)
@@ -89,6 +90,18 @@ def perform(
                 "the export was not confirmed "
                 f"({export_record.status.value}), so nothing was destroyed and the "
                 "environment is left standing for a manual decision"
+            ),
+            retained=[str(item) for item in per_run],
+            shared_preserved=[str(item) for item in shared],
+            verified=False,
+        )
+
+    if not stop_confirmed:
+        return CleanupRecord(
+            status=CleanupStatus.RESIDUE,
+            reason=(
+                "the stop was not confirmed, so nothing was destroyed; a resource "
+                "whose state is unknown is left standing for a manual decision"
             ),
             retained=[str(item) for item in per_run],
             shared_preserved=[str(item) for item in shared],

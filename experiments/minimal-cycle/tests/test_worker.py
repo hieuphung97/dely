@@ -145,3 +145,9 @@ class WorkerTest(unittest.TestCase):
         ]
         _, _, record = self.launch(script=script)
         self.assertNotIn(secret, json.dumps(record.to_document()))
+
+    def test_a_run_create_that_reaches_the_deadline_is_a_timeout(self):
+        script = [("run-create", None, "", "deadline", True)]
+        _, _, record = self.launch(script=script)
+        self.assertEqual(record.status, status.PhaseStatus.TIMEOUT)
+        self.assertIn("deadline", record.detail)

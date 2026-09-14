@@ -177,6 +177,10 @@ def launch(
         plan.run_create_argv, timeout=timeout_seconds, env=overlay, extra_values=secrets
     )
     record.commands.append(created.to_record())
+    if created.timed_out:
+        record.status = PhaseStatus.TIMEOUT
+        record.detail = "orca orchestration run-create reached the run deadline"
+        return record
     if not created.ok:
         record.status = PhaseStatus.FAILED
         record.detail = (
