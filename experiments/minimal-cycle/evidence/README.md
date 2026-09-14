@@ -31,7 +31,7 @@ missing rather than inventing a path around it.
 
 ## `run-blocked-on-host-orca/`
 
-One real cycle. A fresh box was created from `docker.io/library/ubuntu:24.04`
+One real cycle, `20260915T001500Z-aaaaaa-00000003`, produced by the committed code. A fresh box was created from `docker.io/library/ubuntu:24.04`
 with its own home, the project was exported at a pinned revision and copied in,
 the identity probe ran on both sides, and the run stopped at the identity gate.
 Every artifact was exported and confirmed, and the box and its per-run state

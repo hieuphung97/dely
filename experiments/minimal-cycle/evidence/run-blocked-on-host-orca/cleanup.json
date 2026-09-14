@@ -2,8 +2,8 @@
   "host_difference": {},
   "reason": "every declared per-run resource is gone and every shared one remains",
   "removed": [
-    "container:dely-cycle-20260914t231500z-aaaaaa-00000002",
-    "path:/var/tmp/dely-cycle/state/20260914T231500Z-aaaaaa-00000002"
+    "container:dely-cycle-20260915t001500z-aaaaaa-00000003",
+    "path:/var/tmp/dely-cycle/state/20260915T001500Z-aaaaaa-00000003"
   ],
   "retained": [],
   "shared_preserved": [

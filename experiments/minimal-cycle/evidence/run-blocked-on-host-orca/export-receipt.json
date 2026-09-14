@@ -2,12 +2,12 @@
   "artifacts": [
     {
       "path": "auth-receipt.json",
-      "sha256": "5749227c7c4ae0b40ba0ee854e5fec5ad3c26ad4e62c102e544ee69c762c7de4",
+      "sha256": "50cc0f37db49dec707da7ca2e365558a7602e991f111af15a104ad548a38b272",
       "size_bytes": 393
     },
     {
       "path": "backend-status.json",
-      "sha256": "dc441d86db5592190f1cad2c6afb752ca54517e8af11297a9d963a777561bf51",
+      "sha256": "e1605917b138840dc212ce5b7433594e2d3b9ce4c8d48a1558f14e77ab962b1b",
       "size_bytes": 1374
     },
     {
@@ -17,17 +17,17 @@
     },
     {
       "path": "host-before.json",
-      "sha256": "ef32560cde0b04d1c08f01cb393f6c7ebca37c0e7535aad07a1d646002d1ea13",
-      "size_bytes": 690
+      "sha256": "fd8bb03f41347f198a358a30d3d1f58b08a1d03267416ca7d4148ff6eb1c98aa",
+      "size_bytes": 858
     },
     {
       "path": "identity/environment-probe.txt",
-      "sha256": "97ca15bcc81dd9d799fd944618db9ba23dcaace049dda83b6366cf716cacf515",
+      "sha256": "06a23500e289eeffebaeb5341b59fa337e0db446c834ef0647bb89b82494401a",
       "size_bytes": 1567
     },
     {
       "path": "identity/host-probe.txt",
-      "sha256": "2e9f36ceaa4d492831fa0bf78cdf8130f6827a3704fe940f5467bbee994a2787",
+      "sha256": "cc6085fbb2f901482257afc671013e34b8b0de0591cd5dc6b94312d62ec95713",
       "size_bytes": 1358
     },
     {
@@ -37,13 +37,13 @@
     },
     {
       "path": "logs/commands.jsonl",
-      "sha256": "aa57ac6dc2cfd82b53bfa6957d2a15fe8612290a2ec0c26c8ecbb0a01c700e1d",
-      "size_bytes": 4460
+      "sha256": "4f9312a919653c8b438d29efb6ac41f06ade34e50b628f338906336112cc8bd1",
+      "size_bytes": 4459
     },
     {
       "path": "logs/runner.log",
-      "sha256": "72d408da85002bb1b3732db8e255d0ea0bc16efb89951f09288a114ccd6cedbe",
-      "size_bytes": 1354
+      "sha256": "f4df0f2a664487a704ae47cb19d39925c39c058b813fa6b6a8318dd74d7f4f9b",
+      "size_bytes": 1353
     },
     {
       "path": "preflight.json",
@@ -52,11 +52,11 @@
     },
     {
       "path": "run-before-cleanup.json",
-      "sha256": "be30779cb0960bb07162a4e9e4008ee81719d31b2d8849d6cb40da030ea348b6",
-      "size_bytes": 13097
+      "sha256": "b3064423e01f51a41dc40dedc976bb412085acd269a3836884d29c70b6c1db02",
+      "size_bytes": 13095
     }
   ],
-  "confirmed_at": "2026-09-14T22:00:35Z",
+  "confirmed_at": "2026-09-14T22:10:35Z",
   "detail": "11 artifact(s) re-read from the host; 1 unresolved",
   "missing": [
     "task-artifact/evidence.txt (absent from the host)"
