@@ -1,0 +1,11 @@
+backend: vm
+  BLOCK  pulumi on the path: pulumi was not found on PATH
+  ok     qemu-img on the path: /usr/bin/qemu-img
+  ok     virsh on the path: /usr/bin/virsh
+  ok     ssh on the path: /usr/bin/ssh
+  ok     scp on the path: /usr/bin/scp
+  BLOCK  provider schema verified: the rendered program's resource fields have not been checked against pulumi-libvirt@unchecked-on-this-host; set vm.provider_schema_verified once they have been
+  BLOCK  base image present: /var/lib/dely-cycle/images/tool-image.qcow2 is not a file on this host
+  ok     hardware acceleration device: /dev/kvm
+  ok     libvirt connection answers: qemu:///session
+not usable on this host

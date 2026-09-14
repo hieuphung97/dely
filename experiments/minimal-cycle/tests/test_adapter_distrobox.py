@@ -271,3 +271,30 @@ class DryRunTest(AdapterTestCase):
         self.assertTrue(finding.ok)
         self.assertIn("acknowledged", finding.detail)
         self.assertTrue(report.ok, [item.detail for item in report.blockers])
+
+
+class PreflightResidueTest(AdapterTestCase):
+    """Preflight inspects; it does not create the run's state."""
+
+    def test_preflight_leaves_no_per_run_state_behind(self):
+        adapter = self.make()
+        adapter.preflight()
+        self.assertFalse(
+            adapter.run_state.exists(),
+            f"preflight created {adapter.run_state}",
+        )
+
+    def test_preflight_leaves_no_state_root_entry_behind(self):
+        adapter = self.make()
+        before = (
+            sorted(p.name for p in adapter.config.state_root.iterdir())
+            if adapter.config.state_root.is_dir()
+            else []
+        )
+        adapter.preflight()
+        after = (
+            sorted(p.name for p in adapter.config.state_root.iterdir())
+            if adapter.config.state_root.is_dir()
+            else []
+        )
+        self.assertEqual(before, after)

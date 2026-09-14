@@ -175,11 +175,21 @@ def verdict(
     expected_project: str,
 ) -> IdentityRecord:
     """Decide whether the environment answered as itself or as the host."""
+    environment_orca = environment.get("orca_path", "")
+    host_orca = host.get("orca_path", "")
+    environment_version = environment.get("orca_version", "")
+    is_host_installation = bool(environment_orca) and environment_orca == host_orca
     record = IdentityRecord(
         host=_host_view(host),
         environment=_environment_view(environment),
-        orca_present=bool(environment.get("orca_path")),
-        orca_version=environment.get("orca_version") or None,
+        # A path that resolves is not an installation the environment has: a
+        # Distrobox box inherits the host PATH and sees the host home, so the
+        # host's own launcher answers `command -v orca` inside it.
+        orca_present=bool(environment_orca)
+        and not is_host_installation
+        and bool(environment_version),
+        orca_is_host_installation=is_host_installation,
+        orca_version=environment_version or None,
     )
 
     missing = [field for field in ("hostname", "home") if not environment.get(field)]
@@ -238,10 +248,24 @@ def may_continue(record: IdentityRecord) -> tuple[bool, str]:
     """Report whether the run may proceed past the identity gate, and why not."""
     if record.verdict != IDENTITY_ENVIRONMENT:
         return False, record.reason
-    if not record.orca_present:
+    if record.orca_present:
+        return True, record.reason
+    found = record.environment.get("orca_path", "")
+    if record.orca_is_host_installation:
+        return (
+            False,
+            f"the environment resolved orca to the host's own installation at "
+            f"{found}; the run stops rather than driving the host from inside a "
+            "disposable environment",
+        )
+    if not found:
         return (
             False,
             "orca is not present inside the environment; the run stops rather than "
             "using the host's installation",
         )
-    return True, record.reason
+    return (
+        False,
+        f"orca is at {found} inside the environment but reported no version there, "
+        "so it cannot be driven from inside it",
+    )

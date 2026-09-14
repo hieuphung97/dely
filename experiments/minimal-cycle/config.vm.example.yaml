@@ -1,0 +1,68 @@
+# One minimal proof cycle on the virtual-machine backend.
+#
+# This backend needs a prepared tool image, a pinned libvirt provider, and a
+# provider schema someone has actually checked. Preflight refuses each of those
+# rather than guessing.
+
+backend: vm
+
+tested_revision: replace-with-the-revision-under-test
+dely_revision: replace-with-the-dely-revision
+claude_code_version: replace-with-the-pinned-claude-code-version
+
+timeout_seconds: 3600
+
+artifact_root: /var/tmp/dely-cycle/artifacts
+state_root: /var/tmp/dely-cycle/state
+
+project:
+  source: /var/tmp/dely-cycle/project-source
+  revision: main
+  environment_path: project
+
+task:
+  marker: dely-cycle-marker
+  relative_path: evidence.txt
+
+check:
+  relative_path: evidence.txt
+
+auth:
+  mode: short_lived_token
+  reference: workshop-token
+  # The variable name only. Its value is read from the runner's environment for
+  # the duration of the run and is never written to the seed, the stack state,
+  # the manifest or a log.
+  token_env: CLAUDE_CODE_OAUTH_TOKEN
+
+orca:
+  version: replace-with-the-pinned-orca-version
+  model: replace-with-the-pinned-model
+  effort: replace-with-the-pinned-effort
+  agent: claude
+  worktree_selector: current
+
+vm:
+  provider: pulumi-libvirt
+  provider_version: replace-with-the-version-you-checked
+  stack_prefix: dely-cycle
+  # The preserved tool image built separately with Packer. The run opens it only
+  # as a backing file and never destroys it.
+  base_image: /var/lib/dely-cycle/images/tool-image.qcow2
+  # A digest of the right shape that matches nothing: preflight blocks on it
+  # until it is replaced with the real one.
+  base_image_sha256: '0000000000000000000000000000000000000000000000000000000000000000'
+  guest_user: cycle
+  pulumi_binary: pulumi
+  connect_uri: qemu:///session
+  overlay_size: 24g
+  memory_mb: 4096
+  vcpus: 2
+  graphics: spice
+  transport: ssh
+  network: default
+  ssh_port: 22
+  # The rendered Pulumi program names resource fields that belong to the pinned
+  # provider version. Preflight blocks until someone has checked them.
+  provider_schema_verified: false
+  provision: []

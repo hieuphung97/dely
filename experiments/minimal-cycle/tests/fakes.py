@@ -67,6 +67,7 @@ class FakeAdapter(BackendAdapter):
         stop_confirmed: bool = True,
         leave_residue: bool = False,
         marker: str = "dely-cycle-marker",
+        orca_path_from_host: bool = False,
         task_writes_nothing: bool = False,
         host_project: Path | None = None,
     ):
@@ -84,6 +85,7 @@ class FakeAdapter(BackendAdapter):
         self.stop_confirmed = stop_confirmed
         self.leave_residue = leave_residue
         self.marker = marker
+        self.orca_path_from_host = orca_path_from_host
         self.task_writes_nothing = task_writes_nothing
         self.host_project = host_project
         self.destroyed = False
@@ -117,14 +119,15 @@ class FakeAdapter(BackendAdapter):
             description={"image": "fake"},
         )
 
+    def _host_snapshot_text(self) -> str:
+        target = str(self.host_project or self.project)
+        return proc.run(probe.probe_argv(target), timeout=30, context="host").stdout
+
     def _snapshot(self) -> str:
         if self.identity == "host":
             # The counterexample: the command really did run on the host, so the
             # probe answers with the host's own values rather than a stand-in.
-            target = str(self.host_project or self.project)
-            return proc.run(
-                probe.probe_argv(target), timeout=30, context="host"
-            ).stdout
+            return self._host_snapshot_text()
         environment = dict(HOST)
         environment.update(
             {
@@ -134,11 +137,18 @@ class FakeAdapter(BackendAdapter):
                 "home": str(self.home),
                 "container_marker": "containerenv",
                 "project_real": str(self.project),
-                "orca_path": "/usr/bin/orca" if self.orca_present else "",
+                "orca_path": self._orca_path(),
                 "orca_version": "1.4.201" if self.orca_present else "",
             }
         )
         return render(environment)
+
+    def _orca_path(self) -> str:
+        if not self.orca_present:
+            return ""
+        if self.orca_path_from_host:
+            return probe.parse(self._host_snapshot_text()).get("orca_path", "")
+        return "/usr/bin/orca"
 
     def execute(
         self,

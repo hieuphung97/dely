@@ -1,0 +1,65 @@
+# One minimal proof cycle on the Distrobox backend.
+#
+# Every path here is an example. Replace them before running, and read the
+# README's "What Distrobox does not give you" section before trusting the
+# isolation this backend provides.
+
+backend: distrobox
+
+# The revision of the system under test, and of dely itself. Both are recorded
+# in the manifest so a result can be tied to what produced it.
+tested_revision: replace-with-the-revision-under-test
+dely_revision: replace-with-the-dely-revision
+claude_code_version: replace-with-the-pinned-claude-code-version
+
+timeout_seconds: 1800
+
+# Both roots are absolute, and neither may contain the other: cleanup removes
+# per-run state, and the artifacts have to outlive it.
+artifact_root: /var/tmp/dely-cycle/artifacts
+state_root: /var/tmp/dely-cycle/state
+
+project:
+  # A git repository on the host. The runner exports one revision with
+  # `git archive`, so the copy carries no repository state and no uncommitted work.
+  source: /var/tmp/dely-cycle/project-source
+  revision: main
+  # Where the copy lands inside the environment, relative to the per-run home.
+  environment_path: project
+
+task:
+  marker: dely-cycle-marker
+  relative_path: evidence.txt
+
+check:
+  relative_path: evidence.txt
+
+auth:
+  # existing_login | short_lived_token | api_key_helper
+  #
+  # existing_login copies only the relative entries listed below into the
+  # per-run home. On Distrobox that buys less than it appears to: see the
+  # README, because Distrobox mounts the host home regardless.
+  mode: api_key_helper
+  reference: workshop-helper
+  helper_argv:
+    - /usr/local/bin/replace-with-your-key-helper
+
+orca:
+  version: replace-with-the-pinned-orca-version
+  model: replace-with-the-pinned-model
+  effort: replace-with-the-pinned-effort
+  agent: claude
+  worktree_selector: current
+
+distrobox:
+  # Pull the image deliberately before the run; the runner refuses to fetch it.
+  image: docker.io/library/ubuntu:24.04
+  container_prefix: dely-cycle
+  extra_mounts: []
+  # Commands run inside the fresh box before the identity gate. This is where
+  # Orca and Claude Code get installed if the image does not already carry them.
+  provision: []
+  # Distrobox mounts the host home into every box and offers no flag to suppress
+  # it. Preflight blocks until this records that the compromise is deliberate.
+  accept_host_home_mount: false

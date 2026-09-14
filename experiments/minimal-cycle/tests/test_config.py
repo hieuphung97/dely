@@ -1,6 +1,7 @@
 """The run configuration is explicit, backend-aware, and never carries a secret."""
 
 import copy
+import importlib.util
 import json
 import tempfile
 import unittest
@@ -225,3 +226,33 @@ class DocumentRoundTripTest(unittest.TestCase):
         loaded = config.from_document(minimal_document())
         reloaded = config.from_document(loaded.to_document())
         self.assertEqual(reloaded.to_document(), loaded.to_document())
+
+
+class ExampleConfigurationTest(unittest.TestCase):
+    """The shipped examples have to satisfy the validator they document."""
+
+    def examples(self):
+        root = Path(__file__).resolve().parent.parent
+        return sorted(root.glob("config.*.example.yaml"))
+
+    def test_both_backends_ship_an_example(self):
+        names = {path.name for path in self.examples()}
+        self.assertEqual(
+            names, {"config.distrobox.example.yaml", "config.vm.example.yaml"}
+        )
+
+    def test_every_example_loads(self):
+        for path in self.examples():
+            with self.subTest(path=path.name):
+                if importlib.util.find_spec("yaml") is None:  # pragma: no cover
+                    self.skipTest("no yaml parser on this host")
+                self.assertIn(config.load(path).backend, config.BACKENDS)
+
+    def test_no_example_carries_a_credential(self):
+        for path in self.examples():
+            with self.subTest(path=path.name):
+                from cycle_runner import redact
+
+                self.assertFalse(
+                    redact.carries_credential_shape(path.read_text(encoding="utf-8"))
+                )

@@ -1,6 +1,7 @@
 """The shared lifecycle: export before destroy, and never a silent host fallback."""
 
 import json
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -256,3 +257,26 @@ class RunIdentifierTest(CycleTestCase):
         _, outcome = self.run_cycle()
         self.assertEqual(outcome.artifact_dir, self.artifacts / RUN_ID)
         self.assertTrue(ids.is_run_id(outcome.run_result.run_id))
+
+
+class HostOrcaTest(CycleTestCase):
+    """Reproduces a real Distrobox run: the box saw the host's own orca.
+
+    Distrobox mounts the host home and preserves PATH, so `command -v orca`
+    resolved to the host launcher. The environment verdict was correct and the
+    run still had no Orca of its own.
+    """
+
+    @unittest.skipUnless(shutil.which("orca"), "no orca on this host to resolve to")
+    def test_an_orca_that_is_the_hosts_own_blocks_before_the_worker(self):
+        adapter, outcome = self.run_cycle(orca_path_from_host=True)
+        self.assertEqual(outcome.run_result.status, status.RunStatus.BLOCKED)
+        self.assertNotIn("worker", adapter.calls)
+        self.assertTrue(outcome.run_result.identity.orca_is_host_installation)
+        self.assertIn("host", outcome.run_result.failure_classification.lower())
+
+    @unittest.skipUnless(shutil.which("orca"), "no orca on this host to resolve to")
+    def test_that_run_still_exports_and_cleans_up(self):
+        adapter, outcome = self.run_cycle(orca_path_from_host=True)
+        self.assertEqual(outcome.run_result.export.status, status.ExportStatus.CONFIRMED)
+        self.assertEqual(outcome.run_result.cleanup.status, status.CleanupStatus.DESTROYED)

@@ -1,0 +1,13 @@
+hostname=dely-cycle-20260914t231500z-aaaaaa-00000002
+machine_id=<scrubbed>
+boot_id=<scrubbed>
+home=/var/tmp/dely-cycle/state/20260914T231500Z-aaaaaa-00000002/home
+user=<host-user>
+path=<host-home>/.local/bin:<host-home>/.local/bin:<host-home>/.polygraph/bin:<host-home>/.local/bin:<host-home>/.opencode/bin:<host-home>/.kimi-code/bin:/usr/lib/ccache/bin/:<host-home>/.config/orca/linux-orca-cli-shim:<host-home>/.local/bin:<host-home>/.polygraph/bin:<host-home>/.opencode/bin:<host-home>/.kimi-code/bin:/usr/lib/ccache/bin/:<host-home>/.local/share/pnpm:/usr/local/bin:/usr/bin:/bin:<host-home>/.cargo/bin/:<host-home>/.local/bin/:<host-home>/.nvm/versions/node/v26.7.0/bin:<host-home>/.volta/bin:<host-home>/.asdf/shims:<host-home>/.fnm/aliases/default/bin:<host-home>/.local/share/mise/shims:<host-home>/.yarn/bin:<host-home>/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/snap/bin:/home/linuxbrew/.linuxbrew/bin:/nix/var/nix/profiles/default/bin:<host-home>/bin:<host-home>/.nix-profile/bin:<host-home>/.vite-plus/bin:<host-home>/.cargo/bin/:<host-home>/.local/bin/:<host-home>/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/bin:/usr/local/sbin:/usr/sbin:/usr/local/bin:/usr/bin:/sbin:/bin:/usr/local/sbin:/usr/sbin:/sbin
+pid=3749127
+uname=Linux 7.2.4-200.fc44.x86_64 x86_64
+container_marker=containerenv
+virt=docker
+orca_path=<host-home>/.config/orca/linux-orca-cli-shim/orca
+orca_version=
+project_real=/var/tmp/dely-cycle/state/20260914T231500Z-aaaaaa-00000002/home/project

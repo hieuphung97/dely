@@ -87,6 +87,7 @@ class IdentityRecord:
     environment: dict[str, Any] = field(default_factory=dict)
     markers: list[str] = field(default_factory=list)
     orca_present: bool = False
+    orca_is_host_installation: bool = False
     orca_version: str | None = None
     orca_status_exit_code: int | None = None
 
@@ -98,6 +99,7 @@ class IdentityRecord:
             "environment": dict(self.environment),
             "markers": list(self.markers),
             "orca_present": self.orca_present,
+            "orca_is_host_installation": self.orca_is_host_installation,
             "orca_version": self.orca_version,
             "orca_status_exit_code": self.orca_status_exit_code,
         }

@@ -14,6 +14,7 @@ credentials. That is a refusal, not a default.
 from __future__ import annotations
 
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
@@ -166,12 +167,14 @@ class DistroboxAdapter(BackendAdapter):
         the evidence; the configuration has to acknowledge what it shows.
         """
         name = "host home reachable from the environment"
-        self.write_manifest()
-        rendered = self.runner(
-            [self.binary, "assemble", "create", "--dry-run", "--file", str(self.manifest_path)],
-            timeout=300,
-            context="host",
-        )
+        with tempfile.TemporaryDirectory(prefix="dely-cycle-preflight-") as staging:
+            probe_manifest = Path(staging) / "distrobox.ini"
+            probe_manifest.write_text(self.render_manifest(), encoding="utf-8")
+            rendered = self.runner(
+                [self.binary, "assemble", "create", "--dry-run", "--file", str(probe_manifest)],
+                timeout=300,
+                context="host",
+            )
         home = str(self.host_home)
         mounted = (
             f'--volume "{home}":"{home}"' in rendered.stdout

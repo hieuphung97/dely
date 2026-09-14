@@ -1,0 +1,11 @@
+{
+  "detail": "the helper command is declared in the per-run settings; no credential value passes through the runner",
+  "entries": [
+    ".claude/settings.json"
+  ],
+  "mode": "api_key_helper",
+  "reference": "workshop-helper-declared-only",
+  "removed_after_run": false,
+  "status": "OK",
+  "target": "/var/tmp/dely-cycle/state/20260914T231500Z-aaaaaa-00000002/home/.claude/settings.json"
+}

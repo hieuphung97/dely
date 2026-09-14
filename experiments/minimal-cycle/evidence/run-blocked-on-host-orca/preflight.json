@@ -1,0 +1,36 @@
+{
+  "backend": "distrobox",
+  "findings": [
+    {
+      "detail": "/usr/bin/distrobox",
+      "name": "distrobox on the path",
+      "ok": true
+    },
+    {
+      "detail": "podman",
+      "name": "container manager on the path",
+      "ok": true
+    },
+    {
+      "detail": "docker.io/library/ubuntu:24.04 is present",
+      "name": "image present locally",
+      "ok": true
+    },
+    {
+      "detail": "/var/tmp/dely-cycle/state",
+      "name": "state root writable",
+      "ok": true
+    },
+    {
+      "detail": "/var/tmp/dely-cycle/artifacts",
+      "name": "artifact root writable",
+      "ok": true
+    },
+    {
+      "detail": "distrobox mounts <host-home> into the box and offers no flag to suppress it; the configuration acknowledged this, so the run records a declared compromise rather than claiming isolation",
+      "name": "host home reachable from the environment",
+      "ok": true
+    }
+  ],
+  "ok": true
+}

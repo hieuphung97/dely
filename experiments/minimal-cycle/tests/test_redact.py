@@ -118,3 +118,33 @@ class ContainsSecretTest(unittest.TestCase):
 
     def test_a_document_carrying_a_token_is_not_secret_free(self):
         self.assertFalse(redact.looks_secret_free(f"key {NEVER_SEEN}"))
+
+
+class CredentialShapeTest(unittest.TestCase):
+    """A narrower question than redaction: does this text carry a value?"""
+
+    def test_a_token_is_a_credential_shape(self):
+        self.assertTrue(redact.carries_credential_shape(f"key {NEVER_SEEN}"))
+
+    def test_a_private_key_block_is_a_credential_shape(self):
+        block = (
+            "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+            "qwertyuiopasdfghjklzxcvbnm\n"
+            "-----END OPENSSH PRIVATE KEY-----"
+        )
+        self.assertTrue(redact.carries_credential_shape(block))
+
+    def test_a_variable_name_is_not_a_credential_shape(self):
+        self.assertFalse(
+            redact.carries_credential_shape("token_env: CLAUDE_CODE_OAUTH_TOKEN")
+        )
+
+    def test_a_bearer_header_is_a_credential_shape(self):
+        self.assertTrue(
+            redact.carries_credential_shape("authorization: Bearer abcdefghijklmnop")
+        )
+
+    def test_ordinary_configuration_text_is_not_a_credential_shape(self):
+        self.assertFalse(
+            redact.carries_credential_shape("mode: existing_login\nreference: workshop")
+        )

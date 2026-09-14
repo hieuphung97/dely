@@ -99,6 +99,19 @@ def structure(document: Any, extra_values: Sequence[str] = ()) -> Any:
     return document
 
 
+def carries_credential_shape(value: str) -> bool:
+    """Report whether the text carries a credential *value*.
+
+    Narrower than :func:`looks_secret_free`, which also flags a sensitive key
+    name next to any value at all. This asks only whether something shaped
+    like a secret is present, so a configuration naming the variable that will
+    carry a token is not mistaken for one that carries the token.
+    """
+    if _PRIVATE_KEY_BLOCK.search(value) or _BEARER.search(value):
+        return True
+    return any(shape.search(value) for shape in _TOKEN_SHAPES)
+
+
 def looks_secret_free(value: str) -> bool:
     """Report whether redaction would change the string at all."""
     return text(value) == value

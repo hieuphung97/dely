@@ -1,0 +1,185 @@
+# Minimal cycle runner
+
+One Python runner drives one minimal proof cycle on a disposable environment,
+through one of two backends, and answers a single narrow question:
+
+> Can a fresh environment be created, driven through Orca to one Claude Code
+> worker on a clean copy of a project, checked independently, exported to the
+> host, and destroyed — without losing the evidence and without quietly falling
+> back onto the host?
+
+It is not a benchmark, not an evaluation of a model or of a tester, and not a
+task matrix. It measures plumbing.
+
+## What is here
+
+```
+run-cycle                     the command line
+schema.json                   the required shape of a run manifest
+config.distrobox.example.yaml an example configuration for the container backend
+config.vm.example.yaml        an example configuration for the machine backend
+cycle_runner/                 the runner
+cycle_runner/adapters/        one adapter per backend, behind one interface
+fixtures/evidence-task/       the one small task the worker is given
+tests/                        the suite, including the counterexamples
+evidence/                     what the runner actually did on one host
+```
+
+The runner uses the Python standard library at runtime. A configuration may be
+written as JSON always, or as YAML when a parser is importable; the error names
+the alternative rather than parsing half a document.
+
+## Running it
+
+```bash
+cd experiments/minimal-cycle
+./run-cycle preflight --config /path/to/config.yaml
+./run-cycle run --config /path/to/config.yaml
+```
+
+`preflight` reports, fact by fact, whether this host can run the configured
+backend, and exits non-zero when it cannot. `run` mints a run identifier,
+performs the whole cycle, and exits with the code its status maps to. Pass
+`--run-id` to pin the identifier, and `--json` to get the machine-readable form
+of either command.
+
+The suite needs nothing installed:
+
+```bash
+python3 -m unittest discover -s tests -t . -v
+```
+
+## The cycle
+
+```
+prepare -> create -> bootstrap -> identity -> task -> check
+        -> collect -> export -> cleanup -> close
+```
+
+Two orderings are the point of the whole runner.
+
+**Evidence is exported before anything is destroyed.** `collect` brings the
+project tree back to the host, `export` writes every artifact and then re-reads
+each one from its host path and recomputes its digest. Only an export where
+every required artifact matches releases the run to stop and destroy anything.
+An unconfirmed export, or an unconfirmed stop, leaves the environment standing
+and records residue with the reason.
+
+**The task runs only after the identity gate.** The same shell probe runs on the
+host and inside the environment. A result that carries no environment marker and
+repeats the host's own name, machine identity and home is a host fallback, and a
+host fallback stops the run. So does finding no Orca inside the environment: the
+run is blocked, never redirected to the host's installation.
+
+## Statuses
+
+| Status | Exit | Meaning |
+| --- | --- | --- |
+| `SETTLED` | 0 | every phase ran, the check observed the marker, the export was confirmed and the per-run resources are gone |
+| `ERROR` | 1 | the run completed but something it promised did not hold — usually the check |
+| `TIMEOUT` | 2 | the task reached the configured deadline; the artifacts were still exported |
+| `CANCELLED` | 3 | the run was stopped deliberately |
+| `BLOCKED` | 4 | a gate refused: preflight, auth, the identity verdict, or a missing Orca |
+| `CLEANUP_FAILED` | 5 | everything else held, but a per-run resource survived |
+| `UNKNOWN` | 6 | the export was not confirmed, so nothing about the run rests on complete evidence |
+
+A status name is a classification of the manifest, never a substitute for it.
+
+## Artifacts
+
+```
+$artifact_root/<run_id>/
+  manifest.json              the whole run, validated against schema.json
+  preflight.json             what the host could and could not do
+  backend-status.json        the environment and its declared resources
+  auth-receipt.json          the method and its status, never its material
+  host-before.json           the host before the run
+  host-after.json            the host after it, and what changed
+  identity/host-probe.txt    the probe as the host answered it
+  identity/environment-probe.txt  the probe as the environment answered it
+  identity/orca-status.json  what Orca reported inside the environment
+  check.stdout / check.stderr  the independent check, as a process
+  diff.patch                 what the task changed, computed on the host
+  task-artifact/             the file the task was asked to produce
+  logs/runner.log            the runner's own narration
+  logs/commands.jsonl        every command, with timings and exit codes
+  run-before-cleanup.json    the result as it stood when the export was taken
+  export-receipt.json        each artifact re-read from the host, with its digest
+  cleanup.json               what was removed, what was kept, and how that was checked
+```
+
+Every stream is redacted on the way out. Redaction matches shapes — bearer
+headers, key prefixes, compact web tokens, private-key blocks, absolute paths to
+credential files, and any assignment whose key names a secret — so a credential
+this run has never seen is still removed.
+
+## The two backends
+
+### Distrobox
+
+A fresh box from a declared Distrobox Assemble manifest, with its own home and
+its own copy of the project, created and destroyed through Assemble rather than
+through a container manager this runner would have to become.
+
+**What Distrobox does not give you.** Distrobox exists to integrate with the
+host, and it mounts the invoking user's home directory into every box at its own
+path. There is no flag that suppresses it. A separate per-run home limits which
+state the run writes; it does not make the host's credentials unreachable from
+inside the box.
+
+The runner does not assert this either way. Preflight asks Distrobox what it
+would actually mount, with `distrobox assemble create --dry-run`, and reads the
+rendered container command. If the host home is mounted, the run is blocked
+until `distrobox.accept_host_home_mount` records that the compromise is
+deliberate — and the manifest then carries that acknowledgement.
+
+Extra mounts are checked separately: a mount naming the host home, a directory
+above it, or any known credential directory under it is refused outright.
+
+`--unshare-all` is not written for you. It exists, it may conflict with the
+graphical and message-bus access Orca needs, and choosing it is a decision to
+make against a real Orca launch rather than a default to inherit.
+
+### Virtual machine
+
+A per-run libvirt domain declared with Pulumi in Python, over a qcow2 overlay
+whose backing file is a preserved tool image, with a cloud-init NoCloud seed and
+an ssh transport.
+
+The base image is opened only as a backing file and is declared a shared
+resource, so it can never appear in a destroy plan. The seed carries one per-run
+public key and nothing else; the private half is generated into the per-run
+state directory with owner-only permissions and is removed with it.
+
+The provider's resource schema is not assumed. The rendered program names fields
+that belong to the pinned provider version, and preflight refuses to run until
+`vm.provider_schema_verified` records that someone checked them against that
+version. Building the tool image is a separate job — the runner consumes an
+image, it does not build one, and it is not an image cache.
+
+## Auth
+
+Exactly one declared method runs, and none of them writes a credential value, a
+length, or a prefix into any artifact.
+
+- `existing_login` copies only the relative allowlist entries from the host home
+  into the per-run home with owner-only permissions, and removes them before
+  cleanup. An entry that is absent blocks the run. On Distrobox this buys less
+  than it looks like, for the reason above.
+- `short_lived_token` passes the value of one named variable to the worker
+  process for the duration of the run. On Distrobox the name alone is forwarded
+  to the container manager, so the value never appears in a command line. It is
+  never written to a file, an image, a seed, stack state, or a log.
+- `api_key_helper` declares a helper command in the per-run settings and passes
+  no value at all.
+
+An absolute path to a credential file is refused in the configuration outright,
+and a configuration key whose name means "secret" is refused with it.
+
+## What this does not prove
+
+Nothing here observes Orca starting inside either backend, a window bound to
+that instance, a Claude Code worker driven through it, or a login surviving a
+run. Those need a host that carries Orca in the chosen image, a built tool image,
+and a pinned libvirt provider. `evidence/` records what one host actually did,
+including where it stopped.

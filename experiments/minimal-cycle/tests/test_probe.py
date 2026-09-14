@@ -17,7 +17,7 @@ def host_snapshot(**overrides):
         "uname": "linux workshop amd64",
         "container_marker": "",
         "virt": "none",
-        "orca_path": "/usr/bin/orca",
+        "orca_path": "/opt/host/bin/orca",
         "orca_version": "1.4.201",
         "project_real": "/home/someone/code/under-test",
     }
@@ -32,6 +32,7 @@ def container_snapshot(**overrides):
         home="/var/tmp/cycle-state/run/home",
         container_marker="containerenv",
         project_real="/var/tmp/cycle-state/run/home/project",
+        orca_path="/usr/bin/orca",
     )
     snapshot.update(overrides)
     return snapshot
@@ -180,3 +181,59 @@ class HostProbeIntegrationTest(unittest.TestCase):
             probe.probe_argv("/nonexistent-cycle-path"), timeout=30, context="host"
         )
         self.assertEqual(probe.parse(outcome.stdout)["project_real"], "")
+
+
+class OrcaPresenceTest(unittest.TestCase):
+    """Observed on a real Distrobox run: `command -v orca` found the host's own.
+
+    Distrobox mounts the host home and preserves PATH, so a shim on the host
+    resolves inside the box. It is not an Orca the environment has.
+    """
+
+    def test_an_orca_resolved_to_the_host_installation_is_not_present(self):
+        record = verdict(
+            container_snapshot(
+                orca_path=host_snapshot()["orca_path"], orca_version=""
+            )
+        )
+        self.assertFalse(record.orca_present)
+        self.assertTrue(record.orca_is_host_installation)
+
+    def test_an_orca_that_reports_no_version_inside_is_not_present(self):
+        record = verdict(
+            container_snapshot(orca_path="/usr/bin/orca", orca_version="")
+        )
+        self.assertFalse(record.orca_present)
+        self.assertFalse(record.orca_is_host_installation)
+
+    def test_an_orca_of_its_own_is_present(self):
+        record = verdict(
+            container_snapshot(orca_path="/usr/bin/orca", orca_version="1.4.201")
+        )
+        self.assertTrue(record.orca_present)
+        self.assertFalse(record.orca_is_host_installation)
+
+    def test_the_gate_names_the_host_installation_when_that_is_what_it_found(self):
+        allowed, reason = probe.may_continue(
+            verdict(
+                container_snapshot(
+                    orca_path=host_snapshot()["orca_path"], orca_version=""
+                )
+            )
+        )
+        self.assertFalse(allowed)
+        self.assertIn("host", reason.lower())
+        self.assertIn(host_snapshot()["orca_path"], reason)
+
+    def test_the_gate_names_a_version_that_never_came_back(self):
+        allowed, reason = probe.may_continue(
+            verdict(container_snapshot(orca_path="/usr/bin/orca", orca_version=""))
+        )
+        self.assertFalse(allowed)
+        self.assertIn("version", reason.lower())
+
+    def test_the_gate_opens_for_an_orca_the_environment_carries(self):
+        allowed, _ = probe.may_continue(
+            verdict(container_snapshot(orca_path="/usr/bin/orca", orca_version="1.4.201"))
+        )
+        self.assertTrue(allowed)

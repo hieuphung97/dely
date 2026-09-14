@@ -1,0 +1,8 @@
+backend: distrobox
+  ok     distrobox on the path: /usr/bin/distrobox
+  ok     container manager on the path: podman
+  ok     image present locally: docker.io/library/ubuntu:24.04 is present
+  ok     state root writable: /var/tmp/dely-cycle/state
+  ok     artifact root writable: /var/tmp/dely-cycle/artifacts
+  ok     host home reachable from the environment: distrobox mounts <host-home> into the box and offers no flag to suppress it; the configuration acknowledged this, so the run records a declared compromise rather than claiming isolation
+usable on this host

@@ -103,6 +103,7 @@
         "environment": {"type": "object"},
         "markers": {"type": "array"},
         "orca_present": {"type": "boolean"},
+        "orca_is_host_installation": {"type": "boolean"},
         "orca_version": {"type": ["string", "null"]},
         "orca_status_exit_code": {"type": ["integer", "null"]}
       }
