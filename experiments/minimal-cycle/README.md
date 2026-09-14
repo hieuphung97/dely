@@ -176,10 +176,41 @@ length, or a prefix into any artifact.
 An absolute path to a credential file is refused in the configuration outright,
 and a configuration key whose name means "secret" is refused with it.
 
-## What this does not prove
+## Acceptance
 
-Nothing here observes Orca starting inside either backend, a window bound to
-that instance, a Claude Code worker driven through it, or a login surviving a
-run. Those need a host that carries Orca in the chosen image, a built tool image,
-and a pinned libvirt provider. `evidence/` records what one host actually did,
-including where it stopped.
+Each rail below is proved by an instrument that rejects an implementation which
+is present, runs, and returns a pass — not one that is merely absent.
+`python3 counterexamples.py` applies each wrong implementation in turn and
+checks that its instrument goes red; `python3 counterexamples.py --list` prints
+the table with the tests each row runs. The recorded sweep is in
+`evidence/counterexamples.txt`.
+
+| Requirement | Instrument | Evidence |
+| --- | --- | --- |
+| A probe result equal to the host's own snapshot is rejected | `counterexamples.py` case `no-host-fallback` | `evidence/counterexamples.txt` |
+| An orca resolving to the host's installation does not count as present | case `orca-is-the-environments-own` | `evidence/run-blocked-on-host-orca/` |
+| Cleanup runs only after a confirmed export | case `export-before-destroy` | `evidence/counterexamples.txt` |
+| Cleanup runs only after a confirmed stop | case `stop-must-be-confirmed` | `evidence/counterexamples.txt` |
+| Evidence is collected and exported before anything is destroyed | case `destroy-after-export` | `evidence/counterexamples.txt` |
+| The receipt proves bytes on the host, not bytes in memory | case `receipt-is-a-re-read` | `evidence/run-blocked-on-host-orca/export-receipt.json` |
+| A per-run path containing a shared resource is refused | case `cleanup-only-per-run` | `evidence/counterexamples.txt` |
+| Redaction catches a credential this run has never seen | case `redaction-by-shape` | `evidence/counterexamples.txt` |
+| The manifest carries every required field on every path | case `manifest-required-fields` | `evidence/run-blocked-on-host-orca/manifest.json` |
+| The run identifier discloses neither the host name nor the auth reference | case `run-id-carries-no-name` | `evidence/counterexamples.txt` |
+| A secret-shaped value under a dull key is refused in the configuration | case `config-refuses-a-secret` | `evidence/counterexamples.txt` |
+| No credential value, length or prefix reaches a receipt | case `auth-leaves-no-material` | `evidence/run-blocked-on-host-orca/auth-receipt.json` |
+| An unacknowledged host-home mount blocks the run | case `host-home-mount-acknowledged` | `evidence/preflight-distrobox.txt` |
+| Preflight inspects without creating the run's state | case `preflight-leaves-no-residue` | `evidence/counterexamples.txt` |
+| The preserved base image is never the overlay's output path | case `base-is-only-a-backing-file`, and a real `qemu-img` backing-chain test | `tests/test_adapter_vm.py` |
+| An unverified provider schema blocks the machine backend | case `provider-schema-verified` | `evidence/preflight-vm.txt` |
+| Preflight blocks rather than inventing a path | `./run-cycle preflight` on a host with no `pulumi` and no tool image | `evidence/preflight-vm.txt` |
+| A real cycle stops at the identity gate rather than using the host | `./run-cycle run` on this host | `evidence/run-blocked-on-host-orca/manifest.json` |
+
+## What no instrument here observes
+
+Orca starting inside either backend, a window bound to that instance, a Claude
+Code worker driven through it, a login surviving a run, or any domain being
+created at all. Those need a host that carries Orca in the chosen image, a built
+tool image, and a pinned libvirt provider. They are the separate acceptance test
+this work does not claim to have passed; `evidence/README.md` says exactly where
+this host stopped.

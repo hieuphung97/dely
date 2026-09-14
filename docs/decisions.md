@@ -69,6 +69,17 @@ its shape, not because it was on a list, and an absolute path to a credential
 file is replaced before it reaches a log, a manifest, a seed, a stack setting
 or this repository.
 
+Where a backend's own behaviour contradicts one of those rails, the runner
+neither hides it nor works around it. It asks the tool what it would really do,
+and turns the answer into a preflight finding that blocks until the
+configuration records the compromise deliberately. Two exist. Distrobox mounts
+the invoking user's home into every box and offers no flag to suppress it, so
+`distrobox.accept_host_home_mount` has to say so before a run starts. The
+libvirt provider's resource schema is not assumed from an example, so
+`vm.provider_schema_verified` has to record that someone checked the rendered
+program against the pinned version. An acknowledgement is recorded in the
+manifest; it is not a way of making the fact go away.
+
 #### Alternatives considered
 
 One backend only, deferring the other. It would have halved the work and
@@ -108,6 +119,22 @@ blocked run rather than as a green one.
 This decision does not make Distrobox a sandbox and does not claim the two
 backends are equivalent. It claims one lifecycle can drive both and that the
 evidence survives every way the cycle can end.
+
+Running it already moved one rail. The first real Distrobox cycle reached the
+identity gate, was correctly judged to be in the environment, and was allowed
+through because `command -v orca` resolved inside the box. It resolved to the
+*host's* launcher: Distrobox mounts the host home and preserves `PATH`, so a
+host installation answers from inside a container that has none. That run failed
+later, at the launch, for an unrelated reason. Had the launcher been one that
+works from inside a container, it would have driven the host and produced a
+complete green manifest for work the environment never did.
+
+Presence of a command is therefore not presence of an installation. Orca counts
+as present only when the path found inside differs from the one the host probe
+found and the binary reports a version there. The point generalises past Orca:
+anything a disposable environment inherits from the host through a mount or
+through `PATH` can answer a presence check without being present, and a check
+that only asks whether a name resolves cannot tell the two apart.
 
 #### Non-goals
 
