@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cycle_runner import config as config_module, proc
+from cycle_runner import config as config_module, proc, redact
 from cycle_runner.adapters import distrobox
 from tests.test_config import minimal_document
 
@@ -20,14 +20,16 @@ class StubRunner:
         self.table = list(table or [])
         self.passthrough = passthrough
         self.seen: list[tuple[str, ...]] = []
+        self.extra_values_seen: list[tuple[str, ...]] = []
 
     def __call__(self, argv, *, timeout, context, cwd=None, env=None, extra_values=(), stdin_text=None):
         argv = tuple(str(item) for item in argv)
         self.seen.append(argv)
+        self.extra_values_seen.append(tuple(extra_values))
         joined = " ".join(argv)
         for needle, code, out, err in self.table:
             if needle in joined:
-                return self._outcome(argv, code, out, err, context)
+                return self._outcome(argv, code, out, err, context, extra_values)
         if self.passthrough:
             return proc.run(
                 argv,
@@ -38,15 +40,17 @@ class StubRunner:
                 extra_values=extra_values,
                 stdin_text=stdin_text,
             )
-        return self._outcome(argv, 0, "", "", context)
+        return self._outcome(argv, 0, "", "", context, extra_values)
 
     @staticmethod
-    def _outcome(argv, code, out, err, context):
+    def _outcome(argv, code, out, err, context, extra_values=()):
+        # Redact exactly as the real runner does, so a test cannot pass only
+        # because the double skipped the step the adapter relies on.
         return proc.CommandOutcome(
             argv=argv,
             exit_code=code,
-            stdout=out,
-            stderr=err,
+            stdout=redact.text(out, tuple(extra_values)),
+            stderr=redact.text(err, tuple(extra_values)),
             started_at="2026-09-14T22:15:30Z",
             finished_at="2026-09-14T22:15:31Z",
             elapsed_seconds=0.1,

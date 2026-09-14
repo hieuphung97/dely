@@ -108,6 +108,11 @@ $artifact_root/<run_id>/
   cleanup.json               what was removed, what was kept, and how that was checked
 ```
 
+`manifest.json`, `cleanup.json` and `host-after.json` are written after cleanup,
+so they are deliberately outside the export receipt: the receipt proves what the
+host held *before* anything was destroyed, which is the only moment at which
+that proof is worth anything.
+
 Every stream is redacted on the way out. Redaction matches shapes — bearer
 headers, key prefixes, compact web tokens, private-key blocks, absolute paths to
 credential files, and any assignment whose key names a secret — so a credential
@@ -176,6 +181,14 @@ length, or a prefix into any artifact.
 An absolute path to a credential file is refused in the configuration outright,
 and a configuration key whose name means "secret" is refused with it.
 
+One limit is worth stating rather than glossing. On Distrobox a forwarded value
+never appears in a command line: the container manager is given the variable's
+*name* and reads the value from the runner's own environment. On the machine
+backend the transport is ssh, and the value is placed on the guest command line,
+so it is visible in the guest's process table for the life of that command. It
+is redacted from everything the runner captures, and the guest is destroyed
+after the run, but that is a bounded exposure and not an absence of one.
+
 ## Acceptance
 
 Each rail below is proved by an instrument that rejects an implementation which
@@ -202,6 +215,7 @@ the table with the tests each row runs. The recorded sweep is in
 | An unacknowledged host-home mount blocks the run | case `host-home-mount-acknowledged` | `evidence/preflight-distrobox.txt` |
 | Preflight inspects without creating the run's state | case `preflight-leaves-no-residue` | `evidence/counterexamples.txt` |
 | The preserved base image is never the overlay's output path | case `base-is-only-a-backing-file`, and a real `qemu-img` backing-chain test | `tests/test_adapter_vm.py` |
+| A value forwarded into the guest is redacted from captured output | case `forwarded-value-is-redacted` | `evidence/counterexamples.txt` |
 | An unverified provider schema blocks the machine backend | case `provider-schema-verified` | `evidence/preflight-vm.txt` |
 | Preflight blocks rather than inventing a path | `./run-cycle preflight` on a host with no `pulumi` and no tool image | `evidence/preflight-vm.txt` |
 | A real cycle stops at the identity gate rather than using the host | `./run-cycle run` on this host | `evidence/run-blocked-on-host-orca/manifest.json` |

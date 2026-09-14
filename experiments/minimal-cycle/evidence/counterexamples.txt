@@ -13,6 +13,7 @@ RED   auth-leaves-no-material       No credential value, length or prefix reache
 RED   host-home-mount-acknowledged  An unacknowledged host-home mount blocks the run
 RED   preflight-leaves-no-residue   Preflight inspects without creating the run's state
 RED   base-is-only-a-backing-file   The preserved base image is never the overlay's output path
+RED   forwarded-value-is-redacted   A value forwarded into the guest is redacted from captured output
 RED   provider-schema-verified      An unverified provider schema blocks the machine backend
 
-all 16 counterexamples discriminated
+all 17 counterexamples discriminated

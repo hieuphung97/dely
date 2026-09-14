@@ -211,6 +211,14 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_adapter_vm.OverlayTest",),
     ),
     Counterexample(
+        name="forwarded-value-is-redacted",
+        requirement="A value forwarded into the guest is redacted from captured output",
+        path="cycle_runner/adapters/vm.py",
+        original="            extra_values=tuple(extra_values) + tuple((env or {}).values()),",
+        replacement="            extra_values=tuple(extra_values),",
+        instruments=("tests.test_adapter_vm.TransportRedactionTest",),
+    ),
+    Counterexample(
         name="provider-schema-verified",
         requirement="An unverified provider schema blocks the machine backend",
         path="cycle_runner/adapters/vm.py",

@@ -238,3 +238,30 @@ class OverlayIntegrationTest(VmTestCase):
         )
         self.assertIn(str(base), chain.stdout)
         self.assertEqual(hashlib.sha256(base.read_bytes()).hexdigest(), before)
+
+
+class TransportRedactionTest(VmTestCase):
+    """A token forwarded into the guest must not survive into captured output."""
+
+    def test_a_forwarded_value_is_redacted_from_what_is_captured(self):
+        runner = StubRunner(
+            [("echo", 0, f"the value was {TOKEN}", "")], passthrough=True
+        )
+        adapter = self.make(runner=runner)
+        adapter.prepare_identity()
+        adapter.address = "192.0.2.10"
+        outcome = adapter.execute(
+            ["echo", "x"], timeout=5, env={"CLAUDE_CODE_OAUTH_TOKEN": TOKEN}
+        )
+        self.assertNotIn(TOKEN, outcome.stdout)
+        self.assertIn(TOKEN, runner.extra_values_seen[-1])
+
+    def test_the_forwarded_name_and_value_reach_the_guest_command(self):
+        runner = StubRunner(passthrough=True)
+        adapter = self.make(runner=runner)
+        adapter.prepare_identity()
+        adapter.address = "192.0.2.10"
+        adapter.execute(["true"], timeout=5, env={"CLAUDE_CODE_OAUTH_TOKEN": TOKEN})
+        argv = runner.seen[-1]
+        self.assertIn("env", argv)
+        self.assertIn(f"CLAUDE_CODE_OAUTH_TOKEN={TOKEN}", argv)
