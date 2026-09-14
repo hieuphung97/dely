@@ -215,6 +215,7 @@ the table with the tests each row runs. The recorded sweep is in
 | An unacknowledged host-home mount blocks the run | case `host-home-mount-acknowledged` | `evidence/preflight-distrobox.txt` |
 | Preflight inspects without creating the run's state | case `preflight-leaves-no-residue` | `evidence/counterexamples.txt` |
 | The preserved base image is never the overlay's output path | case `base-is-only-a-backing-file`, and a real `qemu-img` backing-chain test | `tests/test_adapter_vm.py` |
+| A create that fails partway records what it may have left behind | case `failed-create-names-its-residue` | `evidence/counterexamples.txt` |
 | A value forwarded into the guest is redacted from captured output | case `forwarded-value-is-redacted` | `evidence/counterexamples.txt` |
 | An unverified provider schema blocks the machine backend | case `provider-schema-verified` | `evidence/preflight-vm.txt` |
 | Preflight blocks rather than inventing a path | `./run-cycle preflight` on a host with no `pulumi` and no tool image | `evidence/preflight-vm.txt` |

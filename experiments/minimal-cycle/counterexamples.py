@@ -211,6 +211,14 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_adapter_vm.OverlayTest",),
     ),
     Counterexample(
+        name="failed-create-names-its-residue",
+        requirement="A create that fails partway records what it may have left behind",
+        path="cycle_runner/lifecycle.py",
+        original="        planned = self.create_attempted and self.adapter.plan_handle()",
+        replacement="        planned = None",
+        instruments=("tests.test_lifecycle.CreateFailureTest",),
+    ),
+    Counterexample(
         name="forwarded-value-is-redacted",
         requirement="A value forwarded into the guest is redacted from captured output",
         path="cycle_runner/adapters/vm.py",

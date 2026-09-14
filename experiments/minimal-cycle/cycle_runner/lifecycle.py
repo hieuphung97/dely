@@ -158,6 +158,7 @@ class _Cycle:
             dely_revision=run_config.dely_revision,
         )
         self.handle: EnvironmentHandle | None = None
+        self.create_attempted = False
         self.blocked_reason = ""
         self.error_reason = ""
         self.timed_out = False
@@ -262,6 +263,7 @@ class _Cycle:
 
     def _create(self) -> None:
         with self.phase("create"):
+            self.create_attempted = True
             self.handle = self.adapter.create()
             self.result.environment_id = self.handle.environment_id
             self.result.environment = {
@@ -441,11 +443,7 @@ class _Cycle:
 
     def _cleanup(self, export_record) -> CleanupRecord:
         if self.handle is None:
-            record = CleanupRecord(
-                status=CleanupStatus.DESTROYED,
-                reason="no environment was created, so no per-run resource existed",
-                verified=True,
-            )
+            record = self._cleanup_without_a_handle()
             self.result.cleanup = record
             self.skip("cleanup", record.reason)
             return record
@@ -470,6 +468,27 @@ class _Cycle:
             )
             phase_record.detail = record.reason
             return record
+
+    def _cleanup_without_a_handle(self) -> CleanupRecord:
+        """Report what a run that never got a handle may still have left."""
+        planned = self.create_attempted and self.adapter.plan_handle()
+        if not planned:
+            return CleanupRecord(
+                status=CleanupStatus.DESTROYED,
+                reason="no environment was created, so no per-run resource existed",
+                verified=True,
+            )
+        return CleanupRecord(
+            status=CleanupStatus.RESIDUE,
+            reason=(
+                "create did not return a handle, so the state of these per-run "
+                "resources is unknown; nothing was destroyed blind and they need a "
+                "manual decision"
+            ),
+            retained=[str(item) for item in planned.per_run_resources],
+            shared_preserved=[str(item) for item in planned.shared_resources],
+            verified=False,
+        )
 
     def _close(self, export_record, cleanup_record, started: float) -> CycleOutcome:
         with self.phase("close"):

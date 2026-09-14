@@ -280,3 +280,26 @@ class HostOrcaTest(CycleTestCase):
         adapter, outcome = self.run_cycle(orca_path_from_host=True)
         self.assertEqual(outcome.run_result.export.status, status.ExportStatus.CONFIRMED)
         self.assertEqual(outcome.run_result.cleanup.status, status.CleanupStatus.DESTROYED)
+
+
+class CreateFailureTest(CycleTestCase):
+    """A create that fails partway may already have made resources."""
+
+    def test_a_failed_create_records_the_planned_resources_as_residue(self):
+        adapter, outcome = self.run_cycle(create_fails=True)
+        record = outcome.run_result.cleanup
+        self.assertEqual(record.status, status.CleanupStatus.RESIDUE)
+        self.assertTrue(
+            any(str(adapter.home) in item for item in record.retained),
+            record.retained,
+        )
+        self.assertIn("create", record.reason.lower())
+
+    def test_a_failed_create_does_not_destroy_blind(self):
+        adapter, _ = self.run_cycle(create_fails=True)
+        self.assertNotIn("destroy", adapter.calls)
+
+    def test_a_failed_create_still_writes_a_manifest(self):
+        _, outcome = self.run_cycle(create_fails=True)
+        self.assertTrue(self.artifact("manifest.json").is_file())
+        self.assertEqual(outcome.run_result.status, status.RunStatus.ERROR)

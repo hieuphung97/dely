@@ -161,6 +161,15 @@ class BackendAdapter(abc.ABC):
     def resource_exists(self, resource: Resource) -> bool:
         """Report whether a resource is still present, for cleanup verification."""
 
+    def plan_handle(self) -> EnvironmentHandle | None:
+        """Describe the environment this adapter *would* create, before it does.
+
+        The runner uses it when `create` fails partway: the resources it names
+        may already exist, and a run that cannot confirm their state records
+        them as residue rather than destroying them blind.
+        """
+        return None
+
     def describe(self) -> dict[str, Any]:
         """Return backend facts for the manifest."""
         return {"backend": self.name}

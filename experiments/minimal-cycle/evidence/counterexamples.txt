@@ -1,19 +1,20 @@
-RED   no-host-fallback              A probe result equal to the host's own snapshot is rejected
-RED   orca-is-the-environments-own  An orca that resolves to the host's installation is not present
-RED   export-before-destroy         Cleanup runs only after a confirmed export
-RED   stop-must-be-confirmed        Cleanup runs only after a confirmed stop
-RED   destroy-after-export          Evidence is collected and exported before anything is destroyed
-RED   receipt-is-a-re-read          The receipt proves bytes on the host, not bytes in memory
-RED   cleanup-only-per-run          A per-run path that contains a shared resource is refused
-RED   redaction-by-shape            Redaction catches a credential this run has never seen
-RED   manifest-required-fields      The manifest carries every required field on every path
-RED   run-id-carries-no-name        The run identifier discloses neither the host name nor the auth reference
-RED   config-refuses-a-secret       A secret-shaped value under a dull key is refused
-RED   auth-leaves-no-material       No credential value, length or prefix reaches a receipt
-RED   host-home-mount-acknowledged  An unacknowledged host-home mount blocks the run
-RED   preflight-leaves-no-residue   Preflight inspects without creating the run's state
-RED   base-is-only-a-backing-file   The preserved base image is never the overlay's output path
-RED   forwarded-value-is-redacted   A value forwarded into the guest is redacted from captured output
-RED   provider-schema-verified      An unverified provider schema blocks the machine backend
+RED   no-host-fallback                 A probe result equal to the host's own snapshot is rejected
+RED   orca-is-the-environments-own     An orca that resolves to the host's installation is not present
+RED   export-before-destroy            Cleanup runs only after a confirmed export
+RED   stop-must-be-confirmed           Cleanup runs only after a confirmed stop
+RED   destroy-after-export             Evidence is collected and exported before anything is destroyed
+RED   receipt-is-a-re-read             The receipt proves bytes on the host, not bytes in memory
+RED   cleanup-only-per-run             A per-run path that contains a shared resource is refused
+RED   redaction-by-shape               Redaction catches a credential this run has never seen
+RED   manifest-required-fields         The manifest carries every required field on every path
+RED   run-id-carries-no-name           The run identifier discloses neither the host name nor the auth reference
+RED   config-refuses-a-secret          A secret-shaped value under a dull key is refused
+RED   auth-leaves-no-material          No credential value, length or prefix reaches a receipt
+RED   host-home-mount-acknowledged     An unacknowledged host-home mount blocks the run
+RED   preflight-leaves-no-residue      Preflight inspects without creating the run's state
+RED   base-is-only-a-backing-file      The preserved base image is never the overlay's output path
+RED   failed-create-names-its-residue  A create that fails partway records what it may have left behind
+RED   forwarded-value-is-redacted      A value forwarded into the guest is redacted from captured output
+RED   provider-schema-verified         An unverified provider schema blocks the machine backend
 
-all 17 counterexamples discriminated
+all 18 counterexamples discriminated

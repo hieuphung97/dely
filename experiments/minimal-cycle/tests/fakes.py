@@ -68,6 +68,7 @@ class FakeAdapter(BackendAdapter):
         leave_residue: bool = False,
         marker: str = "dely-cycle-marker",
         orca_path_from_host: bool = False,
+        create_fails: bool = False,
         task_writes_nothing: bool = False,
         host_project: Path | None = None,
     ):
@@ -86,6 +87,7 @@ class FakeAdapter(BackendAdapter):
         self.leave_residue = leave_residue
         self.marker = marker
         self.orca_path_from_host = orca_path_from_host
+        self.create_fails = create_fails
         self.task_writes_nothing = task_writes_nothing
         self.host_project = host_project
         self.destroyed = False
@@ -105,9 +107,23 @@ class FakeAdapter(BackendAdapter):
             ),
         )
 
+    def plan_handle(self) -> EnvironmentHandle:
+        return EnvironmentHandle(
+            environment_id=f"fake-{self.root.name}",
+            home_path=str(self.home),
+            project_path=str(self.project),
+            per_run_resources=(Resource(kind="path", identifier=str(self.home)),),
+            shared_resources=(Resource(kind="image", identifier=str(self.shared_base)),),
+            description={"image": "fake"},
+        )
+
     def create(self) -> EnvironmentHandle:
         self.calls.append("create")
         self.project.mkdir(parents=True, exist_ok=True)
+        if self.create_fails:
+            self.shared_base.parent.mkdir(parents=True, exist_ok=True)
+            self.shared_base.write_bytes(b"shared base image")
+            raise RuntimeError("the container manager refused halfway through")
         self.shared_base.parent.mkdir(parents=True, exist_ok=True)
         self.shared_base.write_bytes(b"shared base image")
         return EnvironmentHandle(
