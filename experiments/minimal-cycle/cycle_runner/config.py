@@ -66,6 +66,15 @@ def _text(document: Mapping[str, Any], key: str, where: str, default=_UNSET) -> 
     return value
 
 
+def _flag(document: Mapping[str, Any], key: str, where: str, default: bool) -> bool:
+    if key not in document:
+        return default
+    value = document[key]
+    if not isinstance(value, bool):
+        _fail(f"field {where}.{key} must be true or false, got {value!r}")
+    return value
+
+
 def _positive_int(document: Mapping[str, Any], key: str, where: str, default=_UNSET) -> int:
     if key not in document:
         if default is _UNSET:
@@ -217,6 +226,7 @@ class DistroboxConfig:
     container_prefix: str
     extra_mounts: tuple[str, ...] = ()
     provision: tuple[tuple[str, ...], ...] = ()
+    accept_host_home_mount: bool = False
 
     def to_document(self) -> dict[str, Any]:
         return {
@@ -224,6 +234,7 @@ class DistroboxConfig:
             "container_prefix": self.container_prefix,
             "extra_mounts": list(self.extra_mounts),
             "provision": [list(argv) for argv in self.provision],
+            "accept_host_home_mount": self.accept_host_home_mount,
         }
 
 
@@ -436,7 +447,15 @@ def _provision(document: Mapping[str, Any], where: str) -> tuple[tuple[str, ...]
 
 def _distrobox(document: Mapping[str, Any]) -> DistroboxConfig:
     _reject_unknown(
-        document, ("image", "container_prefix", "extra_mounts", "provision"), "distrobox"
+        document,
+        (
+            "image",
+            "container_prefix",
+            "extra_mounts",
+            "provision",
+            "accept_host_home_mount",
+        ),
+        "distrobox",
     )
     mounts = tuple(document.get("extra_mounts") or ())
     for mount in mounts:
@@ -447,6 +466,9 @@ def _distrobox(document: Mapping[str, Any]) -> DistroboxConfig:
         container_prefix=_text(document, "container_prefix", "distrobox"),
         extra_mounts=mounts,
         provision=_provision(document, "distrobox"),
+        accept_host_home_mount=_flag(
+            document, "accept_host_home_mount", "distrobox", False
+        ),
     )
 
 
