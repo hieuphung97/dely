@@ -16,8 +16,9 @@ RUN_ID = "20260914T221530Z-abc123-0123abcd"
 class StubRunner:
     """Answers commands from a table so the adapter can be tested without podman."""
 
-    def __init__(self, table=None):
+    def __init__(self, table=None, *, passthrough=False):
         self.table = list(table or [])
+        self.passthrough = passthrough
         self.seen: list[tuple[str, ...]] = []
 
     def __call__(self, argv, *, timeout, context, cwd=None, env=None, extra_values=(), stdin_text=None):
@@ -27,6 +28,16 @@ class StubRunner:
         for needle, code, out, err in self.table:
             if needle in joined:
                 return self._outcome(argv, code, out, err, context)
+        if self.passthrough:
+            return proc.run(
+                argv,
+                timeout=timeout,
+                context=context,
+                cwd=cwd,
+                env=env,
+                extra_values=extra_values,
+                stdin_text=stdin_text,
+            )
         return self._outcome(argv, 0, "", "", context)
 
     @staticmethod

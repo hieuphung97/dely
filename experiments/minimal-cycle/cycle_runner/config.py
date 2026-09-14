@@ -253,6 +253,9 @@ class VmConfig:
     vcpus: int = 2
     graphics: str = "spice"
     transport: str = "ssh"
+    network: str = "default"
+    ssh_port: int = 22
+    provider_schema_verified: bool = False
     provision: tuple[tuple[str, ...], ...] = ()
 
     def to_document(self) -> dict[str, Any]:
@@ -270,6 +273,9 @@ class VmConfig:
             "vcpus": self.vcpus,
             "graphics": self.graphics,
             "transport": self.transport,
+            "network": self.network,
+            "ssh_port": self.ssh_port,
+            "provider_schema_verified": self.provider_schema_verified,
             "provision": [list(argv) for argv in self.provision],
         }
 
@@ -489,6 +495,9 @@ def _vm(document: Mapping[str, Any]) -> VmConfig:
             "vcpus",
             "graphics",
             "transport",
+            "network",
+            "ssh_port",
+            "provider_schema_verified",
             "provision",
         ),
         "vm",
@@ -513,6 +522,11 @@ def _vm(document: Mapping[str, Any]) -> VmConfig:
         vcpus=_positive_int(document, "vcpus", "vm", 2),
         graphics=_text(document, "graphics", "vm", "spice"),
         transport=_text(document, "transport", "vm", "ssh"),
+        network=_text(document, "network", "vm", "default"),
+        ssh_port=_positive_int(document, "ssh_port", "vm", 22),
+        provider_schema_verified=_flag(
+            document, "provider_schema_verified", "vm", False
+        ),
         provision=_provision(document, "vm"),
     )
 
