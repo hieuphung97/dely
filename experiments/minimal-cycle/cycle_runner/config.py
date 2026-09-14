@@ -196,6 +196,7 @@ class OrcaConfig:
     status_argv: tuple[str, ...] = ("orca", "status", "--json")
     version_argv: tuple[str, ...] = ("orca", "--version")
     run_objective: str = "dely minimal cycle"
+    worktree_selector: str = "current"
 
     def to_document(self) -> dict[str, Any]:
         return {
@@ -206,6 +207,7 @@ class OrcaConfig:
             "status_argv": list(self.status_argv),
             "version_argv": list(self.version_argv),
             "run_objective": self.run_objective,
+            "worktree_selector": self.worktree_selector,
         }
 
 
@@ -393,7 +395,16 @@ def _auth(document: Mapping[str, Any]) -> AuthConfig:
 def _orca(document: Mapping[str, Any]) -> OrcaConfig:
     _reject_unknown(
         document,
-        ("version", "model", "effort", "agent", "status_argv", "version_argv", "run_objective"),
+        (
+            "version",
+            "model",
+            "effort",
+            "agent",
+            "status_argv",
+            "version_argv",
+            "run_objective",
+            "worktree_selector",
+        ),
         "orca",
     )
     return OrcaConfig(
@@ -404,6 +415,7 @@ def _orca(document: Mapping[str, Any]) -> OrcaConfig:
         status_argv=_argv(document, "status_argv", "orca", ("orca", "status", "--json")),
         version_argv=_argv(document, "version_argv", "orca", ("orca", "--version")),
         run_objective=_text(document, "run_objective", "orca", "dely minimal cycle"),
+        worktree_selector=_text(document, "worktree_selector", "orca", "current"),
     )
 
 
