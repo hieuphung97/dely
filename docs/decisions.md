@@ -3,11 +3,126 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-06.
+Last updated 2026-09-14.
 
 ---
 
 ## Settled
+
+### 2026-09-14 — One shared cycle runner, two backend adapters, export before cleanup
+
+#### Context
+
+The delivery contract has never been exercised against a disposable
+environment. Every observation so far comes from this checkout on this host,
+so a run that silently used the host's own Orca, the host's own checkout, or
+the host's own login would look exactly like a run that used an isolated one.
+The design handed to this delivery asks a narrower question than a benchmark
+does: can one cycle be created, driven, observed, exported and destroyed
+without losing its evidence?
+
+Two isolation mechanisms were on the table and neither subsumes the other.
+Distrobox integrates deliberately with the host — home directory, graphical
+sockets, audio, message bus — and its own documentation warns against reading
+that as container-grade isolation. A virtual machine under `libvirt` with
+`qemu` isolates far more and costs a base image, a tool image, a seed and an
+address for reaching into the guest. Choosing one would have settled the
+isolation question by deleting the other half of it.
+
+The failure this record is built around is not a weak backend. It is a green
+manifest produced by a run that never entered the environment, or a clean
+cleanup that removed the evidence that would have shown it.
+
+#### Decision
+
+`experiments/minimal-cycle/` carries one Python runner with one lifecycle and
+two backend adapters behind one interface. The runner is a coordinator and a
+redactor; it is not a container manager, a virtual-machine manager, a
+scheduler, or a second orchestration next to Orca. Each adapter drives the
+documented interface of its own tool — Distrobox Assemble and the Distrobox
+command line for one, Pulumi with the `libvirt` provider over `qemu` for the
+other — and both return the same result contract.
+
+Four rails are load-bearing and each is proved by an instrument that rejects a
+present, running, passing implementation rather than an absent one.
+
+An identity verdict precedes the task. The runner runs the same probe on the
+host and inside the environment and refuses to continue when the environment's
+answer carries no environment marker and repeats the host's own name, machine
+identity and home. Finding no Orca inside the environment is a blocked run,
+never a reason to use the host's.
+
+Export precedes destruction, and the receipt is a re-read. Every required
+artifact is written to the host, then read back from that host path and
+digested again; the run is exportable only when every one of them matches.
+Cleanup is attempted only after that confirmation. An unconfirmed export
+leaves the environment standing and records residue with its reason.
+
+Cleanup is a declared list, not a path expression. Each adapter names its
+per-run resources and its shared ones, and the runner refuses any target
+outside the per-run list. A shared base image, a shared tool image and a
+shared configuration survive every terminal state by construction rather than
+by the destroy command happening to point elsewhere.
+
+Redaction is by pattern. A token the run has never seen is redacted because of
+its shape, not because it was on a list, and an absolute path to a credential
+file is replaced before it reaches a log, a manifest, a seed, a stack setting
+or this repository.
+
+#### Alternatives considered
+
+One backend only, deferring the other. It would have halved the work and
+settled by omission the one architectural question actually in play — whether
+the lifecycle can be written once. Writing both adapters against one interface
+is what tests that claim.
+
+`libvirt-python` directly instead of Pulumi. It is the lower-level official
+binding, and using it would have meant writing domain, disk, state and cleanup
+management inside this runner: exactly the second manager the design forbids.
+
+A single shell script per backend. It is smaller, and it cannot express the
+one ordering that matters. Export-then-verify-then-destroy, with a refusal in
+the middle, is control flow with state, and the rails above are testable only
+because they are functions rather than lines in a script.
+
+Writing the diff inside the environment with `diff` or `git`. It adds a tool
+requirement to every image and makes the patch a property of the environment
+rather than of the runner. The tree is fetched and the patch is computed on
+the host with the standard library instead, identically for both backends.
+
+#### Consequences
+
+The repository now carries Python, which it did not before. It is confined to
+`experiments/minimal-cycle/`, depends on the standard library at runtime, and
+is not part of the dely plugin surface: no skill, no plugin manifest and no
+structural contract check moves because of it.
+
+The runner is ready for the separate acceptance test the design reserves, and
+it has not passed that test. This host carries no `pulumi`, no Orca package
+inside any container image, and no built tool image, so nothing here observes
+Orca starting in either backend, a window bound to that instance, a Claude
+Code worker driven through it, or a login surviving a run. Those remain
+unproven, and the runner's rails are written so that the absence shows up as a
+blocked run rather than as a green one.
+
+This decision does not make Distrobox a sandbox and does not claim the two
+backends are equivalent. It claims one lifecycle can drive both and that the
+evidence survives every way the cycle can end.
+
+#### Non-goals
+
+Measuring start-up time, model quality, tester quality, cost, or any task
+matrix. Building an image cache engine. Implementing the tester, builder,
+reviewer and committer roles. Running the cycle under continuous integration.
+
+#### Deferred
+
+The real one-cycle acceptance on each backend, triggered by a host that
+carries `pulumi`, a verified base image, a built tool image, and an Orca
+package installable into the chosen image. A second fixture beyond the single
+marker file, triggered by that acceptance passing. Running the runner's own
+suite in continuous integration, triggered by a decision about whether this
+repository's workflow should carry a Python step.
 
 ### 2026-09-06 — The dispatch prompt carries the acceptance row as written
 
