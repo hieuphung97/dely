@@ -1,0 +1,188 @@
+{
+  "title": "dely minimal cycle manifest",
+  "description": "Required shape of the manifest one cycle writes to the host. Validated by cycle_runner.manifest, which supports type, required, properties, items, enum, const and pattern.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "generated_at",
+    "run_id",
+    "backend",
+    "tested_revision",
+    "dely_revision",
+    "environment_id",
+    "status",
+    "started_at",
+    "finished_at",
+    "elapsed_seconds",
+    "timeout_seconds",
+    "failure_classification",
+    "versions",
+    "environment",
+    "config",
+    "artifact_root",
+    "artifacts",
+    "host_before",
+    "host_after",
+    "phases",
+    "identity",
+    "worker",
+    "check",
+    "export",
+    "cleanup",
+    "auth"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "generated_at": {"type": "string"},
+    "run_id": {"type": "string", "pattern": "^\\d{8}T\\d{6}Z-[0-9a-f]{6}-[0-9a-f]{8}$"},
+    "backend": {"type": "string", "enum": ["distrobox", "vm"]},
+    "tested_revision": {"type": "string"},
+    "dely_revision": {"type": "string"},
+    "environment_id": {"type": ["string", "null"]},
+    "status": {
+      "type": "string",
+      "enum": [
+        "SETTLED",
+        "ERROR",
+        "TIMEOUT",
+        "CANCELLED",
+        "CLEANUP_FAILED",
+        "UNKNOWN",
+        "BLOCKED"
+      ]
+    },
+    "started_at": {"type": ["string", "null"]},
+    "finished_at": {"type": ["string", "null"]},
+    "elapsed_seconds": {"type": ["number", "null"]},
+    "timeout_seconds": {"type": "integer"},
+    "failure_classification": {"type": "string"},
+    "versions": {"type": "object"},
+    "environment": {"type": "object"},
+    "config": {"type": "object"},
+    "artifact_root": {"type": "string"},
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "size_bytes", "sha256"],
+        "properties": {
+          "path": {"type": "string"},
+          "size_bytes": {"type": "integer"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "host_before": {"type": "object"},
+    "host_after": {"type": "object"},
+    "phases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "status", "commands"],
+        "properties": {
+          "name": {"type": "string"},
+          "status": {
+            "type": "string",
+            "enum": ["OK", "FAILED", "SKIPPED", "TIMEOUT", "BLOCKED"]
+          },
+          "detail": {"type": "string"},
+          "commands": {"type": "array"}
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "required": ["verdict", "reason", "host", "environment", "orca_present"],
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": ["ENVIRONMENT", "HOST_FALLBACK", "UNKNOWN"]
+        },
+        "reason": {"type": "string"},
+        "host": {"type": "object"},
+        "environment": {"type": "object"},
+        "markers": {"type": "array"},
+        "orca_present": {"type": "boolean"},
+        "orca_version": {"type": ["string", "null"]},
+        "orca_status_exit_code": {"type": ["integer", "null"]}
+      }
+    },
+    "worker": {
+      "type": "object",
+      "required": ["status", "detail", "commands"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["OK", "FAILED", "SKIPPED", "TIMEOUT", "BLOCKED"]
+        },
+        "agent": {"type": ["string", "null"]},
+        "model": {"type": ["string", "null"]},
+        "effort": {"type": ["string", "null"]},
+        "run_id": {"type": ["string", "null"]},
+        "dispatch_id": {"type": ["string", "null"]},
+        "outcome": {"type": ["string", "null"]},
+        "detail": {"type": "string"},
+        "commands": {"type": "array"}
+      }
+    },
+    "check": {
+      "type": "object",
+      "required": ["status", "argv", "exit_code", "detail"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["OK", "FAILED", "SKIPPED", "TIMEOUT", "BLOCKED"]
+        },
+        "argv": {"type": "array"},
+        "exit_code": {"type": ["integer", "null"]},
+        "started_at": {"type": ["string", "null"]},
+        "finished_at": {"type": ["string", "null"]},
+        "elapsed_seconds": {"type": ["number", "null"]},
+        "stdout_path": {"type": ["string", "null"]},
+        "stderr_path": {"type": ["string", "null"]},
+        "expected_marker": {"type": ["string", "null"]},
+        "detail": {"type": "string"}
+      }
+    },
+    "export": {
+      "type": "object",
+      "required": ["status", "artifacts", "missing", "detail"],
+      "properties": {
+        "status": {"type": "string", "enum": ["CONFIRMED", "PARTIAL", "FAILED"]},
+        "confirmed_at": {"type": ["string", "null"]},
+        "receipt_path": {"type": ["string", "null"]},
+        "artifacts": {"type": "array"},
+        "missing": {"type": "array"},
+        "detail": {"type": "string"}
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "required": ["status", "reason", "removed", "retained", "verified"],
+      "properties": {
+        "status": {"type": "string", "enum": ["DESTROYED", "RESIDUE", "UNKNOWN"]},
+        "reason": {"type": "string"},
+        "removed": {"type": "array"},
+        "retained": {"type": "array"},
+        "shared_preserved": {"type": "array"},
+        "verified": {"type": "boolean"}
+      }
+    },
+    "auth": {
+      "type": "object",
+      "required": ["mode", "reference", "status", "removed_after_run", "detail"],
+      "properties": {
+        "mode": {"type": "string"},
+        "reference": {"type": "string"},
+        "status": {
+          "type": "string",
+          "enum": ["OK", "FAILED", "SKIPPED", "TIMEOUT", "BLOCKED"]
+        },
+        "target": {"type": ["string", "null"]},
+        "entries": {"type": "array"},
+        "removed_after_run": {"type": "boolean"},
+        "detail": {"type": "string"}
+      }
+    }
+  }
+}

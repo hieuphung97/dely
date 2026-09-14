@@ -3,8 +3,7 @@
 Decision record: `docs/decisions.md` — "One shared cycle runner, two backend
 adapters, export before cleanup".
 
-**Baseline:** the SHA of the commit carrying the decision record and this plan.
-Leave empty until that commit exists rather than guessing it.
+**Baseline:** `6688d475413f80c862e131f1ebc93cf27a5fc830`.
 
 **Spec:** `/home/paczos/Documents/Warsztat/myDely/docs/projekt-srodowiska-testowego.md`
 with `projekt-wspolnej-petli.md`, `projekt-lokalnej-petli-distrobox.md`,
