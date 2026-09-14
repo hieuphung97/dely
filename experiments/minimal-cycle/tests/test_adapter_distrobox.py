@@ -302,3 +302,31 @@ class PreflightResidueTest(AdapterTestCase):
             else []
         )
         self.assertEqual(before, after)
+
+
+@unittest.skipUnless(shutil.which("distrobox"), "distrobox is not on this host")
+class RealPreflightResidueTest(AdapterTestCase):
+    """distrobox itself creates the custom home, so only a real run shows this."""
+
+    def make(self, **options):
+        options.setdefault("host_home", Path.home())
+        options.setdefault("runner", proc.run)
+        return super().make(**options)
+
+    def test_a_real_preflight_leaves_no_per_run_state_behind(self):
+        adapter = self.make()
+        adapter.preflight()
+        self.assertFalse(
+            adapter.run_state.exists(),
+            f"preflight left {adapter.run_state} on the host",
+        )
+
+    def test_a_real_preflight_leaves_the_state_root_empty(self):
+        adapter = self.make()
+        adapter.preflight()
+        entries = (
+            sorted(p.name for p in adapter.config.state_root.iterdir())
+            if adapter.config.state_root.is_dir()
+            else []
+        )
+        self.assertEqual(entries, [])

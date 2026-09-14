@@ -193,10 +193,9 @@ CASES: tuple[Counterexample, ...] = (
         name="preflight-leaves-no-residue",
         requirement="Preflight inspects without creating the run's state",
         path="cycle_runner/adapters/distrobox.py",
-        original="""            probe_manifest = Path(staging) / "distrobox.ini"
-            probe_manifest.write_text(self.render_manifest(), encoding="utf-8")""",
-        replacement="            probe_manifest = self.write_manifest()",
-        instruments=("tests.test_adapter_distrobox.PreflightResidueTest",),
+        original="""                self.render_manifest(home_override=Path(staging) / "home"),""",
+        replacement="""                self.render_manifest(),""",
+        instruments=("tests.test_adapter_distrobox.RealPreflightResidueTest",),
     ),
     Counterexample(
         name="base-is-only-a-backing-file",

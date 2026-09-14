@@ -104,12 +104,17 @@ class DistroboxAdapter(BackendAdapter):
 
     # -- the declared environment ----------------------------------------
 
-    def render_manifest(self) -> str:
-        """Return the Distrobox Assemble manifest for this run."""
+    def render_manifest(self, *, home_override: Path | None = None) -> str:
+        """Return the Distrobox Assemble manifest for this run.
+
+        `home_override` exists for preflight: `distrobox create` creates the
+        custom home before it prints a dry run, so a probe manifest pointing at
+        the per-run home would leave that directory behind.
+        """
         lines = [
             f"[{self.container_name}]",
             f"image={self.settings.image}",
-            f"home={self.home_path}",
+            f"home={home_override or self.home_path}",
             f"hostname={self.container_name}",
             "entry=false",
             "pull=false",
@@ -169,7 +174,10 @@ class DistroboxAdapter(BackendAdapter):
         name = "host home reachable from the environment"
         with tempfile.TemporaryDirectory(prefix="dely-cycle-preflight-") as staging:
             probe_manifest = Path(staging) / "distrobox.ini"
-            probe_manifest.write_text(self.render_manifest(), encoding="utf-8")
+            probe_manifest.write_text(
+                self.render_manifest(home_override=Path(staging) / "home"),
+                encoding="utf-8",
+            )
             rendered = self.runner(
                 [self.binary, "assemble", "create", "--dry-run", "--file", str(probe_manifest)],
                 timeout=300,
