@@ -30,6 +30,8 @@ that harness's defaults for model and effort, written as the literal
 
 **Customize.** For each of `implement` and `review`, offer the discovered
 harnesses, models and effort levels and write what the human chooses.
+For Grok Build, Antigravity CLI, Kiro CLI and GitHub Copilot CLI, write the
+literal `default` for Model and Effort and point to Orca's agent default arguments.
 
 Ask which path. Do not start writing until that is answered.
 
@@ -71,25 +73,17 @@ no model turn. Do not treat them as a dispatch.
 Codex slugs with `visibility: hide` are not offered. Codex reasoning levels
 are `supported_reasoning_levels` on each slug, not one vocabulary per harness.
 
-Grok effort is not discovered by calling the model. Read the installed CLI's
-help and any validation already observed. Do not run a Grok prompt to learn
-the flag.
-
-Antigravity CLI effort is `low|medium|high`, read from `agy --help`'s
-`--effort` flag; do not prompt the model to learn it. Some model slugs already
-end in `-high`, `-medium`, or `-low` — that suffix names the model, not the
-effort flag, so do not strip it.
+For Grok Build, Antigravity CLI, Kiro CLI and GitHub Copilot CLI, write the
+literal `default` for Model and Effort. Point the human to Orca's agent default arguments to set the model. `grok models` and `agy models` list what
+that harness can run; do not write those slugs into the managed block.
 
 A harness that is not installed is omitted from the offer, not an error.
 
 ### Kiro CLI
 
-Kiro CLI models: `kiro-cli chat --list-models --format json` (offer each
-`model_id`). Kiro CLI effort is read from `kiro-cli chat --help`'s `--effort`
-flag; do not prompt the model to learn it and do not store a catalogue. Live
-discovery may offer only `auto` — that is a valid result, not a reason to
-invent model names. Omit Kiro discovery that is unavailable or unusable
-rather than guessing.
+Write the literal `default` for Model and Effort. Point the human to Orca's agent default arguments to set the model. Do not run `kiro-cli chat
+--list-models`, do not store a catalogue, and do not invent model names.
+Omit Kiro discovery that is unavailable or unusable rather than guessing.
 
 ### Cursor Agent CLI
 
@@ -101,12 +95,9 @@ is unavailable or unusable rather than guessing.
 
 ### GitHub Copilot CLI
 
-GitHub Copilot CLI models: there is no non-interactive listing. Write
-the literal `default` for Model; do not invent a catalogue, do not prompt
-the model to learn one, and do not treat `copilot -p "/model"` as
-discovery. GitHub Copilot CLI effort is read from `copilot --help`'s
-`--effort` flag. Omit Copilot discovery that is unavailable or unusable
-rather than guessing.
+Write the literal `default` for Model and Effort. Point the human to Orca's agent default arguments to set the model. Do not invent a catalogue, do not
+prompt the model to learn one, and do not treat `copilot -p "/model"` as
+discovery.
 
 ## Pinning
 
@@ -165,12 +156,33 @@ file is inert in the same sense that it is not imported. Cursor Agent CLI
 applies `CLAUDE.md` as a rule. GitHub Copilot CLI loads both `AGENTS.md`
 and `CLAUDE.md`. Grok does not expand it.
 
+## Trust
+
+After the managed block is written, for each pinned harness whose `Setup`
+column in `skills/delivery/references/harnesses.md` is `trust dialog`,
+`trust-all confirmation`, or `y/n security question`, open it once for the human with
+`orca terminal create --worktree path:<repo> --command "<binary> <permission default>"`.
+The binary is `claude`, `codex`, `grok`, `agy`, `kiro-cli`, `cursor-agent`,
+or `copilot` for that harness. Take the permission default from the harness
+table. The human answers that harness's own dialog; setup never answers it
+and never writes a harness store. The human closes the terminal when done.
+`Orca preflight` and `none` need no step.
+
+## Preflight
+
+Open a Run first as `orca skills get orchestration` describes. Then run
+`../delivery/scripts/dely preflight --repo <path> --run <runId>` relative
+to this skill. Any `PREFLIGHT … FAIL` (exit 1): do not dispatch to any pin;
+relay the printed reason to the human.
+
 ## What setup will not do
 
-No plugin or skill install. No hook trust. No writes to `~/.claude`,
-`~/.codex`, `~/.grok`, `~/.gemini`, `~/.kiro`, `~/.cursor`, or `~/.copilot`.
-No custom Kiro agent creation or modification. No coordinator installation
-or field. No control or release row. No enumeration or invocation of
-project-owned workflow plugins. No model catalogue.
+No plugin or skill install. No hook trust. Setup may open a pinned harness
+in an Orca terminal so the human can answer that harness's own trust dialog;
+it still never answers the dialog and never writes a harness store
+(`~/.claude`, `~/.codex`, `~/.grok`, `~/.gemini`, `~/.kiro`, `~/.cursor`,
+or `~/.copilot`). No custom Kiro agent creation or modification. No
+coordinator installation or field. No control or release row. No enumeration
+or invocation of project-owned workflow plugins. No model catalogue.
 
 Print verified install guidance only when the human explicitly asks for it.

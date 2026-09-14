@@ -3,11 +3,565 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-06.
+Last updated 2026-09-14.
 
 ---
 
 ## Settled
+
+### 2026-09-14 — Dely coordinates on Orca's own supervised loop; the 0.18.0 runtime is replaced by a small helper
+
+#### Context
+
+The 2026-09-11 runtime (`dely.js`, 1,736 lines, 3,751 lines of tests and a fake
+Orca) passed every review and CI. Live probes on 2026-09-13 in fresh repositories,
+with every harness pinned to the candidate, still stalled Controls:
+
+- **Nudge wake lost events.** A `worker_done` that arrived while a nudge-mode
+  Control's turn was still active was never nudged. That lost 2 of 2 wakes in one
+  Antigravity delivery. A Copilot Control's nudge sat unsubmitted after its TUI
+  reloaded. Orca's own guide calls a nudge best-effort attention.
+- **Nudge-form verify misbehaved under a real Control.** It blocked about 56 s,
+  beyond Codex's 30 s exec yield. Codex started a second verify, and that one
+  wrote FAIL although both workers succeeded.
+- **Most live defects sat in code that re-derives what Orca already reports.**
+  Examples: adopted-terminal ownership read from a shape only the fake used, a
+  fallback that also closed a terminal a human took over, verify-Run restore and
+  fencing, an Antigravity log classifier that blamed every unexplained NO_ACK on
+  quota, and Kiro's adopted argv.
+- **Dead time, not wrong code, dominated.** Measured: a worker dead of a
+  connection loss undetected for 2 h 15 min, an unsubmitted prompt for 12 min,
+  and lost wakes for 4 to 20 min.
+
+A Spike on 2026-09-14 measured the alternative:
+
+- **Control on Orca's own loop.** Control ran `orca skills get orchestration`,
+  plus a slim protocol and an 83-line helper.
+  - Claude and Cursor Controls delivered end to end.
+  - A killed worker surfaced as `projection.attention.requiresAction` with
+    `nextAction: worker-release`; Control followed it and dispatched once more.
+  - Control diagnosed a signed-out Antigravity from `worker-read`, with no
+    classifier.
+- **Codex as Control.** Codex reaps any process its exec starts, `nohup`
+  included. A waiter run as a separate Orca terminal survived, ran `check`
+  with `--terminal` naming Control, and typed a wake line into Codex. Codex then
+  delivered end to end and ignored Orca nudges. Orca allows one active waiter
+  per Run.
+- **Dead-time signals Orca already exposes.**
+  - A preflight ACK-only dispatch per pin failed a signed-out Antigravity in
+    106 s, before any work.
+  - A 15 s wait cycle reported a killed worker 15 s after the kill.
+  - A `worker-read` cursor that stopped advancing reported a stalled worker at
+    140 s with a 2-minute threshold, while Orca liveness still said `live`.
+- **Structured worker mode** (Orca 1.4.200, a user setting for new agent tabs).
+  - Claude workers ran with no terminal in an untrusted repository, with model
+    and effort pins kept.
+  - Codex structured workers run their shell inside Codex's sandbox, cannot
+    reach Orca, and never send `worker_done`.
+
+#### Decision
+
+1. **Control follows Orca's supervised loop.** The delivery skill tells Control
+   to load `orca skills get orchestration` and follow it for Runs, consuming and
+   acknowledging, completion accounting, recovery and cleanup. Dely keeps only
+   the protocol: gates, shapes, acceptance, roles, review, remediation and
+   release.
+2. **A small helper replaces the runtime.** `skills/delivery/scripts/dely.js`
+   has five commands:
+   - `preflight`: one ACK-only dispatch per distinct pin at delivery start.
+   - `dispatch`: pin to `worker-start`, then an ACK peek.
+   - `wait`: whole-batch `SETTLED`, `ATTENTION` from Orca's projection, and
+     `STALLED` from a non-advancing `worker-read` cursor.
+   - `wait-bg`: a waiter in a separate Orca terminal, with a lock, that wakes
+     Control by typing a line.
+   - `notify`: the wake line itself.
+
+   It keeps no verdict, run memory, classifier, adopted launch or nudge
+   handling.
+3. **Wake by harness.** A Control whose harness resumes when a background
+   command exits (Claude Code, Cursor Agent CLI, GitHub Copilot CLI) runs `wait`
+   in the background. Codex, Antigravity and Grok use `wait-bg`. Kiro is not
+   supported as Control. Nudges are never a wake source.
+4. **Pins.** `worker-start --model`/`--effort` for Claude, Codex and Cursor.
+   Other harnesses take their model from Orca's per-agent default arguments.
+5. **Setup ends with `dely preflight`.** The `dely:verify` skill is deleted.
+6. **Worker mode is the user's Orca setting.** Structured Claude workers need
+   no workspace trust. Codex workers must stay terminal workers while its
+   structured sandbox cannot reach Orca.
+
+This supersedes items 2, 4 and 5 of the 2026-09-11 decision and the runtime
+parts of its item 9. Items 1, 3, 6 and 7 carry forward in reduced form.
+
+#### Alternatives considered
+
+**Keep the 0.18.0 runtime and restrict Control to background harnesses.**
+Rejected: it keeps the code where the live defects were and the fake that hid
+them, and still loses no fewer events for Codex.
+
+**Mitigate nudges.** Rejected: the lost-event window is Orca's, and the helper's
+own waker removes it.
+
+**Protocol only, no helper.** Rejected after the Spike. The two operations
+Controls get wrong are consuming whole batches and choosing a wait form, and a
+hand-written waiter spun on an unacknowledged `status` batch.
+
+**Structured workers for every harness.** Not available: Orca offers it for
+Claude and Codex only, and Codex cannot report from it.
+
+#### Consequences
+
+- About 90% of the runtime and test code is deleted. Behaviour now depends on
+  Orca's projection fields `attention`, `nextAction` and `liveness`, and on
+  `worker-read` cursors, all measured live on Orca 1.4.200.
+- A quiet but legitimate long command can trip `STALLED`. Control reads the last
+  output and may wait again. The default threshold is set above normal quiet
+  stretches.
+- A waker terminal is left until its wait ends if Control abandons it.
+- Control model quality is a precondition. Copilot's Free plan offers only Auto,
+  and its Auto model once implemented the change itself instead of delivering it.
+- Proactive human notification is not provided.
+- **Known residual failures, none of them fixed.** Each was found in review of this delivery:
+  - A failed row that Orca reports with `nextAction.kind: none` (already released or
+    abandoned) produces no ATTENTION, so it surfaces only at `DEADLINE`.
+  - A `worker-read` error sticks: `STALLED` keeps naming it after a later read succeeds.
+  - The sleep between empty preflight polls is untested.
+  - `wait-bg` quotes its values with JSON, not shell quoting, so `$` or a backtick in a
+    Control-owned value would expand.
+  - The fake Orca's second-waiter refusal cannot trigger, because fake invocations run
+    one at a time.
+  - Two phases sharing one pin print a single PREFLIGHT line, under the first phase.
+  - The contracts rail against a `nudge` wake is lexical and case-sensitive.
+  - `0.18.0` now names different content from the 0.18.0 candidates installed for the
+    2026-09-13 probes. A plugin cache keyed by version can keep the old runtime, so
+    installs are verified by hash, not by version.
+  - Cursor Agent CLI as a background Control and Grok Build as a waker Control rest on
+    the 2026-09-14 Spike alone. Both failed as nudge-mode Controls on 2026-09-11.
+  - `STALLED` covers only workers whose `worker-read` source is a hook-reported transcript
+    (Claude Code, Codex CLI). A terminal-stream cursor advanced about 940 bytes per 20 s
+    under an idle Cursor TUI, so for terminal-stream workers (Cursor, Copilot, Antigravity,
+    Grok) a stall surfaces only at `DEADLINE`, which Control treats as a checkpoint.
+  - A `PREFLIGHT … FAIL` or `NO_ACK` line quotes the worker's screen or last transcript
+    text read before the worker is stopped and released. Live, the earlier form printed
+    Orca's projection JSON and lost a flaky Cursor preflight's cause for good.
+  - Preflight waits about 150 s for each `worker_done`: a Cursor pin that passed one
+    preflight failed the next at the 90 s budget.
+  - `notify` never types into Control while Orca reports `agent_prompt_blocked`, because
+    Orca raises that only while Control's TUI holds a permission or approval prompt,
+    and typed text and Return there could approve it. It retries `--enter` every 30 s
+    for up to 30 minutes, then leaves the result file unread. A Control whose prompt
+    stays unanswered that long is not woken.
+
+- **Amended 2026-09-14, after a re-probe of 397d4fd.** Background Controls (Claude Code,
+  Cursor, Copilot) and waker Controls (Codex, Antigravity, Grok) each delivered, and the
+  fault checks held. Six defects followed, and each is fixed:
+  - **Antigravity workers lost their prompt.** A plain `worker-start` typed it before the
+    TUI was ready, which was measured 0 of 4 on 2026-09-11. Dely again launches an
+    Antigravity worker in its own terminal, waits for output quiescence, then adopts it
+    with `worker-start --terminal`.
+  - **A Codex Control ran `dely wait` inside its own exec** and stalled when Codex reaped
+    it. `wait` now needs `--control`, and it refuses any harness whose Control wake is not
+    `background`.
+  - **A preflight failure line lost its cause:** it quoted the prompt preamble, not the
+    dialog. The quote now prefers screen lines that name a known gate.
+  - **A preflight on a gated pin always waited its full budget.** It now fails early when
+    a known gate line is still on screen on two consecutive polls.
+  - **A Control told the human to answer a released worker's dialog.** The skill now says
+    a preflight failure needs the human to run the harness once in a new terminal, then a
+    new preflight.
+  - **Grok Build 1.0.30 asks a y/n security question in a fresh repository,** so its
+    Setup cell is no longer `none`.
+  - **Residuals of this fix.** No test settles one dispatch's `worker_done` while the
+    adopt file records a different dispatch. The adopt file is rewritten without a lock,
+    so a concurrent record and settle can lose an entry. Losing one leaks a terminal and
+    never closes the wrong one.
+
+#### Non-goals
+
+- Fixing Orca's nudge.
+- Codex structured workers.
+- Kiro as Control.
+- Changing this repository's pins.
+
+#### Deferred
+
+- **Proactive human notification.** Trigger: a delivery that waits on a human
+  for longer than its stall threshold.
+- **Codex structured workers.** Trigger: an Orca or Codex release that lets its
+  sandbox reach Orca.
+
+### 2026-09-11 — Workers acknowledge, Control sleeps until an event, and `dely:verify` proves the path before the first dispatch
+
+**Superseded in part 2026-09-14:** the runtime, verify, adopted launch and nudge wake below are replaced by the 2026-09-14 decision above; this record keeps the measurements and history.
+
+#### Context
+
+Two failures stopped real deliveries after the move to Orca orchestration. A third
+cost more than the work.
+
+- **Launch barriers destroyed or parked workers.** This is how `worker-start`
+  behaved in a fresh, untrusted `git init` path on 2026-09-11 (Orca 1.4.199):
+  - **Claude Code 2.1.268:** the trust dialog opens on `No, exit` even with
+    `--dangerously-skip-permissions`. The injected prompt plus Enter exited the
+    agent while Orca kept reporting `ready` and `live`.
+  - **Kiro:** its `--trust-all-tools` confirmation, which Orca adds, behaved the
+    same way.
+  - **Antigravity:** lost the prompt in 4 of 4 launches, even on a trusted path.
+  - **Copilot:** parked on its trust dialog.
+  - **Cursor:** failed fast, because Orca's trust preflight writes a slug Cursor
+    does not use for long paths.
+  - **Copilot's trust preflight** is a silent no-op, because `config.json` is now
+    JSONC.
+  - **Codex:** a version-update popup opened on `Update now` and appeared after the
+    composer. An injected Enter updated Codex and exited it.
+- **The trust handling this record deleted on 2026-09-04 rested on a confounded
+  probe.** That probe ran in a git worktree of an already trusted repository, and
+  worktrees inherit Claude Code's trust. Reproduced on 2026-09-11: a fresh repository
+  shows the dialog; a worktree of this repository does not.
+- **Control polled.** A Codex Control supervising one Cursor implementer in a new
+  consuming project spent 18 turns and 3.10M input tokens in 6 minutes. Codex's
+  `exec_command` yields after at most 30 000 ms, and nothing wakes the model when a
+  process exits. The turn ended with `usage_limit_exceeded`. The worker's
+  `worker_done` arrived ten minutes later and stayed unread for seven hours.
+
+Measurements that shaped the decision, all on macOS, 2026-09-11:
+
+- **Explicit acknowledgement.** A dispatch prompt whose first action is a heartbeat
+  with subject `ack` was acknowledged in 6–22 s on all seven harnesses. In Orca's
+  records since 2026-09-04, all 177 completed dispatches sent at least one message,
+  and 34 of 40 failed dispatches never did. Heartbeats alone are not an early signal:
+  22 of 48 Codex and 9 of 31 Claude Code dispatches sent `worker_done` first.
+- **Event wake.**
+  - Claude Code and Cursor Agent CLI resume when a background command they started
+    exits. Cursor completed 3 of 3 full Control cycles this way.
+  - Orca's mailbox nudge woke idle Claude Code, Codex, Copilot and Antigravity
+    Controls.
+  - Nudges failed twice on Cursor: once the text stayed unsubmitted in its composer;
+    once a `worker_done` arrived while Control still held a waiter, and Orca never
+    re-drove it.
+  - A sidecar terminal consuming only heartbeats for the Control's handle meant a
+    Codex Control ran exactly one turn to dispatch plus one per `worker_done`, with
+    zero turns asleep.
+- **Liveness.**
+  - Orca reported `unverifiable` or `live` for an agent killed inside a live shell.
+    Terminal-output silence over 90 s caught it (`SILENT 109s`).
+  - A worker busy behind an animated spinner — which is how Antigravity's
+    `RESOURCE_EXHAUSTED` backoff looks — kept output fresh. Only a deadline caught
+    it (`DEADLINE 162s`, last output 0 s old).
+- **Launch paths.**
+  - `worker-start` succeeded for Claude Code, Codex and Cursor. It succeeded for
+    Copilot in 5 of 5 runs once the path was trusted.
+  - Antigravity succeeded 4 of 4 — two in parallel, one real review that returned
+    `CHANGES_REQUESTED` on a planted defect, one real implement that went red then
+    green — when its TUI was launched first, adopted after its output had been quiet
+    for 3 s, and the path was trusted beforehand.
+  - Readiness by `terminal wait --for tui-idle` returned after 1 s and lost the
+    prompt.
+  - Answering Antigravity's trust dialog inside the worker's own session failed in 4
+    of the last 5 launches: Orca's readiness classifier kept matching the leftover
+    dialog text.
+- **Dry run.** A prototype dispatched one read-only task per pin and reported PASS
+  on this repository (Cursor `cursor-grok-4.6-high` and Codex `gpt-5.6-sol` high,
+  ACK 30 s and 49 s). It classified an untrusted Copilot path and an effort Orca
+  rejects, both with no model call. It also passed with an Antigravity pin, and with
+  a Codex Control in nudge mode.
+- **Runtime.** The `orca` command is Node.js run on Orca's bundled Electron runtime
+  (`ELECTRON_RUN_AS_NODE`, Node v24.20.0 on macOS). Wherever Orca runs, a Node
+  runtime exists.
+- **Delivery semantics.** These were measured with `status` messages after this
+  record's first approval, when a review of the first runtime found that a
+  heartbeat-only consumer is impossible. Orca's version-matched messaging guide
+  states the same rule.
+  - A consuming `check` returns the oldest FIFO Delivery, up to 50 messages. It
+    replays exactly that batch until acknowledged, even after newer messages
+    arrive.
+  - `--types` only decides when a waiter wakes: a heartbeat-typed wait timed out
+    while only `status` messages were pending.
+  - `--peek` lists every unread message without consuming anything. `--all` lists
+    the whole history, including acknowledged messages.
+  - So whoever acknowledges a Delivery consumes every message in it, heartbeats and
+    settling messages alike.
+- **Terminal reuse.** Re-engaging a settled reviewer terminal with `worker-start
+  --terminal` accepted the input but never submitted it. That Codex session had also
+  switched itself from `gpt-5.6-sol` high to `gpt-5.6-luna` medium after warning
+  that less than 10% of its weekly limit remained.
+
+#### Decision
+
+1. **One runtime owns dispatch mechanics.** Dely ships
+   `skills/delivery/scripts/dely.js`: CommonJS, Node 18 or newer, no npm
+   dependencies. The launchers `dely` (POSIX) and `dely.cmd` (Windows) run it on
+   `node` from PATH, or on Orca's bundled runtime when `node` is absent. Every
+   dispatch goes through `dely dispatch`. Control does not compose worker launches
+   by hand.
+2. **`dely:verify` proves the path, and dispatch enforces it.**
+   - Verify runs a read-only preflight: trust state, a pending Codex update, runtime
+     resolution.
+   - It then sends one dispatch per distinct pin, with a task that acknowledges,
+     writes and deletes a scratch file, and reads `HEAD`.
+   - It records a `dely-verify-verdict` task in that Orca Run. Its result carries the
+     verdict and the key: repository, both pins, Control harness and wake mode.
+   - `dely dispatch` refuses when Orca holds no PASS verdict for the current key.
+     Delivery then runs verify automatically, with no extra human gate, and stops
+     with the reported fix on FAIL or BLOCKED.
+   - A PASS lapses when the key changes. **Amended 2026-09-13:** it does not lapse on an
+     environment escalation, which this record first said. Nothing implements that, and
+     the next dispatch's ACK re-checks the environment; a quota or sign-in failure then
+     reports `NO_ACK`, and the same failure twice goes to the human.
+   - Verify restores the Control terminal's previously bound Run when it finishes,
+     because creating a Run rebinds the caller and a delivery's `worker-start` then
+     refuses to run.
+3. **Workers acknowledge.** `dely dispatch` appends the acknowledgement instruction
+   to the spec and waits 120 s by default. It observes the ACK only through
+   `check --peek`, as a heartbeat from that dispatch's terminal, and never consumes
+   a Delivery. No ACK stops the dispatch and reports a diagnosed cause. Recovery is
+   one fresh start with the pins named again, never a retry into the same terminal
+   and never a reused settled terminal. The same failure twice goes to the human.
+4. **Launch path is a harness property, not a screen reading.**
+   `references/harnesses.md` gains the columns Launch, Model pin, Control wake and
+   Setup. `dely.js` reads them from that table.
+   - Antigravity is adopted: launch, wait for output quiescence (at least 5 s since
+     launch and 3 s of silence), then `worker-start --terminal`.
+   - A model Orca cannot pin for a harness is pinned on the adopted launch argv.
+   - Everything else uses `worker-start`.
+   - No screen signature decides a route. Screen and log text only phrase the
+     diagnosis.
+5. **Control sleeps by its harness's wake mode.**
+   - Claude Code, Cursor Agent CLI and GitHub Copilot CLI run `dely wait` as a
+     background command.
+   - Codex, Antigravity and Grok end their turn after dispatching. When
+     nudged they run only `dely collect`, never the command quoted in the nudge text,
+     because it would consume the message.
+   - Kiro is not supported as Control.
+   - **One consumer per Run at a time;** every other observer only peeks.
+   - `dely wait` is that consumer in the background mode. It judges each Delivery as
+     a whole: heartbeats only, it acknowledges and keeps waiting; any settling
+     message, it acknowledges, prints the whole batch and exits `SETTLED`. It also
+     exits `SILENT` (90 s without output after ACK) or `DEADLINE` (per dispatch,
+     default 3600 s). It reports a dead dispatch as `collect` does, after consuming.
+   - `dely collect` is that consumer in nudge mode. It reports settled work from
+     `check --all` and `worker-list`, drains what remains, and checks silence and the
+     deadline. A dispatch Orca has marked dead — no longer open, and it sent no
+     settling message — is released and reported once as `FAILED`.
+   - **Reported once is Dely's own memory, not Orca's bookkeeping.** The dispatch ids
+     already reported, and those Dely stopped itself, live in
+     `<git-dir>/dely/runs/<run>.json`, falling back to `~/.dely/runs` when the working
+     directory is not a git repository. Orca's `terminalState` cannot carry it: an
+     adopted dispatch is born `retained`, and `worker-release` can report success while
+     releasing nothing.
+   - **Amended 2026-09-12.** A `dely sidecar` process was this record's watchdog for a
+     nudge-mode Control. It is removed. Orca already reports a dead worker
+     (`liveness.verdict` `exited`, `dispatchStatus` `failed`), a sidecar terminal
+     cannot be recognised by title because the shell rewrites it, and its liveness
+     needs fields Orca does not send. What the sidecar alone covered — a worker that
+     neither sends a message nor exits — now goes to the human.
+6. **Setup hands trust to the human.** `dely:setup` opens each pinned harness once in
+   an Orca terminal for the human to answer that harness's own trust dialog, then
+   runs `dely:verify`. Setup still never answers a dialog and never writes a harness
+   store. Codex needs no step: Orca's preflight trusts it.
+7. **Tests.** `node --test tests/scripts.test.js` is a closure gate. It exercises the
+   runtime against a fake `orca` with no model call.
+8. **Amended in place.** The 2026-09-04 record's recovery route (retry into the same
+   terminal) and its claim that `agent_prompt_blocked` was never observed are
+   corrected. So is the 2026-08-29 trust record's superseding note.
+9. **Amended 2026-09-13, after a live probe of 0.18.0 before merge.** Every harness
+   was pinned to the candidate. Five deliveries in fresh repositories rotated Claude
+   Code, Codex, Cursor, Copilot and Antigravity through Control, implement and
+   review. All five reviews returned `ACCEPT` and pushed correct code, and injected
+   faults held (`FAILED` exit 8 in 1 s for a killed worker, `SILENT` exit 6 at 93 s,
+   report-once). Controls still stalled where the runtime left them a choice:
+   - Claude Code invented a run id, and Copilot dispatched on the verify Run that
+     `dely status` printed. So `dely open` creates and binds the delivery Run and
+     prints it, `dely dispatch` refuses a Run that is not the one bound to Control,
+     and `dely status` prints no run id.
+   - Codex and Copilot, in nudge mode, ran the background form of verify. Codex then
+     slept after a PASS with nothing left to wake it. So one `dely verify` picks the
+     form from the Control wake column, and `dely wait` refuses a nudge-mode Control.
+   - Copilot's nudge stayed unsubmitted in its composer after its TUI reloaded.
+     Copilot 1.0.83 resumed on its own when a detached shell it started exited, so its
+     wake mode is background.
+   - Settled workers were never released, leaving two to four live harness sessions
+     per delivery. `wait` and `collect` now release a dispatch after its
+     `worker_done`, and Orca decides whether that terminal closes. Dely closes a
+     terminal itself only when it created that terminal for an adopted launch, which
+     `worker-release` retains. It knows this from its own run memory, written at
+     launch, never from Orca's row shape. It also leaves the terminal open when Orca
+     reports the terminal `user_owned`. Two readings of the row failed first: the
+     top-level `ownershipState` the fake used, which real Orca nests under
+     `resource`, and a `terminalState: retained` fallback, which also matches a
+     terminal a human took over.
+   - Any unexplained `NO_ACK` was blamed on Antigravity quota, because diagnosis read
+     the three oldest Antigravity logs for every harness. It now reads Antigravity's
+     newest log only for an Antigravity worker.
+   - Codex and Copilot also load `~/.agents/skills`, where a stale 0.17.8 copy from
+     `npx skills add` shadowed the 0.18.0 plugin while `codex plugin list` reported
+     0.18.0. Install guidance now covers that directory.
+   - Smaller fixes: Kiro's adopted argv needs `chat`; `dely wait` with nothing open
+     exits; a group skipped because another is BLOCKED reads `SKIPPED`; an
+     unregistered repository names `orca repo add`; verify opens no Run when every pin
+     is BLOCKED.
+
+   The nudge's quoted `check` command was run by both nudge-mode Controls and lost
+   nothing, because an unacknowledged Delivery is replayed; that prohibition is kept
+   but no longer carries the delivery.
+
+This decision ships in **0.18.0**.
+
+#### Alternatives considered
+
+**Keep Control composing `orca` commands.** Rejected: it polls on harnesses that
+cannot wake on exit, it improvises keystrokes, and it has no mechanism to enforce a
+proven environment.
+
+**A sidecar that consumes only heartbeats, and a dispatch that consumes to see the
+ACK.** This was this record's first approved design. Superseded the same day: a
+Delivery carries its whole FIFO batch whatever `--types` says, so either consumer
+would acknowledge a settling message batched with a heartbeat. The dispatch would
+lose it, and the sidecar would either lose it or stall on replay. Replaced by
+peek-only ACK observation and a single whole-batch consumer.
+
+**Rely on Orca's nudge for every Control.** Rejected: measured to race, and to stay
+unsubmitted on Cursor. Harness-native background wake is used wherever it exists.
+
+**A sidecar that wakes a sleeping nudge-mode Control on silence or deadline.**
+Shipped, then superseded on 2026-09-12 after its re-review and a round of probes. As
+an Orca terminal it cannot be found again: the shell rewrites the title, and
+`terminal show` sends no field that says whether it still runs, so `collect` either
+opens one per wake and leaks shells or never reopens one. As a detached process it
+survives and can wake Control, but the detach command differs per operating system —
+macOS has no `setsid` — and Orca cannot see or reclaim it. `orca automations` is
+agent-backed, hourly at finest, and creates a worktree per run. Worker heartbeats run
+1.5 to 15 minutes apart and are the agent's, not a clock. What remains is what Orca
+already answers on the next wake: liveness, silence and the deadline, all read by
+`dely collect`.
+
+**Clear gates by screen signatures on every dispatch.** A prototype handled every
+harness, but needed five fix iterations. Grok and Cursor updated themselves in the
+background during the same probe, which ages any signature. Rejected in favour of
+trust at setup and fail-closed diagnosis.
+
+**Write the harness trust stores.** Rejected: it is authority the envelope does not
+grant, and Orca's own writer was already wrong for two of three harnesses.
+
+**Run the dry run on every delivery.** Rejected: it spends a worker session per pin
+per delivery. The first real dispatch's ACK already re-checks the environment.
+
+**Store the verdict in a file.** Rejected: the project keeps no log, `~/.dely` is
+opt-in, and Orca is already the evidence store.
+
+**bash with jq, or bash plus PowerShell twins.** Rejected: jq is not present
+everywhere, bash does not run natively on Windows, and twins drift.
+
+**Orca structured worker mode for Claude Code and Codex.** Not tried. It needs three
+UI-only settings and is disabled while agent default arguments exist. Deferred.
+
+**Name the skill `dely:check`, `dely:test`, `dely:ready` or `dely:doctor`.**
+Rejected:
+
+- `check` collides with the `orca orchestration check` command quoted in every nudge.
+- `test` reads as project tests.
+- `ready` is an Orca state.
+- `doctor` names a rail this repository deleted and gates as absent. `verify` runs
+  the live delivery path, not a static inspection.
+
+#### Consequences
+
+- **Dely is no longer prose-only.** It ships and tests a runtime. Its skills name
+  runtime commands instead of Orca argv.
+- **The bundled-runtime fallback depends on Orca's launcher layout,** which is not a
+  public interface. When it breaks, verify reports BLOCKED and asks for Node 18 or
+  newer.
+- **Only macOS is measured live.** Linux runs the tests in CI. Windows is designed,
+  not measured.
+- **Nudge-mode Controls depend on Orca delivering the nudge, and on the worker
+  speaking at all.** A worker that neither sends a message nor exits wakes nobody, and
+  a human ends that wait. Measured across this delivery's 17 dispatches: no wake
+  depended on a watchdog, and both failures were Control's own stop and terminal
+  close.
+- **The known residual failures, none of them fixed.** Each was measured during this
+  delivery, and each needs a human to notice:
+  - A git directory that resolves but cannot be written makes the dead-dispatch memory a
+    silent no-op, so the `FAILED` line repeats on every collect.
+  - A `.git` that is readable but not writable dies with an uncaught `EACCES` before
+    reporting anything at all.
+  - A throw raised inside `finishVerify` after the verdict is written cannot change that
+    verdict.
+  - The window between claiming a dispatch id and printing its `FAILED` line: a crash
+    there loses that report permanently. At-most-once is the deliberate trade against
+    duplicating the line.
+  - `dely collect` on a Run whose only dispatch is dead and already reported exits 0 with
+    no line, the same code a fully settled batch uses.
+  - `collectSettles` turns a repeated delivery id into `ERROR ack failed`. That is the
+    right bound for an ack-failure hang; whether real Orca ever reissues an id is unknown.
+  - `skills/delivery/SKILL.md`'s "exit 8 when nothing is still open" over-claims: a fully
+    settled batch with nothing open exits 0.
+  - `releaseDispatch` parses the release receipt into two lines that do nothing. The
+    contract holds by not depending on the receipt, not by those lines.
+  - The report-once guard is held twice, by the memory read and by `remember()`'s return
+    value; removing either alone keeps every test green.
+  - `tests/fixtures/fake-orca.js` puts `stage` at the top level, where real Orca nests it
+    under `projection`; the runtime reads both, and only the fake's shape is tested. For
+    `ownershipState` and `retainedReason` the fake now emits real Orca's `resource`
+    nesting, after an integration review found the runtime read only the fake's
+    top-level copy and so never closed an adopted terminal against real Orca.
+  - While a nudge-mode verify is asleep, a Control that dispatches anyway, is refused,
+    and runs `dely open` has that new binding overwritten when `verify collect`
+    restores the Run saved before verify.
+  - `dely collect` accepts and ignores `--repo`.
+  - `dely open` requires `--repo` and does not use it.
+  - `dely collect` re-reads the whole Run history, so every call releases, and closes
+    the terminal of, every past `worker_done` again. The repeats are redundant.
+  - `dely dispatch` refuses a verify Run only when its objective matches the current key.
+    A verify Run from another key, or a Run missing from `run-list`, passes that check.
+  - An adopted terminal is closed only when the run memory that recorded its launch is
+    found. `wait` or `collect` run from another working directory leaves it open.
+  - That close also needs the dispatch's `worker-list` row: when the list fails or omits
+    the row, a Dely-created terminal is left open.
+  - Only `user_owned` stops the close. A Dely-created terminal Orca retains as
+    `user_requested` with `external` ownership is still closed.
+  - Two closes sit outside that rule. A launch that never reaches `ready` or never
+    acknowledges closes its handle even when Orca created it. Verify's cleanup closes
+    its adopted terminals without the `user_owned` guard.
+  - Orca fences `check --run <id>` to the Run the caller is bound to
+    (`consumer_fenced`). The fake does not model it, so ordering between binding and
+    consuming is untested.
+  - `dely wait` decides `NOTHING_OPEN` after peeking for a pending settle. Whether live
+    Orca moves `dispatchStatus` before the `worker_done` is delivered, and whether a
+    settle can show in `--peek` yet never reach this consumer's `check --wait`, are
+    unmeasured.
+  - `skills/verify/SKILL.md`'s prohibition on the nudge's quoted `check` command is
+    unpinned, as is `AGENTS.md`'s gate list.
+- **`AGENTS.md`'s gate list is not pinned to the workflow.** `tests/contracts.sh` pins
+  the workflow's run lines against its own literal list, so deleting a gate block from
+  `AGENTS.md` alone leaves the gate green.
+- **A verify run costs one short worker session per distinct pin,** about one to two
+  minutes for `implement` and `review` together.
+- **Setup becomes more than pin selection,** and needs a human present for trust.
+
+This decision is **not** expected to improve review rework, model quality, Orca
+defects, or quota limits beyond detecting them.
+
+#### Non-goals
+
+- Fixing Orca's nudge race, readiness classifier or trust preflight.
+- Orca structured worker mode.
+- Changing this repository's `implement` or `review` pins.
+- Optimising Grok Build or Kiro CLI.
+- Parallel task execution.
+
+#### Deferred
+
+- **Live Linux and Windows verification.** Trigger: the first `dely verify` run on
+  either.
+- **Grok Build and Kiro CLI optimisation.** Trigger: either becomes a pinned harness
+  for a real delivery.
+- **Orca structured worker mode.** Trigger: a human decision to change Orca settings.
+- **Removing each workaround when Orca fixes its defect.** Trigger: an Orca release
+  that fixes the nudge race, the residual-text classifier, a trust preflight, or
+  prompt injection timing.
+- **Fallback pins on quota exhaustion.** Trigger: a second delivery escalated for
+  quota.
+- **An ACK limit scaled by effort.** Trigger: a NO_ACK on a worker that later
+  acknowledged.
 
 ### 2026-09-06 — The dispatch prompt carries the acceptance row as written
 
@@ -342,7 +896,13 @@ it, and it changed the design:
    split that route across two typed errors; a later measurement found the
    plane does not distinguish them, and the single route is what every
    recovery actually performed. It enumerates no vendor's dialogs, so it does
-   not go stale when a vendor ships a new one.
+   not go stale when a vendor ships a new one. Amended 2026-09-11: the retry
+   into the same terminal is withdrawn. A live re-review retried into a reused
+   Codex terminal left its prompt unsubmitted and its model drifted, and a
+   later probe did observe `agent_prompt_blocked`. Recovery is now one fresh
+   start with the pins named again. See `2026-09-11 — Workers acknowledge,
+   Control sleeps until an event, and dely:verify proves the path before the
+   first dispatch`.
 4. The prompt and the handoff stay files inside the worktree. Messages carry a
    short body and a `payload.reportPath`. The reason is this skill's own rule:
    a task spec and a message body are shell arguments, and prompts do not go in
@@ -746,7 +1306,10 @@ retrying into it rather than by an enumerated per-harness answer. This note
 first attributed that routing to a typed `agent_prompt_blocked`; a later probe
 never observed that code, so the route does not depend on it. See
 `2026-09-04 — Orca orchestration is the execution plane, and Dely stops
-hand-rolling dispatch`.
+hand-rolling dispatch`. Amended 2026-09-11: a later probe did observe that code, and the retry into
+the same terminal is withdrawn in favour of one fresh start. No screen reading
+routes recovery. See `2026-09-11 — Workers acknowledge, Control sleeps until an
+event, and dely:verify proves the path before the first dispatch`.
 #### Context
 
 `skills/delivery/references/harnesses.md` already records a per-harness

@@ -1,0 +1,84 @@
+#!/bin/sh
+# Run dely.js on Node 18+ from PATH, or on Orca's bundled runtime.
+set -u
+DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+SCRIPT="$DIR/dely.js"
+
+run() {
+  runtime=$1
+  shift
+  exec "$runtime" "$SCRIPT" "$@"
+}
+
+if [ -n "${DELY_NODE-}" ]; then
+  run "$DELY_NODE" "$@"
+fi
+
+if command -v node >/dev/null 2>&1; then
+  ver=`node -v 2>/dev/null` || ver=v0
+  major=${ver#v}
+  major=${major%%.*}
+  case "$major" in
+    ''|*[!0-9]*) ;;
+    *)
+      if [ "$major" -ge 18 ]; then
+        run node "$@"
+      fi
+      ;;
+  esac
+fi
+
+orca_bin=${ORCA_CLI_COMMAND-}
+if [ -z "$orca_bin" ]; then
+  orca_bin=`command -v orca 2>/dev/null` || orca_bin=
+fi
+
+follow_symlinks() {
+  src=$1
+  while [ -L "$src" ]; do
+    dir=$(dirname "$src")
+    next=`readlink "$src"` || return 1
+    case "$next" in
+      /*) src=$next ;;
+      *) src="$dir/$next" ;;
+    esac
+  done
+  printf '%s\n' "$src"
+}
+
+electron_from_orca() {
+  src=$1
+  [ -n "$src" ] || return 1
+  resolved=`follow_symlinks "$src"` || resolved=$src
+  dir=$(CDPATH= cd -- "$(dirname "$resolved")" && pwd) || return 1
+  case "$dir" in
+    *.app*)
+      app="${dir%%${dir#*.app}}"
+      if [ -x "$app/Contents/MacOS/Orca" ]; then
+        printf '%s\n' "$app/Contents/MacOS/Orca"
+        return 0
+      fi
+      ;;
+  esac
+  if [ -x "$dir/../MacOS/Orca" ]; then
+    printf '%s\n' "$dir/../MacOS/Orca"
+    return 0
+  fi
+  if [ -x "$dir/Orca" ]; then
+    printf '%s\n' "$dir/Orca"
+    return 0
+  fi
+  if [ -x "$dir/orca" ] && [ "$dir/orca" != "$resolved" ]; then
+    printf '%s\n' "$dir/orca"
+    return 0
+  fi
+  return 1
+}
+
+ELECTRON=`electron_from_orca "$orca_bin"` || ELECTRON=
+if [ -n "$ELECTRON" ] && [ -x "$ELECTRON" ]; then
+  ELECTRON_RUN_AS_NODE=1 exec "$ELECTRON" "$SCRIPT" "$@"
+fi
+
+printf '%s\n' 'BLOCKED no Node 18+ runtime; install Node 18+' >&2
+exit 10

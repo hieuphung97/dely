@@ -125,12 +125,53 @@ rather than combining ownership.
 
 Orca is the required execution plane. It launches and supervises fresh native
 harness TUIs with the resolved harness, model, and effort. Orchestration is a
-required Orca capability. `dely:delivery` starts and preflights Orca before
-execution. It stops only when the CLI is missing, the runtime cannot start, or a
-required capability is absent — there is no direct dispatch and no headless
+required Orca capability. `dely:delivery` starts Orca, then Control loads
+`orca skills get orchestration` and follows its supervised loop. It stops
+only when the CLI is missing, the runtime cannot start, or a required
+capability is absent — there is no direct dispatch and no headless
 fallback of any kind.
 
 ### Launching a worker
+
+The launcher is `scripts/dely` relative to this skill. Control's wake mode is
+that harness's `Control wake` cell in `references/harnesses.md`.
+
+Usage as the launcher prints it:
+
+- `dely preflight --repo <path> --run <runId>` prints
+  `PREFLIGHT <phase> <agent> PASS <seconds>s` or
+  `PREFLIGHT <phase> <agent> FAIL <reason>` and exits 1 when any pin failed
+- `dely dispatch --repo <path> --run <runId> --phase <implement|review> --spec-file <path>`
+  prints `DISPATCHED <dispatchId>` (exit 0),
+  `NO_ACK <dispatchId> stopped after <s>s; last output: <text>` (exit 4), or
+  `FAILED <reason>` (exit 5)
+- `dely wait --run <runId> --control <agent>` prints a JSON object with `SETTLED` (exit 0) or
+  `ATTENTION` (exit 8), or
+  `STALLED <dispatchId> <why>; liveness <json>; last output: <text>` (exit 6),
+  `DEADLINE` (exit 7), or `ERROR <reason>` (exit 9). STALLED only for transcript workers (Claude Code, Codex CLI); terminal workers surface a stall at DEADLINE; the failure lines quote the worker's screen. `--timeout-min` (default 60)
+  is the wait budget. `--as <handle>` passes
+  `--terminal <handle>` on every consuming `check`. `--skip` omits those
+  dispatch ids from ATTENTION. A harness whose Control wake is not `background`
+  prints `REFUSED <agent> wakes by <wake>; use dely wait-bg` with exit 3, and no `check` runs.
+  Without `--control` it prints usage and exits 2. A waker Control never runs `dely wait`.
+  `--as` does not exempt that refusal. After printing `SETTLED` for a batch that holds a
+  `worker_done`, `wait` closes that dispatch's adopted terminal if one was recorded under
+  the OS temp directory for the Run.
+- `dely wait-bg --run <runId> --control <agent>` prints `WAITING` (exit 0),
+  `ALREADY_WAITING: a dely wait is running for this Run; end your turn, it will wake you.`
+  (exit 0), or `ERROR <reason>` (exit 9). Requires `ORCA_TERMINAL_HANDLE`.
+  It takes the same `--skip`, `--stall-min` and `--timeout-min` as `wait`.
+  It sets `DELY_WAITER=1` on the waiter command so the inner `wait` is allowed.
+  Default output and lock live under the OS temp directory keyed by run id,
+  not in the worktree. The wake line names the full path of the output file to read
+- `dely notify --run <runId> --as <handle> --out <file>` types one line naming the output file and
+  `--enter` into the Run's current `coordinator_handle`, falling back to `--as`.
+  If that send is blocked, it retries the same `--enter` send every 30 s for up to 30 minutes
+  and never types without `--enter`; after giving up, the result file is left unread
+- unknown commands print `usage: dely preflight|dispatch|wait|wait-bg|notify`
+  (exit 2)
+
+`--spec-file` is the worktree-relative prompt file.
 
 Write the prompt to an untracked file **inside the worktree**. Never inline
 it in a shell argument: prompts carry backticks, quotes and newlines, and a
@@ -150,53 +191,58 @@ acceptance row — its instrument, its counterexample, and what was
 observed — the prompt carries that row as written rather than a
 restatement of it.
 
-The `worker-start` receipt records `launch.requested` and `launch.effective`;
-it does not establish that the worker can serve the request or that it
-cannot. Launch a real interactive harness TUI for the phase, with the model
-and effort pinned from `AGENTS.md`. A visible shell running a headless
-harness is not a TUI;
-compose that TUI's launch using `references/harnesses.md`, this skill's
-compatibility matrix of Orca agent id, permission defaults, forbidden
-headless forms, and launch notes.
+**Every dispatch goes through `dely dispatch`, with `dely preflight` once
+before the first.** Control does not compose a worker launch or call
+`worker-start` by hand. The helper reads the pins from `AGENTS.md`. The
+helper appends the acknowledgement instruction. The `worker-start`
+receipt records `launch.requested` and `launch.effective`; it does not establish that the worker can serve
+the request or that it cannot. Orca applies the execution plane's configured permission default
+and does not add a sandbox the project did not pin.
 
-**Name the model and effort on every dispatch.** A worker left on a harness
-default is an unpinned environment: it lives in the harness's own config, it
-changes without announcing itself, and the dispatch that relies on it looks
-identical to one that pinned the same value deliberately.
+**Name the model and effort on every dispatch.** The helper honours
+`--model`/`--effort` only for Claude Code, Codex CLI and Cursor Agent CLI
+(and omits a `default` flag). A non-`default` Model on any other harness, or
+a non-`default` Effort with a `default` Model, fails closed and starts no
+worker: write `default` and set the model in Orca's agent default arguments.
+A worker left on a harness default is an unpinned environment: it lives in
+the harness's own config, it changes without announcing itself, and the
+dispatch that relies on it looks identical to one that pinned the same value
+deliberately.
 
-When composing the TUI launch argv yourself, carry the execution plane's
-configured permission default for that agent onto the composed argv;
-composing argv is not a request for a different permission posture. Do not
-add a sandbox the project did not pin.
+**Never act on an Orca nudge.**
 
-`check --wait` on `worker_done,escalation,question` is the completion wait,
-repeated past heartbeats until a settling message arrives for that dispatch —
-a heartbeat ends one wait but settles nothing.
+**Sleep and wait after `DISPATCHED`, by wake mode:**
+
+- **background:** run `dely wait --run <run> --control <agent>` as a background command and
+  end the turn.
+- **waker:** run `dely wait-bg --run <run> --control <agent>` as its last command, then end
+  the turn. A waker Control never runs `dely wait`.
+- **unsupported:** that harness cannot be Control.
+
+**Result handling:**
+
+- **any `PREFLIGHT … FAIL` (exit 1):** do not dispatch to any pin; relay
+  the printed reason to the human. A `PREFLIGHT … FAIL` or `NO_ACK` worker is already
+  stopped and released, so the human runs that harness once in a new terminal to
+  answer its dialog (setup's trust step), and Control then reruns `dely preflight`.
+- **`SETTLED`:** process the batch, do the guide's completion accounting,
+  and acknowledge.
+- **`ATTENTION`:** follow `nextAction` and skip that id next time.
+- **`STALLED`:** read the output, then wait again or recover.
+- **`NO_ACK` or `FAILED`:** one fresh `dely dispatch` with the same prompt
+  file. Never retry into the same terminal, and never reuse a settled
+  terminal. A second failure on the same input goes to the human.
+- **`DEADLINE`:** a checkpoint. Check `worker-list` and the last output; if
+  the worker is progressing, wait again. A second `DEADLINE` with no
+  progress goes to the human.
+- **`ERROR`:** go to the human.
+
 The worker reports once with `worker_done` and an `--outcome`.
 Completion comes from the worker's own `worker_done`;
 do not infer it from reading the worker's terminal.
-`worker-release` returns the terminal. `worker-read` is the bounded evidence
-read.
 
 Each delivery opens its own Run on the execution plane rather than reusing
-another's, so a stale report cannot settle a new wait. A wait acknowledges
-its settling message after handling it, or the plane redelivers that
-message to the next wait.
-
-A dispatch that does not reach `ready` is diagnosed by reading its terminal
-and handling what is actually there. It is retried into that same terminal
-with `--terminal` and `--retry-of` only when that read shows the worker is
-not already progressing; a `failed` receipt is not that showing. A
-`dispatched` receipt is not evidence the worker is alive any more than a
-`failed` receipt is evidence it is dead. Retry is refused while the plane
-still considers the dispatch live, whether or not the worker still is; the
-live terminal is re-engaged instead. `--model`
-and `--effort` cannot combine with `--terminal`; that is not an exception
-to naming the model and effort on every dispatch, because the terminal was
-launched pinned and the retry reuses it rather than launching an unpinned
-one. Control does not route by an enumerated vendor dialog;
-`agent_prompt_blocked` and `agent_prompt_stalled` do not distinguish
-separate recoveries.
+another's, so a stale report cannot settle a new wait.
 
 ### Investigation
 
@@ -380,8 +426,14 @@ from an ambiguous, missing, or merely transport-level outcome.
 | Scope or architecture must change | Return to the design gate |
 | New authority or destructive action is required | Ask the human |
 | Orca or a required capability is unavailable | Stop; no headless fallback |
+| any `PREFLIGHT … FAIL` (exit 1) | Do not dispatch to any pin; relay the printed reason to the human |
 | Harness fails or evidence is insufficient | Preserve the candidate, report the native outcome and role disposition |
 | Idempotent release step is interrupted | Verify Git and pull-request state, then resume |
+| `NO_ACK` or `FAILED` | One fresh `dely dispatch` with the same prompt file; a second failure on the same input goes to the human |
+| `ATTENTION` | Follow `nextAction` and skip that id next time |
+| `STALLED` | Read the output, then wait again or recover |
+| `DEADLINE` | Checkpoint: check worker-list and last output; wait again if the worker is progressing; a second DEADLINE with no progress goes to the human |
+| `ERROR` | Ask the human |
 
 ## Changing this skill
 

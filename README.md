@@ -66,7 +66,8 @@ harness and that harness's defaults.
 The plugin is `dely`, from the `dely` marketplace at
 `https://github.com/hieuphung97/dely.git`. The skill name is `delivery`;
 invoke it as `dely:delivery`. Kiro CLI has no plugin verb; use
-`### Kiro CLI` below.
+`### Kiro CLI` below. The runtime needs Node 18 or newer on PATH, or
+Orca's bundled runtime.
 
 ### Claude Code
 
@@ -176,6 +177,11 @@ npx skills update --global                   # update
 npx skills remove --agent kiro-cli --global --skill delivery --skill setup  # uninstall
 ```
 
+`npx skills add` also writes `~/.agents/skills` (Codex and Copilot load it)
+and `~/.kiro/skills`. Update or remove both copies. Compare
+`skills/delivery/SKILL.md` by hash with the installed file before assuming
+the plugin version is the one that runs.
+
 Invoke the skills in a Kiro CLI session as `/delivery` and `/setup`.
 
 ### Checked versions
@@ -191,14 +197,25 @@ against — observations, not a promised minimum:
 | Antigravity CLI | 1.1.19 |
 | Kiro CLI | 2.16.2 |
 | Cursor Agent CLI | 2026.08.25-3e8eec8 |
-| GitHub Copilot CLI | 1.0.82 |
-| Orca | 1.4.196 |
+| GitHub Copilot CLI | 1.0.83 |
+| Orca | 1.4.200 |
 
 ## How Dely works
 
 Ask for a change. Approve the design when asked. Dely implements, a
 different session reviews, then opens a PR. You merge. A Spike investigates
 only — no delivery run.
+
+Control loads `orca skills get orchestration` and follows that supervised
+loop. `dely preflight` checks each distinct pin once before the first
+`dely dispatch`. After `DISPATCHED`, Control waits by the harness Control
+wake: `background` runs `dely wait`; `waker` runs `dely wait-bg` as its
+last command and ends the turn. It never acts on an Orca nudge. `SETTLED`
+hands over the batch; `ATTENTION` follows `nextAction`; `STALLED` is read
+then waited or recovered; `NO_ACK` and `FAILED` retry once; `DEADLINE` is a
+checkpoint (`worker-list` and last output; wait again if progressing; a
+second `DEADLINE` with no progress goes to the human); `ERROR` goes to the
+human.
 
 The workflow contract is [`skills/delivery/SKILL.md`](skills/delivery/SKILL.md).
 
@@ -207,9 +224,10 @@ The workflow contract is [`skills/delivery/SKILL.md`](skills/delivery/SKILL.md).
 - **`dely:delivery` stops immediately.** Orca is not running or a required
   capability is absent, including orchestration. Run the Quickstart
   preflight, then retry.
-- **A harness still runs the old workflow after you edited this checkout.**
-  You edited the source, not an installed copy. Reinstall or update the
-  plugin in the harness.
+- **A stale copy from `npx skills add` shadows a newer plugin.** Codex and
+  Copilot also load `~/.agents/skills`; Kiro loads `~/.kiro/skills`. Compare
+  `skills/delivery/SKILL.md` by hash with the copy in those directories,
+  then update or remove the shadowing install.
 - **Codex still behaves the same after `codex plugin marketplace upgrade`.**
   Confirm the remote has new commits. A delivery already running keeps the
   plugin version from its start; open a new session after the upgrade.
