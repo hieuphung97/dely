@@ -268,6 +268,18 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_worker.RealResponseShapeTest",),
     ),
     Counterexample(
+        name="provisioning-comes-first",
+        requirement="Provisioning runs before anything that needs what it installs",
+        path="cycle_runner/lifecycle.py",
+        original="""            for argv in self._provision_steps():
+                record.commands.append(self.execute(list(argv)).to_record())
+            # Orca registers a worktree for a repository; the exported copy is
+            # not one until this makes it one.""",
+        replacement="""            # Orca registers a worktree for a repository; the exported copy is
+            # not one until this makes it one.""",
+        instruments=("tests.test_lifecycle.BootstrapOrderTest",),
+    ),
+    Counterexample(
         name="the-copy-is-a-repository",
         requirement="The project copy is made into a repository Orca can register",
         path="cycle_runner/lifecycle.py",

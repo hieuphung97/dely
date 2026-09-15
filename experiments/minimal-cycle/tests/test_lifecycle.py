@@ -61,8 +61,12 @@ class CycleTestCase(unittest.TestCase):
         document.update(overrides)
         return config_module.from_document(document)
 
-    def run_cycle(self, **adapter_options):
-        run_config = self.make_config()
+    def run_cycle(self, config_document=None, **adapter_options):
+        run_config = (
+            config_module.from_document(config_document)
+            if config_document is not None
+            else self.make_config()
+        )
         adapter = FakeAdapter(
             self.state / RUN_ID, host_project=self.repo, **adapter_options
         )
@@ -432,3 +436,30 @@ class UnverifiableDispatchTest(CycleTestCase):
     def test_a_genuine_refusal_is_still_an_error(self):
         _, outcome = self.run_cycle(dispatch_state="refused")
         self.assertEqual(outcome.run_result.status, status.RunStatus.ERROR)
+
+
+class BootstrapOrderTest(CycleTestCase):
+    """Provisioning is what makes the environment able to do the rest.
+
+    Observed on a real container: the repository initialisation ran first and
+    failed with `executable file not found`, because git is installed by the
+    provisioning steps that had not run yet.
+    """
+
+    def test_provisioning_runs_before_the_repository_is_initialised(self):
+        document = self.make_config().to_document()
+        document["distrobox"]["provision"] = [["mkdir", "-p", "/tmp/provisioned"]]
+        adapter, outcome = self.run_cycle(config_document=document)
+        bootstrap = outcome.run_result.phase("bootstrap")
+        argv = [" ".join(c.argv) for c in bootstrap.commands]
+        provisioned = next(i for i, line in enumerate(argv) if "provisioned" in line)
+        initialised = next(i for i, line in enumerate(argv) if "git" in line and "init" in line)
+        self.assertLess(provisioned, initialised, argv)
+
+    def test_the_project_is_placed_before_either(self):
+        adapter, _ = self.run_cycle()
+        self.assertIn("put_tree", adapter.calls)
+        first_git = next(
+            i for i, c in enumerate(adapter.calls) if c.startswith("execute:git")
+        )
+        self.assertLess(adapter.calls.index("put_tree"), first_git)

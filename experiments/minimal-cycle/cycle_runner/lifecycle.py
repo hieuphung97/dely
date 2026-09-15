@@ -292,6 +292,10 @@ class _Cycle:
         assert self.handle is not None
         with self.phase("bootstrap") as record:
             self.adapter.put_tree(baseline, self.handle.project_path)
+            # Provisioning first: it is what gives the environment the tools the
+            # rest of the bootstrap needs, git among them.
+            for argv in self._provision_steps():
+                record.commands.append(self.execute(list(argv)).to_record())
             # Orca registers a worktree for a repository; the exported copy is
             # not one until this makes it one.
             for argv in project.initialise_repository_commands(self.handle.project_path):
@@ -305,8 +309,6 @@ class _Cycle:
                     )
                     self.error_reason = self.error_reason or record.detail
                     return
-            for argv in self._provision_steps():
-                record.commands.append(self.execute(list(argv)).to_record())
             auth_record, overlay = auth.bootstrap(
                 run_config=self.config,
                 adapter=self.adapter,
