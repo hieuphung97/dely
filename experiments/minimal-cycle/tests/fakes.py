@@ -64,8 +64,12 @@ ORCA_TERMINAL_REPLY = (
     '"worktreeId": "repo::project", "surface": "visible"}}}'
 )
 
+# The real shape: identifiers nested under `result`, the top-level `id` being
+# the request's. One reply serves all three orchestration commands here.
 ORCA_DISPATCH_REPLY = (
-    '{"runId": "run-fake", "dispatchId": "dispatch-fake", '
+    '{"id": "request-fake", "ok": true, "result": {"run": {"id": "run-fake"}, '
+    '"runId": "run-fake", "taskId": "task-fake", "dispatchId": "dispatch-fake", '
+    '"state": "ready"}, '
     '"messages": [{"type": "worker_done", "outcome": "DONE"}]}'
 )
 

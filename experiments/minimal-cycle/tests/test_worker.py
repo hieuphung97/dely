@@ -9,8 +9,27 @@ from cycle_runner import config as config_module, status, worker
 from tests.fakes import ScriptedAdapter
 from tests.test_config import minimal_document
 
-READY = json.dumps({"runId": "run-abcdef"})
-STARTED = json.dumps({"dispatchId": "dispatch-abcdef", "status": "ready"})
+# These are the shapes a live runtime returns. The identifiers are nested under
+# `result`; the top-level `id` belongs to the request, not to the Run.
+READY = json.dumps(
+    {
+        "id": "request-abcdef",
+        "ok": True,
+        "result": {"run": {"id": "run-abcdef", "objective": "dely minimal cycle"}},
+    }
+)
+STARTED = json.dumps(
+    {
+        "id": "request-123456",
+        "ok": True,
+        "result": {
+            "runId": "run-abcdef",
+            "taskId": "task-abcdef",
+            "dispatchId": "dispatch-abcdef",
+            "state": "ready",
+        },
+    }
+)
 SETTLED = json.dumps({"messages": [{"type": "worker_done", "outcome": "DONE"}]})
 
 DEFAULT_SCRIPT = [
@@ -187,3 +206,74 @@ class CoordinatorTerminalTest(WorkerTest):
         adapter, _ = self.launch_from(None)
         for argv in adapter.executed:
             self.assertNotIn("--from", argv)
+
+
+#: The shapes Orca actually returns, copied from a live guest. The earlier
+#: fixtures put the identifiers at the top level; the real ones are nested, and
+#: the top-level `id` is the request identifier, not the Run.
+REAL_RUN_CREATE = json.dumps(
+    {
+        "id": "f1a0c3be-5f9d-4e21-81d1-dffcb6c647a8",
+        "ok": True,
+        "result": {
+            "run": {
+                "id": "run_a52fcdd366b4",
+                "objective": "dely minimal cycle",
+                "coordinator_handle": "term_50c4a5b6",
+            }
+        },
+    }
+)
+
+REAL_WORKER_START = json.dumps(
+    {
+        "id": "7056aa38-852c-4d6d-8287-443521841556",
+        "ok": True,
+        "result": {
+            "runId": "run_a52fcdd366b4",
+            "taskId": "task_0e636c920592",
+            "dispatchId": "ctx_098ec148783c",
+            "state": "outcome_unknown",
+            "stage": "turn_start_unobserved",
+            "launch": {
+                "requested": {"agent": "claude", "model": "m", "effort": "high"},
+                "effective": {"agent": "claude", "model": "m", "effort": "high"},
+            },
+        },
+    }
+)
+
+
+class RealResponseShapeTest(WorkerTest):
+    """Observed against a live runtime: the identifiers are nested."""
+
+    def test_the_run_identifier_comes_from_the_nested_run(self):
+        self.assertEqual(worker.run_identifier(json.loads(REAL_RUN_CREATE)), "run_a52fcdd366b4")
+
+    def test_the_request_identifier_is_never_mistaken_for_the_run(self):
+        self.assertNotEqual(
+            worker.run_identifier(json.loads(REAL_RUN_CREATE)),
+            "f1a0c3be-5f9d-4e21-81d1-dffcb6c647a8",
+        )
+
+    def test_the_dispatch_identifier_comes_from_the_result(self):
+        self.assertEqual(
+            worker.dispatch_identifier(json.loads(REAL_WORKER_START)), "ctx_098ec148783c"
+        )
+
+    def test_the_task_and_state_are_carried_too(self):
+        parsed = json.loads(REAL_WORKER_START)
+        self.assertEqual(worker.dispatch_state(parsed), "outcome_unknown")
+
+    def test_a_launch_against_the_real_shapes_uses_the_run_identifier(self):
+        script = [
+            ("run-create", 0, REAL_RUN_CREATE, "", False),
+            ("worker-start", 0, REAL_WORKER_START, "", False),
+            ("check --wait", 0, SETTLED, "", False),
+        ]
+        adapter, _, record = self.launch(script=script)
+        start = next(argv for argv in adapter.executed if "worker-start" in argv)
+        self.assertIn("--run", start)
+        self.assertEqual(start[start.index("--run") + 1], "run_a52fcdd366b4")
+        self.assertEqual(record.run_id, "run_a52fcdd366b4")
+        self.assertEqual(record.dispatch_id, "ctx_098ec148783c")

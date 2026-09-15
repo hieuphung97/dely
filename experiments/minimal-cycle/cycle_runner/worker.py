@@ -136,17 +136,42 @@ def _first_document(text: str) -> dict[str, Any]:
     return {}
 
 
-def _identifier(document: Mapping[str, Any], *names: str) -> str | None:
-    for name in names:
-        value = document.get(name)
-        if isinstance(value, str) and value:
-            return value
-    for value in document.values():
-        if isinstance(value, Mapping):
-            found = _identifier(value, *names)
-            if found:
-                return found
-    return None
+def _result(document: Mapping[str, Any]) -> Mapping[str, Any]:
+    result = document.get("result")
+    return result if isinstance(result, Mapping) else {}
+
+
+def run_identifier(document: Mapping[str, Any]) -> str | None:
+    """Return the Run identifier from a run-create or worker-start reply.
+
+    The reply's top-level `id` is the identifier of the *request*, not of the
+    Run. Passing it as `--run` makes the next command fail with
+    `consumer_fenced`, because no Run by that name is bound to the terminal.
+    """
+    result = _result(document)
+    run = result.get("run")
+    if isinstance(run, Mapping) and isinstance(run.get("id"), str):
+        return run["id"]
+    value = result.get("runId")
+    return value if isinstance(value, str) and value else None
+
+
+def dispatch_identifier(document: Mapping[str, Any]) -> str | None:
+    """Return the Dispatch identifier from a worker-start reply."""
+    value = _result(document).get("dispatchId")
+    return value if isinstance(value, str) and value else None
+
+
+def dispatch_state(document: Mapping[str, Any]) -> str | None:
+    """Return what the plane said the dispatch reached, if it said anything."""
+    value = _result(document).get("state")
+    return value if isinstance(value, str) and value else None
+
+
+def task_identifier(document: Mapping[str, Any]) -> str | None:
+    """Return the Task identifier from a worker-start reply."""
+    value = _result(document).get("taskId")
+    return value if isinstance(value, str) and value else None
 
 
 def _settling_message(document: Mapping[str, Any]) -> dict[str, Any]:
@@ -198,10 +223,10 @@ def launch(
         record.status = PhaseStatus.FAILED
         record.detail = (
             "orca orchestration run-create did not return a Run: "
-            + redact.text((created.stderr or created.stdout).strip()[:400], secrets)
+            + redact.text((created.stderr or created.stdout).strip()[-400:], secrets)
         )
         return record
-    record.run_id = _identifier(_first_document(created.stdout), "runId", "run_id", "id")
+    record.run_id = run_identifier(_first_document(created.stdout))
 
     plan = build_plan(
         run_config=run_config,
@@ -225,14 +250,20 @@ def launch(
         return record
     if not started.ok:
         record.status = PhaseStatus.FAILED
+        state = dispatch_state(_first_document(started.stdout))
+        record.dispatch_id = dispatch_identifier(_first_document(started.stdout))
+        record.outcome = state
         record.detail = (
-            "orca orchestration worker-start did not reach ready: "
-            + redact.text((started.stderr or started.stdout).strip()[:400], secrets)
+            f"orca orchestration worker-start reported {state or 'no state'}: "
+            + redact.text((started.stderr or started.stdout).strip()[-400:], secrets)
         )
         return record
-    record.dispatch_id = _identifier(
-        _first_document(started.stdout), "dispatchId", "dispatch_id", "id"
-    )
+    start_document = _first_document(started.stdout)
+    record.dispatch_id = dispatch_identifier(start_document)
+    record.run_id = record.run_id or run_identifier(start_document)
+    state = dispatch_state(start_document)
+    if state:
+        record.detail = f"the plane reported the dispatch as {state}"
 
     settled = adapter.execute(
         plan.wait_argv, timeout=timeout_seconds, env=overlay, extra_values=secrets

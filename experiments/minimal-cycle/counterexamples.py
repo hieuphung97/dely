@@ -230,6 +230,20 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_lifecycle.CreateFailureTest",),
     ),
     Counterexample(
+        name="the-request-is-not-the-run",
+        requirement="The Run identifier is read from the Run, not from the request",
+        path="cycle_runner/worker.py",
+        original="""    result = _result(document)
+    run = result.get("run")
+    if isinstance(run, Mapping) and isinstance(run.get("id"), str):
+        return run["id"]
+    value = result.get("runId")
+    return value if isinstance(value, str) and value else None""",
+        replacement="""    value = document.get("id")
+    return value if isinstance(value, str) and value else None""",
+        instruments=("tests.test_worker.RealResponseShapeTest",),
+    ),
+    Counterexample(
         name="the-copy-is-a-repository",
         requirement="The project copy is made into a repository Orca can register",
         path="cycle_runner/lifecycle.py",
