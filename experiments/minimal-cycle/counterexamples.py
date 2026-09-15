@@ -230,6 +230,14 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_lifecycle.CreateFailureTest",),
     ),
     Counterexample(
+        name="the-host-session-does-not-leak",
+        requirement="The host's own session identity is removed before a command runs inside",
+        path="cycle_runner/isolate.py",
+        original="""    return ["sh", "-c", _SCRIPT, "cycle-isolate", "--", *[str(item) for item in argv]]""",
+        replacement="""    return [str(item) for item in argv]""",
+        instruments=("tests.test_isolate",),
+    ),
+    Counterexample(
         name="an-error-is-reported-by-its-code",
         requirement="A refusal is reported by its code, not by the tail of raw output",
         path="cycle_runner/worker.py",

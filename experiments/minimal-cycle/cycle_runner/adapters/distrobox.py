@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
-from .. import cleanup, ids, proc
+from .. import cleanup, ids, isolate, proc
 from ..config import RunConfig
 from .base import (
     BackendAdapter,
@@ -308,6 +308,10 @@ class DistroboxAdapter(BackendAdapter):
         inside = list(argv)
         if cwd:
             inside = ["sh", "-c", 'cd "$1" || exit 1; shift; exec "$@"', "cycle-cd", cwd, *inside]
+        # The box inherits this process's environment, and this process may be
+        # running inside the execution plane the box is meant to be separate
+        # from.
+        inside = isolate.without_host_session(inside)
         return self.runner(
             self.enter_argv(inside, env_names=tuple(overlay)),
             timeout=timeout,

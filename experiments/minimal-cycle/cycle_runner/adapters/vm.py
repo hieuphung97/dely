@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
-from .. import cleanup, ids, proc
+from .. import cleanup, ids, isolate, proc
 from ..config import RunConfig
 from . import schema
 from .base import (
@@ -764,6 +764,9 @@ class VmAdapter(BackendAdapter):
             inside = ["env", *[f"{name}={value}" for name, value in env.items()], *inside]
         if cwd:
             inside = ["sh", "-c", 'cd "$1" || exit 1; shift; exec "$@"', "cycle-cd", cwd, *inside]
+        # The transport does not forward this process's environment today, but
+        # nothing about the guest should depend on that staying true.
+        inside = isolate.without_host_session(inside)
         return self.runner(
             self.ssh_argv(inside),
             timeout=timeout,

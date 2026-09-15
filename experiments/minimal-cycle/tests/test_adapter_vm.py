@@ -433,10 +433,12 @@ class RemoteQuotingTest(VmTestCase):
         from cycle_runner import probe
         import shlex
 
-        argv = self.ready().ssh_argv(probe.probe_argv("/home/cycle/project"))
+        argv = self.ready().ssh_argv(probe.probe_argv("/home/cycle/project", "orca"))
         parsed = shlex.split(argv[-1])
-        self.assertEqual(parsed[-1], "/home/cycle/project")
-        self.assertEqual(parsed[2], probe.PROBE_SCRIPT)
+        # The probe takes the project path and then the command to look for.
+        self.assertIn("/home/cycle/project", parsed)
+        self.assertEqual(parsed[-1], "orca")
+        self.assertIn(probe.PROBE_SCRIPT, parsed)
 
     def test_a_value_carrying_a_quote_cannot_break_out(self):
         import shlex
