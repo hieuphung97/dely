@@ -1,0 +1,57 @@
+{
+  "id": "f834829b-d386-4f5e-9cea-7b57e5164887",
+  "ok": true,
+  "result": {
+    "terminals": [
+      {
+        "handle": "term_50c4a5b6-5060-4cab-ba85-609b60a69f45",
+        "ptyId": "e8ac363c-41b0-4447-bd9a-f850ed3c837f::/home/cycle/project@@ef0e740a",
+        "incarnationId": "ab2cdf23-9a54-48ea-b918-53a0546e9bb6",
+        "orphaned": false,
+        "worktreeId": "e8ac363c-41b0-4447-bd9a-f850ed3c837f::/home/cycle/project",
+        "worktreePath": "/home/cycle/project",
+        "branch": "refs/heads/master",
+        "tabId": "279dcdae-cb06-4c20-ad82-ef7d28df9dcb",
+        "leafId": "5ddefe26-a667-4717-aa9b-c1eea4a727e1",
+        "title": "cycle@dely-cycle-spike2: ~/project",
+        "connected": true,
+        "writable": true,
+        "lastOutputAt": 1789469911288,
+        "preview": "cycle@dely-cycle-spike2:~/project$",
+        "executionHostId": "local"
+      },
+      {
+        "handle": "term_c862c124-5808-407a-9ef3-8a3f53eff7c7",
+        "ptyId": "e8ac363c-41b0-4447-bd9a-f850ed3c837f::/home/cycle/project@@670ed7a6",
+        "incarnationId": "d6143ee6-e69d-4cc3-85c4-776e34d0cfe0",
+        "orphaned": false,
+        "worktreeId": "e8ac363c-41b0-4447-bd9a-f850ed3c837f::/home/cycle/project",
+        "worktreePath": "/home/cycle/project",
+        "branch": "refs/heads/master",
+        "tabId": "0b359691-1fda-43b5-970d-8c5f110a0e9e",
+        "leafId": "9a737bc6-6efb-4673-a9b8-a8e9aa51357b",
+        "title": "cycle@dely-cycle-spike2: ~/project",
+        "connected": true,
+        "writable": true,
+        "lastOutputAt": 1789469937962,
+        "preview": "cycle@dely-cycle-spike2:~/project$ claude '--dangerously-skip-permissions' '--model' 'claude-opus-5' '--effort' 'high'",
+        "executionHostId": "local",
+        "agentIdentity": "claude"
+      }
+    ],
+    "hostScope": {
+      "hostIds": [
+        "local"
+      ],
+      "omittedHostIds": []
+    },
+    "topologyRevisions": {
+      "e8ac363c-41b0-4447-bd9a-f850ed3c837f::/home/cycle/project": 2
+    },
+    "totalCount": 2,
+    "truncated": false
+  },
+  "_meta": {
+    "runtimeId": "9386612e-bf79-44a0-9232-173c653dcba8"
+  }
+}

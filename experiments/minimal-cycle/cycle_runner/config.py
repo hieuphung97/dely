@@ -206,6 +206,7 @@ class OrcaConfig:
     version_argv: tuple[str, ...] = ("orca", "--version")
     run_objective: str = "dely minimal cycle"
     worktree_selector: str = "current"
+    ready_timeout_seconds: int = 300
 
     def to_document(self) -> dict[str, Any]:
         return {
@@ -217,6 +218,7 @@ class OrcaConfig:
             "version_argv": list(self.version_argv),
             "run_objective": self.run_objective,
             "worktree_selector": self.worktree_selector,
+            "ready_timeout_seconds": self.ready_timeout_seconds,
         }
 
 
@@ -254,6 +256,7 @@ class VmConfig:
     memory_mb: int = 4096
     vcpus: int = 2
     graphics: str = "vnc"
+    video: str = "virtio"
     listen_address: str = "127.0.0.1"
     transport: str = "ssh"
     network: str = "default"
@@ -279,6 +282,7 @@ class VmConfig:
             "memory_mb": self.memory_mb,
             "vcpus": self.vcpus,
             "graphics": self.graphics,
+            "video": self.video,
             "listen_address": self.listen_address,
             "transport": self.transport,
             "network": self.network,
@@ -436,6 +440,7 @@ def _orca(document: Mapping[str, Any]) -> OrcaConfig:
             "version_argv",
             "run_objective",
             "worktree_selector",
+            "ready_timeout_seconds",
         ),
         "orca",
     )
@@ -448,6 +453,7 @@ def _orca(document: Mapping[str, Any]) -> OrcaConfig:
         version_argv=_argv(document, "version_argv", "orca", ("orca", "--version")),
         run_objective=_text(document, "run_objective", "orca", "dely minimal cycle"),
         worktree_selector=_text(document, "worktree_selector", "orca", "current"),
+        ready_timeout_seconds=_positive_int(document, "ready_timeout_seconds", "orca", 300),
     )
 
 
@@ -511,6 +517,7 @@ def _vm(document: Mapping[str, Any]) -> VmConfig:
             "memory_mb",
             "vcpus",
             "graphics",
+            "video",
             "listen_address",
             "transport",
             "network",
@@ -548,6 +555,7 @@ def _vm(document: Mapping[str, Any]) -> VmConfig:
         memory_mb=_positive_int(document, "memory_mb", "vm", 4096),
         vcpus=_positive_int(document, "vcpus", "vm", 2),
         graphics=_text(document, "graphics", "vm", "vnc"),
+        video=_text(document, "video", "vm", "virtio"),
         listen_address=_text(document, "listen_address", "vm", "127.0.0.1"),
         transport=_text(document, "transport", "vm", "ssh"),
         network=_text(document, "network", "vm", "default"),

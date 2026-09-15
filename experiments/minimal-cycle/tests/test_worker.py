@@ -151,3 +151,39 @@ class WorkerTest(unittest.TestCase):
         _, _, record = self.launch(script=script)
         self.assertEqual(record.status, status.PhaseStatus.TIMEOUT)
         self.assertIn("deadline", record.detail)
+
+
+class CoordinatorTerminalTest(WorkerTest):
+    """Orca refuses an orchestration command with no sender terminal.
+
+    Observed inside a real guest: run-create returned
+    no_active_sender_terminal until it was given --from.
+    """
+
+    def launch_from(self, handle):
+        from tests.fakes import ScriptedAdapter
+
+        adapter = ScriptedAdapter(self.root / "run", script=DEFAULT_SCRIPT)
+        environment = adapter.create()
+        record = worker.launch(
+            run_config=self.config,
+            adapter=adapter,
+            handle=environment,
+            timeout_seconds=self.config.timeout_seconds,
+            env_overlay={},
+            coordinator_handle=handle,
+        )
+        return adapter, record
+
+    def test_every_orchestration_command_names_the_sender_terminal(self):
+        adapter, _ = self.launch_from("term_abcdef")
+        orchestration = [argv for argv in adapter.executed if "orchestration" in argv]
+        self.assertEqual(len(orchestration), 3)
+        for argv in orchestration:
+            self.assertIn("--from", argv)
+            self.assertEqual(argv[argv.index("--from") + 1], "term_abcdef")
+
+    def test_without_a_terminal_the_flag_is_not_invented(self):
+        adapter, _ = self.launch_from(None)
+        for argv in adapter.executed:
+            self.assertNotIn("--from", argv)

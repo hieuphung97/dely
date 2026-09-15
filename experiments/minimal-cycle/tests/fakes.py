@@ -39,6 +39,24 @@ HOST = {
 }
 
 
+ORCA_STATUS_REPLY = (
+    '{"ok": true, "result": {"app": {"running": true, "pid": 1786, '
+    '"desktopWindowStatus": "available"}, "runtime": {"state": "ready", '
+    '"reachable": true, "connectionState": "connected", "runtimeId": '
+    '"runtime-fake", "appVersion": "1.4.201", "capabilities": '
+    '["orchestration.contract.v1"]}}}'
+)
+
+ORCA_STATUS_DOWN = (
+    '{"ok": true, "result": {"app": {"running": false, "pid": null}, '
+    '"runtime": {"state": "unavailable", "reachable": false}}}'
+)
+
+ORCA_TERMINAL_REPLY = (
+    '{"ok": true, "result": {"terminal": {"handle": "term_fake", '
+    '"worktreeId": "repo::project", "surface": "visible"}}}'
+)
+
 ORCA_DISPATCH_REPLY = (
     '{"runId": "run-fake", "dispatchId": "dispatch-fake", '
     '"messages": [{"type": "worker_done", "outcome": "DONE"}]}'
@@ -68,6 +86,8 @@ class FakeAdapter(BackendAdapter):
         leave_residue: bool = False,
         marker: str = "dely-cycle-marker",
         orca_path_from_host: bool = False,
+        runtime_ready: bool = True,
+        terminal_refused: bool = False,
         create_fails: bool = False,
         task_writes_nothing: bool = False,
         host_project: Path | None = None,
@@ -87,6 +107,8 @@ class FakeAdapter(BackendAdapter):
         self.leave_residue = leave_residue
         self.marker = marker
         self.orca_path_from_host = orca_path_from_host
+        self.runtime_ready = runtime_ready
+        self.terminal_refused = terminal_refused
         self.create_fails = create_fails
         self.task_writes_nothing = task_writes_nothing
         self.host_project = host_project
@@ -189,7 +211,16 @@ class FakeAdapter(BackendAdapter):
             return self._outcome(argv, 0, ORCA_DISPATCH_REPLY, "")
         if tuple(argv[:2]) == ("orca", "status"):
             self.calls.append("orca-status")
-            return self._outcome(argv, 0, '{"ready": true}', "")
+            up = self.orca_present and self.runtime_ready
+            return self._outcome(argv, 0, ORCA_STATUS_REPLY if up else ORCA_STATUS_DOWN, "")
+        if "terminal create" in joined:
+            self.calls.append("terminal-create")
+            if self.terminal_refused:
+                return self._outcome(argv, 1, "", "the runtime refused a terminal")
+            return self._outcome(argv, 0, ORCA_TERMINAL_REPLY, "")
+        if "repo add" in joined:
+            self.calls.append("repo-add")
+            return self._outcome(argv, 0, '{"ok": true}', "")
         if "cycle-check" in joined:
             self.calls.append("check")
         else:

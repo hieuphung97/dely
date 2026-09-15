@@ -504,3 +504,22 @@ class TransportReadinessTest(VmTestCase):
         adapter = self.make(runner=self.Refusing(0))
         with self.assertRaises(vm.VmContractError):
             adapter.wait_for_transport(timeout=0)
+
+
+class VideoDeviceTest(VmTestCase):
+    """Rootless X needs kernel mode setting, which emulated cirrus does not give.
+
+    Observed in a real guest: with the default video model the display server
+    died with "xf86OpenConsole: Switching VT failed" and there was no device
+    under /dev/dri. A virtio model provides one and the session starts.
+    """
+
+    def test_the_program_declares_a_video_device(self):
+        program = self.make().render_program()
+        self.assertIn("video=libvirt.DomainVideoArgs(type=VIDEO)", program)
+
+    def test_the_default_model_provides_mode_setting(self):
+        self.assertIn('VIDEO = \'virtio\'', self.make().render_program())
+
+    def test_another_model_can_be_declared(self):
+        self.assertIn("VIDEO = 'qxl'", self.make(video="qxl").render_program())

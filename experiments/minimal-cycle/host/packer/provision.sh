@@ -12,7 +12,7 @@ sudo apt-get install -y --no-install-recommends \
   qemu-guest-agent \
   nodejs npm \
   xserver-xorg-core xserver-xorg-video-vesa xserver-xorg-video-qxl \
-  xserver-xorg-input-libinput xinit openbox xterm \
+  xserver-xorg-input-libinput xinit openbox xterm xdotool \
   dbus-x11 x11-xserver-utils xdg-utils \
   libgtk-3-0t64 libnss3 libasound2t64 libatk-bridge2.0-0t64 libcups2t64 \
   libdrm2 libgbm1 libxkbcommon0 libpango-1.0-0 libxcomposite1 libxdamage1 \
@@ -35,21 +35,38 @@ sudo tee /etc/systemd/system/dely-cycle-desktop.service > /dev/null <<UNIT
 [Unit]
 Description=Minimal graphical session for the dely cycle
 After=systemd-user-sessions.service
+Conflicts=getty@tty1.service
 
 [Service]
 User=${GUEST_USER}
 PAMName=login
+Type=simple
+# Without a controlling terminal the display server cannot take the virtual
+# terminal and dies with "Switching VT failed".
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
 TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
 Environment=XDG_RUNTIME_DIR=/run/user/1000
-ExecStart=/usr/bin/startx /usr/bin/openbox-session -- :0 vt1 -keeptty -nolisten tcp
+WorkingDirectory=/home/${GUEST_USER}
+ExecStart=/usr/bin/startx /usr/bin/openbox-session -- :0 vt1
 Restart=on-failure
 RestartSec=5
 
 [Install]
 WantedBy=graphical.target
 UNIT
-# The session runs on a real console through PAM, so the display server's
-# default "console only" rule already permits it; no wrapper override is needed.
+
+# The command line is a client of the runtime the application owns, so the
+# application has to be running before anything can be dispatched.
+sudo -u "${GUEST_USER}" mkdir -p "/home/${GUEST_USER}/.config/openbox"
+sudo -u "${GUEST_USER}" tee "/home/${GUEST_USER}/.config/openbox/autostart" > /dev/null <<AUTOSTART
+/opt/Orca/orca-ide &
+AUTOSTART
+
 sudo systemctl set-default graphical.target
 sudo systemctl enable dely-cycle-desktop.service
 sudo systemctl enable qemu-guest-agent
@@ -68,6 +85,8 @@ cat /etc/dely-cycle-image
 # -- leave no build credential behind ------------------------------------
 sudo rm -f "/home/${GUEST_USER}/.ssh/authorized_keys"
 sudo rm -rf "/home/${GUEST_USER}/.ssh"
+# Nothing the application wrote during the build belongs in the image.
+sudo rm -rf "/home/${GUEST_USER}/.config/orca"
 sudo cloud-init clean --logs --seed
 sudo rm -rf /var/lib/cloud/instances /var/lib/cloud/instance
 sudo truncate -s 0 /etc/machine-id

@@ -55,6 +55,9 @@ class CycleTestCase(unittest.TestCase):
         document["project"]["source"] = str(self.repo)
         document["project"]["revision"] = "main"
         document["task"]["marker"] = MARKER
+        # These tests drive a fake environment, so a runtime that is never going
+        # to be ready should be given up on at once rather than in five minutes.
+        document["orca"]["ready_timeout_seconds"] = 1
         document.update(overrides)
         return config_module.from_document(document)
 
@@ -303,3 +306,36 @@ class CreateFailureTest(CycleTestCase):
         _, outcome = self.run_cycle(create_fails=True)
         self.assertTrue(self.artifact("manifest.json").is_file())
         self.assertEqual(outcome.run_result.status, status.RunStatus.ERROR)
+
+
+class OrcaSessionTest(CycleTestCase):
+    """Orca being installed is not Orca being able to take a dispatch."""
+
+    def test_a_runtime_that_never_becomes_ready_blocks_before_the_worker(self):
+        adapter, outcome = self.run_cycle(runtime_ready=False)
+        self.assertEqual(outcome.run_result.status, status.RunStatus.BLOCKED)
+        self.assertNotIn("worker", adapter.calls)
+        self.assertIn("runtime", outcome.run_result.failure_classification.lower())
+
+    def test_a_refused_coordinator_terminal_blocks_before_the_worker(self):
+        adapter, outcome = self.run_cycle(terminal_refused=True)
+        self.assertEqual(outcome.run_result.status, status.RunStatus.BLOCKED)
+        self.assertNotIn("worker", adapter.calls)
+        self.assertIn("terminal", outcome.run_result.failure_classification.lower())
+
+    def test_a_ready_runtime_is_recorded_with_its_identifier(self):
+        _, outcome = self.run_cycle()
+        runtime = outcome.run_result.identity.orca_runtime
+        self.assertTrue(runtime["ready"])
+        self.assertEqual(runtime["runtime_id"], "runtime-fake")
+        self.assertEqual(runtime["desktop_window"], "available")
+        self.assertIn("orchestration.contract.v1", runtime["capabilities"])
+
+    def test_the_runtime_report_is_exported(self):
+        self.run_cycle()
+        self.assertTrue(self.artifact("identity/orca-runtime.json").is_file())
+
+    def test_the_coordinator_terminal_is_opened_before_the_dispatch(self):
+        adapter, _ = self.run_cycle()
+        self.assertIn("terminal-create", adapter.calls)
+        self.assertLess(adapter.calls.index("terminal-create"), adapter.calls.index("worker"))

@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
-from . import auth, cleanup, hostinfo, manifest, probe, proc, project, redact, worker
+from . import auth, cleanup, hostinfo, manifest, orca, probe, proc, project, redact, worker
 from .adapters.base import BackendAdapter, EnvironmentHandle
 from .config import RunConfig
 from .export import Exporter
@@ -165,6 +165,7 @@ class _Cycle:
         self.task_ran = False
         self.stop_confirmed = True
         self.env_overlay: dict[str, str] = {}
+        self.coordinator_handle: str | None = None
         self.host_before: dict[str, Any] = {}
 
     # -- plumbing ---------------------------------------------------------
@@ -340,6 +341,38 @@ class _Cycle:
                 record.status = PhaseStatus.BLOCKED
                 record.detail = reason
                 self.blocked_reason = self.blocked_reason or reason
+                return
+            # A command that resolves is not a runtime that can take a dispatch.
+            runtime = orca.wait_for_runtime(
+                self.adapter,
+                self.config.orca.status_argv,
+                timeout=self.config.orca.ready_timeout_seconds,
+            )
+            identity.orca_runtime = runtime.to_document()
+            self.exporter.write_json("identity/orca-runtime.json", runtime.to_document())
+            if not runtime.ready:
+                record.status = PhaseStatus.BLOCKED
+                record.detail = (
+                    "orca is installed in the environment but its runtime never became "
+                    f"ready there: {runtime.detail}"
+                )
+                self.blocked_reason = self.blocked_reason or record.detail
+                return
+            try:
+                self.coordinator_handle = orca.open_coordinator_terminal(
+                    self.adapter,
+                    self.handle.project_path,
+                    timeout=min(300, self.config.timeout_seconds),
+                )
+            except orca.OrcaSessionError as error:
+                record.status = PhaseStatus.BLOCKED
+                record.detail = str(error)
+                self.blocked_reason = self.blocked_reason or record.detail
+                return
+            record.detail = (
+                f"orca runtime {runtime.runtime_id} is ready and the coordinator "
+                f"terminal is {self.coordinator_handle}"
+            )
 
     def _task(self) -> None:
         assert self.handle is not None
@@ -351,6 +384,7 @@ class _Cycle:
                 handle=self.handle,
                 timeout_seconds=self.config.timeout_seconds,
                 env_overlay=self.env_overlay,
+                coordinator_handle=self.coordinator_handle,
             )
             self.result.worker = worker_record
             record.status = worker_record.status

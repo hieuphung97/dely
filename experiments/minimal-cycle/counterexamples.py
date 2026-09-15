@@ -230,6 +230,26 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_lifecycle.CreateFailureTest",),
     ),
     Counterexample(
+        name="a-present-orca-is-not-a-ready-one",
+        requirement="A dispatch waits for Orca's runtime, not just for its binary",
+        path="cycle_runner/lifecycle.py",
+        original="""            if not runtime.ready:""",
+        replacement="""            if False:""",
+        instruments=("tests.test_lifecycle.OrcaSessionTest",),
+    ),
+    Counterexample(
+        name="dispatch-needs-a-sender-terminal",
+        requirement="Every orchestration command names the terminal it is sent from",
+        path="cycle_runner/worker.py",
+        original="""    if coordinator_handle:
+        for command in (created, start, wait):
+            command.extend(["--from", coordinator_handle])""",
+        replacement="""    if False:
+        for command in (created, start, wait):
+            command.extend(["--from", coordinator_handle])""",
+        instruments=("tests.test_worker.CoordinatorTerminalTest",),
+    ),
+    Counterexample(
         name="an-address-is-not-readiness",
         requirement="Creation waits for the guest to answer, not just to take an address",
         path="cycle_runner/adapters/vm.py",

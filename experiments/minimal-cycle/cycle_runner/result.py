@@ -90,6 +90,7 @@ class IdentityRecord:
     orca_is_host_installation: bool = False
     orca_version: str | None = None
     orca_status_exit_code: int | None = None
+    orca_runtime: dict[str, Any] = field(default_factory=dict)
 
     def to_document(self) -> dict[str, Any]:
         return {
@@ -102,6 +103,7 @@ class IdentityRecord:
             "orca_is_host_installation": self.orca_is_host_installation,
             "orca_version": self.orca_version,
             "orca_status_exit_code": self.orca_status_exit_code,
+            "orca_runtime": dict(self.orca_runtime),
         }
 
 

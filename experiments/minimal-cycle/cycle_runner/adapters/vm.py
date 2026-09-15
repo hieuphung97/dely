@@ -78,6 +78,7 @@ USER_DATA = {user_data!r}
 META_DATA = {meta_data!r}
 NETWORK_CONFIG = {network_config!r}
 GRAPHICS = {graphics!r}
+VIDEO = {video!r}
 LISTEN_ADDRESS = {listen_address!r}
 MEMORY_MB = {memory_mb!r}
 VCPUS = {vcpus!r}
@@ -125,6 +126,7 @@ domain = libvirt.Domain(
     consoles=[
         libvirt.DomainConsoleArgs(type="pty", target_port="0", target_type="serial")
     ],
+    video=libvirt.DomainVideoArgs(type=VIDEO),
     xml=libvirt.DomainXmlArgs(xslt=EGRESS_XSLT),
 )
 
@@ -320,6 +322,7 @@ class VmAdapter(BackendAdapter):
             meta_data=self.render_meta_data(),
             network_config=self.render_network_config(),
             graphics=self.settings.graphics,
+            video=self.settings.video,
             listen_address=self.settings.listen_address,
             memory_mb=self.settings.memory_mb,
             vcpus=self.settings.vcpus,
@@ -394,6 +397,7 @@ class VmAdapter(BackendAdapter):
                 "base_image": str(self.settings.base_image),
                 "base_volume": self.settings.base_volume_name,
                 "graphics": self.settings.graphics,
+                "video": self.settings.video,
                 "transport_mac": self.transport_mac,
                 "egress": self.settings.egress,
             },
@@ -918,6 +922,7 @@ class VmAdapter(BackendAdapter):
             "base_volume": self.settings.base_volume_name,
             "base_image_sha256": self.settings.base_image_sha256,
             "graphics": self.settings.graphics,
+            "video": self.settings.video,
             "listen_address": self.settings.listen_address,
             "transport_mac": self.transport_mac,
             "egress_interface": self.settings.egress,

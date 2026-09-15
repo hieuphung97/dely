@@ -55,7 +55,12 @@ def build_prompt(run_config: RunConfig, handle: EnvironmentHandle) -> str:
 
 
 def build_plan(
-    *, run_config: RunConfig, handle: EnvironmentHandle, timeout_seconds: int, orca_run_id: str | None
+    *,
+    run_config: RunConfig,
+    handle: EnvironmentHandle,
+    timeout_seconds: int,
+    orca_run_id: str | None,
+    coordinator_handle: str | None = None,
 ) -> LaunchPlan:
     """Compose the argv for run-create, worker-start and the completion wait."""
     prompt_path = str(Path(handle.home_path) / PROMPT_NAME)
@@ -95,17 +100,23 @@ def build_plan(
     if orca_run_id:
         start.extend(["--run", orca_run_id])
         wait.extend(["--run", orca_run_id])
+    created = [
+        "orca",
+        "orchestration",
+        "run-create",
+        "--objective",
+        run_config.orca.run_objective,
+        "--json",
+    ]
+    # Every orchestration command is sent from a terminal the runtime knows;
+    # without one Orca refuses with no_active_sender_terminal.
+    if coordinator_handle:
+        for command in (created, start, wait):
+            command.extend(["--from", coordinator_handle])
     return LaunchPlan(
         prompt_path=prompt_path,
         spec=spec,
-        run_create_argv=(
-            "orca",
-            "orchestration",
-            "run-create",
-            "--objective",
-            run_config.orca.run_objective,
-            "--json",
-        ),
+        run_create_argv=tuple(created),
         worker_start_argv=tuple(start),
         wait_argv=tuple(wait),
     )
@@ -156,6 +167,7 @@ def launch(
     handle: EnvironmentHandle,
     timeout_seconds: int,
     env_overlay: Mapping[str, str] | None = None,
+    coordinator_handle: str | None = None,
 ) -> WorkerRecord:
     """Run exactly one worker and report how it settled."""
     record = WorkerRecord(
@@ -171,6 +183,7 @@ def launch(
         handle=handle,
         timeout_seconds=timeout_seconds,
         orca_run_id=None,
+        coordinator_handle=coordinator_handle,
     )
 
     created = adapter.execute(
@@ -195,6 +208,7 @@ def launch(
         handle=handle,
         timeout_seconds=timeout_seconds,
         orca_run_id=record.run_id,
+        coordinator_handle=coordinator_handle,
     )
     adapter.write_file(plan.prompt_path, build_prompt(run_config, handle), mode=0o644)
 

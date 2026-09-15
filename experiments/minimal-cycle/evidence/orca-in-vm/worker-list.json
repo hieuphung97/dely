@@ -1,0 +1,99 @@
+{
+  "id": "5651081b-a1d9-4071-b535-9be8a85068a8",
+  "ok": true,
+  "result": {
+    "workers": [
+      {
+        "dispatchId": "ctx_098ec148783c",
+        "taskId": "task_0e636c920592",
+        "runId": "run_a52fcdd366b4",
+        "workerState": "start_unknown",
+        "dispatchStatus": "pending",
+        "agentTerminalHandle": "term_c862c124-5808-407a-9ef3-8a3f53eff7c7",
+        "terminalState": "active",
+        "resource": {
+          "id": "wtr_d189325f038a",
+          "ownershipState": "owned",
+          "releaseState": "not_requested",
+          "retainedReason": null,
+          "terminalHandle": "term_c862c124-5808-407a-9ef3-8a3f53eff7c7",
+          "worktreeId": "e8ac363c-41b0-4447-bd9a-f850ed3c837f::/home/cycle/project",
+          "endpointId": "9386612e-bf79-44a0-9232-173c653dcba8",
+          "endpointIncarnation": "e8ac363c-41b0-4447-bd9a-f850ed3c837f::/home/cycle/project@@670ed7a6:d6143ee6-e69d-4cc3-85c4-776e34d0cfe0",
+          "originDispatchId": "ctx_098ec148783c",
+          "ownerDispatchId": "ctx_098ec148783c",
+          "releaseRequestedAt": null,
+          "releaseCompletedAt": null,
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": null,
+            "status": null
+          }
+        },
+        "projection": {
+          "id": "ctx_098ec148783c",
+          "dispatchId": "ctx_098ec148783c",
+          "taskId": "task_0e636c920592",
+          "runId": "run_a52fcdd366b4",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "e8ac363c-41b0-4447-bd9a-f850ed3c837f::/home/cycle/project",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "start_unknown",
+            "dispatch": "pending",
+            "detail": "turn_start_unobserved",
+            "activity": "unknown"
+          },
+          "outcome": "in_progress",
+          "liveness": {
+            "verdict": "unverifiable",
+            "reason": "missing_status"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "owned"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "unverifiable"
+            ],
+            "requiresAction": true
+          }
+        }
+      }
+    ],
+    "counts": {
+      "active": 1
+    },
+    "page": {
+      "limit": 100,
+      "total": 1,
+      "hasMore": false,
+      "nextCursor": null
+    },
+    "scope": {
+      "source": "all"
+    }
+  },
+  "_meta": {
+    "runtimeId": "9386612e-bf79-44a0-9232-173c653dcba8"
+  }
+}
