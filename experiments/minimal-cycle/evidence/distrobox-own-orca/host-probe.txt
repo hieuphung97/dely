@@ -1,0 +1,14 @@
+hostname=system
+machine_id=<scrubbed>
+boot_id=<scrubbed>
+home=<host-home>
+user=<host-user>
+path=<host-home>/.local/bin:<host-home>/.local/bin:<host-home>/.polygraph/bin:<host-home>/.local/bin:<host-home>/.opencode/bin:<host-home>/.kimi-code/bin:/usr/lib/ccache/bin/:<host-home>/.config/orca/linux-orca-cli-shim:<host-home>/.local/bin:<host-home>/.polygraph/bin:<host-home>/.opencode/bin:<host-home>/.kimi-code/bin:/usr/lib/ccache/bin/:<host-home>/.local/share/pnpm:/usr/local/bin:/usr/bin:/bin:<host-home>/.cargo/bin/:<host-home>/.local/bin/:<host-home>/.pulumi/bin:<host-home>/.nvm/versions/node/v26.7.0/bin:<host-home>/.volta/bin:<host-home>/.asdf/shims:<host-home>/.fnm/aliases/default/bin:<host-home>/.local/share/mise/shims:<host-home>/.yarn/bin:<host-home>/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/sbin:/snap/bin:/home/linuxbrew/.linuxbrew/bin:/nix/var/nix/profiles/default/bin:<host-home>/bin:<host-home>/.nix-profile/bin:<host-home>/.vite-plus/bin:<host-home>/.cargo/bin/:<host-home>/.local/bin/:<host-home>/.pulumi/bin:<host-home>/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/bin:<host-home>/.claude/plugins/cache/pulumi-agent-skills/pulumi-migration/1.0.0/bin:<host-home>/.claude/plugins/cache/pulumi-agent-skills/pulumi/2.0.6/bin:<host-home>/.claude/plugins/cache/pulumi-agent-skills/pulumi-delegation/1.0.0/bin
+pid=293833
+uname=Linux 7.2.5-200.fc44.x86_64 x86_64
+container_marker=
+virt=none
+orca_path=/opt/Orca/resources/bin/orca-ide
+orca_version=1.4.201
+orca_fingerprint=7199608:1592:1789327972
+project_real=<host-home>
