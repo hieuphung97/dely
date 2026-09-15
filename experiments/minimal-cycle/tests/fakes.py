@@ -64,13 +64,19 @@ ORCA_TERMINAL_REPLY = (
     '"worktreeId": "repo::project", "surface": "visible"}}}'
 )
 
-# The real shape: identifiers nested under `result`, the top-level `id` being
-# the request's. One reply serves all three orchestration commands here.
+# The real shape: identifiers and the delivery both nested under `result`, the
+# top-level `id` being the request's. One reply serves all three orchestration
+# commands here.
 ORCA_DISPATCH_REPLY = (
     '{"id": "request-fake", "ok": true, "result": {"run": {"id": "run-fake"}, '
     '"runId": "run-fake", "taskId": "task-fake", "dispatchId": "dispatch-fake", '
-    '"state": "ready"}, '
-    '"messages": [{"type": "worker_done", "outcome": "DONE"}]}'
+    '"state": "ready", '
+    '"messages": [{"type": "worker_done", "outcome": "DONE"}], "count": 1}}'
+)
+
+#: A wait that woke with nothing to report, in the same shape.
+ORCA_EMPTY_DELIVERY = (
+    '{"id": "request-fake", "ok": true, "result": {"messages": [], "count": 0}}'
 )
 
 
@@ -233,7 +239,7 @@ class FakeAdapter(BackendAdapter):
                 return self._outcome(argv, 1, reply, "")
             if not self.wait_settles and "--wait" in joined:
                 # The dispatch never reports, so the wait returns nothing.
-                return self._outcome(argv, 0, '{"messages": []}', "")
+                return self._outcome(argv, 0, ORCA_EMPTY_DELIVERY, "")
             if not self.task_writes_nothing:
                 self.project.mkdir(parents=True, exist_ok=True)
                 (self.project / "evidence.txt").write_text(self.marker, encoding="utf-8")

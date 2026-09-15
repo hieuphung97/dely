@@ -442,6 +442,11 @@ class _Cycle:
         assert self.handle is not None
         with self.phase("task") as record:
             self.task_ran = True
+            def keep(name: str, stdout: str, stderr: str) -> None:
+                self.exporter.write_text(f"dispatch/{name}.stdout", stdout)
+                if stderr.strip():
+                    self.exporter.write_text(f"dispatch/{name}.stderr", stderr)
+
             worker_record = worker.launch(
                 run_config=self.config,
                 adapter=self.adapter,
@@ -449,6 +454,7 @@ class _Cycle:
                 timeout_seconds=self.config.timeout_seconds,
                 env_overlay=self.env_overlay,
                 coordinator_handle=self.coordinator_handle,
+                keep=keep,
             )
             self.result.worker = worker_record
             record.status = worker_record.status

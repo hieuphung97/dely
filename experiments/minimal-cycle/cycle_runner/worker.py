@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from . import redact
 from .adapters.base import BackendAdapter, EnvironmentHandle
@@ -208,13 +208,17 @@ def task_identifier(document: Mapping[str, Any]) -> str | None:
 
 
 def _settling_message(document: Mapping[str, Any]) -> dict[str, Any]:
-    messages = document.get("messages")
+    """Return the message that settled the wait, from the plane's own reply.
+
+    The delivery is a field of the reply's `result`; the reply's top level is
+    the request envelope. Reading the envelope finds no messages and reports a
+    worker that finished as one that never answered.
+    """
+    messages = _result(document).get("messages")
     if isinstance(messages, list):
         for message in messages:
             if isinstance(message, Mapping) and message.get("type") in SETTLING_TYPES:
                 return dict(message)
-    if document.get("type") in SETTLING_TYPES:
-        return dict(document)
     return {}
 
 
@@ -226,8 +230,14 @@ def launch(
     timeout_seconds: int,
     env_overlay: Mapping[str, str] | None = None,
     coordinator_handle: str | None = None,
+    keep: Callable[[str, str, str], None] | None = None,
 ) -> WorkerRecord:
-    """Run exactly one worker and report how it settled."""
+    """Run exactly one worker and report how it settled.
+
+    `keep` is offered each orchestration reply under a name, redacted. The
+    reply is what decides the run, and a run that reports only its verdict
+    leaves the next reader nothing to check the verdict against.
+    """
     record = WorkerRecord(
         agent=run_config.orca.agent,
         model=run_config.orca.model,
@@ -235,6 +245,14 @@ def launch(
     )
     overlay = dict(env_overlay or {})
     secrets: Sequence[str] = tuple(value for value in overlay.values() if value)
+
+    def remember(name: str, outcome) -> None:
+        if keep is not None:
+            keep(
+                name,
+                redact.text(outcome.stdout or "", secrets),
+                redact.text(outcome.stderr or "", secrets),
+            )
 
     plan = build_plan(
         run_config=run_config,
@@ -248,6 +266,7 @@ def launch(
         plan.run_create_argv, timeout=timeout_seconds, env=overlay, extra_values=secrets
     )
     record.commands.append(created.to_record())
+    remember("run-create", created)
     if created.timed_out:
         record.status = PhaseStatus.TIMEOUT
         record.detail = "orca orchestration run-create reached the run deadline"
@@ -277,6 +296,7 @@ def launch(
         extra_values=secrets,
     )
     record.commands.append(started.to_record())
+    remember("worker-start", started)
     if started.timed_out:
         record.status = PhaseStatus.TIMEOUT
         record.detail = "orca orchestration worker-start reached the run deadline"
@@ -309,6 +329,7 @@ def launch(
         plan.wait_argv, timeout=timeout_seconds, env=overlay, extra_values=secrets
     )
     record.commands.append(settled.to_record())
+    remember("completion-wait", settled)
     if settled.timed_out:
         record.status = PhaseStatus.TIMEOUT
         record.detail = "the completion wait reached the run deadline before the worker settled"

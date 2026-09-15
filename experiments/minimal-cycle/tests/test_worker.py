@@ -30,7 +30,20 @@ STARTED = json.dumps(
         },
     }
 )
-SETTLED = json.dumps({"messages": [{"type": "worker_done", "outcome": "DONE"}]})
+# The shape `orca orchestration check` really answers with: the messages are
+# a field of the result, and the reply's top level is the request envelope.
+def delivery(*messages):
+    """Return a check reply carrying these messages, as the plane sends it."""
+    return json.dumps(
+        {
+            "id": "e0a1e4d0-0000-4000-8000-000000000000",
+            "ok": True,
+            "result": {"messages": list(messages), "count": len(messages)},
+        }
+    )
+
+
+SETTLED = delivery({"type": "worker_done", "outcome": "DONE"})
 
 DEFAULT_SCRIPT = [
     ("run-create", 0, READY, "", False),
@@ -140,7 +153,7 @@ class WorkerTest(unittest.TestCase):
             (
                 "check --wait",
                 0,
-                json.dumps({"messages": [{"type": "escalation", "outcome": "BLOCKED"}]}),
+                delivery({"type": "escalation", "outcome": "BLOCKED"}),
                 "",
                 False,
             ),
@@ -324,7 +337,7 @@ class UnverifiedStartTest(WorkerTest):
         self.assertEqual(record.dispatch_id, "dispatch-abcdef")
 
     def test_a_dispatch_that_never_settles_keeps_the_unverifiable_state(self):
-        _, _, record = self.launch(script=self.script(json.dumps({"messages": []})))
+        _, _, record = self.launch(script=self.script(delivery()))
         self.assertEqual(record.outcome, "outcome_unknown")
         self.assertNotEqual(record.status, status.PhaseStatus.OK)
 
@@ -423,3 +436,35 @@ class ErrorReportingTest(WorkerTest):
         _, _, record = self.launch(script=script)
         self.assertIn("consumer_fenced", record.detail)
         self.assertNotIn("{", record.detail)
+
+
+class KeptRepliesTest(WorkerTest):
+    """The reply that decided the run is the one worth keeping."""
+
+    def launch_keeping(self, **overrides):
+        kept = {}
+        adapter = ScriptedAdapter(self.root / "run", script=DEFAULT_SCRIPT)
+        handle = adapter.create()
+        worker.launch(
+            run_config=self.config,
+            adapter=adapter,
+            handle=handle,
+            timeout_seconds=self.config.timeout_seconds,
+            keep=lambda name, stdout, stderr: kept.__setitem__(name, stdout + stderr),
+            **overrides,
+        )
+        return kept
+
+    def test_every_orchestration_reply_is_offered_for_export(self):
+        kept = self.launch_keeping(env_overlay={})
+        self.assertEqual(
+            sorted(kept), ["completion-wait", "run-create", "worker-start"]
+        )
+        self.assertIn("worker_done", kept["completion-wait"])
+
+    def test_a_kept_reply_carries_no_value_the_overlay_passed(self):
+        kept = self.launch_keeping(
+            env_overlay={"CLAUDE_CODE_OAUTH_TOKEN": "sk-ant-secret-value-here"}
+        )
+        for name, text in kept.items():
+            self.assertNotIn("sk-ant-secret-value-here", text, name)

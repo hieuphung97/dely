@@ -39,6 +39,30 @@ class Counterexample:
 
 CASES: tuple[Counterexample, ...] = (
     Counterexample(
+        name="a-settling-message-is-read-from-the-delivery",
+        requirement=(
+            "A wait read from the request envelope reports a worker that "
+            "finished as one that never answered"
+        ),
+        path="cycle_runner/worker.py",
+        original='    messages = _result(document).get("messages")',
+        replacement='    messages = document.get("messages")',
+        instruments=(
+            "tests.test_worker.WorkerTest",
+            "tests.test_lifecycle.SettledCycleTest",
+        ),
+    ),
+    Counterexample(
+        name="the-reply-that-decided-the-run-is-kept",
+        requirement="A run that exports only its verdict keeps nothing to check it against",
+        path="cycle_runner/worker.py",
+        original="""    def remember(name: str, outcome) -> None:
+        if keep is not None:""",
+        replacement="""    def remember(name: str, outcome) -> None:
+        if False:""",
+        instruments=("tests.test_worker.KeptRepliesTest",),
+    ),
+    Counterexample(
         name="first-run-state-names-the-environment-copy",
         requirement=(
             "First-run state keyed to a path the agent will never open leaves "
