@@ -107,7 +107,8 @@ $artifact_root/<run_id>/
   logs/commands.jsonl        every command, with timings and exit codes
   run-before-cleanup.json    the result as it stood when the export was taken
   export-receipt.json        each artifact re-read from the host, with its digest
-  cleanup.json               what was removed, what was kept, and how that was checked
+  cleanup.json               what was removed, what was kept, what the run left
+                             running on the host, and how each was checked
 ```
 
 `manifest.json`, `cleanup.json` and `host-after.json` are written after cleanup,
@@ -267,12 +268,20 @@ the table with the tests each row runs. The recorded sweep is in
 | The reply that decided the run is exported beside the verdict | case `the-reply-that-decided-the-run-is-kept` | `evidence/distrobox-settled-cycle/dispatch-worker-start.json` |
 | A dispatch the plane could not verify keeps what its agent's terminal held | case `an-unverifiable-dispatch-keeps-its-terminal` | `evidence/vm-unobserved-turn/` |
 | A worker really does the task and an independent check agrees | `./run-cycle run` on this host | `evidence/distrobox-settled-cycle/` |
+| A coordinator terminal has to say which machine it is on | case `the-terminal-says-which-machine-it-is-on` | `evidence/distrobox-settled-cycle/` |
+| A run whose processes are still on the host is residue, not destroyed | case `a-process-left-running-is-residue` | `evidence/counterexamples.txt` |
+| The survey matches this run's paths, never a program name | case `the-survey-matches-a-path-not-a-program` | `evidence/counterexamples.txt` |
 
 ## What no instrument here observes
 
-A second, different task. A run on any host but this one. Isolation on the
-container backend, which mounts the host home and says so in `preflight.json`
-rather than claiming otherwise.
+A second, different task. A run on any host but this one.
+
+Isolation on the container backend. Distrobox mounts the host home, shares the
+host's process namespace and shares the host's display sockets. The runner
+records each of these rather than claiming otherwise: `preflight.json` blocks
+until the home mount is acknowledged, the cleanup survey exists because
+processes outlive the container, and a virtual display did **not** keep the
+application off the host's desktop when one run assumed it would.
 
 The machine backend has not completed a cycle. It creates its domain, proves a
 distinct kernel, starts Orca, opens a coordinator terminal and dispatches a
