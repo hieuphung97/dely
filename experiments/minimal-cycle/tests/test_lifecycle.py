@@ -393,3 +393,33 @@ class ProjectRepositoryTest(CycleTestCase):
         patch = self.artifact("diff.patch").read_text(encoding="utf-8")
         self.assertNotIn(".git/", patch)
         self.assertIn("evidence.txt", patch)
+
+
+class UnverifiableDispatchTest(CycleTestCase):
+    """The plane saying it cannot tell is not the plane saying it failed.
+
+    Observed against a live runtime: with no credential in the image, Claude
+    Code's turn never began and Orca reported `outcome_unknown` with
+    `turn_start_unobserved` — explicitly unverifiable, not proof of failure.
+    """
+
+    def test_an_unverifiable_dispatch_settles_unknown_rather_than_error(self):
+        _, outcome = self.run_cycle(dispatch_state="outcome_unknown")
+        self.assertEqual(outcome.run_result.status, status.RunStatus.UNKNOWN)
+        self.assertIn("unknown", outcome.run_result.failure_classification.lower())
+
+    def test_the_dispatch_identifiers_are_still_recorded(self):
+        _, outcome = self.run_cycle(dispatch_state="outcome_unknown")
+        worker_record = outcome.run_result.worker
+        self.assertEqual(worker_record.dispatch_id, "dispatch-fake")
+        self.assertEqual(worker_record.outcome, "outcome_unknown")
+        self.assertEqual(worker_record.model, "pinned-model")
+
+    def test_the_evidence_is_still_exported_and_the_environment_destroyed(self):
+        _, outcome = self.run_cycle(dispatch_state="outcome_unknown")
+        self.assertEqual(outcome.run_result.export.status, status.ExportStatus.CONFIRMED)
+        self.assertEqual(outcome.run_result.cleanup.status, status.CleanupStatus.DESTROYED)
+
+    def test_a_genuine_refusal_is_still_an_error(self):
+        _, outcome = self.run_cycle(dispatch_state="refused")
+        self.assertEqual(outcome.run_result.status, status.RunStatus.ERROR)

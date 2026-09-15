@@ -101,6 +101,7 @@ class FakeAdapter(BackendAdapter):
         terminal_refused: bool = False,
         already_running: bool = False,
         refuse_repository: bool = False,
+        dispatch_state: str | None = None,
         create_fails: bool = False,
         task_writes_nothing: bool = False,
         host_project: Path | None = None,
@@ -126,6 +127,7 @@ class FakeAdapter(BackendAdapter):
         # what the real environment does too.
         self.app_started = already_running
         self.refuse_repository = refuse_repository
+        self.dispatch_state = dispatch_state
         self.create_fails = create_fails
         self.task_writes_nothing = task_writes_nothing
         self.host_project = host_project
@@ -222,6 +224,11 @@ class FakeAdapter(BackendAdapter):
             self.calls.append("worker")
             if self.task_hangs:
                 return self._outcome(argv, None, "", "deadline reached", timed_out=True)
+            if self.dispatch_state and "worker-start" in joined:
+                reply = ORCA_DISPATCH_REPLY.replace(
+                    '"state": "ready"', f'"state": "{self.dispatch_state}"'
+                )
+                return self._outcome(argv, 1, reply, "")
             if not self.task_writes_nothing:
                 self.project.mkdir(parents=True, exist_ok=True)
                 (self.project / "evidence.txt").write_text(self.marker, encoding="utf-8")

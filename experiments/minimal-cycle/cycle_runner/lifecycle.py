@@ -110,6 +110,7 @@ def _classify(
     blocked_reason: str,
     timed_out: bool,
     error_reason: str,
+    unverifiable_reason: str,
     cleanup_record: CleanupRecord,
 ) -> tuple[RunStatus, str]:
     if export_status is not ExportStatus.CONFIRMED:
@@ -124,6 +125,8 @@ def _classify(
         return RunStatus.TIMEOUT, "the task reached the configured deadline"
     if error_reason:
         return RunStatus.ERROR, error_reason
+    if unverifiable_reason:
+        return RunStatus.UNKNOWN, unverifiable_reason
     if cleanup_record.status is not CleanupStatus.DESTROYED:
         return RunStatus.CLEANUP_FAILED, cleanup_record.reason
     return RunStatus.SETTLED, ""
@@ -161,6 +164,7 @@ class _Cycle:
         self.create_attempted = False
         self.blocked_reason = ""
         self.error_reason = ""
+        self.unverifiable_reason = ""
         self.timed_out = False
         self.task_ran = False
         self.stop_confirmed = True
@@ -234,10 +238,21 @@ class _Cycle:
             self._task()
         else:
             self.skip("task", self.blocked_reason or self.error_reason or "no environment")
-        if self.task_ran and not self.timed_out and not self.error_reason:
+        if (
+            self.task_ran
+            and not self.timed_out
+            and not self.error_reason
+            and not self.unverifiable_reason
+        ):
             self._check()
         else:
-            self.skip("check", self.blocked_reason or self.error_reason or "the task did not settle")
+            self.skip(
+                "check",
+                self.blocked_reason
+                or self.error_reason
+                or self.unverifiable_reason
+                or "the task did not settle",
+            )
 
         self._collect(baseline, fetched)
         export_record = self._export()
@@ -419,7 +434,14 @@ class _Cycle:
             if worker_record.status is PhaseStatus.TIMEOUT:
                 self.timed_out = True
             elif worker_record.status is not PhaseStatus.OK:
-                self.error_reason = self.error_reason or worker_record.detail
+                if worker_record.outcome in worker.UNVERIFIABLE_STATES:
+                    self.unverifiable_reason = self.unverifiable_reason or (
+                        f"the execution plane reported the dispatch as "
+                        f"{worker_record.outcome}, which is unverifiable rather than "
+                        "failed: nothing here knows whether the worker ran"
+                    )
+                else:
+                    self.error_reason = self.error_reason or worker_record.detail
 
     def _check(self) -> None:
         assert self.handle is not None
@@ -560,6 +582,7 @@ class _Cycle:
                 blocked_reason=self.blocked_reason,
                 timed_out=self.timed_out,
                 error_reason=self.error_reason,
+                unverifiable_reason=self.unverifiable_reason,
                 cleanup_record=cleanup_record,
             )
             self.result.status = run_status

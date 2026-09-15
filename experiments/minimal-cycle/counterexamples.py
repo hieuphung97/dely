@@ -230,6 +230,14 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_lifecycle.CreateFailureTest",),
     ),
     Counterexample(
+        name="unverifiable-is-not-failed",
+        requirement="A dispatch the plane cannot judge settles unknown, not error",
+        path="cycle_runner/lifecycle.py",
+        original="""                if worker_record.outcome in worker.UNVERIFIABLE_STATES:""",
+        replacement="""                if False:""",
+        instruments=("tests.test_lifecycle.UnverifiableDispatchTest",),
+    ),
+    Counterexample(
         name="the-request-is-not-the-run",
         requirement="The Run identifier is read from the Run, not from the request",
         path="cycle_runner/worker.py",

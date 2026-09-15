@@ -20,6 +20,11 @@ from .result import WorkerRecord
 from .status import PhaseStatus
 
 SETTLING_TYPES = ("worker_done", "escalation", "question")
+
+#: States the execution plane uses to say it could not tell what happened. They
+#: are not failures: the worker may still be starting, wedged, or holding the
+#: task unsent. Treating them as failures claims knowledge nobody has.
+UNVERIFIABLE_STATES = ("outcome_unknown",)
 PROMPT_NAME = "dispatch-prompt.md"
 DEFAULT_PROMPT_PATH = (
     Path(__file__).resolve().parent.parent / "fixtures" / "evidence-task" / "prompt.md"
