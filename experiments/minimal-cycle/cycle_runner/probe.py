@@ -31,6 +31,7 @@ REQUIRED_FIELDS = (
     "virt",
     "orca_path",
     "orca_version",
+    "orca_fingerprint",
     "project_real",
 )
 
@@ -39,6 +40,7 @@ REQUIRED_FIELDS = (
 PROBE_SCRIPT = r"""
 set -u
 project_path="${1:-}"
+orca_command="${2:-orca}"
 
 first_line() {
     if [ -r "$1" ]; then
@@ -60,10 +62,13 @@ if command -v systemd-detect-virt >/dev/null 2>&1; then
     if [ -n "$detected" ]; then virt="$detected"; fi
 fi
 
-orca_binary="$(command -v orca 2>/dev/null || printf '')"
+orca_binary="$(command -v "$orca_command" 2>/dev/null || printf '')"
 orca_release=''
+orca_fingerprint=''
 if [ -n "$orca_binary" ]; then
     orca_release="$("$orca_binary" --version 2>/dev/null | head -n 1 || printf '')"
+    orca_resolved="$(readlink -f "$orca_binary" 2>/dev/null || printf '%s' "$orca_binary")"
+    orca_fingerprint="$(stat -c '%i:%s:%Y' "$orca_resolved" 2>/dev/null || printf '')"
 fi
 
 project_resolved=''
@@ -83,15 +88,21 @@ printf 'container_marker=%s\n' "$marker"
 printf 'virt=%s\n' "$virt"
 printf 'orca_path=%s\n' "$orca_binary"
 printf 'orca_version=%s\n' "$orca_release"
+printf 'orca_fingerprint=%s\n' "$orca_fingerprint"
 printf 'project_real=%s\n' "$project_resolved"
 """
 
 _UNINFORMATIVE_VIRT = ("", "none", "unknown")
 
 
-def probe_argv(project_path: str) -> list[str]:
-    """Return the argv that runs the probe with the project path to resolve."""
-    return ["sh", "-c", PROBE_SCRIPT, "cycle-probe", project_path]
+def probe_argv(project_path: str, orca_command: str = "orca") -> list[str]:
+    """Return the argv that runs the probe for a project path and an Orca command.
+
+    The command is named rather than assumed: a container inherits the host's
+    search path, so the bare name can resolve to the host's own launcher even
+    when the container has an installation of its own.
+    """
+    return ["sh", "-c", PROBE_SCRIPT, "cycle-probe", project_path, orca_command]
 
 
 def parse(text: str) -> dict[str, str]:
@@ -122,6 +133,10 @@ def _host_view(host: Mapping[str, str]) -> dict[str, Any]:
         "home_digest": digest(host.get("home", "")),
         "user_digest": digest(host.get("user", "")),
         "project_real_digest": digest(host.get("project_real", "")),
+        # Digests, not paths: the host's own installation may sit under a home
+        # directory, and this block travels into artifacts a person may share.
+        "orca_path_digest": digest(host.get("orca_path", "")),
+        "orca_fingerprint_digest": digest(host.get("orca_fingerprint", "")),
         "virt": host.get("virt", ""),
         "orca_present": bool(host.get("orca_path")),
     }
@@ -141,6 +156,7 @@ def _environment_view(environment: Mapping[str, str]) -> dict[str, Any]:
             "virt",
             "orca_path",
             "orca_version",
+            "orca_fingerprint",
             "project_real",
         )
     }
@@ -178,7 +194,15 @@ def verdict(
     environment_orca = environment.get("orca_path", "")
     host_orca = host.get("orca_path", "")
     environment_version = environment.get("orca_version", "")
-    is_host_installation = bool(environment_orca) and environment_orca == host_orca
+    # The same path is not the same file: a container that installs its own
+    # Orca has it where the host does. Compare what the path resolves to, and
+    # fall back to the path only when nothing could be resolved.
+    environment_print = environment.get("orca_fingerprint", "")
+    host_print = host.get("orca_fingerprint", "")
+    if environment_print and host_print:
+        is_host_installation = environment_print == host_print
+    else:
+        is_host_installation = bool(environment_orca) and environment_orca == host_orca
     record = IdentityRecord(
         host=_host_view(host),
         environment=_environment_view(environment),

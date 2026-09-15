@@ -304,13 +304,15 @@ class _Cycle:
         with self.phase("identity") as record:
             host_probe = self.log.record(
                 proc.run(
-                    probe.probe_argv(str(self.config.project.source)),
+                    probe.probe_argv(
+                        str(self.config.project.source), self.config.orca.command
+                    ),
                     timeout=min(120, self.config.timeout_seconds),
                     context="host",
                 )
             )
             environment_probe = self.execute(
-                probe.probe_argv(self.handle.project_path),
+                probe.probe_argv(self.handle.project_path, self.config.orca.command),
                 timeout=min(120, self.config.timeout_seconds),
             )
             self.exporter.write_text("identity/host-probe.txt", host_probe.stdout)

@@ -230,6 +230,17 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_lifecycle.CreateFailureTest",),
     ),
     Counterexample(
+        name="the-same-path-is-not-the-same-file",
+        requirement="An environment with its own Orca at the host's path is not the host's",
+        path="cycle_runner/probe.py",
+        original="""    if environment_print and host_print:
+        is_host_installation = environment_print == host_print
+    else:
+        is_host_installation = bool(environment_orca) and environment_orca == host_orca""",
+        replacement="""    is_host_installation = bool(environment_orca) and environment_orca == host_orca""",
+        instruments=("tests.test_probe.OrcaFingerprintTest",),
+    ),
+    Counterexample(
         name="the-application-is-started",
         requirement="The runner starts the application rather than hoping something did",
         path="cycle_runner/lifecycle.py",

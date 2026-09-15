@@ -237,3 +237,123 @@ class OrcaPresenceTest(unittest.TestCase):
             verdict(container_snapshot(orca_path="/usr/bin/orca", orca_version="1.4.201"))
         )
         self.assertTrue(allowed)
+
+
+class OrcaFingerprintTest(unittest.TestCase):
+    """The same path is not the same file.
+
+    A container that installs its own Orca has it at `/opt/Orca/orca-ide`, and
+    so does the host. Comparing paths would call that the host's installation.
+    Comparing what the path resolves to does not.
+    """
+
+    def test_the_same_path_with_a_different_file_is_the_environments_own(self):
+        record = verdict(
+            container_snapshot(
+                orca_path="/opt/Orca/orca-ide",
+                orca_version="1.4.201",
+                orca_fingerprint="222:9001:1700000000",
+            ),
+            host=host_snapshot(
+                orca_path="/opt/Orca/orca-ide",
+                orca_fingerprint="111:9001:1600000000",
+            ),
+        )
+        self.assertFalse(record.orca_is_host_installation)
+        self.assertTrue(record.orca_present)
+
+    def test_the_same_path_and_the_same_file_is_the_hosts(self):
+        record = verdict(
+            container_snapshot(
+                orca_path="/opt/Orca/orca-ide",
+                orca_version="1.4.201",
+                orca_fingerprint="111:9001:1600000000",
+            ),
+            host=host_snapshot(
+                orca_path="/opt/Orca/orca-ide",
+                orca_fingerprint="111:9001:1600000000",
+            ),
+        )
+        self.assertTrue(record.orca_is_host_installation)
+        self.assertFalse(record.orca_present)
+
+    def test_without_a_fingerprint_the_path_is_still_compared(self):
+        record = verdict(
+            container_snapshot(
+                orca_path=host_snapshot()["orca_path"],
+                orca_version="1.4.201",
+                orca_fingerprint="",
+            )
+        )
+        self.assertTrue(record.orca_is_host_installation)
+
+    def test_a_different_path_is_never_the_hosts(self):
+        record = verdict(
+            container_snapshot(
+                orca_path="/usr/local/bin/orca",
+                orca_version="1.4.201",
+                orca_fingerprint="333:100:1700000000",
+            )
+        )
+        self.assertFalse(record.orca_is_host_installation)
+        self.assertTrue(record.orca_present)
+
+    def test_the_fingerprint_is_a_named_probe_field(self):
+        self.assertIn("orca_fingerprint", probe.REQUIRED_FIELDS)
+        self.assertIn("orca_fingerprint=", probe.PROBE_SCRIPT)
+
+
+class HostViewDisclosureTest(unittest.TestCase):
+    """The host block travels into shared artifacts, so it carries no paths."""
+
+    def test_no_absolute_path_reaches_the_host_view(self):
+        record = verdict(
+            container_snapshot(),
+            host=host_snapshot(
+                orca_path="/home/someone/.config/orca/linux-orca-cli-shim/orca",
+                home="/home/someone",
+                project_real="/home/someone/code/under-test",
+            ),
+        )
+        rendered = str(record.host)
+        self.assertNotIn("/home/someone", rendered)
+        self.assertNotIn("someone", rendered)
+        self.assertNotIn("/", rendered.replace("orca_path_digest", "").replace(
+            "orca_fingerprint_digest", ""))
+
+    def test_the_digests_still_separate_two_different_installations(self):
+        first = verdict(container_snapshot(), host=host_snapshot(orca_path="/a/orca"))
+        second = verdict(container_snapshot(), host=host_snapshot(orca_path="/b/orca"))
+        self.assertNotEqual(
+            first.host["orca_path_digest"], second.host["orca_path_digest"]
+        )
+
+
+class ConfiguredOrcaCommandTest(unittest.TestCase):
+    """Which Orca the environment must use is a decision, not a PATH accident.
+
+    A Distrobox container inherits the host's PATH and sees the host's home, so
+    `command -v orca` finds the host's launcher even when the container has its
+    own installation. The command to look for is therefore named.
+    """
+
+    def test_the_probe_takes_the_command_to_look_for(self):
+        argv = probe.probe_argv("/home/cycle/project", orca_command="/opt/Orca/orca-ide")
+        self.assertIn("/opt/Orca/orca-ide", argv)
+        self.assertIn("/home/cycle/project", argv)
+
+    def test_the_default_is_the_plain_name(self):
+        self.assertIn("orca", probe.probe_argv("/p"))
+
+    def test_the_script_resolves_the_named_command(self):
+        self.assertIn('command -v "$orca_command"', probe.PROBE_SCRIPT)
+
+    def test_a_named_command_is_what_the_probe_reports(self):
+        from cycle_runner import proc
+
+        outcome = proc.run(
+            probe.probe_argv("/", orca_command="/bin/sh"), timeout=30, context="host"
+        )
+        snapshot = probe.parse(outcome.stdout)
+        self.assertEqual(snapshot["orca_path"], "/bin/sh")
+        self.assertNotEqual(snapshot["orca_fingerprint"], "")
