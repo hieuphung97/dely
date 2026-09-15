@@ -339,3 +339,24 @@ class OrcaSessionTest(CycleTestCase):
         adapter, _ = self.run_cycle()
         self.assertIn("terminal-create", adapter.calls)
         self.assertLess(adapter.calls.index("terminal-create"), adapter.calls.index("worker"))
+
+
+class OrcaApplicationStartTest(CycleTestCase):
+    """Nothing else starts the application, so the runner does."""
+
+    def test_the_application_is_started_inside_the_environment(self):
+        adapter, _ = self.run_cycle()
+        joined = [" ".join(argv) for argv in getattr(adapter, "executed", [])]
+        self.assertTrue(
+            any("orca-start" in line for line in joined)
+            or any("execute:sh" in call for call in adapter.calls),
+            adapter.calls,
+        )
+
+    def test_the_start_is_recorded_as_a_command_of_the_identity_phase(self):
+        _, outcome = self.run_cycle()
+        identity = outcome.run_result.phase("identity")
+        self.assertTrue(
+            any("orca-start" in " ".join(c.argv) for c in identity.commands),
+            [" ".join(c.argv)[:60] for c in identity.commands],
+        )

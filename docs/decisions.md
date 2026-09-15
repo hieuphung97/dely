@@ -3,11 +3,80 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-14.
+Last updated 2026-09-15.
 
 ---
 
 ## Settled
+
+### 2026-09-15 — A test double that can run a command runs it on the developer's machine
+
+#### Context
+
+The cycle runner's fake backend adapter treated its "environment" as a
+directory on the host, and answered a small set of commands from a table.
+Anything it did not recognise fell through to the real process runner, which
+meant it ran on the machine running the tests. That was a deliberate choice:
+it made the fake honest about the commands it did handle, because the check
+script and the auth teardown really executed and really observed their files.
+
+Then the runner gained a step that starts the Orca desktop application inside
+the environment. The fake did not recognise it, so it fell through. Every
+lifecycle test that reached the identity phase — more than a dozen — launched a
+real Orca on the developer's own desktop. The result was dozens of application
+windows and a reboot to clear them.
+
+Nothing about that was a bug in the runner. The runner did exactly what it was
+asked. The fault was entirely in the double: its fall-through was a general
+permission to execute, held open for the convenience of a few specific
+commands.
+
+#### Decision
+
+A test double never runs a command it does not name. The fake adapter carries
+an allowlist of program names and, for `sh -c`, an allowlist of the runner's
+own script names; anything else is answered with a non-zero outcome and a
+reason, never executed. Removals are refused outside the fake's own root. The
+stub runner's passthrough is narrowed to key generation, which is the one thing
+it genuinely needs a real process for.
+
+`tests/test_doubles_are_contained.py` holds these as tests: starting the
+application through the fake must be refused, an arbitrary program must be
+refused, an unnamed shell script must be refused, and the runner's own scripts
+must still run.
+
+#### Alternatives considered
+
+Removing execution from the fake entirely and scripting every answer. It would
+be safe and it would make the check and the teardown prove nothing: those tests
+are worth having precisely because a real file is really inspected.
+
+Running the suite in a container or a virtual machine. It would contain the
+blast radius and it would also hide the defect, which is that a double should
+not be able to do this in the first place. It is worth doing later as defence
+in depth; it is not the fix.
+
+#### Consequences
+
+The allowlist has to grow deliberately when the runner learns a new command the
+fake should really execute, and a reviewer sees that growth. That is the point.
+
+This generalises past this runner. Any test double standing in for a remote or
+isolated environment, on a machine where the same commands would also work
+locally, has this shape: the fall-through case is the dangerous one, and it is
+usually written for convenience by someone who is thinking about the commands
+they listed rather than the ones they did not.
+
+#### Non-goals
+
+Sandboxing the suite. Preventing the runner itself from starting applications
+in a real environment — that is its job.
+
+#### Deferred
+
+Running the suite inside a disposable environment as defence in depth,
+triggered by the suite needing to execute anything broader than the current
+allowlist.
 
 ### 2026-09-14 — One shared cycle runner, two backend adapters, export before cleanup
 

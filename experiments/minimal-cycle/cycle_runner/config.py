@@ -207,6 +207,8 @@ class OrcaConfig:
     run_objective: str = "dely minimal cycle"
     worktree_selector: str = "current"
     ready_timeout_seconds: int = 300
+    app_argv: tuple[str, ...] = ("/opt/Orca/orca-ide",)
+    display: str = ":0"
 
     def to_document(self) -> dict[str, Any]:
         return {
@@ -219,6 +221,8 @@ class OrcaConfig:
             "run_objective": self.run_objective,
             "worktree_selector": self.worktree_selector,
             "ready_timeout_seconds": self.ready_timeout_seconds,
+            "app_argv": list(self.app_argv),
+            "display": self.display,
         }
 
 
@@ -441,6 +445,8 @@ def _orca(document: Mapping[str, Any]) -> OrcaConfig:
             "run_objective",
             "worktree_selector",
             "ready_timeout_seconds",
+            "app_argv",
+            "display",
         ),
         "orca",
     )
@@ -454,6 +460,8 @@ def _orca(document: Mapping[str, Any]) -> OrcaConfig:
         run_objective=_text(document, "run_objective", "orca", "dely minimal cycle"),
         worktree_selector=_text(document, "worktree_selector", "orca", "current"),
         ready_timeout_seconds=_positive_int(document, "ready_timeout_seconds", "orca", 300),
+        app_argv=_argv(document, "app_argv", "orca", ("/opt/Orca/orca-ide",)),
+        display=_text(document, "display", "orca", ":0"),
     )
 
 

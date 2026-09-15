@@ -121,6 +121,21 @@ def build() -> int:
 
         IMAGES.mkdir(parents=True, exist_ok=True)
         target = IMAGES / IMAGE_NAME
+        # A previous image that a domain has used belongs to the emulator, not
+        # to this user, so it is removed through libvirt rather than by hand.
+        if target.exists():
+            subprocess.run(
+                ["virsh", "--connect", VERSIONS["host_tools"]["connect_uri"],
+                 "vol-delete", "--pool", VERSIONS["host_tools"]["storage_pool"]["name"],
+                 IMAGE_NAME],
+                capture_output=True, timeout=300,
+            )
+        if target.exists():
+            try:
+                target.unlink()
+            except PermissionError:
+                print(f"BLOCK  {target} could not be removed; delete it and build again")
+                return 1
         shutil.move(str(produced), target)
         target.chmod(0o644)
 

@@ -13,6 +13,12 @@ from tests.test_config import minimal_document
 RUN_ID = "20260914T221530Z-abc123-0123abcd"
 
 
+#: Passthrough exists so a test can generate a real key pair, and for nothing
+#: else. Anything not named here is answered from the table, never run: a stub
+#: that runs whatever it is handed runs it on the developer's own machine.
+PASSTHROUGH_PROGRAMS = frozenset({"ssh-keygen"})
+
+
 class StubRunner:
     """Answers commands from a table so the adapter can be tested without podman."""
 
@@ -30,7 +36,7 @@ class StubRunner:
         for needle, code, out, err in self.table:
             if needle in joined:
                 return self._outcome(argv, code, out, err, context, extra_values)
-        if self.passthrough:
+        if self.passthrough and Path(argv[0]).name in PASSTHROUGH_PROGRAMS:
             return proc.run(
                 argv,
                 timeout=timeout,

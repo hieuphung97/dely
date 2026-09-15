@@ -149,3 +149,42 @@ class CoordinatorTerminalTest(unittest.TestCase):
         with self.assertRaises(orca.OrcaSessionError) as caught:
             orca.open_coordinator_terminal(environment, "/home/cycle/project", timeout=5)
         self.assertIn("terminal", str(caught.exception).lower())
+
+
+class StartApplicationTest(unittest.TestCase):
+    """The command line is a client; something has to start the application.
+
+    Observed in a real guest: launched from the window manager's autostart the
+    application left only a crash handler directory and a singleton lock, and
+    the runtime never appeared. Launched as a detached command it reached
+    `ready`. So the runner starts it, and that start is a recorded command.
+    """
+
+    def test_the_application_is_started_detached_with_a_display(self):
+        environment = Environment([])
+        orca.start_application(
+            environment, ("/opt/Orca/orca-ide",), display=":0", timeout=30
+        )
+        argv = environment.seen[-1]
+        joined = " ".join(argv)
+        self.assertIn("/opt/Orca/orca-ide", joined)
+        self.assertIn("nohup", joined)
+        # The display is an argument the script exports, never inlined text.
+        self.assertIn('export DISPLAY="$1"', joined)
+        self.assertIn(":0", argv)
+        self.assertEqual(argv[-1], "/opt/Orca/orca-ide")
+
+    def test_a_stale_singleton_lock_is_cleared_first(self):
+        environment = Environment([])
+        orca.start_application(
+            environment, ("/opt/Orca/orca-ide",), display=":0", timeout=30
+        )
+        joined = " ".join(" ".join(argv) for argv in environment.seen)
+        self.assertIn("SingletonLock", joined)
+
+    def test_the_start_reports_what_it_ran(self):
+        environment = Environment([])
+        outcome = orca.start_application(
+            environment, ("/opt/Orca/orca-ide",), display=":0", timeout=30
+        )
+        self.assertEqual(outcome.context, "environment")

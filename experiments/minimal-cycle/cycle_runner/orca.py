@@ -120,6 +120,32 @@ def wait_for_runtime(
         sleeper(interval)
 
 
+#: Launched detached with its own output kept, because a window manager's
+#: autostart was observed to leave only a crash directory and a stale lock.
+START_SCRIPT = (
+    'rm -f "$HOME/.config/orca/SingletonLock" "$HOME/.config/orca/SingletonCookie"; '
+    'export DISPLAY="$1"; export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"; '
+    'shift; nohup "$@" > "$HOME/orca-app.log" 2>&1 & '
+    'printf "started %s\n" "$!"'
+)
+
+
+def start_argv(app_argv: Sequence[str], display: str) -> list[str]:
+    """Return the command that starts the application inside the environment."""
+    return ["sh", "-c", START_SCRIPT, "orca-start", display, *[str(a) for a in app_argv]]
+
+
+def start_application(
+    environment: Environment,
+    app_argv: Sequence[str],
+    *,
+    display: str,
+    timeout: float,
+) -> Any:
+    """Start the Orca application inside the environment and return the outcome."""
+    return environment.execute(start_argv(app_argv, display), timeout=timeout)
+
+
 def open_coordinator_terminal(
     environment: Environment, project_path: str, *, timeout: float
 ) -> str:

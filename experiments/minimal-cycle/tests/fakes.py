@@ -39,6 +39,11 @@ HOST = {
 }
 
 
+#: The only programs a fake environment may really run on this machine, and
+#: the only `sh -c` scripts among them. `orca-start` is deliberately absent.
+RUNNABLE_PROGRAMS = frozenset({"sh", "rm", "mkdir", "cat", "test", "true", "false", "printf"})
+RUNNABLE_SHELL_SCRIPTS = frozenset({"cycle-check", "auth-teardown", "cycle-cd"})
+
 ORCA_STATUS_REPLY = (
     '{"ok": true, "result": {"app": {"running": true, "pid": 1786, '
     '"desktopWindowStatus": "available"}, "runtime": {"state": "ready", '
@@ -225,6 +230,9 @@ class FakeAdapter(BackendAdapter):
             self.calls.append("check")
         else:
             self.calls.append(f"execute:{argv[0]}")
+        refusal = self._refuse(argv)
+        if refusal is not None:
+            return refusal
         return proc.run(
             argv,
             timeout=timeout,
@@ -233,6 +241,37 @@ class FakeAdapter(BackendAdapter):
             env=env,
             extra_values=extra_values,
         )
+
+    def _refuse(self, argv) -> proc.CommandOutcome | None:
+        """Answer, rather than run, anything outside the narrow allowlist.
+
+        This fake's "environment" is a directory on the developer's own
+        machine, so a command it does not recognise runs *here*. That is not
+        hypothetical: when the runner gained a step that starts the Orca
+        desktop application, every lifecycle test launched a real one on the
+        host. A test double that can start an application will start it.
+        """
+        program = Path(argv[0]).name
+        if program not in RUNNABLE_PROGRAMS:
+            return self._outcome(
+                argv, 127, "", f"the fake environment does not run {program}"
+            )
+        if program == "sh":
+            name = argv[3] if len(argv) > 3 else ""
+            if name not in RUNNABLE_SHELL_SCRIPTS:
+                return self._outcome(
+                    argv, 127, "", f"the fake environment does not run the script {name!r}"
+                )
+        if program == "rm":
+            targets = [item for item in argv[1:] if not item.startswith("-")]
+            outside = [
+                item for item in targets if not Path(item).is_relative_to(self.root)
+            ]
+            if outside:
+                return self._outcome(
+                    argv, 1, "", f"refusing to remove outside the fake root: {outside}"
+                )
+        return None
 
     def _outcome(self, argv, exit_code, stdout, stderr, timed_out=False):
         return proc.CommandOutcome(
