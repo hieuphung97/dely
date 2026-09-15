@@ -40,7 +40,7 @@ class ScrubbedArgvTest(unittest.TestCase):
             env={
                 "ORCA_TERMINAL_HANDLE": "a",
                 "ORCA_AGENT_HOOK_TOKEN": "b",
-                "ORCA_WORKSPACE_ID": "c",
+                "ORCA_PANE_KEY": "c",
             },
         )
         self.assertEqual(outcome.stdout.strip(), "0")

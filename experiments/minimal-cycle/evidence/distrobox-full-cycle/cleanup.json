@@ -1,0 +1,15 @@
+{
+  "host_difference": {},
+  "reason": "every declared per-run resource is gone and every shared one remains",
+  "removed": [
+    "container:dely-cycle-20260916t050000z-cccccc-00000004",
+    "path:/var/tmp/dely-cycle/state/20260916T050000Z-cccccc-00000004"
+  ],
+  "retained": [],
+  "shared_preserved": [
+    "image:docker.io/library/ubuntu:24.04"
+  ],
+  "status": "DESTROYED",
+  "stop_confirmed": true,
+  "verified": true
+}

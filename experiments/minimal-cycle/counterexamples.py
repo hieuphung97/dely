@@ -354,11 +354,13 @@ CASES: tuple[Counterexample, ...] = (
         requirement="Every orchestration command names the terminal it is sent from",
         path="cycle_runner/worker.py",
         original="""    if coordinator_handle:
-        for command in (created, start, wait):
-            command.extend(["--from", coordinator_handle])""",
+        for command in (created, start):
+            command.extend(["--from", coordinator_handle])
+        wait.extend(["--terminal", coordinator_handle])""",
         replacement="""    if False:
-        for command in (created, start, wait):
-            command.extend(["--from", coordinator_handle])""",
+        for command in (created, start):
+            command.extend(["--from", coordinator_handle])
+        wait.extend(["--terminal", coordinator_handle])""",
         instruments=("tests.test_worker.CoordinatorTerminalTest",),
     ),
     Counterexample(

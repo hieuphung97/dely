@@ -7,7 +7,7 @@ backend: vm
   ok     pinned environment present: /var/tmp/dely-cycle/venv/bin/python
   ok     pulumi state backend is local: state lives at file://~
   ok     provider schema verified: every class and field the program names exists in pulumi-libvirt@0.5.4
-  ok     base image present: /var/tmp/dely-cycle/images/ubuntu-24.04-server-cloudimg-amd64.img
+  ok     base image present: /var/tmp/dely-cycle/images/tool-image.qcow2
   ok     base image digest matches the pin: the preserved base matches the pinned digest
   ok     hardware acceleration device: /dev/kvm
   ok     libvirt connection answers: qemu:///system
