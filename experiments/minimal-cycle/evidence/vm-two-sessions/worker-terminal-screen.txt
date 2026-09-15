@@ -1,0 +1,9 @@
+handle: term_977b5b45-c86b-4e16-a32b-9669801c43f9
+status: running
+source: screen
+cursor: 1
+oldest cursor: 0
+latest cursor: 1
+
+cycle@dely-cycle-20260916t010000z-bbbbbb-00000014:~/project$ claude '--dangerously-skip-permissions' '--model' 'claude-o
+pus-5' '--effort' 'high'

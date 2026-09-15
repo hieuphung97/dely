@@ -1,0 +1,57 @@
+{
+  "id": "a251f26c-df94-4541-a8ee-95eb2ac9bb39",
+  "ok": true,
+  "result": {
+    "terminals": [
+      {
+        "handle": "term_388f8f62-dfea-4469-8aa7-1240fead6d28",
+        "ptyId": "d467a630-443a-4833-94b7-00287c9e59d6::/home/cycle/project@@3f54b13d",
+        "incarnationId": "bf7719f4-53b8-43b9-9b89-6f7e314ee0f8",
+        "orphaned": false,
+        "worktreeId": "d467a630-443a-4833-94b7-00287c9e59d6::/home/cycle/project",
+        "worktreePath": "/home/cycle/project",
+        "branch": "refs/heads/main",
+        "tabId": "bea97365-cedb-42c8-b3a1-8fd78ff65df8",
+        "leafId": "2585a216-9bac-4f26-a462-80027cdb4259",
+        "title": "cycle@dely-cycle-20260916t010000z-bbbbbb-00000014: ~/project",
+        "connected": true,
+        "writable": true,
+        "lastOutputAt": 1789492245803,
+        "preview": "cycle@dely-cycle-20260916t010000z-bbbbbb-00000014:~/project$",
+        "executionHostId": "local"
+      },
+      {
+        "handle": "term_977b5b45-c86b-4e16-a32b-9669801c43f9",
+        "ptyId": "d467a630-443a-4833-94b7-00287c9e59d6::/home/cycle/project@@b2f21216",
+        "incarnationId": "99bbcd01-9f93-4ba3-acb7-37e3f2b50c32",
+        "orphaned": false,
+        "worktreeId": "d467a630-443a-4833-94b7-00287c9e59d6::/home/cycle/project",
+        "worktreePath": "/home/cycle/project",
+        "branch": "refs/heads/main",
+        "tabId": "9405d064-84ed-453c-8eb8-6c25d489ff61",
+        "leafId": "735cc51a-e69d-441e-b39b-0942a8e10441",
+        "title": "cycle@dely-cycle-20260916t010000z-bbbbbb-00000014: ~/project",
+        "connected": true,
+        "writable": true,
+        "lastOutputAt": 1789492246897,
+        "preview": "cycle@dely-cycle-20260916t010000z-bbbbbb-00000014:~/project$ claude '--dangerously-skip-permissions' '--model' 'claude-opus-5' '--effort' 'high'",
+        "executionHostId": "local",
+        "agentIdentity": "claude"
+      }
+    ],
+    "hostScope": {
+      "hostIds": [
+        "local"
+      ],
+      "omittedHostIds": []
+    },
+    "topologyRevisions": {
+      "d467a630-443a-4833-94b7-00287c9e59d6::/home/cycle/project": 2
+    },
+    "totalCount": 2,
+    "truncated": false
+  },
+  "_meta": {
+    "runtimeId": "80cb98d3-d25b-4b4d-bf7f-148ef7386c8e"
+  }
+}

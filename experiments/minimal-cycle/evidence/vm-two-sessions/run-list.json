@@ -1,0 +1,30 @@
+{
+  "id": "e82452fd-c422-497b-b85d-542fc9b81f73",
+  "ok": true,
+  "result": {
+    "runs": [
+      {
+        "id": "run_569a123bb1f3",
+        "objective": "dely minimal cycle",
+        "coordinator_handle": "term_388f8f62-dfea-4469-8aa7-1240fead6d28",
+        "consumer_generation": 1,
+        "legacy": 0,
+        "created_at": "2026-09-15T17:10:46Z",
+        "updated_at": "2026-09-15T17:10:46Z"
+      },
+      {
+        "id": "run_legacy_local",
+        "objective": "Legacy orchestration state (inspect only)",
+        "coordinator_handle": null,
+        "consumer_generation": 0,
+        "legacy": 1,
+        "created_at": "2026-09-15T17:10:41Z",
+        "updated_at": "2026-09-15T17:10:41Z"
+      }
+    ],
+    "nextCursor": null
+  },
+  "_meta": {
+    "runtimeId": "80cb98d3-d25b-4b4d-bf7f-148ef7386c8e"
+  }
+}
