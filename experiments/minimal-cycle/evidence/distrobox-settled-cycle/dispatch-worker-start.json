@@ -1,0 +1,86 @@
+{
+  "id": "9a56e977-b437-4a57-941f-120c7f3dd40e",
+  "ok": true,
+  "result": {
+    "runId": "run_5a5f2688c661",
+    "taskId": "task_e6721765bb09",
+    "dispatchId": "ctx_68f16395149d",
+    "state": "ready",
+    "stage": "input_accepted",
+    "turnStart": "observed",
+    "setup": {
+      "requested": "not_applicable",
+      "effective": "not_applicable",
+      "source": "existing_worktree",
+      "hookFound": false,
+      "startupPolicy": "start-immediately",
+      "state": "not_applicable"
+    },
+    "launch": {
+      "requested": {
+        "agent": "claude",
+        "model": "claude-opus-5",
+        "effort": "high"
+      },
+      "effective": {
+        "agent": "claude",
+        "model": "claude-opus-5",
+        "effort": "high"
+      }
+    },
+    "mode": {
+      "mode": "terminal",
+      "preferred": "terminal",
+      "reason": "user_default",
+      "detail": "Started a terminal agent worker, the default for new agent tabs in your settings."
+    },
+    "timeoutMs": 420000,
+    "effects": [
+      {
+        "kind": "worktree",
+        "action": "reused",
+        "id": "6b8ade27-109b-443a-a2a1-d4f098ae6aa4::/var/tmp/dely-cycle/state/20260915T183739Z-bbc5e6-9088bc04/home/project"
+      },
+      {
+        "kind": "setup",
+        "action": "not_applicable",
+        "state": "not_applicable"
+      },
+      {
+        "kind": "terminal",
+        "role": "agent",
+        "action": "created",
+        "id": "term_443d588e-1c2c-440f-b36c-a28c84f7870c",
+        "surface": "visible"
+      },
+      {
+        "kind": "dispatch_input",
+        "role": "agent",
+        "id": "term_443d588e-1c2c-440f-b36c-a28c84f7870c",
+        "state": "accepted"
+      }
+    ],
+    "prompt": {
+      "requestId": "a45e30f9-80ab-4367-be2b-afde8eda58b5",
+      "stages": [
+        "input_accepted",
+        "turn_started"
+      ],
+      "provider": "claude",
+      "observation": "supported",
+      "processIncarnation": "ba5d1fb6-eb2a-40fa-9fd4-4562433153c6",
+      "generation": 2,
+      "baselineWorkingSequence": 0,
+      "baselineExplicitWorkingStartedAt": null,
+      "baselinePermissionSequence": 0
+    },
+    "residualResources": [],
+    "mutation": {
+      "requestId": "a45e30f9-80ab-4367-be2b-afde8eda58b5",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "7d2eb076-9fdd-4c8b-a706-5a37d6b15a6d"
+  }
+}

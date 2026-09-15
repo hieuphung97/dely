@@ -43,7 +43,15 @@ def delivery(*messages):
     )
 
 
-SETTLED = delivery({"type": "worker_done", "outcome": "DONE"})
+SETTLED = delivery(
+    {
+        "type": "worker_done",
+        "subject": "evidence.txt created with marker",
+        # The worker's own outcome travels as a JSON string in the payload;
+        # the message itself carries no outcome field at all.
+        "payload": '{"dispatchId": "dispatch-fake", "outcome": "DONE"}',
+    }
+)
 
 DEFAULT_SCRIPT = [
     ("run-create", 0, READY, "", False),
@@ -153,7 +161,7 @@ class WorkerTest(unittest.TestCase):
             (
                 "check --wait",
                 0,
-                delivery({"type": "escalation", "outcome": "BLOCKED"}),
+                delivery({"type": "escalation", "payload": '{"outcome": "BLOCKED"}'}),
                 "",
                 False,
             ),

@@ -222,6 +222,26 @@ def _settling_message(document: Mapping[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def _message_outcome(message: Mapping[str, Any]) -> str | None:
+    """Return what the worker said it reached, from the message's payload.
+
+    A settling message carries no outcome field of its own: the worker's own
+    verdict travels as a JSON document in `payload`. Falling back to the
+    message `type` reports `worker_done` as the outcome, which only repeats
+    that the worker finished and says nothing about how.
+    """
+    payload = message.get("payload")
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except json.JSONDecodeError:
+            payload = None
+    if isinstance(payload, Mapping) and isinstance(payload.get("outcome"), str):
+        return payload["outcome"]
+    value = message.get("outcome")
+    return value if isinstance(value, str) and value else message.get("type")
+
+
 def launch(
     *,
     run_config: RunConfig,
@@ -340,7 +360,7 @@ def launch(
         return record
 
     message = _settling_message(_first_document(settled.stdout))
-    record.outcome = message.get("outcome") or message.get("type") or record.outcome
+    record.outcome = _message_outcome(message) or record.outcome
     if message.get("type") == "worker_done":
         record.status = PhaseStatus.OK
         record.detail = f"the worker reported worker_done with outcome {record.outcome!r}"

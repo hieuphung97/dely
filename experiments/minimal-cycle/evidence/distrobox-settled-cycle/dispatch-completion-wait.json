@@ -1,0 +1,38 @@
+{
+  "id": "69ed6a61-33bf-4382-b6d1-beda2926d35a",
+  "ok": true,
+  "result": {
+    "runId": "run_5a5f2688c661",
+    "deliveryId": "delivery_e6ec30e50065",
+    "messages": [
+      {
+        "id": "msg_49a5efeb992b",
+        "run_id": "run_5a5f2688c661",
+        "delivery_contract": "current_delivery",
+        "from_handle": "term_443d588e-1c2c-440f-b36c-a28c84f7870c",
+        "to_handle": "run:run_5a5f2688c661",
+        "subject": "evidence.txt created with marker",
+        "body": "Created /var/tmp/dely-cycle/state/20260915T183739Z-bbc5e6-9088bc04/home/project/evidence.txt containing exactly 'dely-cycle-marker' with no trailing newline, using printf. Verified with od -c and wc -c: 17 bytes, final byte is 'r', no 0x0a present. Nothing is left; no other files were touched and no tests were run, per the dispatch prompt's constraints.",
+        "type": "worker_done",
+        "priority": "normal",
+        "thread_id": null,
+        "payload": "{\"taskId\":\"task_e6721765bb09\",\"dispatchId\":\"ctx_68f16395149d\",\"outcome\":\"succeeded\",\"filesModified\":[\"evidence.txt\"]}",
+        "created_at": "2026-09-15T18:41:25Z",
+        "delivered_at": null
+      }
+    ],
+    "count": 1,
+    "replayed": false,
+    "acknowledged": null,
+    "timedOut": false,
+    "cancelled": false,
+    "connectionLost": false,
+    "mutation": {
+      "requestId": "5d272960-9757-4f31-b586-31f6b9d81097",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "7d2eb076-9fdd-4c8b-a706-5a37d6b15a6d"
+  }
+}

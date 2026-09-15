@@ -1,0 +1,11 @@
+{
+  "detail": "1 allowlisted entry(s) copied into the per-run home with owner-only permissions",
+  "entries": [
+    ".claude/.credentials.json"
+  ],
+  "mode": "existing_login",
+  "reference": "workshop-host-login",
+  "removed_after_run": false,
+  "status": "OK",
+  "target": "/var/tmp/dely-cycle/state/20260915T183739Z-bbc5e6-9088bc04/home"
+}

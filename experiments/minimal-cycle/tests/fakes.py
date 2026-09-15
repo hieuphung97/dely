@@ -71,7 +71,8 @@ ORCA_DISPATCH_REPLY = (
     '{"id": "request-fake", "ok": true, "result": {"run": {"id": "run-fake"}, '
     '"runId": "run-fake", "taskId": "task-fake", "dispatchId": "dispatch-fake", '
     '"state": "ready", '
-    '"messages": [{"type": "worker_done", "outcome": "DONE"}], "count": 1}}'
+    '"messages": [{"type": "worker_done", '
+    '"payload": "{\\"outcome\\": \\"DONE\\"}"}], "count": 1}}'
 )
 
 #: A wait that woke with nothing to report, in the same shape.

@@ -1,0 +1,109 @@
+{
+  "artifacts": [
+    {
+      "path": "auth-receipt.json",
+      "sha256": "c996beacea9d24bdb485e1d359a54747ae2344131fc78909217ee2bc4991d3c5",
+      "size_bytes": 343
+    },
+    {
+      "path": "backend-status.json",
+      "sha256": "578a295cc17196b3586022b6bfd4d9fde730e646de6bd0f660cb6323e53fafb4",
+      "size_bytes": 1374
+    },
+    {
+      "path": "check.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "check.stdout",
+      "sha256": "fd062483e16ca3fe0050ec7b982d08add70b72c2b796a9043455d9d82f6771c8",
+      "size_bytes": 103
+    },
+    {
+      "path": "diff.patch",
+      "sha256": "77d82181227d3ffdbde56de7f6b5e3783e9914d78580ac648cab8e47d9e23fec",
+      "size_bytes": 65
+    },
+    {
+      "path": "dispatch/completion-wait.stderr",
+      "sha256": "53562e7ef430fc26bcbe371bbde4fc1bc753da61884776b862cbe08cac80d1da",
+      "size_bytes": 76
+    },
+    {
+      "path": "dispatch/completion-wait.stdout",
+      "sha256": "7631d7c8e88ad35b5a63cd142bc7be210576a7afb3aab5daa155c6ccf832e5ad",
+      "size_bytes": 1506
+    },
+    {
+      "path": "dispatch/run-create.stdout",
+      "sha256": "9ee965eff898a62032de6f2cea227376e73de08606a5f6bfe94f1c453f2cf7dc",
+      "size_bytes": 569
+    },
+    {
+      "path": "dispatch/worker-start.stdout",
+      "sha256": "139acbafb14b19ad6de114df8d2dbad314a18cc5d038b812987b95941ce34a49",
+      "size_bytes": 2323
+    },
+    {
+      "path": "first-run-state.json",
+      "sha256": "7e6840655893af6d27eaa7b31306aff9af61209e43c75c243da517c5ee01cdeb",
+      "size_bytes": 611
+    },
+    {
+      "path": "host-before.json",
+      "sha256": "6d0176a7f3da708508eb865dd74efae495d5fb39dd1f017bf1d9d48165b56dc2",
+      "size_bytes": 1568
+    },
+    {
+      "path": "identity/environment-probe.txt",
+      "sha256": "26b323166ad7f2827a6163baeda435aa2624fd1628573edf12b64931afbb5f3d",
+      "size_bytes": 1886
+    },
+    {
+      "path": "identity/host-probe.txt",
+      "sha256": "72648f40ecfb3adbb1027b1be9c8270f187d0706e5b5ddd41b5292b50abaa179",
+      "size_bytes": 1668
+    },
+    {
+      "path": "identity/orca-runtime.json",
+      "sha256": "5d98e1c0fa7c596491842bb3d14e7a3e2e364de7acc8197d1f85240bd34678ee",
+      "size_bytes": 3181
+    },
+    {
+      "path": "identity/orca-status.json",
+      "sha256": "86222f82dc556d15cb413be50082d0c6670a8d1d3c0dae8212c695c995a130e7",
+      "size_bytes": 363
+    },
+    {
+      "path": "logs/commands.jsonl",
+      "sha256": "b84d5ce115b6d7aa4f45f97fe89d56a01260f900b82f4f21b8f3c5c61a790ac7",
+      "size_bytes": 15053
+    },
+    {
+      "path": "logs/runner.log",
+      "sha256": "1ea53a14f619659363d09c4676a528f65b803b65c96683cc3f1f06cfc032ea6f",
+      "size_bytes": 2063
+    },
+    {
+      "path": "preflight.json",
+      "sha256": "cf001294a15d21827f09103ed1a6c9b70b3ae575ce52079ac8ac34335bdafea3",
+      "size_bytes": 928
+    },
+    {
+      "path": "run-before-cleanup.json",
+      "sha256": "895bcf02bc37659c7479b7062244fd563652b29c0490e0cf8540ef803d468eab",
+      "size_bytes": 36232
+    },
+    {
+      "path": "task-artifact/evidence.txt",
+      "sha256": "08b84ed9a0ffcce4c1802c042afa823ff70a713da509491790bf65fc294ab268",
+      "size_bytes": 17
+    }
+  ],
+  "confirmed_at": "2026-09-15T18:41:26Z",
+  "detail": "20 artifact(s) re-read from the host; 0 unresolved",
+  "missing": [],
+  "receipt_path": "export-receipt.json",
+  "status": "CONFIRMED"
+}

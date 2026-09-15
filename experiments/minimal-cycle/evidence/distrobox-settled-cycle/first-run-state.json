@@ -1,0 +1,15 @@
+{
+  "detail": "2 first-run state file(s) written into the per-run home, answering 4 question(s) the agent asks a home it has never run in",
+  "entries": [
+    ".claude.json",
+    ".claude/settings.json"
+  ],
+  "questions": [
+    "onboarding, which otherwise offers a theme and an interactive sign-in",
+    "trusting the project copy, by its path inside the environment",
+    "the external imports the project's own instructions declare",
+    "the permission mode the execution plane launches the agent with"
+  ],
+  "status": "OK",
+  "target": "/var/tmp/dely-cycle/state/20260915T183739Z-bbc5e6-9088bc04/home"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "b6fab545-9046-423d-b2b2-3f1157a919f6",
+  "ok": true,
+  "result": {
+    "run": {
+      "id": "run_5a5f2688c661",
+      "objective": "dely minimal cycle",
+      "coordinator_handle": "term_78d6aa0b-d97c-42d4-984c-fae24707c9b9",
+      "consumer_generation": 1,
+      "legacy": 0,
+      "created_at": "2026-09-15T18:41:00Z",
+      "updated_at": "2026-09-15T18:41:00Z"
+    },
+    "mutation": {
+      "requestId": "c4cd6c58-5a19-445c-afd3-9e53bb9457d5",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "7d2eb076-9fdd-4c8b-a706-5a37d6b15a6d"
+  }
+}

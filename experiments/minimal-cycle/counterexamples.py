@@ -39,6 +39,17 @@ class Counterexample:
 
 CASES: tuple[Counterexample, ...] = (
     Counterexample(
+        name="the-outcome-is-the-workers-own-verdict",
+        requirement=(
+            "Reporting the message type as the outcome says the worker "
+            "finished and nothing about how"
+        ),
+        path="cycle_runner/worker.py",
+        original='    payload = message.get("payload")\n    if isinstance(payload, str):',
+        replacement='    payload = None\n    if isinstance(payload, str):',
+        instruments=("tests.test_worker.WorkerTest",),
+    ),
+    Counterexample(
         name="a-settling-message-is-read-from-the-delivery",
         requirement=(
             "A wait read from the request envelope reports a worker that "
