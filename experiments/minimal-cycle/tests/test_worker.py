@@ -380,3 +380,46 @@ class SenderFlagShapeTest(WorkerTest):
         argv = self.plan().wait_argv
         self.assertEqual(argv[argv.index("--run") + 1], "run-abcdef")
         self.assertIn("--types", argv)
+
+
+class ErrorReportingTest(WorkerTest):
+    """Orca replies carry a structured error; the tail of raw JSON is not it."""
+
+    def test_the_code_and_message_are_reported(self):
+        reply = json.dumps({
+            "id": "req", "ok": False,
+            "error": {"code": "consumer_fenced", "message": "the Run is bound elsewhere",
+                      "data": {"originalCommand": ["orca", "orchestration", "run-create"]}},
+        })
+        self.assertEqual(
+            worker.orca_error(json.loads(reply)),
+            "consumer_fenced: the Run is bound elsewhere",
+        )
+
+    def test_a_reply_without_an_error_reports_nothing(self):
+        self.assertIsNone(worker.orca_error({"ok": True, "result": {}}))
+
+    def test_a_failed_run_create_names_the_code(self):
+        reply = json.dumps({
+            "ok": False,
+            "error": {"code": "selector_not_found", "message": "no such worktree"},
+        })
+        script = [("run-create", 1, reply, "", False)]
+        _, _, record = self.launch(script=script)
+        self.assertIn("selector_not_found", record.detail)
+        self.assertIn("no such worktree", record.detail)
+        # The point is that it reads as a sentence, not as a slice of a
+        # document: the raw reply also contains the code, further in.
+        self.assertNotIn("{", record.detail)
+        self.assertLess(len(record.detail), 160, record.detail)
+
+    def test_a_failed_start_names_the_code(self):
+        reply = json.dumps({
+            "ok": False,
+            "error": {"code": "consumer_fenced", "message": "bound elsewhere"},
+            "result": {"state": "failed"},
+        })
+        script = [("run-create", 0, READY, "", False), ("worker-start", 1, reply, "", False)]
+        _, _, record = self.launch(script=script)
+        self.assertIn("consumer_fenced", record.detail)
+        self.assertNotIn("{", record.detail)

@@ -230,6 +230,17 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_lifecycle.CreateFailureTest",),
     ),
     Counterexample(
+        name="an-error-is-reported-by-its-code",
+        requirement="A refusal is reported by its code, not by the tail of raw output",
+        path="cycle_runner/worker.py",
+        original="""    described = orca_error(_first_document(outcome.stdout))
+    if described:
+        return redact.text(described, secrets)""",
+        replacement="""    if False:
+        pass""",
+        instruments=("tests.test_worker.ErrorReportingTest",),
+    ),
+    Counterexample(
         name="the-wait-takes-a-terminal-not-a-sender",
         requirement="The completion wait names the terminal with the flag it accepts",
         path="cycle_runner/worker.py",

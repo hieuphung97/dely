@@ -175,6 +175,32 @@ def dispatch_state(document: Mapping[str, Any]) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+def orca_error(document: Mapping[str, Any]) -> str | None:
+    """Return the code and message of an Orca reply's error, if it carries one.
+
+    The reply is a document with a structured error at a known place. Showing
+    the tail of the raw text instead loses the code, which sits near the start
+    and is the one part worth reading.
+    """
+    error = document.get("error")
+    if not isinstance(error, Mapping):
+        return None
+    code = error.get("code")
+    message = error.get("message")
+    if code and message and code != message:
+        return f"{code}: {message}"
+    return str(code or message) if (code or message) else None
+
+
+def _explain(outcome, secrets) -> str:
+    """Describe a failed orca command by its error, falling back to its output."""
+    described = orca_error(_first_document(outcome.stdout))
+    if described:
+        return redact.text(described, secrets)
+    text = (outcome.stderr or outcome.stdout).strip()[-400:]
+    return redact.text(f"exit={outcome.exit_code}: {text}", secrets)
+
+
 def task_identifier(document: Mapping[str, Any]) -> str | None:
     """Return the Task identifier from a worker-start reply."""
     value = _result(document).get("taskId")
@@ -230,7 +256,7 @@ def launch(
         record.status = PhaseStatus.FAILED
         record.detail = (
             "orca orchestration run-create did not return a Run: "
-            + redact.text((created.stderr or created.stdout).strip()[-400:], secrets)
+            + _explain(created, secrets)
         )
         return record
     record.run_id = run_identifier(_first_document(created.stdout))
@@ -273,7 +299,7 @@ def launch(
             record.status = PhaseStatus.FAILED
             record.detail = (
                 f"orca orchestration worker-start reported {state or 'no state'}: "
-                + redact.text((started.stderr or started.stdout).strip()[-400:], secrets)
+                + _explain(started, secrets)
             )
             return record
     elif state:
@@ -289,9 +315,7 @@ def launch(
         return record
     if not settled.ok:
         record.status = PhaseStatus.FAILED
-        record.detail = "the completion wait failed: " + redact.text(
-            (settled.stderr or settled.stdout).strip()[:400], secrets
-        )
+        record.detail = "the completion wait failed: " + _explain(settled, secrets)
         return record
 
     message = _settling_message(_first_document(settled.stdout))
