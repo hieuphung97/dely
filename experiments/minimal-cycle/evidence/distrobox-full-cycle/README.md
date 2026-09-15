@@ -15,12 +15,24 @@ driven through the same lifecycle the machine backend uses.
     export:    CONFIRMED
     cleanup:   DESTROYED
 
-## Nothing rendered on the host's desktop
+## The virtual display did not keep the application off the host's desktop
 
-Distrobox shares the host's display, so an application started in a box appears
-on the host's own screen. This run gave the box a display of its own instead —
-a virtual framebuffer on `:99`, provisioned into the container — and pointed
-Orca at it. The host's desktop was untouched.
+This run gave the box a display of its own — a virtual framebuffer on `:99`,
+provisioned into the container — and pointed Orca at it. An earlier version of
+this file claimed the host's desktop was therefore untouched. **That claim was
+wrong, and a later session disproved it.**
+
+Distrobox shares the host's Wayland socket as well as its X socket, and the
+application chose Wayland: it ran with `--ozone-platform=wayland` against the
+host's own compositor, ignoring the `DISPLAY` it was given. Its windows appeared
+on the operator's screen. Worse, because a Distrobox container shares the host's
+PID namespace, destroying the container did not end those processes: instances
+from seven separate runs were found still alive on the host hours later, each
+holding `--user-data-dir` under its own destroyed per-run directory.
+
+Setting `DISPLAY` is not isolation from a desktop. Nothing in this run observed
+where the application actually drew, which is why the claim survived as long as
+it did.
 
 ## Two things this run found
 
@@ -37,9 +49,14 @@ Provisioning also has to come before anything that needs what it installs: the
 repository initialisation ran first and failed with
 `executable file not found`, because git arrives with the provisioning steps.
 
-## Where it stops
+## Where it stops, and what came after
 
-Exactly where the machine backend stops: the dispatch exists, the worker has a
-terminal of its own, and its turn never begins. The deadline fired, the
-evidence was exported and confirmed, and the box and its per-run home were
-removed. See `../vm-two-sessions/` for what the worker's terminal holds.
+This run reached a dispatch whose turn never began, and stopped there. The
+deadline fired, the evidence was exported and confirmed, and the box and its
+per-run home were removed. See `../vm-two-sessions/` for what the worker's
+terminal held.
+
+Two defects were behind that, and both were found later: the agent was stopped
+at first-run questions nobody could answer, and the completion wait was read
+from the wrong half of the reply. `../distrobox-settled-cycle/` is the first
+run on this backend that got past both.
