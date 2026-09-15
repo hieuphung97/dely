@@ -1,0 +1,595 @@
+{
+  "artifact_root": "/var/tmp/dely-cycle/artifacts/20260915T150000Z-bbbbbb-00000006",
+  "artifacts": [
+    {
+      "path": "auth-receipt.json",
+      "sha256": "d07d42f1b658cd692c32580ba917e1fab793697285148de9714b9ba3cda98e4f",
+      "size_bytes": 341
+    },
+    {
+      "path": "backend-status.json",
+      "sha256": "6a1f900514162cb6bb3c7b06552687c9e4873279a848f5f1fd0370189855c406",
+      "size_bytes": 2080
+    },
+    {
+      "path": "diff.patch",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "host-before.json",
+      "sha256": "f60a04fc7ac3b0e6b8a8a74cc1f4912d7f89ed25f66e19af6ceaffe6fc89e5e8",
+      "size_bytes": 973
+    },
+    {
+      "path": "identity/environment-probe.txt",
+      "sha256": "285da27d881eec44433f8c9b0ac93bfb79ea878340b9f086ddf6e65478bff14c",
+      "size_bytes": 405
+    },
+    {
+      "path": "identity/host-probe.txt",
+      "sha256": "8186bd380f569e2656fed0f91ccc7593be082a25bc2cd6e32fd26a2ed024ae22",
+      "size_bytes": 1383
+    },
+    {
+      "path": "identity/orca-status.json",
+      "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+      "size_bytes": 3
+    },
+    {
+      "path": "logs/commands.jsonl",
+      "sha256": "ff74b2a3cf4cd86e2d1064adf578dd95a0990693fe236ef761b699c0994cd779",
+      "size_bytes": 5045
+    },
+    {
+      "path": "logs/runner.log",
+      "sha256": "1d0b004f57b690c2dc4fec02b94f461999d0795f39e36b25f79e67fabcc2f050",
+      "size_bytes": 1149
+    },
+    {
+      "path": "preflight.json",
+      "sha256": "d2c853a24dbc9d3d390d714dd4881cd6e3063fc17b693f251b5e6096ca31d837",
+      "size_bytes": 1827
+    },
+    {
+      "path": "run-before-cleanup.json",
+      "sha256": "5051a2a64cf817c15eaf0fb8e58d0d0a4aed06b70e200b68d4b4441f7a57d9ff",
+      "size_bytes": 13048
+    }
+  ],
+  "auth": {
+    "detail": "the helper command is declared in the per-run settings; no credential value passes through the runner",
+    "entries": [
+      ".claude/settings.json"
+    ],
+    "mode": "api_key_helper",
+    "reference": "workshop-helper-declared-only",
+    "removed_after_run": false,
+    "status": "OK",
+    "target": "/home/cycle/.claude/settings.json"
+  },
+  "backend": "vm",
+  "check": {
+    "argv": [],
+    "detail": "not attempted",
+    "elapsed_seconds": null,
+    "exit_code": null,
+    "expected_marker": null,
+    "finished_at": null,
+    "started_at": null,
+    "status": "SKIPPED",
+    "stderr_path": null,
+    "stdout_path": null
+  },
+  "cleanup": {
+    "reason": "every declared per-run resource is gone and every shared one remains",
+    "removed": [
+      "domain:dely-cycle-20260915t150000z-bbbbbb-00000006",
+      "path:/var/tmp/dely-cycle/state/20260915T150000Z-bbbbbb-00000006"
+    ],
+    "retained": [],
+    "shared_preserved": [
+      "image:/var/tmp/dely-cycle/images/ubuntu-24.04-server-cloudimg-amd64.img"
+    ],
+    "status": "DESTROYED",
+    "verified": true
+  },
+  "config": {
+    "artifact_root": "/var/tmp/dely-cycle/artifacts",
+    "auth": {
+      "helper_argv": [
+        "/usr/local/bin/dely-cycle-key-helper"
+      ],
+      "mode": "api_key_helper",
+      "reference": "workshop-helper-declared-only"
+    },
+    "backend": "vm",
+    "check": {
+      "expected_marker": "dely-cycle-marker",
+      "relative_path": "evidence.txt"
+    },
+    "claude_code_version": "not-yet-in-this-image",
+    "dely_revision": "9ff4701623db4cf1db7341ddd1467a873b49da78",
+    "orca": {
+      "agent": "claude",
+      "effort": "high",
+      "model": "claude-opus-5",
+      "run_objective": "dely minimal cycle",
+      "status_argv": [
+        "orca",
+        "status",
+        "--json"
+      ],
+      "version": "1.4.201",
+      "version_argv": [
+        "orca",
+        "--version"
+      ],
+      "worktree_selector": "current"
+    },
+    "project": {
+      "environment_path": "project",
+      "revision": "9ff4701623db4cf1db7341ddd1467a873b49da78",
+      "source": "/var/tmp/dely-cycle/project-source"
+    },
+    "state_root": "/var/tmp/dely-cycle/state",
+    "task": {
+      "marker": "dely-cycle-marker",
+      "relative_path": "evidence.txt"
+    },
+    "tested_revision": "9ff4701623db4cf1db7341ddd1467a873b49da78",
+    "timeout_seconds": 1800,
+    "vm": {
+      "address_timeout_seconds": 600,
+      "base_image": "/var/tmp/dely-cycle/images/ubuntu-24.04-server-cloudimg-amd64.img",
+      "base_image_sha256": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+      "connect_uri": "qemu:///system",
+      "egress": true,
+      "graphics": "vnc",
+      "guest_user": "cycle",
+      "listen_address": "127.0.0.1",
+      "memory_mb": 4096,
+      "network": "default",
+      "overlay_size_bytes": 25769803776,
+      "pool": "dely-cycle",
+      "provider": "pulumi-libvirt",
+      "provider_version": "0.5.4",
+      "provision": [],
+      "pulumi_binary": "<host-home>/.pulumi/bin/pulumi",
+      "qemu_agent": false,
+      "ssh_port": 22,
+      "stack_prefix": "dely-cycle",
+      "transport": "ssh",
+      "vcpus": 2,
+      "venv": "/var/tmp/dely-cycle/venv"
+    }
+  },
+  "dely_revision": "9ff4701623db4cf1db7341ddd1467a873b49da78",
+  "elapsed_seconds": 21.831,
+  "environment": {
+    "backend": {
+      "address": "192.168.122.235",
+      "backend": "vm",
+      "base_image": "/var/tmp/dely-cycle/images/ubuntu-24.04-server-cloudimg-amd64.img",
+      "base_image_sha256": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+      "base_volume": "ubuntu-24.04-server-cloudimg-amd64.img",
+      "connect_uri": "qemu:///system",
+      "domain": "dely-cycle-20260915t150000z-bbbbbb-00000006",
+      "egress_interface": true,
+      "graphics": "vnc",
+      "listen_address": "127.0.0.1",
+      "network": "default",
+      "pool": "dely-cycle",
+      "provider": "pulumi-libvirt@0.5.4",
+      "stack": "dely-cycle-20260915t150000z-bbbbbb-00000006",
+      "transport_mac": "52:54:00:f5:8f:7c"
+    },
+    "description": {
+      "address": "192.168.122.235",
+      "base_image": "/var/tmp/dely-cycle/images/ubuntu-24.04-server-cloudimg-amd64.img",
+      "base_volume": "ubuntu-24.04-server-cloudimg-amd64.img",
+      "connect_uri": "qemu:///system",
+      "domain": "dely-cycle-20260915t150000z-bbbbbb-00000006",
+      "egress": true,
+      "graphics": "vnc",
+      "network": "default",
+      "pool": "dely-cycle",
+      "provider": "pulumi-libvirt@0.5.4",
+      "stack": "/var/tmp/dely-cycle/state/20260915T150000Z-bbbbbb-00000006/stack",
+      "transport_mac": "52:54:00:f5:8f:7c"
+    },
+    "environment_id": "dely-cycle-20260915t150000z-bbbbbb-00000006",
+    "home_path": "/home/cycle",
+    "per_run_resources": [
+      {
+        "identifier": "dely-cycle-20260915t150000z-bbbbbb-00000006",
+        "kind": "domain"
+      },
+      {
+        "identifier": "/var/tmp/dely-cycle/state/20260915T150000Z-bbbbbb-00000006",
+        "kind": "path"
+      },
+      {
+        "identifier": "/var/tmp/dely-cycle/images/dely-cycle-20260915t150000z-bbbbbb-00000006-overlay.qcow2",
+        "kind": "volume"
+      },
+      {
+        "identifier": "/var/tmp/dely-cycle/images/dely-cycle-20260915t150000z-bbbbbb-00000006-seed.iso",
+        "kind": "volume"
+      }
+    ],
+    "project_path": "/home/cycle/project",
+    "shared_resources": [
+      {
+        "identifier": "/var/tmp/dely-cycle/images/ubuntu-24.04-server-cloudimg-amd64.img",
+        "kind": "image"
+      }
+    ]
+  },
+  "environment_id": "dely-cycle-20260915t150000z-bbbbbb-00000006",
+  "export": {
+    "artifacts": [
+      {
+        "path": "auth-receipt.json",
+        "sha256": "d07d42f1b658cd692c32580ba917e1fab793697285148de9714b9ba3cda98e4f",
+        "size_bytes": 341
+      },
+      {
+        "path": "backend-status.json",
+        "sha256": "6a1f900514162cb6bb3c7b06552687c9e4873279a848f5f1fd0370189855c406",
+        "size_bytes": 2080
+      },
+      {
+        "path": "diff.patch",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_bytes": 0
+      },
+      {
+        "path": "host-before.json",
+        "sha256": "f60a04fc7ac3b0e6b8a8a74cc1f4912d7f89ed25f66e19af6ceaffe6fc89e5e8",
+        "size_bytes": 973
+      },
+      {
+        "path": "identity/environment-probe.txt",
+        "sha256": "285da27d881eec44433f8c9b0ac93bfb79ea878340b9f086ddf6e65478bff14c",
+        "size_bytes": 405
+      },
+      {
+        "path": "identity/host-probe.txt",
+        "sha256": "8186bd380f569e2656fed0f91ccc7593be082a25bc2cd6e32fd26a2ed024ae22",
+        "size_bytes": 1383
+      },
+      {
+        "path": "identity/orca-status.json",
+        "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+        "size_bytes": 3
+      },
+      {
+        "path": "logs/commands.jsonl",
+        "sha256": "ff74b2a3cf4cd86e2d1064adf578dd95a0990693fe236ef761b699c0994cd779",
+        "size_bytes": 5045
+      },
+      {
+        "path": "logs/runner.log",
+        "sha256": "1d0b004f57b690c2dc4fec02b94f461999d0795f39e36b25f79e67fabcc2f050",
+        "size_bytes": 1149
+      },
+      {
+        "path": "preflight.json",
+        "sha256": "d2c853a24dbc9d3d390d714dd4881cd6e3063fc17b693f251b5e6096ca31d837",
+        "size_bytes": 1827
+      },
+      {
+        "path": "run-before-cleanup.json",
+        "sha256": "5051a2a64cf817c15eaf0fb8e58d0d0a4aed06b70e200b68d4b4441f7a57d9ff",
+        "size_bytes": 13048
+      }
+    ],
+    "confirmed_at": "2026-09-15T10:47:44Z",
+    "detail": "11 artifact(s) re-read from the host; 1 unresolved",
+    "missing": [
+      "task-artifact/evidence.txt (absent from the host)"
+    ],
+    "receipt_path": "export-receipt.json",
+    "status": "CONFIRMED"
+  },
+  "failure_classification": "orca is not present inside the environment; the run stops rather than using the host's installation",
+  "finished_at": "2026-09-15T10:47:50Z",
+  "generated_at": "2026-09-15T10:47:50Z",
+  "host_after": {
+    "architecture": "x86_64",
+    "artifact_root": {
+      "entries": [
+        "20260914T230000Z-aaaaaa-00000001",
+        "20260914T231500Z-aaaaaa-00000002",
+        "20260915T001500Z-aaaaaa-00000003",
+        "20260915T003000Z-aaaaaa-00000004",
+        "20260915T130000Z-bbbbbb-00000001",
+        "20260915T131500Z-bbbbbb-00000002",
+        "20260915T134500Z-bbbbbb-00000003",
+        "20260915T140000Z-bbbbbb-00000004",
+        "20260915T143000Z-bbbbbb-00000005",
+        "20260915T150000Z-bbbbbb-00000006"
+      ],
+      "exists": true,
+      "path": "/var/tmp/dely-cycle/artifacts"
+    },
+    "boot_id_digest": "bc21f149eed21643",
+    "captured_at": "2026-09-15T10:47:50Z",
+    "extra": {
+      "backend": "vm"
+    },
+    "hostname_digest": "bbc5e661e106c6dc",
+    "kernel": "7.2.4-200.fc44.x86_64",
+    "machine_id_digest": "907fa710d6d1c501",
+    "python_version": "3.14.7",
+    "state_root": {
+      "entries": [],
+      "exists": true,
+      "path": "/var/tmp/dely-cycle/state"
+    },
+    "user_digest": "8fda3821c06d512d"
+  },
+  "host_before": {
+    "architecture": "x86_64",
+    "artifact_root": {
+      "entries": [
+        "20260914T230000Z-aaaaaa-00000001",
+        "20260914T231500Z-aaaaaa-00000002",
+        "20260915T001500Z-aaaaaa-00000003",
+        "20260915T003000Z-aaaaaa-00000004",
+        "20260915T130000Z-bbbbbb-00000001",
+        "20260915T131500Z-bbbbbb-00000002",
+        "20260915T134500Z-bbbbbb-00000003",
+        "20260915T140000Z-bbbbbb-00000004",
+        "20260915T143000Z-bbbbbb-00000005",
+        "20260915T150000Z-bbbbbb-00000006"
+      ],
+      "exists": true,
+      "path": "/var/tmp/dely-cycle/artifacts"
+    },
+    "boot_id_digest": "bc21f149eed21643",
+    "captured_at": "2026-09-15T10:47:29Z",
+    "extra": {
+      "backend": "vm"
+    },
+    "hostname_digest": "bbc5e661e106c6dc",
+    "kernel": "7.2.4-200.fc44.x86_64",
+    "machine_id_digest": "907fa710d6d1c501",
+    "python_version": "3.14.7",
+    "state_root": {
+      "entries": [],
+      "exists": true,
+      "path": "/var/tmp/dely-cycle/state"
+    },
+    "user_digest": "8fda3821c06d512d"
+  },
+  "identity": {
+    "environment": {
+      "container_marker": "",
+      "home": "/home/cycle",
+      "hostname": "dely-cycle-20260915t150000z-bbbbbb-00000006",
+      "orca_path": "",
+      "orca_version": "",
+      "path": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin",
+      "pid": "1475",
+      "project_real": "/home/cycle/project",
+      "uname": "Linux 6.8.0-139-generic x86_64",
+      "user": "cycle",
+      "virt": "kvm"
+    },
+    "host": {
+      "boot_id_digest": "bc21f149eed21643",
+      "home_digest": "8fda3821c06d512d",
+      "hostname_digest": "bbc5e661e106c6dc",
+      "machine_id_digest": "907fa710d6d1c501",
+      "orca_present": true,
+      "project_real_digest": "0d03c9e72dddfdae",
+      "user_digest": "3cc9cee71b0b967f",
+      "virt": "none"
+    },
+    "markers": [
+      "distinct-machine-identity",
+      "distinct-boot-identity",
+      "distinct-hostname",
+      "reported-virtualisation:kvm"
+    ],
+    "orca_is_host_installation": false,
+    "orca_present": false,
+    "orca_status_exit_code": 127,
+    "orca_version": null,
+    "reason": "the environment answered with its own identity, home and project copy",
+    "verdict": "ENVIRONMENT"
+  },
+  "phases": [
+    {
+      "commands": [],
+      "detail": "",
+      "elapsed_seconds": 0.612,
+      "finished_at": "2026-09-15T10:47:29Z",
+      "name": "prepare",
+      "started_at": "2026-09-15T10:47:29Z",
+      "status": "OK"
+    },
+    {
+      "commands": [],
+      "detail": "",
+      "elapsed_seconds": 13.48,
+      "finished_at": "2026-09-15T10:47:43Z",
+      "name": "create",
+      "started_at": "2026-09-15T10:47:29Z",
+      "status": "OK"
+    },
+    {
+      "commands": [],
+      "detail": "",
+      "elapsed_seconds": 0.809,
+      "finished_at": "2026-09-15T10:47:44Z",
+      "name": "bootstrap",
+      "started_at": "2026-09-15T10:47:43Z",
+      "status": "OK"
+    },
+    {
+      "commands": [
+        {
+          "argv": [
+            "sh",
+            "-c",
+            "\nset -u\nproject_path=\"${1:-}\"\n\nfirst_line() {\n    if [ -r \"$1\" ]; then\n        head -n 1 \"$1\" 2>/dev/null || printf ''\n    else\n        printf ''\n    fi\n}\n\nmarker=''\nif [ -f /run/.containerenv ]; then marker='containerenv'; fi\nif [ -z \"$marker\" ] && [ -f /.dockerenv ]; then marker='dockerenv'; fi\nif [ -z \"$marker\" ] && [ -f /run/.toolboxenv ]; then marker='toolboxenv'; fi\nif [ -z \"$marker\" ] && [ -n \"${container:-}\" ]; then marker=\"${container}\"; fi\n\nvirt='unknown'\nif command -v systemd-detect-virt >/dev/null 2>&1; then\n    detected=\"$(systemd-detect-virt 2>/dev/null | head -n 1)\"\n    if [ -n \"$detected\" ]; then virt=\"$detected\"; fi\nfi\n\norca_binary=\"$(command -v orca 2>/dev/null || printf '')\"\norca_release=''\nif [ -n \"$orca_binary\" ]; then\n    orca_release=\"$(\"$orca_binary\" --version 2>/dev/null | head -n 1 || printf '')\"\nfi\n\nproject_resolved=''\nif [ -n \"$project_path\" ] && [ -d \"$project_path\" ]; then\n    project_resolved=\"$(cd \"$project_path\" 2>/dev/null && pwd -P || printf '')\"\nfi\n\nprintf 'hostname=%s\\n' \"$(uname -n 2>/dev/null || printf '')\"\nprintf 'machine_id=%s\\n' \"$(first_line /etc/machine-id)\"\nprintf 'boot_id=%s\\n' \"$(first_line /proc/sys/kernel/random/boot_id)\"\nprintf 'home=%s\\n' \"${HOME:-}\"\nprintf 'user=%s\\n' \"$(id -un 2>/dev/null || printf '')\"\nprintf 'path=%s\\n' \"${PATH:-}\"\nprintf 'pid=%s\\n' \"$$\"\nprintf 'uname=%s\\n' \"$(uname -srm 2>/dev/null || printf '')\"\nprintf 'container_marker=%s\\n' \"$marker\"\nprintf 'virt=%s\\n' \"$virt\"\nprintf 'orca_path=%s\\n' \"$orca_binary\"\nprintf 'orca_version=%s\\n' \"$orca_release\"\nprintf 'project_real=%s\\n' \"$project_resolved\"\n",
+            "cycle-probe",
+            "/var/tmp/dely-cycle/project-source"
+          ],
+          "context": "host",
+          "elapsed_seconds": 0.07,
+          "exit_code": 0,
+          "finished_at": "2026-09-15T10:47:44Z",
+          "started_at": "2026-09-15T10:47:44Z",
+          "stderr_path": null,
+          "stdout_path": null,
+          "timed_out": false
+        },
+        {
+          "argv": [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            "UserKnownHostsFile=/var/tmp/dely-cycle/state/20260915T150000Z-bbbbbb-00000006/known_hosts",
+            "-p",
+            "22",
+            "-i",
+            "<redacted:credential-path>",
+            "cycle@192.168.122.235",
+            "--",
+            "sh -c '\nset -u\nproject_path=\"${1:-}\"\n\nfirst_line() {\n    if [ -r \"$1\" ]; then\n        head -n 1 \"$1\" 2>/dev/null || printf '\"'\"''\"'\"'\n    else\n        printf '\"'\"''\"'\"'\n    fi\n}\n\nmarker='\"'\"''\"'\"'\nif [ -f /run/.containerenv ]; then marker='\"'\"'containerenv'\"'\"'; fi\nif [ -z \"$marker\" ] && [ -f /.dockerenv ]; then marker='\"'\"'dockerenv'\"'\"'; fi\nif [ -z \"$marker\" ] && [ -f /run/.toolboxenv ]; then marker='\"'\"'toolboxenv'\"'\"'; fi\nif [ -z \"$marker\" ] && [ -n \"${container:-}\" ]; then marker=\"${container}\"; fi\n\nvirt='\"'\"'unknown'\"'\"'\nif command -v systemd-detect-virt >/dev/null 2>&1; then\n    detected=\"$(systemd-detect-virt 2>/dev/null | head -n 1)\"\n    if [ -n \"$detected\" ]; then virt=\"$detected\"; fi\nfi\n\norca_binary=\"$(command -v orca 2>/dev/null || printf '\"'\"''\"'\"')\"\norca_release='\"'\"''\"'\"'\nif [ -n \"$orca_binary\" ]; then\n    orca_release=\"$(\"$orca_binary\" --version 2>/dev/null | head -n 1 || printf '\"'\"''\"'\"')\"\nfi\n\nproject_resolved='\"'\"''\"'\"'\nif [ -n \"$project_path\" ] && [ -d \"$project_path\" ]; then\n    project_resolved=\"$(cd \"$project_path\" 2>/dev/null && pwd -P || printf '\"'\"''\"'\"')\"\nfi\n\nprintf '\"'\"'hostname=%s\\n'\"'\"' \"$(uname -n 2>/dev/null || printf '\"'\"''\"'\"')\"\nprintf '\"'\"'machine_id=%s\\n'\"'\"' \"$(first_line /etc/machine-id)\"\nprintf '\"'\"'boot_id=%s\\n'\"'\"' \"$(first_line /proc/sys/kernel/random/boot_id)\"\nprintf '\"'\"'home=%s\\n'\"'\"' \"${HOME:-}\"\nprintf '\"'\"'user=%s\\n'\"'\"' \"$(id -un 2>/dev/null || printf '\"'\"''\"'\"')\"\nprintf '\"'\"'path=%s\\n'\"'\"' \"${PATH:-}\"\nprintf '\"'\"'pid=%s\\n'\"'\"' \"$$\"\nprintf '\"'\"'uname=%s\\n'\"'\"' \"$(uname -srm 2>/dev/null || printf '\"'\"''\"'\"')\"\nprintf '\"'\"'container_marker=%s\\n'\"'\"' \"$marker\"\nprintf '\"'\"'virt=%s\\n'\"'\"' \"$virt\"\nprintf '\"'\"'orca_path=%s\\n'\"'\"' \"$orca_binary\"\nprintf '\"'\"'orca_version=%s\\n'\"'\"' \"$orca_release\"\nprintf '\"'\"'project_real=%s\\n'\"'\"' \"$project_resolved\"\n' cycle-probe /home/cycle/project"
+          ],
+          "context": "environment",
+          "elapsed_seconds": 0.223,
+          "exit_code": 0,
+          "finished_at": "2026-09-15T10:47:44Z",
+          "started_at": "2026-09-15T10:47:44Z",
+          "stderr_path": null,
+          "stdout_path": null,
+          "timed_out": false
+        },
+        {
+          "argv": [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            "UserKnownHostsFile=/var/tmp/dely-cycle/state/20260915T150000Z-bbbbbb-00000006/known_hosts",
+            "-p",
+            "22",
+            "-i",
+            "<redacted:credential-path>",
+            "cycle@192.168.122.235",
+            "--",
+            "orca status --json"
+          ],
+          "context": "environment",
+          "elapsed_seconds": 0.163,
+          "exit_code": 127,
+          "finished_at": "2026-09-15T10:47:44Z",
+          "started_at": "2026-09-15T10:47:44Z",
+          "stderr_path": null,
+          "stdout_path": null,
+          "timed_out": false
+        }
+      ],
+      "detail": "orca is not present inside the environment; the run stops rather than using the host's installation",
+      "elapsed_seconds": 0.459,
+      "finished_at": "2026-09-15T10:47:44Z",
+      "name": "identity",
+      "started_at": "2026-09-15T10:47:44Z",
+      "status": "BLOCKED"
+    },
+    {
+      "commands": [],
+      "detail": "orca is not present inside the environment; the run stops rather than using the host's installation",
+      "elapsed_seconds": null,
+      "finished_at": null,
+      "name": "task",
+      "started_at": null,
+      "status": "SKIPPED"
+    },
+    {
+      "commands": [],
+      "detail": "orca is not present inside the environment; the run stops rather than using the host's installation",
+      "elapsed_seconds": null,
+      "finished_at": null,
+      "name": "check",
+      "started_at": null,
+      "status": "SKIPPED"
+    },
+    {
+      "commands": [],
+      "detail": "0 patch line(s) collected",
+      "elapsed_seconds": 0.251,
+      "finished_at": "2026-09-15T10:47:44Z",
+      "name": "collect",
+      "started_at": "2026-09-15T10:47:44Z",
+      "status": "OK"
+    },
+    {
+      "commands": [],
+      "detail": "11 artifact(s) re-read from the host; 1 unresolved",
+      "elapsed_seconds": 0.013,
+      "finished_at": "2026-09-15T10:47:44Z",
+      "name": "export",
+      "started_at": "2026-09-15T10:47:44Z",
+      "status": "OK"
+    },
+    {
+      "commands": [],
+      "detail": "every declared per-run resource is gone and every shared one remains",
+      "elapsed_seconds": 6.207,
+      "finished_at": "2026-09-15T10:47:50Z",
+      "name": "cleanup",
+      "started_at": "2026-09-15T10:47:44Z",
+      "status": "OK"
+    },
+    {
+      "commands": [],
+      "detail": "",
+      "elapsed_seconds": null,
+      "finished_at": null,
+      "name": "close",
+      "started_at": "2026-09-15T10:47:50Z",
+      "status": "OK"
+    }
+  ],
+  "run_id": "20260915T150000Z-bbbbbb-00000006",
+  "schema_version": 1,
+  "started_at": "2026-09-15T10:47:29Z",
+  "status": "BLOCKED",
+  "tested_revision": "9ff4701623db4cf1db7341ddd1467a873b49da78",
+  "timeout_seconds": 1800,
+  "versions": {
+    "configured_revision": "9ff4701623db4cf1db7341ddd1467a873b49da78",
+    "distrobox": "distrobox: 1.8.2.5",
+    "git": "git version 2.55.0",
+    "podman": "podman version 5.8.4",
+    "project_revision": "9ff4701623db4cf1db7341ddd1467a873b49da78",
+    "pulumi": "v3.262.0",
+    "python": "3.14.7",
+    "qemu_img": "Copyright (c) 2003-2025 Fabrice Bellard and the QEMU Project developers",
+    "runner": "minimal-cycle",
+    "virsh": "12.0.0"
+  },
+  "worker": {
+    "agent": null,
+    "commands": [],
+    "detail": "not attempted",
+    "dispatch_id": null,
+    "effort": null,
+    "model": null,
+    "outcome": null,
+    "run_id": null,
+    "status": "SKIPPED"
+  }
+}

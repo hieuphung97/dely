@@ -148,19 +148,51 @@ make against a real Orca launch rather than a default to inherit.
 ### Virtual machine
 
 A per-run libvirt domain declared with Pulumi in Python, over a qcow2 overlay
-whose backing file is a preserved tool image, with a cloud-init NoCloud seed and
-an ssh transport.
+whose backing volume is a preserved tool image, with a cloud-init NoCloud seed
+and an ssh transport. The guest is Ubuntu Server 24.04 LTS from Canonical's
+cloud image, verified against the published checksum — a disk image for qemu,
+never a container image.
 
-The base image is opened only as a backing file and is declared a shared
-resource, so it can never appear in a destroy plan. The seed carries one per-run
-public key and nothing else; the private half is generated into the per-run
-state directory with owner-only permissions and is removed with it.
+Run `host/prepare-host` once. It installs the pinned Pulumi, points it at a
+local file state backend, builds the python environment carrying the pinned
+software development kit and libvirt provider, downloads and verifies the base
+image, and declares a storage pool over the image directory. `--check` verifies
+all of that and changes nothing.
 
-The provider's resource schema is not assumed. The rendered program names fields
-that belong to the pinned provider version, and preflight refuses to run until
-`vm.provider_schema_verified` records that someone checked them against that
-version. Building the tool image is a separate job — the runner consumes an
-image, it does not build one, and it is not an image cache.
+`host/packer/build-tool-image` then builds the one tool image: it boots the
+verified base under packer's qemu builder, installs the pinned Orca package, the
+pinned Claude Code, a graphical session for the Orca window, and the guest
+agent, then records a metadata file naming every version and digest that went
+in. The build key is generated per build and removed from the image before
+shutdown.
+
+**Nothing about the provider is assumed.** The rendered program is parsed, every
+provider class and keyword it names is collected, and each is checked against
+the provider actually importable from the pinned environment. Preflight blocks
+when a field does not exist and also when the check cannot be run at all. That
+check has already earned its place: it caught a class name the program had
+wrong before a single domain was created.
+
+Preflight reads host facts rather than trusting configuration: that the Pulumi
+state backend is a local file backend and not the hosted service, that the
+storage pool and network are active, that the base image digest matches, and
+that this emulator actually offers the configured graphics type. On the machine
+this was built on, qemu has no spice at all — it offers sdl, vnc and dbus — so
+the graphics finding is a refusal, not a formality.
+
+Two facts about the guest's network are worth stating, because both were found
+by running it. The domain takes a bridged interface for the runner's transport,
+and a second, user-mode interface for the guest's own outbound traffic: a
+bridged guest cannot reach the internet when the host routes through a virtual
+private network or its firewall declines to forward, and a user-mode interface
+is served by qemu itself and does not use that path. And an address is not
+readiness — libvirt hands out the lease while the guest is still booting, so
+creation is not finished until the guest answers a command and its first-boot
+configuration has settled.
+
+The base image is a shared resource, opened only as a backing volume, so it can
+never appear in a destroy plan. The per-run overlay, seed, domain, stack and
+state are all per-run and go together.
 
 ## Auth
 
@@ -220,12 +252,16 @@ the table with the tests each row runs. The recorded sweep is in
 | An unverified provider schema blocks the machine backend | case `provider-schema-verified` | `evidence/preflight-vm.txt` |
 | Preflight blocks rather than inventing a path | `./run-cycle preflight` on a host with no `pulumi` and no tool image | `evidence/preflight-vm.txt` |
 | A real cycle stops at the identity gate rather than using the host | `./run-cycle run` on this host | `evidence/run-blocked-on-host-orca/manifest.json` |
+| The rendered program names only classes and fields the pinned provider has | `tests/test_adapter_vm.py::ProviderSchemaIntegrationTest` against the real provider | `evidence/preflight-vm.txt` |
+| A hosted state backend blocks the machine backend | case `state-backend-is-local` | `evidence/counterexamples.txt` |
+| A graphics type this emulator lacks blocks the run | case `graphics-type-is-supported` | `evidence/preflight-vm.txt` |
+| An argument vector survives the transport intact | case `remote-command-is-quoted` | `evidence/counterexamples.txt` |
+| Creation waits for the guest to answer, not just to take an address | case `an-address-is-not-readiness` | `evidence/counterexamples.txt` |
+| A real machine cycle creates a domain, proves a distinct kernel, and destroys it | `./run-cycle run` on this host | `evidence/vm-blocked-on-absent-orca/manifest.json` |
 
 ## What no instrument here observes
 
 Orca starting inside either backend, a window bound to that instance, a Claude
-Code worker driven through it, a login surviving a run, or any domain being
-created at all. Those need a host that carries Orca in the chosen image, a built
-tool image, and a pinned libvirt provider. They are the separate acceptance test
-this work does not claim to have passed; `evidence/README.md` says exactly where
-this host stopped.
+Code worker driven through it, or a login surviving a run. Both backends reach
+their identity gate and stop there, for the same honest reason: the image they run does not carry Orca. `evidence/README.md` says
+exactly where this host stopped and what it did prove on the way.

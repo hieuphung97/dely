@@ -1,20 +1,26 @@
-RED   no-host-fallback                 A probe result equal to the host's own snapshot is rejected
-RED   orca-is-the-environments-own     An orca that resolves to the host's installation is not present
-RED   export-before-destroy            Cleanup runs only after a confirmed export
-RED   stop-must-be-confirmed           Cleanup runs only after a confirmed stop
-RED   destroy-after-export             Evidence is collected and exported before anything is destroyed
-RED   receipt-is-a-re-read             The receipt proves bytes on the host, not bytes in memory
-RED   cleanup-only-per-run             A per-run path that contains a shared resource is refused
-RED   redaction-by-shape               Redaction catches a credential this run has never seen
-RED   manifest-required-fields         The manifest carries every required field on every path
-RED   run-id-carries-no-name           The run identifier discloses neither the host name nor the auth reference
-RED   config-refuses-a-secret          A secret-shaped value under a dull key is refused
-RED   auth-leaves-no-material          No credential value, length or prefix reaches a receipt
-RED   host-home-mount-acknowledged     An unacknowledged host-home mount blocks the run
-RED   preflight-leaves-no-residue      Preflight inspects without creating the run's state
-RED   base-is-only-a-backing-file      The preserved base image is never the overlay's output path
-RED   failed-create-names-its-residue  A create that fails partway records what it may have left behind
-RED   forwarded-value-is-redacted      A value forwarded into the guest is redacted from captured output
-RED   provider-schema-verified         An unverified provider schema blocks the machine backend
+RED   no-host-fallback                    A probe result equal to the host's own snapshot is rejected
+RED   orca-is-the-environments-own        An orca that resolves to the host's installation is not present
+RED   export-before-destroy               Cleanup runs only after a confirmed export
+RED   stop-must-be-confirmed              Cleanup runs only after a confirmed stop
+RED   destroy-after-export                Evidence is collected and exported before anything is destroyed
+RED   receipt-is-a-re-read                The receipt proves bytes on the host, not bytes in memory
+RED   cleanup-only-per-run                A per-run path that contains a shared resource is refused
+RED   redaction-by-shape                  Redaction catches a credential this run has never seen
+RED   manifest-required-fields            The manifest carries every required field on every path
+RED   run-id-carries-no-name              The run identifier discloses neither the host name nor the auth reference
+RED   config-refuses-a-secret             A secret-shaped value under a dull key is refused
+RED   auth-leaves-no-material             No credential value, length or prefix reaches a receipt
+RED   host-home-mount-acknowledged        An unacknowledged host-home mount blocks the run
+RED   preflight-leaves-no-residue         Preflight inspects without creating the run's state
+RED   base-is-only-a-backing-file         The preserved base image is a backing volume, never a per-run one
+RED   overlay-is-not-the-base             The rendered program creates an overlay, not a volume named like the base
+RED   failed-create-names-its-residue     A create that fails partway records what it may have left behind
+RED   an-address-is-not-readiness         Creation waits for the guest to answer, not just to take an address
+RED   remote-command-is-quoted            An argument vector survives the transport intact
+RED   forwarded-value-is-redacted         A value forwarded into the guest is redacted from captured output
+RED   provider-schema-verified            A program the provider cannot be checked against blocks the run
+RED   state-backend-is-local              A cloud state backend blocks the machine backend
+RED   graphics-type-is-supported          A graphics type this emulator lacks blocks the run
+RED   transport-address-is-the-right-one  Another interface's address is not mistaken for the transport's
 
-all 18 counterexamples discriminated
+all 24 counterexamples discriminated

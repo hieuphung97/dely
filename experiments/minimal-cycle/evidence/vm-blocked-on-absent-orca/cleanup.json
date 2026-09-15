@@ -1,0 +1,15 @@
+{
+  "host_difference": {},
+  "reason": "every declared per-run resource is gone and every shared one remains",
+  "removed": [
+    "domain:dely-cycle-20260915t150000z-bbbbbb-00000006",
+    "path:/var/tmp/dely-cycle/state/20260915T150000Z-bbbbbb-00000006"
+  ],
+  "retained": [],
+  "shared_preserved": [
+    "image:/var/tmp/dely-cycle/images/ubuntu-24.04-server-cloudimg-amd64.img"
+  ],
+  "status": "DESTROYED",
+  "stop_confirmed": true,
+  "verified": true
+}

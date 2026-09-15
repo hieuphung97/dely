@@ -1,11 +1,17 @@
 backend: vm
-  BLOCK  pulumi on the path: pulumi was not found on PATH
+  ok     pulumi on the path: <host-home>/.pulumi/bin/pulumi
   ok     qemu-img on the path: /usr/bin/qemu-img
   ok     virsh on the path: /usr/bin/virsh
   ok     ssh on the path: /usr/bin/ssh
   ok     scp on the path: /usr/bin/scp
-  BLOCK  provider schema verified: the rendered program's resource fields have not been checked against pulumi-libvirt@unchecked-on-this-host; set vm.provider_schema_verified once they have been
-  BLOCK  base image present: /var/lib/dely-cycle/images/tool-image.qcow2 is not a file on this host
+  ok     pinned environment present: /var/tmp/dely-cycle/venv/bin/python
+  ok     pulumi state backend is local: state lives at file://~
+  ok     provider schema verified: every class and field the program names exists in pulumi-libvirt@0.5.4
+  ok     base image present: /var/tmp/dely-cycle/images/ubuntu-24.04-server-cloudimg-amd64.img
+  ok     base image digest matches the pin: the preserved base matches the pinned digest
   ok     hardware acceleration device: /dev/kvm
-  ok     libvirt connection answers: qemu:///session
-not usable on this host
+  ok     libvirt connection answers: qemu:///system
+  ok     storage pool active: dely-cycle is active
+  ok     network active: default is active
+  ok     graphics type supported by this emulator: vnc is among sdl, vnc, dbus
+usable on this host

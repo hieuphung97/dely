@@ -1,0 +1,13 @@
+hostname=dely-cycle-20260915t150000z-bbbbbb-00000006
+machine_id=<scrubbed>
+boot_id=<scrubbed>
+home=/home/cycle
+user=cycle
+path=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+pid=1475
+uname=Linux 6.8.0-139-generic x86_64
+container_marker=
+virt=kvm
+orca_path=
+orca_version=
+project_real=/home/cycle/project

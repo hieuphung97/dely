@@ -1,0 +1,66 @@
+{
+  "artifacts": [
+    {
+      "path": "auth-receipt.json",
+      "sha256": "d07d42f1b658cd692c32580ba917e1fab793697285148de9714b9ba3cda98e4f",
+      "size_bytes": 341
+    },
+    {
+      "path": "backend-status.json",
+      "sha256": "6a1f900514162cb6bb3c7b06552687c9e4873279a848f5f1fd0370189855c406",
+      "size_bytes": 2080
+    },
+    {
+      "path": "diff.patch",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "host-before.json",
+      "sha256": "f60a04fc7ac3b0e6b8a8a74cc1f4912d7f89ed25f66e19af6ceaffe6fc89e5e8",
+      "size_bytes": 973
+    },
+    {
+      "path": "identity/environment-probe.txt",
+      "sha256": "285da27d881eec44433f8c9b0ac93bfb79ea878340b9f086ddf6e65478bff14c",
+      "size_bytes": 405
+    },
+    {
+      "path": "identity/host-probe.txt",
+      "sha256": "8186bd380f569e2656fed0f91ccc7593be082a25bc2cd6e32fd26a2ed024ae22",
+      "size_bytes": 1383
+    },
+    {
+      "path": "identity/orca-status.json",
+      "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+      "size_bytes": 3
+    },
+    {
+      "path": "logs/commands.jsonl",
+      "sha256": "ff74b2a3cf4cd86e2d1064adf578dd95a0990693fe236ef761b699c0994cd779",
+      "size_bytes": 5045
+    },
+    {
+      "path": "logs/runner.log",
+      "sha256": "1d0b004f57b690c2dc4fec02b94f461999d0795f39e36b25f79e67fabcc2f050",
+      "size_bytes": 1149
+    },
+    {
+      "path": "preflight.json",
+      "sha256": "d2c853a24dbc9d3d390d714dd4881cd6e3063fc17b693f251b5e6096ca31d837",
+      "size_bytes": 1827
+    },
+    {
+      "path": "run-before-cleanup.json",
+      "sha256": "5051a2a64cf817c15eaf0fb8e58d0d0a4aed06b70e200b68d4b4441f7a57d9ff",
+      "size_bytes": 13048
+    }
+  ],
+  "confirmed_at": "2026-09-15T10:47:44Z",
+  "detail": "11 artifact(s) re-read from the host; 1 unresolved",
+  "missing": [
+    "task-artifact/evidence.txt (absent from the host)"
+  ],
+  "receipt_path": "export-receipt.json",
+  "status": "CONFIRMED"
+}
