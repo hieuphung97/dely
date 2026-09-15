@@ -102,6 +102,7 @@ class FakeAdapter(BackendAdapter):
         already_running: bool = False,
         refuse_repository: bool = False,
         dispatch_state: str | None = None,
+        wait_settles: bool = True,
         create_fails: bool = False,
         task_writes_nothing: bool = False,
         host_project: Path | None = None,
@@ -128,6 +129,7 @@ class FakeAdapter(BackendAdapter):
         self.app_started = already_running
         self.refuse_repository = refuse_repository
         self.dispatch_state = dispatch_state
+        self.wait_settles = wait_settles
         self.create_fails = create_fails
         self.task_writes_nothing = task_writes_nothing
         self.host_project = host_project
@@ -229,6 +231,9 @@ class FakeAdapter(BackendAdapter):
                     '"state": "ready"', f'"state": "{self.dispatch_state}"'
                 )
                 return self._outcome(argv, 1, reply, "")
+            if not self.wait_settles and "--wait" in joined:
+                # The dispatch never reports, so the wait returns nothing.
+                return self._outcome(argv, 0, '{"messages": []}', "")
             if not self.task_writes_nothing:
                 self.project.mkdir(parents=True, exist_ok=True)
                 (self.project / "evidence.txt").write_text(self.marker, encoding="utf-8")

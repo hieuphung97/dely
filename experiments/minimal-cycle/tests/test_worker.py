@@ -277,3 +277,59 @@ class RealResponseShapeTest(WorkerTest):
         self.assertEqual(start[start.index("--run") + 1], "run_a52fcdd366b4")
         self.assertEqual(record.run_id, "run_a52fcdd366b4")
         self.assertEqual(record.dispatch_id, "ctx_098ec148783c")
+
+
+UNVERIFIED_START = json.dumps(
+    {
+        "id": "request-999",
+        "ok": False,
+        "result": {
+            "runId": "run-abcdef",
+            "taskId": "task-abcdef",
+            "dispatchId": "dispatch-abcdef",
+            "state": "outcome_unknown",
+            "stage": "turn_start_unobserved",
+        },
+    }
+)
+
+
+class UnverifiedStartTest(WorkerTest):
+    """A start the plane could not observe is not a start that failed.
+
+    Observed against a live runtime: worker-start exits non-zero with
+    `outcome_unknown` when the agent's turn does not begin inside the
+    observation window. The dispatch exists and may still settle, so the
+    completion wait has to run.
+    """
+
+    def script(self, settled):
+        return [
+            ("run-create", 0, READY, "", False),
+            ("worker-start", 1, UNVERIFIED_START, "", False),
+            ("check --wait", 0, settled, "", False),
+        ]
+
+    def test_the_completion_wait_still_runs(self):
+        adapter, _, _ = self.launch(script=self.script(SETTLED))
+        self.assertTrue(any("--wait" in argv for argv in adapter.executed))
+
+    def test_a_dispatch_that_settles_afterwards_is_done(self):
+        _, _, record = self.launch(script=self.script(SETTLED))
+        self.assertEqual(record.status, status.PhaseStatus.OK)
+        self.assertEqual(record.outcome, "DONE")
+        self.assertEqual(record.dispatch_id, "dispatch-abcdef")
+
+    def test_a_dispatch_that_never_settles_keeps_the_unverifiable_state(self):
+        _, _, record = self.launch(script=self.script(json.dumps({"messages": []})))
+        self.assertEqual(record.outcome, "outcome_unknown")
+        self.assertNotEqual(record.status, status.PhaseStatus.OK)
+
+    def test_a_start_with_no_dispatch_is_still_a_failure(self):
+        script = [
+            ("run-create", 0, READY, "", False),
+            ("worker-start", 1, json.dumps({"ok": False, "error": {"code": "refused"}}), "", False),
+        ]
+        adapter, _, record = self.launch(script=script)
+        self.assertEqual(record.status, status.PhaseStatus.FAILED)
+        self.assertFalse(any("--wait" in argv for argv in adapter.executed))

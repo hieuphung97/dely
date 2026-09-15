@@ -230,6 +230,14 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_lifecycle.CreateFailureTest",),
     ),
     Counterexample(
+        name="an-unobserved-start-still-waits",
+        requirement="A dispatch the plane could not observe is still waited for",
+        path="cycle_runner/worker.py",
+        original="""        if state in UNVERIFIABLE_STATES and record.dispatch_id:""",
+        replacement="""        if False:""",
+        instruments=("tests.test_worker.UnverifiedStartTest",),
+    ),
+    Counterexample(
         name="unverifiable-is-not-failed",
         requirement="A dispatch the plane cannot judge settles unknown, not error",
         path="cycle_runner/lifecycle.py",

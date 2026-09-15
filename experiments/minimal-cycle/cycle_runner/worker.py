@@ -253,21 +253,28 @@ def launch(
         record.status = PhaseStatus.TIMEOUT
         record.detail = "orca orchestration worker-start reached the run deadline"
         return record
-    if not started.ok:
-        record.status = PhaseStatus.FAILED
-        state = dispatch_state(_first_document(started.stdout))
-        record.dispatch_id = dispatch_identifier(_first_document(started.stdout))
-        record.outcome = state
-        record.detail = (
-            f"orca orchestration worker-start reported {state or 'no state'}: "
-            + redact.text((started.stderr or started.stdout).strip()[-400:], secrets)
-        )
-        return record
     start_document = _first_document(started.stdout)
     record.dispatch_id = dispatch_identifier(start_document)
     record.run_id = record.run_id or run_identifier(start_document)
     state = dispatch_state(start_document)
-    if state:
+    record.outcome = state
+    if not started.ok:
+        # An unobserved turn start is not a dead worker: the plane says so
+        # itself. The dispatch exists and may still settle, so the completion
+        # wait runs. Only a start that produced no dispatch is terminal.
+        if state in UNVERIFIABLE_STATES and record.dispatch_id:
+            record.detail = (
+                f"worker-start reported {state}; the dispatch exists, so the "
+                "completion wait decides"
+            )
+        else:
+            record.status = PhaseStatus.FAILED
+            record.detail = (
+                f"orca orchestration worker-start reported {state or 'no state'}: "
+                + redact.text((started.stderr or started.stdout).strip()[-400:], secrets)
+            )
+            return record
+    elif state:
         record.detail = f"the plane reported the dispatch as {state}"
 
     settled = adapter.execute(
@@ -286,7 +293,7 @@ def launch(
         return record
 
     message = _settling_message(_first_document(settled.stdout))
-    record.outcome = message.get("outcome") or message.get("type") or None
+    record.outcome = message.get("outcome") or message.get("type") or record.outcome
     if message.get("type") == "worker_done":
         record.status = PhaseStatus.OK
         record.detail = f"the worker reported worker_done with outcome {record.outcome!r}"

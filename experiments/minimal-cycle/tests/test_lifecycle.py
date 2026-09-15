@@ -403,20 +403,29 @@ class UnverifiableDispatchTest(CycleTestCase):
     `turn_start_unobserved` — explicitly unverifiable, not proof of failure.
     """
 
+    def never_settles(self):
+        return dict(dispatch_state="outcome_unknown", wait_settles=False)
+
     def test_an_unverifiable_dispatch_settles_unknown_rather_than_error(self):
-        _, outcome = self.run_cycle(dispatch_state="outcome_unknown")
+        _, outcome = self.run_cycle(**self.never_settles())
         self.assertEqual(outcome.run_result.status, status.RunStatus.UNKNOWN)
         self.assertIn("unknown", outcome.run_result.failure_classification.lower())
 
+    def test_a_dispatch_that_recovers_after_an_unobserved_start_settles(self):
+        _, outcome = self.run_cycle(dispatch_state="outcome_unknown", wait_settles=True)
+        self.assertEqual(outcome.run_result.status, status.RunStatus.SETTLED)
+        self.assertEqual(outcome.run_result.worker.outcome, "DONE")
+        self.assertEqual(outcome.run_result.check.exit_code, 0)
+
     def test_the_dispatch_identifiers_are_still_recorded(self):
-        _, outcome = self.run_cycle(dispatch_state="outcome_unknown")
+        _, outcome = self.run_cycle(**self.never_settles())
         worker_record = outcome.run_result.worker
         self.assertEqual(worker_record.dispatch_id, "dispatch-fake")
         self.assertEqual(worker_record.outcome, "outcome_unknown")
         self.assertEqual(worker_record.model, "pinned-model")
 
     def test_the_evidence_is_still_exported_and_the_environment_destroyed(self):
-        _, outcome = self.run_cycle(dispatch_state="outcome_unknown")
+        _, outcome = self.run_cycle(**self.never_settles())
         self.assertEqual(outcome.run_result.export.status, status.ExportStatus.CONFIRMED)
         self.assertEqual(outcome.run_result.cleanup.status, status.CleanupStatus.DESTROYED)
 
