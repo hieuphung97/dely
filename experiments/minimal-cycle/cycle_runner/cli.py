@@ -15,7 +15,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence, TextIO
 
-from . import adapters, config as config_module, ids, lifecycle, manifest, proc
+from . import (
+    adapters,
+    config as config_module,
+    ids,
+    lifecycle,
+    manifest,
+    proc,
+    processes,
+)
 from .status import RunStatus, exit_code
 
 USAGE_EXIT = 2
@@ -81,6 +89,7 @@ def _run(arguments, stdout: TextIO, stderr: TextIO) -> int:
         adapter=adapter,
         run_id=run_id,
         tool_versions=_tool_versions(),
+        survey=processes.survey_and_stop,
     )
     result = outcome.run_result
     if arguments.json:

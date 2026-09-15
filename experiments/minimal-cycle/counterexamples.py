@@ -39,6 +39,28 @@ class Counterexample:
 
 CASES: tuple[Counterexample, ...] = (
     Counterexample(
+        name="a-process-left-running-is-residue",
+        requirement=(
+            "A run whose declared resources are gone while its processes are "
+            "still on the host has not been destroyed"
+        ),
+        path="cycle_runner/cleanup.py",
+        original='    if not survey_report.clean:\n        return CleanupRecord(\n            status=CleanupStatus.RESIDUE,',
+        replacement='    if False:\n        return CleanupRecord(\n            status=CleanupStatus.RESIDUE,',
+        instruments=("tests.test_cleanup.ProcessSurveyTest",),
+    ),
+    Counterexample(
+        name="the-survey-matches-a-path-not-a-program",
+        requirement=(
+            "A survey that matches a program name reaches the operator's own "
+            "application instead of this run's"
+        ),
+        path="cycle_runner/processes.py",
+        original='        return any(path in field for field in (self.command, self.home, self.cwd))',
+        replacement='        return "orca" in self.command',
+        instruments=("tests.test_processes.SurveyTest",),
+    ),
+    Counterexample(
         name="the-terminal-says-which-machine-it-is-on",
         requirement=(
             "A coordinator terminal opened on the host looks identical to one "

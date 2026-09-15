@@ -110,3 +110,27 @@ class StubRunnerContainmentTest(unittest.TestCase):
         )
         self.assertEqual(outcome.exit_code, 0)
         self.assertFalse(Path("/tmp/stub-should-not-exist").exists())
+
+
+class SurveyIsNeverDefaultedTest(unittest.TestCase):
+    """The survey signals real processes, so a test must have to ask for it."""
+
+    def test_cleanup_without_a_survey_reads_no_process_table(self):
+        import inspect
+
+        from cycle_runner import cleanup, lifecycle
+
+        self.assertIsNone(
+            inspect.signature(cleanup.perform).parameters["survey"].default,
+            "cleanup must not default to a survey that signals real processes",
+        )
+        self.assertIsNone(
+            inspect.signature(lifecycle.run_cycle).parameters["survey"].default,
+            "a cycle must not default to a survey that signals real processes",
+        )
+
+    def test_the_command_line_is_what_asks_for_a_real_survey(self):
+        from pathlib import Path
+
+        source = (Path(__file__).resolve().parent.parent / "cycle_runner" / "cli.py").read_text()
+        self.assertIn("survey=processes.survey_and_stop", source)

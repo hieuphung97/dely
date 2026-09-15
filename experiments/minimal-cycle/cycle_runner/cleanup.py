@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
+from . import processes
 from .adapters.base import BackendAdapter, EnvironmentHandle, Resource
 from .result import CleanupRecord, ExportRecord
 from .status import CleanupStatus
@@ -71,12 +72,23 @@ def safe_remove(
         target.unlink()
 
 
+def run_paths(handle: EnvironmentHandle) -> list[str]:
+    """Return the paths that belong to this run and nothing else."""
+    paths = [handle.home_path]
+    paths.extend(
+        item.identifier for item in handle.per_run_resources if item.kind == "path"
+    )
+    return [path for path in dict.fromkeys(paths) if path]
+
+
 def perform(
     *,
     adapter: BackendAdapter,
     handle: EnvironmentHandle,
     export_record: ExportRecord,
     stop_confirmed: bool = True,
+    survey: Callable[..., processes.SurveyReport] | None = None,
+    started: Sequence[int] = (),
 ) -> CleanupRecord:
     """Destroy per-run resources only after a confirmed export and a confirmed stop."""
     per_run = list(handle.per_run_resources)
@@ -108,6 +120,15 @@ def perform(
             verified=False,
         )
 
+    # Before the directory goes: a process still holding a path of this run
+    # outlives the resource that nominally contained it, keeps its window on the
+    # host's screen, and writes to a directory that is about to stop existing.
+    survey_report = (
+        survey(run_paths(handle), roots=tuple(started))
+        if survey is not None
+        else processes.SurveyReport(detail="no survey was asked for")
+    )
+
     report = adapter.destroy()
 
     surviving = [item for item in per_run if adapter.resource_exists(item)]
@@ -125,6 +146,7 @@ def perform(
             retained=[str(item) for item in surviving],
             shared_preserved=[str(item) for item in preserved_shared],
             verified=False,
+            processes=survey_report.to_document(),
         )
 
     if surviving:
@@ -138,13 +160,32 @@ def perform(
             retained=[str(item) for item in surviving],
             shared_preserved=[str(item) for item in preserved_shared],
             verified=True,
+            processes=survey_report.to_document(),
+        )
+
+    if not survey_report.clean:
+        return CleanupRecord(
+            status=CleanupStatus.RESIDUE,
+            reason=(
+                "every declared per-run resource is gone, and "
+                + survey_report.detail
+            ),
+            removed=list(report.removed),
+            retained=[f"process:{pid}" for pid in survey_report.surviving],
+            shared_preserved=[str(item) for item in preserved_shared],
+            verified=True,
+            processes=survey_report.to_document(),
         )
 
     return CleanupRecord(
         status=CleanupStatus.DESTROYED,
-        reason="every declared per-run resource is gone and every shared one remains",
+        reason=(
+            "every declared per-run resource is gone, every shared one remains, and "
+            + survey_report.detail
+        ),
         removed=list(report.removed),
         retained=[],
         shared_preserved=[str(item) for item in preserved_shared],
         verified=True,
+        processes=survey_report.to_document(),
     )

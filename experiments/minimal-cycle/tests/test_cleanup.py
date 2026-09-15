@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cycle_runner import cleanup, result, status
+from cycle_runner import cleanup, processes, result, status
 from cycle_runner.adapters.base import Resource
 from tests.fakes import FakeAdapter
 
@@ -178,3 +178,62 @@ class StopGateTest(unittest.TestCase):
             stop_confirmed=True,
         )
         self.assertEqual(record.status, status.CleanupStatus.DESTROYED)
+
+
+class ProcessSurveyTest(unittest.TestCase):
+    """Cleanup reports what the run left running, and refuses to call it clean."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = FakeAdapter(self.root / "run")
+        self.handle = self.adapter.create()
+        self.addCleanup(self._tmp.cleanup)
+
+    def perform(self, survey, **options):
+        return cleanup.perform(
+            adapter=self.adapter,
+            handle=self.handle,
+            export_record=export_record(status.ExportStatus.CONFIRMED),
+            survey=survey,
+            **options,
+        )
+
+    def test_a_clean_survey_is_named_in_the_reason(self):
+        record = self.perform(
+            lambda paths, roots=(): processes.SurveyReport(detail="no process on the host")
+        )
+        self.assertEqual(record.status, status.CleanupStatus.DESTROYED)
+        self.assertIn("no process on the host", record.reason)
+
+    def test_a_surviving_process_is_residue_even_when_every_resource_is_gone(self):
+        record = self.perform(
+            lambda paths, roots=(): processes.SurveyReport(
+                found=[7], surviving=[7], detail="1 process would not stop"
+            )
+        )
+        self.assertEqual(record.status, status.CleanupStatus.RESIDUE)
+        self.assertIn("process:7", record.retained)
+        self.assertEqual(record.processes["surviving"], [7])
+
+    def test_the_survey_is_given_this_runs_paths_and_no_others(self):
+        seen = []
+
+        def survey(paths, roots=()):
+            seen.append(list(paths))
+            return processes.SurveyReport(detail="looked")
+
+        self.perform(survey)
+        self.assertEqual(len(seen), 1)
+        for path in seen[0]:
+            self.assertTrue(path.startswith(str(self.root)), path)
+
+    def test_what_the_run_started_is_handed_to_the_survey(self):
+        seen = {}
+
+        def survey(paths, roots=()):
+            seen["roots"] = list(roots)
+            return processes.SurveyReport(detail="looked")
+
+        self.perform(survey, started=[4242])
+        self.assertEqual(seen["roots"], [4242])

@@ -156,7 +156,9 @@ class _Cycle:
         host_home: Path | None,
         environ: Mapping[str, str] | None,
         tool_versions: Mapping[str, Any] | None,
+        survey=None,
     ):
+        self.survey = survey
         self.config = run_config
         self.adapter = adapter
         self.run_id = run_id
@@ -173,6 +175,7 @@ class _Cycle:
             dely_revision=run_config.dely_revision,
         )
         self.handle: EnvironmentHandle | None = None
+        self.app_pid: int | None = None
         self.create_attempted = False
         self.blocked_reason = ""
         self.error_reason = ""
@@ -407,6 +410,10 @@ class _Cycle:
                     timeout=min(180, self.config.timeout_seconds),
                 )
                 record.commands.append(started.to_record())
+                # Only meaningful where the environment's process table is the
+                # host's; elsewhere the same number is somebody else's process.
+                if self.adapter.shares_host_processes:
+                    self.app_pid = orca.started_pid(started)
             runtime = orca.wait_for_runtime(
                 self.adapter,
                 self.config.orca.status_argv,
@@ -571,6 +578,8 @@ class _Cycle:
                 handle=self.handle,
                 export_record=export_record,
                 stop_confirmed=self.stop_confirmed,
+                survey=self.survey,
+                started=[self.app_pid] if self.app_pid else [],
             )
             self.result.cleanup = record
             phase_record.status = (
@@ -655,8 +664,14 @@ def run_cycle(
     host_home: Path | None = None,
     environ: Mapping[str, str] | None = None,
     tool_versions: Mapping[str, Any] | None = None,
+    survey=None,
 ) -> CycleOutcome:
-    """Run one minimal proof cycle and return its result and artifacts."""
+    """Run one minimal proof cycle and return its result and artifacts.
+
+    `survey` is how cleanup finds processes this run left on the host. It is
+    passed in rather than defaulted, so a test that does not ask for it can
+    never reach the machine running the tests.
+    """
     cycle = _Cycle(
         run_config=run_config,
         adapter=adapter,
@@ -664,6 +679,7 @@ def run_cycle(
         host_home=host_home,
         environ=environ,
         tool_versions=tool_versions,
+        survey=survey,
     )
     with tempfile.TemporaryDirectory(prefix="dely-cycle-") as staging:
         return cycle.run(Path(staging))

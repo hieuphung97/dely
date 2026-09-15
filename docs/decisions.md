@@ -9,6 +9,81 @@ Last updated 2026-09-15.
 
 ## Settled
 
+### 2026-09-15 — A disposable environment is not disposable until nothing of it is still running on the host
+
+#### Context
+
+A container run gave its Orca a virtual framebuffer of its own and the evidence
+recorded that the host's desktop was therefore untouched. It was not. Distrobox
+shares the host's Wayland socket as well as its X socket, and the application
+chose Wayland: it drew on the operator's own compositor and ignored the
+`DISPLAY` it was handed. Because a Distrobox container also shares the host's
+PID namespace, destroying the container did not end those processes. Instances
+from seven separate runs were found alive on the host hours later, each holding
+a `--user-data-dir` under its own destroyed per-run directory, and each still
+putting windows on the operator's screen — twice, on two different days.
+
+Cleanup had reported `DESTROYED` every time, truthfully: every resource the
+adapter *declared* was gone. The declaration named a container and a directory.
+It did not name the processes the run had started, because nothing in the run
+had ever looked for them.
+
+A second escape had the same shape. A command line inside an environment can
+reach a runtime outside it. The binary, the user data path and the project path
+all look right, the reply carries a terminal handle and reports its surface as
+visible, and the terminal belongs to the host. Two such terminals were found in
+the operator's own application, holding the host's shell in a per-run directory
+that no longer existed.
+
+#### Decision
+
+An environment's resources include what it started. Cleanup surveys the host for
+processes holding a path under this run's own state directory, stops them, and
+reports what it stopped; a survivor is residue, not a detail.
+
+Before anything is dispatched from it, the coordinator terminal is asked which
+machine it is on and has to answer with the name of the environment it is
+supposed to be in. A terminal that answers with another machine, or does not
+answer, stops the run.
+
+Neither check asks the backend to promise anything. Both read what is true after
+the fact, which is the only form in which either of these was ever visible.
+
+#### Alternatives considered
+
+Trusting `DISPLAY`. It is what produced the false claim: an environment variable
+records an intention, and the application is free to connect somewhere else.
+
+Reading the desktop to see whether a window appeared. It answers the question
+for the run that is watching and not for the one that already exited, and it
+needs a desktop the runner is not supposed to touch.
+
+Killing by process name. It would reach the operator's own application, which is
+the failure this is meant to prevent, not a worse version of it.
+
+#### Consequences
+
+"Destroyed" now means something a reader can check, and it costs one survey per
+run. A backend that shares the host's namespaces is recorded as sharing them:
+the container backend mounts the host home, shares the host's PID namespace and
+shares the host's Wayland socket, and the preflight and the evidence say so
+rather than describing a sandbox.
+
+The general form is worth keeping. A disposable environment that shares any
+namespace with its host can leave something behind that outlives the resource
+the run declared, and a cleanup that verifies only its own declarations will
+report success while that thing is still on the screen.
+
+#### Non-goals
+
+Making Distrobox an isolation boundary. Managing the operator's own
+application.
+
+#### Deferred
+
+The same survey for the machine backend's guest-side processes, triggered by a
+backend whose transport can outlive its domain.
+
 ### 2026-09-15 — A test double that can run a command runs it on the developer's machine
 
 #### Context

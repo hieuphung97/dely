@@ -170,6 +170,12 @@ class BackendAdapter(abc.ABC):
         """
         return None
 
+    #: Whether a process identifier from inside this environment means the same
+    #: thing on the host. Distrobox shares the host's process table, so it does;
+    #: a virtual machine has its own, so the same number there belongs to an
+    #: unrelated process here and must never be acted on.
+    shares_host_processes: bool = False
+
     def describe(self) -> dict[str, Any]:
         """Return backend facts for the manifest."""
         return {"backend": self.name}

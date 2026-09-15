@@ -197,6 +197,7 @@ class CleanupRecord:
     retained: list[str] = field(default_factory=list)
     shared_preserved: list[str] = field(default_factory=list)
     verified: bool = False
+    processes: dict[str, Any] = field(default_factory=dict)
 
     def to_document(self) -> dict[str, Any]:
         return {
@@ -206,6 +207,7 @@ class CleanupRecord:
             "retained": list(self.retained),
             "shared_preserved": list(self.shared_preserved),
             "verified": self.verified,
+            "processes": dict(self.processes),
         }
 
 

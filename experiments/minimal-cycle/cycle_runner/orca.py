@@ -145,6 +145,21 @@ def start_argv(app_argv: Sequence[str], display: str) -> list[str]:
     return ["sh", "-c", START_SCRIPT, "orca-start", display, *[str(a) for a in app_argv]]
 
 
+def started_pid(outcome: Any) -> int | None:
+    """Return the process identifier the start script reported, if it did.
+
+    The application appears in the process table naming no path of its own, so
+    this is the only exact handle a run has on what it started.
+    """
+    for line in (getattr(outcome, "stdout", "") or "").splitlines():
+        if line.startswith("started "):
+            try:
+                return int(line.split()[1])
+            except (IndexError, ValueError):
+                return None
+    return None
+
+
 def start_application(
     environment: Environment,
     app_argv: Sequence[str],

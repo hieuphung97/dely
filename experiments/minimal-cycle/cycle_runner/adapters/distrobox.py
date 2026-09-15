@@ -52,6 +52,8 @@ class DistroboxAdapter(BackendAdapter):
     """One disposable Distrobox, driven through Assemble and the command line."""
 
     name = "distrobox"
+    # The container runs in the host's process namespace.
+    shares_host_processes = True
 
     def __init__(
         self,
