@@ -366,3 +366,30 @@ class OrcaApplicationStartTest(CycleTestCase):
             any("orca-start" in " ".join(c.argv) for c in identity.commands),
             [" ".join(c.argv)[:60] for c in identity.commands],
         )
+
+
+class ProjectRepositoryTest(CycleTestCase):
+    """Orca registers a worktree for a repository, so the copy becomes one."""
+
+    def test_the_copy_is_initialised_as_a_repository_and_it_succeeds(self):
+        _, outcome = self.run_cycle()
+        bootstrap = outcome.run_result.phase("bootstrap")
+        commands = [c for c in bootstrap.commands if c.argv and c.argv[0] == "git"]
+        self.assertGreaterEqual(len(commands), 5, [c.argv for c in bootstrap.commands])
+        for command in commands:
+            self.assertEqual(command.exit_code, 0, " ".join(command.argv))
+        joined = " ".join(" ".join(c.argv) for c in commands)
+        self.assertIn("init", joined)
+        self.assertIn("commit", joined)
+
+    def test_a_failed_initialisation_stops_the_run_rather_than_continuing(self):
+        adapter, outcome = self.run_cycle(refuse_repository=True)
+        self.assertEqual(outcome.run_result.status, status.RunStatus.ERROR)
+        self.assertIn("repository", outcome.run_result.failure_classification.lower())
+        self.assertNotIn("worker", adapter.calls)
+
+    def test_repository_metadata_does_not_appear_in_the_patch(self):
+        _, outcome = self.run_cycle()
+        patch = self.artifact("diff.patch").read_text(encoding="utf-8")
+        self.assertNotIn(".git/", patch)
+        self.assertIn("evidence.txt", patch)

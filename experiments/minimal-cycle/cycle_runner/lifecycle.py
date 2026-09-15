@@ -277,6 +277,19 @@ class _Cycle:
         assert self.handle is not None
         with self.phase("bootstrap") as record:
             self.adapter.put_tree(baseline, self.handle.project_path)
+            # Orca registers a worktree for a repository; the exported copy is
+            # not one until this makes it one.
+            for argv in project.initialise_repository_commands(self.handle.project_path):
+                outcome = self.execute(argv, timeout=min(300, self.config.timeout_seconds))
+                record.commands.append(outcome.to_record())
+                if not outcome.ok:
+                    record.status = PhaseStatus.FAILED
+                    record.detail = (
+                        "the project copy could not be made into a repository: "
+                        + redact.text((outcome.stderr or outcome.stdout).strip()[-300:])
+                    )
+                    self.error_reason = self.error_reason or record.detail
+                    return
             for argv in self._provision_steps():
                 record.commands.append(self.execute(list(argv)).to_record())
             auth_record, overlay = auth.bootstrap(

@@ -18,6 +18,10 @@ from . import redact
 
 _TEXT_SAMPLE = 8192
 
+#: Repository metadata is not what a task changed, and a fresh repository would
+#: otherwise dominate the patch with hundreds of files nobody wrote.
+EXCLUDED_DIRECTORIES = frozenset({".git"})
+
 
 class ProjectError(RuntimeError):
     """The project copy could not be produced from the named revision."""
@@ -78,11 +82,15 @@ def _relative_files(root: Path) -> dict[str, Path]:
     root = Path(root)
     if not root.is_dir():
         return {}
-    return {
-        path.relative_to(root).as_posix(): path
-        for path in sorted(root.rglob("*"))
-        if path.is_file() and not path.is_symlink()
-    }
+    found = {}
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.is_symlink():
+            continue
+        relative = path.relative_to(root)
+        if EXCLUDED_DIRECTORIES.intersection(relative.parts):
+            continue
+        found[relative.as_posix()] = path
+    return found
 
 
 def _is_text(raw: bytes) -> bool:
@@ -97,6 +105,24 @@ def _is_text(raw: bytes) -> bool:
 
 def _lines(raw: bytes) -> list[str]:
     return raw.decode("utf-8").splitlines(keepends=True)
+
+
+def initialise_repository_commands(project_path: str) -> list[list[str]]:
+    """Return the commands that make the copy a repository Orca can register.
+
+    The copy is exported with `git archive`, so it carries the tracked tree at
+    one revision and no repository state at all. Orca registers a worktree for
+    a repository, so the copy becomes one: a single commit, identified as this
+    runner rather than as a person.
+    """
+    base = ["git", "-C", project_path]
+    return [
+        base + ["init", "-q", "-b", "main"],
+        base + ["config", "user.email", "dely-cycle@invalid"],
+        base + ["config", "user.name", "dely-cycle"],
+        base + ["add", "-A"],
+        base + ["commit", "-q", "-m", "dely-cycle: the pinned revision as exported"],
+    ]
 
 
 def unified_diff(baseline: Path, current: Path) -> str:

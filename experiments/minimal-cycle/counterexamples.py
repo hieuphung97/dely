@@ -230,6 +230,24 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_lifecycle.CreateFailureTest",),
     ),
     Counterexample(
+        name="the-copy-is-a-repository",
+        requirement="The project copy is made into a repository Orca can register",
+        path="cycle_runner/lifecycle.py",
+        original="""            for argv in project.initialise_repository_commands(self.handle.project_path):""",
+        replacement="""            for argv in []:""",
+        instruments=("tests.test_lifecycle.ProjectRepositoryTest",),
+    ),
+    Counterexample(
+        name="metadata-is-not-the-change",
+        requirement="Repository metadata stays out of the patch",
+        path="cycle_runner/project.py",
+        original="""        if EXCLUDED_DIRECTORIES.intersection(relative.parts):
+            continue""",
+        replacement="""        if False:
+            continue""",
+        instruments=("tests.test_project.DiffExclusionTest",),
+    ),
+    Counterexample(
         name="the-same-path-is-not-the-same-file",
         requirement="An environment with its own Orca at the host's path is not the host's",
         path="cycle_runner/probe.py",

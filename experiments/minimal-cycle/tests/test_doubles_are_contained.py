@@ -75,10 +75,26 @@ class FakeAdapterContainmentTest(unittest.TestCase):
         self.assertEqual(outcome.exit_code, 0)
 
     def test_the_allowlists_stay_small_and_name_nothing_graphical(self):
-        self.assertLessEqual(len(RUNNABLE_PROGRAMS), 8)
+        # A ceiling, so the list cannot grow quietly. Raising it is a decision
+        # a reader sees; `git` was added for the repository the copy has to be.
+        self.assertLessEqual(len(RUNNABLE_PROGRAMS), 9)
         self.assertNotIn("orca", RUNNABLE_PROGRAMS)
         self.assertNotIn("nohup", RUNNABLE_PROGRAMS)
         self.assertNotIn("orca-start", RUNNABLE_SHELL_SCRIPTS)
+
+    def test_git_is_only_allowed_inside_the_fake_root(self):
+        outside = self.adapter._refuse(["git", "-C", "/etc", "init"])
+        self.assertIsNotNone(outside)
+        self.assertEqual(outside.exit_code, 127)
+        inside = self.adapter._refuse(
+            ["git", "-C", str(self.adapter.project), "init"]
+        )
+        self.assertIsNone(inside)
+
+    def test_git_in_any_other_form_is_refused(self):
+        refusal = self.adapter._refuse(["git", "clone", "https://example.invalid/x"])
+        self.assertIsNotNone(refusal)
+        self.assertEqual(refusal.exit_code, 127)
 
 
 class StubRunnerContainmentTest(unittest.TestCase):

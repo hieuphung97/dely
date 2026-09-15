@@ -131,3 +131,55 @@ class DiffTest(unittest.TestCase):
     def test_a_missing_current_tree_reports_every_file_as_removed(self):
         patch = project.unified_diff(self.baseline, self.root / "absent")
         self.assertIn("--- a/readme.md", patch)
+
+
+class DiffExclusionTest(unittest.TestCase):
+    """Repository metadata is not what the task changed."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.baseline = self.root / "baseline"
+        self.current = self.root / "current"
+        for tree in (self.baseline, self.current):
+            (tree / "src").mkdir(parents=True)
+            (tree / "src" / "app.py").write_text("value = 1\n", encoding="utf-8")
+        self.addCleanup(self._tmp.cleanup)
+
+    def test_repository_metadata_is_left_out_of_the_patch(self):
+        objects = self.current / ".git" / "objects"
+        objects.mkdir(parents=True)
+        (objects / "deadbeef").write_bytes(b"\x01\x02\x03")
+        (self.current / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+        patch = project.unified_diff(self.baseline, self.current)
+        self.assertEqual(patch, "")
+
+    def test_what_the_task_changed_is_still_shown(self):
+        (self.current / ".git").mkdir()
+        (self.current / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+        (self.current / "evidence.txt").write_text("dely-cycle-marker\n", encoding="utf-8")
+        patch = project.unified_diff(self.baseline, self.current)
+        self.assertIn("+++ b/evidence.txt", patch)
+        self.assertNotIn(".git", patch)
+
+
+class InitialiseRepositoryTest(unittest.TestCase):
+    """Orca registers a worktree for a repository, so the copy has to be one."""
+
+    def test_the_commands_initialise_and_commit_the_copy(self):
+        argv_list = project.initialise_repository_commands("/home/cycle/project")
+        joined = [" ".join(argv) for argv in argv_list]
+        self.assertTrue(any("init" in line for line in joined))
+        self.assertTrue(any("add" in line for line in joined))
+        self.assertTrue(any("commit" in line for line in joined))
+        for argv in argv_list:
+            self.assertIn("/home/cycle/project", argv)
+
+    def test_an_identity_is_set_so_the_commit_does_not_need_one_configured(self):
+        joined = " ".join(" ".join(argv) for argv in project.initialise_repository_commands("/p"))
+        self.assertIn("user.email", joined)
+        self.assertIn("user.name", joined)
+
+    def test_the_commit_is_not_attributed_to_a_person(self):
+        joined = " ".join(" ".join(argv) for argv in project.initialise_repository_commands("/p"))
+        self.assertIn("dely-cycle", joined)

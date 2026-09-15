@@ -41,7 +41,9 @@ HOST = {
 
 #: The only programs a fake environment may really run on this machine, and
 #: the only `sh -c` scripts among them. `orca-start` is deliberately absent.
-RUNNABLE_PROGRAMS = frozenset({"sh", "rm", "mkdir", "cat", "test", "true", "false", "printf"})
+RUNNABLE_PROGRAMS = frozenset(
+    {"sh", "rm", "mkdir", "cat", "test", "true", "false", "printf", "git"}
+)
 RUNNABLE_SHELL_SCRIPTS = frozenset({"cycle-check", "auth-teardown", "cycle-cd"})
 
 ORCA_STATUS_REPLY = (
@@ -94,6 +96,7 @@ class FakeAdapter(BackendAdapter):
         runtime_ready: bool = True,
         terminal_refused: bool = False,
         already_running: bool = False,
+        refuse_repository: bool = False,
         create_fails: bool = False,
         task_writes_nothing: bool = False,
         host_project: Path | None = None,
@@ -118,6 +121,7 @@ class FakeAdapter(BackendAdapter):
         # The application is not running until something starts it, which is
         # what the real environment does too.
         self.app_started = already_running
+        self.refuse_repository = refuse_repository
         self.create_fails = create_fails
         self.task_writes_nothing = task_writes_nothing
         self.host_project = host_project
@@ -218,6 +222,9 @@ class FakeAdapter(BackendAdapter):
                 self.project.mkdir(parents=True, exist_ok=True)
                 (self.project / "evidence.txt").write_text(self.marker, encoding="utf-8")
             return self._outcome(argv, 0, ORCA_DISPATCH_REPLY, "")
+        if argv[0] == "git" and self.refuse_repository:
+            self.calls.append("git-refused")
+            return self._outcome(argv, 1, "", "the fake refuses to initialise a repository")
         if len(argv) > 3 and argv[0] == "sh" and argv[3] == "orca-start":
             # Simulated, never executed: running this would start a desktop
             # application on the machine running the tests.
@@ -271,6 +278,18 @@ class FakeAdapter(BackendAdapter):
             if name not in RUNNABLE_SHELL_SCRIPTS:
                 return self._outcome(
                     argv, 127, "", f"the fake environment does not run the script {name!r}"
+                )
+        if program == "git":
+            # Only inside the fake's own root, and only in that form: `git`
+            # reaches a great deal further than this fake should.
+            inside = (
+                len(argv) > 2
+                and argv[1] == "-C"
+                and Path(argv[2]).is_relative_to(self.root)
+            )
+            if not inside:
+                return self._outcome(
+                    argv, 127, "", "the fake environment runs git only inside its own root"
                 )
         if program == "rm":
             targets = [item for item in argv[1:] if not item.startswith("-")]
