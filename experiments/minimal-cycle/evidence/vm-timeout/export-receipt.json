@@ -1,0 +1,71 @@
+{
+  "artifacts": [
+    {
+      "path": "auth-receipt.json",
+      "sha256": "b3e1a9da8d4806448f08ecd637daaf22aac7688bafab6e6a98d0b082e2ada44b",
+      "size_bytes": 291
+    },
+    {
+      "path": "backend-status.json",
+      "sha256": "a15d64923f183348040c6c6f5be92dd387a4ae1c602762a50d2fac0b2ecec1b2",
+      "size_bytes": 2016
+    },
+    {
+      "path": "diff.patch",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "host-before.json",
+      "sha256": "5af460083229b542e0c705890c7b0b8516ea6760f103f3f203ab401b63527e5e",
+      "size_bytes": 1309
+    },
+    {
+      "path": "identity/environment-probe.txt",
+      "sha256": "fcaba634c48816dac5dec694b09cedfe4ce45c632cde34e40d47fa267316ef8b",
+      "size_bytes": 471
+    },
+    {
+      "path": "identity/host-probe.txt",
+      "sha256": "231d64a3785b25786617993eb8b7525eb51bda26aa49adef773a5a32e989893c",
+      "size_bytes": 1709
+    },
+    {
+      "path": "identity/orca-runtime.json",
+      "sha256": "fff5639d9009767cc7528b44428da90528be42ad5554665ce15c35ef109729ba",
+      "size_bytes": 3178
+    },
+    {
+      "path": "identity/orca-status.json",
+      "sha256": "86222f82dc556d15cb413be50082d0c6670a8d1d3c0dae8212c695c995a130e7",
+      "size_bytes": 363
+    },
+    {
+      "path": "logs/commands.jsonl",
+      "sha256": "f015e2966d1d8caa93c07d655807331d72e88901c19dea814cbd3553cd2966b7",
+      "size_bytes": 9377
+    },
+    {
+      "path": "logs/runner.log",
+      "sha256": "c0d853c7b5c707c44ac61251eac5f85b9957a406089da5cbcbf891734f40fe83",
+      "size_bytes": 1537
+    },
+    {
+      "path": "preflight.json",
+      "sha256": "a0a2864b989fabdb80b8dc5efcd4e301eff362033b3297114300ea6c75c24340",
+      "size_bytes": 1805
+    },
+    {
+      "path": "run-before-cleanup.json",
+      "sha256": "6f7a2ebb248e16cf0aeb04481ea6a1f9fd141c0044616aefc41c2b4957c5336b",
+      "size_bytes": 25561
+    }
+  ],
+  "confirmed_at": "2026-09-15T17:26:29Z",
+  "detail": "12 artifact(s) re-read from the host; 1 unresolved",
+  "missing": [
+    "task-artifact/evidence.txt (absent from the host)"
+  ],
+  "receipt_path": "export-receipt.json",
+  "status": "CONFIRMED"
+}
