@@ -64,6 +64,7 @@ class PreflightCommandTest(CliTestCase):
             "base_image": str(self.root / "absent.qcow2"),
             "base_image_sha256": "0" * 64,
             "guest_user": "cycle",
+            "venv": str(self.root / "absent-venv"),
         }
         path.write_text(json.dumps(document), encoding="utf-8")
         code, out, _ = self.invoke(["preflight", "--config", str(path)])

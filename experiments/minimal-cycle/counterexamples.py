@@ -199,15 +199,27 @@ CASES: tuple[Counterexample, ...] = (
     ),
     Counterexample(
         name="base-is-only-a-backing-file",
-        requirement="The preserved base image is never the overlay's output path",
+        requirement="The preserved base image is a backing volume, never a per-run one",
         path="cycle_runner/adapters/vm.py",
-        original="""            "-F",
-            "qcow2",
-            str(self.overlay_path),""",
-        replacement="""            "-F",
-            "qcow2",
-            str(self.settings.base_image),""",
-        instruments=("tests.test_adapter_vm.OverlayTest",),
+        original="""                Resource(
+                    kind="volume",
+                    identifier=str(
+                        Path(self.settings.base_image).parent
+                        / f"{self.domain_name}-overlay.qcow2"
+                    ),
+                ),""",
+        replacement="""                Resource(
+                    kind="volume", identifier=str(self.settings.base_image)
+                ),""",
+        instruments=("tests.test_adapter_vm.ResourceTest",),
+    ),
+    Counterexample(
+        name="overlay-is-not-the-base",
+        requirement="The rendered program creates an overlay, not a volume named like the base",
+        path="cycle_runner/adapters/vm.py",
+        original='    name=DOMAIN_NAME + "-overlay.qcow2",',
+        replacement="    name=BASE_VOLUME,",
+        instruments=("tests.test_adapter_vm.ProgramTest",),
     ),
     Counterexample(
         name="failed-create-names-its-residue",
@@ -227,11 +239,37 @@ CASES: tuple[Counterexample, ...] = (
     ),
     Counterexample(
         name="provider-schema-verified",
-        requirement="An unverified provider schema blocks the machine backend",
+        requirement="A program the provider cannot be checked against blocks the run",
         path="cycle_runner/adapters/vm.py",
-        original="                ok=self.settings.provider_schema_verified,",
-        replacement="                ok=True,",
+        original="""        ran, problems = schema.verify_with_interpreter(program, interpreter)
+        if not ran:""",
+        replacement="""        ran, problems = schema.verify_with_interpreter(program, interpreter)
+        if False:""",
         instruments=("tests.test_adapter_vm.PreflightTest",),
+    ),
+    Counterexample(
+        name="state-backend-is-local",
+        requirement="A cloud state backend blocks the machine backend",
+        path="cycle_runner/adapters/vm.py",
+        original="            ok=backend.startswith(\"file://\"),",
+        replacement="            ok=True,",
+        instruments=("tests.test_adapter_vm.PreflightTest",),
+    ),
+    Counterexample(
+        name="graphics-type-is-supported",
+        requirement="A graphics type this emulator lacks blocks the run",
+        path="cycle_runner/adapters/vm.py",
+        original="            ok=self.settings.graphics in supported,",
+        replacement="            ok=True,",
+        instruments=("tests.test_adapter_vm.PreflightTest",),
+    ),
+    Counterexample(
+        name="transport-address-is-the-right-one",
+        requirement="Another interface's address is not mistaken for the transport's",
+        path="cycle_runner/adapters/vm.py",
+        original="                if self.transport_mac in line:",
+        replacement="                if True:",
+        instruments=("tests.test_adapter_vm.AddressDiscoveryTest",),
     ),
 )
 

@@ -1,14 +1,16 @@
 # One minimal proof cycle on the virtual-machine backend.
 #
-# This backend needs a prepared tool image, a pinned libvirt provider, and a
-# provider schema someone has actually checked. Preflight refuses each of those
-# rather than guessing.
+# The stack is Pulumi Python with the libvirt provider over qemu and kvm, a
+# qcow2 overlay on a preserved tool image, and a cloud-init NoCloud seed. Run
+# `host/prepare-host` first: it installs the pinned Pulumi, points it at a
+# local state backend, builds the environment, fetches the base image and
+# declares the storage pool.
 
 backend: vm
 
 tested_revision: replace-with-the-revision-under-test
 dely_revision: replace-with-the-dely-revision
-claude_code_version: replace-with-the-pinned-claude-code-version
+claude_code_version: "2.1.272"
 
 timeout_seconds: 3600
 
@@ -36,7 +38,7 @@ auth:
   token_env: CLAUDE_CODE_OAUTH_TOKEN
 
 orca:
-  version: replace-with-the-pinned-orca-version
+  version: "1.4.201"
   model: replace-with-the-pinned-model
   effort: replace-with-the-pinned-effort
   agent: claude
@@ -44,25 +46,36 @@ orca:
 
 vm:
   provider: pulumi-libvirt
-  provider_version: replace-with-the-version-you-checked
+  provider_version: "0.5.4"
   stack_prefix: dely-cycle
-  # The preserved tool image built separately with Packer. The run opens it only
-  # as a backing file and never destroys it.
-  base_image: /var/lib/dely-cycle/images/tool-image.qcow2
-  # A digest of the right shape that matches nothing: preflight blocks on it
-  # until it is replaced with the real one.
+  # The preserved tool image built by host/packer. The run opens it only as a
+  # backing file and never destroys it. Its name inside the pool is the file
+  # name below.
+  base_image: /var/tmp/dely-cycle/images/tool-image.qcow2
+  # A digest of the right shape that matches nothing, so preflight blocks
+  # until the tool image build's recorded digest replaces it.
   base_image_sha256: '0000000000000000000000000000000000000000000000000000000000000000'
   guest_user: cycle
+  # The environment carrying the pinned Pulumi SDK and libvirt provider. The
+  # rendered program is checked field by field against the provider importable
+  # from here; preflight blocks when it cannot be.
+  venv: /var/tmp/dely-cycle/venv
   pulumi_binary: pulumi
-  connect_uri: qemu:///session
-  overlay_size: 24g
+  connect_uri: qemu:///system
+  pool: dely-cycle
+  network: default
+  overlay_size_bytes: 25769803776
   memory_mb: 4096
   vcpus: 2
-  graphics: spice
+  # This host's qemu reports sdl, vnc, egl-headless and dbus; it has no spice.
+  # Preflight reads the supported list rather than trusting this value.
+  graphics: vnc
+  listen_address: 127.0.0.1
   transport: ssh
-  network: default
   ssh_port: 22
-  # The rendered Pulumi program names resource fields that belong to the pinned
-  # provider version. Preflight blocks until someone has checked them.
-  provider_schema_verified: false
+  address_timeout_seconds: 600
+  # A second, user-mode interface so the guest can reach the internet. It does
+  # not use the host's forwarding path, so it works where a bridged guest is
+  # blocked by the host firewall or a virtual private network.
+  egress: true
   provision: []

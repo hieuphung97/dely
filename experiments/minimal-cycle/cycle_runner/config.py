@@ -246,16 +246,20 @@ class VmConfig:
     base_image: Path
     base_image_sha256: str
     guest_user: str
+    venv: Path
     pulumi_binary: str = "pulumi"
-    connect_uri: str = "qemu:///session"
-    overlay_size: str = "24g"
+    connect_uri: str = "qemu:///system"
+    pool: str = "dely-cycle"
+    overlay_size_bytes: int = 24 * 1024 * 1024 * 1024
     memory_mb: int = 4096
     vcpus: int = 2
-    graphics: str = "spice"
+    graphics: str = "vnc"
+    listen_address: str = "127.0.0.1"
     transport: str = "ssh"
     network: str = "default"
     ssh_port: int = 22
-    provider_schema_verified: bool = False
+    address_timeout_seconds: int = 600
+    egress: bool = True
     provision: tuple[tuple[str, ...], ...] = ()
 
     def to_document(self) -> dict[str, Any]:
@@ -266,18 +270,27 @@ class VmConfig:
             "base_image": str(self.base_image),
             "base_image_sha256": self.base_image_sha256,
             "guest_user": self.guest_user,
+            "venv": str(self.venv),
             "pulumi_binary": self.pulumi_binary,
             "connect_uri": self.connect_uri,
-            "overlay_size": self.overlay_size,
+            "pool": self.pool,
+            "overlay_size_bytes": self.overlay_size_bytes,
             "memory_mb": self.memory_mb,
             "vcpus": self.vcpus,
             "graphics": self.graphics,
+            "listen_address": self.listen_address,
             "transport": self.transport,
             "network": self.network,
             "ssh_port": self.ssh_port,
-            "provider_schema_verified": self.provider_schema_verified,
+            "address_timeout_seconds": self.address_timeout_seconds,
+            "egress": self.egress,
             "provision": [list(argv) for argv in self.provision],
         }
+
+    @property
+    def base_volume_name(self) -> str:
+        """The base image's name as the storage pool knows it."""
+        return self.base_image.name
 
 
 @dataclass(frozen=True)
@@ -488,16 +501,20 @@ def _vm(document: Mapping[str, Any]) -> VmConfig:
             "base_image",
             "base_image_sha256",
             "guest_user",
+            "venv",
             "pulumi_binary",
             "connect_uri",
-            "overlay_size",
+            "pool",
+            "overlay_size_bytes",
             "memory_mb",
             "vcpus",
             "graphics",
+            "listen_address",
             "transport",
             "network",
             "ssh_port",
-            "provider_schema_verified",
+            "address_timeout_seconds",
+            "egress",
             "provision",
         ),
         "vm",
@@ -508,6 +525,9 @@ def _vm(document: Mapping[str, Any]) -> VmConfig:
     digest = _text(document, "base_image_sha256", "vm")
     if len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
         _fail("field vm.base_image_sha256 must be a lowercase content digest")
+    venv = Path(_text(document, "venv", "vm"))
+    if not venv.is_absolute():
+        _fail("field vm.venv must be an absolute path to the pinned environment")
     return VmConfig(
         provider=_text(document, "provider", "vm"),
         provider_version=_text(document, "provider_version", "vm"),
@@ -515,18 +535,24 @@ def _vm(document: Mapping[str, Any]) -> VmConfig:
         base_image=base_image,
         base_image_sha256=digest,
         guest_user=_text(document, "guest_user", "vm"),
+        venv=venv,
         pulumi_binary=_text(document, "pulumi_binary", "vm", "pulumi"),
-        connect_uri=_text(document, "connect_uri", "vm", "qemu:///session"),
-        overlay_size=_text(document, "overlay_size", "vm", "24g"),
+        connect_uri=_text(document, "connect_uri", "vm", "qemu:///system"),
+        pool=_text(document, "pool", "vm", "dely-cycle"),
+        overlay_size_bytes=_positive_int(
+            document, "overlay_size_bytes", "vm", 24 * 1024 * 1024 * 1024
+        ),
         memory_mb=_positive_int(document, "memory_mb", "vm", 4096),
         vcpus=_positive_int(document, "vcpus", "vm", 2),
-        graphics=_text(document, "graphics", "vm", "spice"),
+        graphics=_text(document, "graphics", "vm", "vnc"),
+        listen_address=_text(document, "listen_address", "vm", "127.0.0.1"),
         transport=_text(document, "transport", "vm", "ssh"),
         network=_text(document, "network", "vm", "default"),
         ssh_port=_positive_int(document, "ssh_port", "vm", 22),
-        provider_schema_verified=_flag(
-            document, "provider_schema_verified", "vm", False
+        address_timeout_seconds=_positive_int(
+            document, "address_timeout_seconds", "vm", 600
         ),
+        egress=_flag(document, "egress", "vm", True),
         provision=_provision(document, "vm"),
     )
 

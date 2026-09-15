@@ -1,0 +1,76 @@
+{
+  "description": "Every version, source and digest this environment is pinned to. prepare-host verifies each one and refuses to continue when a digest does not match.",
+  "host_tools": {
+    "pulumi_cli": {
+      "version": "3.262.0",
+      "installer": "https://get.pulumi.com",
+      "install_flag": "--version 3.262.0",
+      "binary": "~/.pulumi/bin/pulumi",
+      "backend": "file:// (pulumi login --local); Pulumi Cloud is never used"
+    },
+    "packer": {
+      "version": "1.16.0",
+      "note": "already present on the development host; the template pins the qemu plugin itself"
+    },
+    "qemu": {"version": "10.2.2"},
+    "libvirt": {"version": "12.0.0"},
+    "connect_uri": "qemu:///system",
+    "network": "default",
+    "storage_pool": {
+      "name": "dely-cycle",
+      "type": "dir",
+      "target": "/var/tmp/dely-cycle/images"
+    }
+  },
+  "python_environment": {
+    "interpreter": "python3",
+    "venv": "/var/tmp/dely-cycle/venv",
+    "packages": {
+      "pulumi": "3.262.0",
+      "pulumi-libvirt": "0.5.4"
+    },
+    "provider_plugin": "libvirt-0.5.4"
+  },
+  "base_image": {
+    "distribution": "Ubuntu Server 24.04 LTS (Noble)",
+    "architecture": "amd64",
+    "kind": "cloud image for qemu and libvirt, not a container image",
+    "url": "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img",
+    "checksums_url": "https://cloud-images.ubuntu.com/releases/noble/release/SHA256SUMS",
+    "file": "ubuntu-24.04-server-cloudimg-amd64.img",
+    "sha256": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+    "format": "qcow2",
+    "virtual_size_bytes": 3758096384,
+    "download_size_bytes": 625256960
+  },
+  "tool_image": {
+    "file": "tool-image.qcow2",
+    "built_by": "packer, qemu builder, from the base image above",
+    "contents": {
+      "orca": {
+        "version": "1.4.201",
+        "package": "orca-ide_1.4.201_amd64.deb",
+        "url": "https://github.com/stablyai/orca/releases/download/v1.4.201/orca-ide_1.4.201_amd64.deb",
+        "sha256": "9dab79a5223837fc91992e04ed54f92f45d6f4b486d7128c08166bfb1a15a573",
+        "size_bytes": 165333236,
+        "note": "the amd64 package only; the rpm is never installed alongside it"
+      },
+      "claude_code": {
+        "version": "2.1.272",
+        "package": "@anthropic-ai/claude-code",
+        "registry": "https://registry.npmjs.org",
+        "note": "installed from the registry at the pinned version, never at latest"
+      },
+      "skills": {
+        "note": "skills are an explicit, pinned part of the image; the runner never fetches an unpinned one at run time"
+      }
+    },
+    "excludes": [
+      "host credentials",
+      "tokens",
+      "cookies",
+      "private keys",
+      "any part of the host home directory"
+    ]
+  }
+}
