@@ -234,6 +234,26 @@ class AuthRecord:
 
 
 @dataclass
+class FirstRunRecord:
+    """What was written so the agent could start, never why it was trusted."""
+
+    status: PhaseStatus = PhaseStatus.SKIPPED
+    target: str | None = None
+    entries: list[str] = field(default_factory=list)
+    questions: list[str] = field(default_factory=list)
+    detail: str = "not attempted"
+
+    def to_document(self) -> dict[str, Any]:
+        return {
+            "status": self.status.value,
+            "target": self.target,
+            "entries": list(self.entries),
+            "questions": list(self.questions),
+            "detail": self.detail,
+        }
+
+
+@dataclass
 class RunResult:
     """One cycle, whatever backend produced it."""
 
@@ -256,6 +276,7 @@ class RunResult:
     export: ExportRecord = field(default_factory=ExportRecord)
     cleanup: CleanupRecord = field(default_factory=CleanupRecord)
     auth: AuthRecord = field(default_factory=AuthRecord)
+    first_run: FirstRunRecord = field(default_factory=FirstRunRecord)
 
     def phase(self, name: str) -> PhaseRecord | None:
         for record in self.phases:
@@ -284,6 +305,7 @@ class RunResult:
             "export": self.export.to_document(),
             "cleanup": self.cleanup.to_document(),
             "auth": self.auth.to_document(),
+            "first_run": self.first_run.to_document(),
         }
 
 

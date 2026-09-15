@@ -21,6 +21,13 @@ from .status import PhaseStatus
 SETTINGS_RELATIVE = ".claude/settings.json"
 
 
+def settings_document(run_config: RunConfig) -> dict[str, str]:
+    """Return what the configured auth method declares in the per-run settings."""
+    if run_config.auth.mode != "api_key_helper":
+        return {}
+    return {"apiKeyHelper": " ".join(run_config.auth.helper_argv)}
+
+
 def _environment_path(handle: EnvironmentHandle, relative: str) -> str:
     return str(Path(handle.home_path) / relative)
 
@@ -91,7 +98,6 @@ def _api_key_helper(
     adapter: BackendAdapter,
     handle: EnvironmentHandle,
 ) -> tuple[AuthRecord, dict[str, str]]:
-    helper = " ".join(run_config.auth.helper_argv)
     record = AuthRecord(
         mode="api_key_helper",
         reference=run_config.auth.reference,
@@ -100,7 +106,7 @@ def _api_key_helper(
     )
     adapter.write_file(
         _environment_path(handle, SETTINGS_RELATIVE),
-        json.dumps({"apiKeyHelper": helper}, indent=2) + "\n",
+        json.dumps(settings_document(run_config), indent=2) + "\n",
         mode=0o600,
     )
     record.status = PhaseStatus.OK

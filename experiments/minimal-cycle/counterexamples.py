@@ -39,6 +39,35 @@ class Counterexample:
 
 CASES: tuple[Counterexample, ...] = (
     Counterexample(
+        name="first-run-state-names-the-environment-copy",
+        requirement=(
+            "First-run state keyed to a path the agent will never open leaves "
+            "every prompt unanswered"
+        ),
+        path="cycle_runner/firstrun.py",
+        original="""    return {
+        "hasCompletedOnboarding": True,
+        "projects": {
+            project_path: {""",
+        replacement="""    return {
+        "hasCompletedOnboarding": True,
+        "projects": {
+            "/home/agent/project": {""",
+        instruments=("tests.test_firstrun.FirstRunStateTest",),
+    ),
+    Counterexample(
+        name="first-run-answers-every-question-it-names",
+        requirement=(
+            "A receipt that lists four answered questions while the state "
+            "answers one is rejected"
+        ),
+        path="cycle_runner/firstrun.py",
+        original="""                "hasTrustDialogAccepted": True,
+                "hasClaudeMdExternalIncludesApproved": True,""",
+        replacement="""                "hasTrustDialogAccepted": True,""",
+        instruments=("tests.test_firstrun.FirstRunStateTest",),
+    ),
+    Counterexample(
         name="no-host-fallback",
         requirement="A probe result equal to the host's own snapshot is rejected",
         path="cycle_runner/probe.py",

@@ -17,7 +17,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
-from . import auth, cleanup, hostinfo, manifest, orca, probe, proc, project, redact, worker
+from . import (
+    auth,
+    cleanup,
+    firstrun,
+    hostinfo,
+    manifest,
+    orca,
+    probe,
+    proc,
+    project,
+    redact,
+    worker,
+)
 from .adapters.base import BackendAdapter, EnvironmentHandle
 from .config import RunConfig
 from .export import Exporter
@@ -322,6 +334,14 @@ class _Cycle:
             if auth_record.status is PhaseStatus.BLOCKED:
                 record.status = PhaseStatus.BLOCKED
                 self.blocked_reason = auth_record.detail
+                return
+            # Auth declares what it wants in the per-run settings; this writes
+            # that file, so it runs after auth rather than before it.
+            first_run = firstrun.apply(
+                run_config=self.config, adapter=self.adapter, handle=self.handle
+            )
+            self.result.first_run = first_run
+            self.exporter.write_json("first-run-state.json", first_run.to_document())
 
     def _provision_steps(self):
         section = (
