@@ -199,8 +199,11 @@ class CoordinatorTerminalTest(WorkerTest):
         orchestration = [argv for argv in adapter.executed if "orchestration" in argv]
         self.assertEqual(len(orchestration), 3)
         for argv in orchestration:
-            self.assertIn("--from", argv)
-            self.assertEqual(argv[argv.index("--from") + 1], "term_abcdef")
+            # The wait takes the terminal by a different flag; both are the
+            # same handle, and neither command may go without one.
+            flag = "--terminal" if "--wait" in argv else "--from"
+            self.assertIn(flag, argv)
+            self.assertEqual(argv[argv.index(flag) + 1], "term_abcdef")
 
     def test_without_a_terminal_the_flag_is_not_invented(self):
         adapter, _ = self.launch_from(None)
@@ -333,3 +336,47 @@ class UnverifiedStartTest(WorkerTest):
         adapter, _, record = self.launch(script=script)
         self.assertEqual(record.status, status.PhaseStatus.FAILED)
         self.assertFalse(any("--wait" in argv for argv in adapter.executed))
+
+
+class SenderFlagShapeTest(WorkerTest):
+    """The three commands do not take the sender the same way.
+
+    Observed against a live runtime: `orchestration check` rejected `--from`
+    with `Unknown flag --from for command: orchestration check`. It names the
+    terminal with `--terminal`; run-create and worker-start use `--from`.
+    """
+
+    def plan(self):
+        from cycle_runner.adapters.base import EnvironmentHandle
+
+        handle = EnvironmentHandle(
+            environment_id="e", home_path="/home/cycle", project_path="/home/cycle/project"
+        )
+        return worker.build_plan(
+            run_config=self.config,
+            handle=handle,
+            timeout_seconds=900,
+            orca_run_id="run-abcdef",
+            coordinator_handle="term_abcdef",
+        )
+
+    def test_run_create_names_the_sender_with_from(self):
+        argv = self.plan().run_create_argv
+        self.assertIn("--from", argv)
+        self.assertEqual(argv[argv.index("--from") + 1], "term_abcdef")
+
+    def test_worker_start_names_the_sender_with_from(self):
+        argv = self.plan().worker_start_argv
+        self.assertIn("--from", argv)
+        self.assertEqual(argv[argv.index("--from") + 1], "term_abcdef")
+
+    def test_the_wait_names_the_terminal_and_never_uses_from(self):
+        argv = self.plan().wait_argv
+        self.assertNotIn("--from", argv)
+        self.assertIn("--terminal", argv)
+        self.assertEqual(argv[argv.index("--terminal") + 1], "term_abcdef")
+
+    def test_the_wait_still_carries_the_run_and_the_settling_types(self):
+        argv = self.plan().wait_argv
+        self.assertEqual(argv[argv.index("--run") + 1], "run-abcdef")
+        self.assertIn("--types", argv)

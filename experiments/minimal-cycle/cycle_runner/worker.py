@@ -113,11 +113,13 @@ def build_plan(
         run_config.orca.run_objective,
         "--json",
     ]
-    # Every orchestration command is sent from a terminal the runtime knows;
-    # without one Orca refuses with no_active_sender_terminal.
+    # Every orchestration command names the terminal the runtime knows it by;
+    # without one Orca refuses with no_active_sender_terminal. The wait takes it
+    # as `--terminal`, not `--from`, and rejects `--from` outright.
     if coordinator_handle:
-        for command in (created, start, wait):
+        for command in (created, start):
             command.extend(["--from", coordinator_handle])
+        wait.extend(["--terminal", coordinator_handle])
     return LaunchPlan(
         prompt_path=prompt_path,
         spec=spec,

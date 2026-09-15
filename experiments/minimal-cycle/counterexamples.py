@@ -230,6 +230,14 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_lifecycle.CreateFailureTest",),
     ),
     Counterexample(
+        name="the-wait-takes-a-terminal-not-a-sender",
+        requirement="The completion wait names the terminal with the flag it accepts",
+        path="cycle_runner/worker.py",
+        original="""        wait.extend(["--terminal", coordinator_handle])""",
+        replacement="""        wait.extend(["--from", coordinator_handle])""",
+        instruments=("tests.test_worker.SenderFlagShapeTest",),
+    ),
+    Counterexample(
         name="an-unobserved-start-still-waits",
         requirement="A dispatch the plane could not observe is still waited for",
         path="cycle_runner/worker.py",
