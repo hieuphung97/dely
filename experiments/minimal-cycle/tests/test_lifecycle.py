@@ -463,3 +463,16 @@ class BootstrapOrderTest(CycleTestCase):
             i for i, c in enumerate(adapter.calls) if c.startswith("execute:git")
         )
         self.assertLess(adapter.calls.index("put_tree"), first_git)
+
+
+class TerminalOutsideTheEnvironmentTest(CycleTestCase):
+    """A command line inside an environment can still reach a runtime outside it."""
+
+    def test_a_coordinator_terminal_on_another_machine_blocks_the_run(self):
+        _, outcome = self.run_cycle(terminal_answers="workstation")
+        self.assertEqual(outcome.run_result.status, status.RunStatus.BLOCKED)
+        self.assertIn("not in this environment", outcome.run_result.failure_classification)
+
+    def test_nothing_is_dispatched_to_a_terminal_that_is_not_ours(self):
+        adapter, _ = self.run_cycle(terminal_answers="workstation")
+        self.assertNotIn("worker-start", " ".join(adapter.calls))

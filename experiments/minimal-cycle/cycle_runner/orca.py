@@ -156,8 +156,71 @@ def start_application(
     return environment.execute(start_argv(app_argv, display), timeout=timeout)
 
 
+#: Printed by the coordinator terminal and read back from its screen. A
+#: terminal that answers with any other name is not in this environment.
+MARKER_PREFIX = "cycle-terminal:"
+
+
+def marker_command(marker: str) -> list[str]:
+    """Return the command that makes a terminal say where it is."""
+    return [
+        "orca",
+        "terminal",
+        "send",
+        "--text",
+        f"printf '{MARKER_PREFIX}%s\\n' \"$(hostname)\"",
+        "--enter",
+        "--json",
+    ]
+
+
+def confirm_terminal_is_inside(
+    environment: Environment,
+    handle: str,
+    expected: str,
+    *,
+    timeout: float,
+    attempts: int = 10,
+    sleeper: Callable[[float], None] = time.sleep,
+) -> tuple[bool, str]:
+    """Make the terminal name its own machine, and check that it is this one.
+
+    A command line inside an environment can reach a runtime outside it: the
+    binary, the user data path and the project path can all look right while
+    the terminal that opens belongs to the host. Nothing in the reply says so.
+    Asking the terminal itself does, and costs one round trip.
+    """
+    argv = marker_command(expected)
+    argv.extend(["--terminal", handle])
+    environment.execute(argv, timeout=timeout)
+    expected_line = f"{MARKER_PREFIX}{expected}"
+    seen = ""
+    for attempt in range(attempts):
+        read = environment.execute(
+            ["orca", "terminal", "read", "--terminal", handle, "--screen"],
+            timeout=timeout,
+        )
+        seen = read.stdout or ""
+        if expected_line in seen:
+            return True, f"the terminal answered with {expected}"
+        if MARKER_PREFIX in seen:
+            answered = seen.split(MARKER_PREFIX, 1)[1].splitlines()[0].strip()
+            return False, (
+                f"the terminal answered with {answered!r}, not {expected!r}: it is "
+                "not in this environment"
+            )
+        if attempt + 1 < attempts:
+            sleeper(1.0)
+    return False, "the terminal never said which machine it is on"
+
+
 def open_coordinator_terminal(
-    environment: Environment, project_path: str, *, timeout: float
+    environment: Environment,
+    project_path: str,
+    *,
+    timeout: float,
+    expected_host: str | None = None,
+    sleeper: Callable[[float], None] = time.sleep,
 ) -> str:
     """Register the project copy with Orca and open the terminal to send from."""
     environment.execute(
@@ -187,4 +250,12 @@ def open_coordinator_terminal(
             "orca terminal create returned no terminal handle, so nothing can be "
             "dispatched from it"
         )
+    if expected_host:
+        inside, detail = confirm_terminal_is_inside(
+            environment, handle, expected_host, timeout=timeout, sleeper=sleeper
+        )
+        if not inside:
+            raise OrcaSessionError(
+                "the coordinator terminal is not in this environment: " + detail
+            )
     return handle

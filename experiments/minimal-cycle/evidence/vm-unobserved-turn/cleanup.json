@@ -1,0 +1,15 @@
+{
+  "host_difference": {},
+  "reason": "every declared per-run resource is gone and every shared one remains",
+  "removed": [
+    "domain:dely-cycle-20260915t190618z-bbc5e6-c588ade8",
+    "path:/var/tmp/dely-cycle/state/20260915T190618Z-bbc5e6-c588ade8"
+  ],
+  "retained": [],
+  "shared_preserved": [
+    "image:/var/tmp/dely-cycle/images/tool-image.qcow2"
+  ],
+  "status": "DESTROYED",
+  "stop_confirmed": true,
+  "verified": true
+}

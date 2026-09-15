@@ -188,3 +188,63 @@ class StartApplicationTest(unittest.TestCase):
             environment, ("/opt/Orca/orca-ide",), display=":0", timeout=30
         )
         self.assertEqual(outcome.context, "environment")
+
+
+class CoordinatorTerminalIsInsideTest(unittest.TestCase):
+    """A terminal that opens outside the environment looks identical until asked."""
+
+    CREATED = json.dumps(
+        {"ok": True, "result": {"terminal": {"handle": "term_fake", "surface": "visible"}}}
+    )
+
+    def environment(self, screen):
+        return Environment(
+            [
+                ("repo add", 0, '{"ok": true}', ""),
+                ("terminal create", 0, self.CREATED, ""),
+                ("terminal send", 0, '{"ok": true}', ""),
+                ("terminal read", 0, screen, ""),
+            ]
+        )
+
+    def open(self, environment, **options):
+        return orca.open_coordinator_terminal(
+            environment,
+            "/home/cycle/project",
+            timeout=5,
+            sleeper=lambda _seconds: None,
+            **options,
+        )
+
+    def test_a_terminal_that_answers_with_this_environment_is_accepted(self):
+        environment = self.environment(
+            "handle: term_fake\nstatus: running\n\ncycle-terminal:dely-cycle-abc\n"
+        )
+        self.assertEqual(
+            self.open(environment, expected_host="dely-cycle-abc"), "term_fake"
+        )
+
+    def test_a_terminal_that_answers_with_another_machine_stops_the_run(self):
+        environment = self.environment(
+            "handle: term_fake\nstatus: running\n\ncycle-terminal:workstation\n"
+        )
+        with self.assertRaises(orca.OrcaSessionError) as raised:
+            self.open(environment, expected_host="dely-cycle-abc")
+        self.assertIn("workstation", str(raised.exception))
+        self.assertIn("not in this environment", str(raised.exception))
+
+    def test_a_terminal_that_never_answers_stops_the_run(self):
+        environment = self.environment("handle: term_fake\nstatus: running\n\n$ \n")
+        with self.assertRaises(orca.OrcaSessionError):
+            self.open(
+                environment,
+                expected_host="dely-cycle-abc",
+            )
+
+    def test_nothing_is_asked_when_no_machine_is_named(self):
+        environment = self.environment("")
+        self.assertEqual(self.open(environment), "term_fake")
+        self.assertFalse(
+            [argv for argv in environment.seen if "send" in " ".join(argv)],
+            "a run that names no machine should ask no question",
+        )

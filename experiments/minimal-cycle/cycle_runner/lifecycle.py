@@ -427,6 +427,7 @@ class _Cycle:
                     self.adapter,
                     self.handle.project_path,
                     timeout=min(300, self.config.timeout_seconds),
+                    expected_host=self.handle.environment_id,
                 )
             except orca.OrcaSessionError as error:
                 record.status = PhaseStatus.BLOCKED

@@ -106,6 +106,7 @@ class FakeAdapter(BackendAdapter):
         orca_path_from_host: bool = False,
         runtime_ready: bool = True,
         terminal_refused: bool = False,
+        terminal_answers: str | None = None,
         already_running: bool = False,
         refuse_repository: bool = False,
         dispatch_state: str | None = None,
@@ -131,6 +132,7 @@ class FakeAdapter(BackendAdapter):
         self.orca_path_from_host = orca_path_from_host
         self.runtime_ready = runtime_ready
         self.terminal_refused = terminal_refused
+        self.terminal_answers = terminal_answers
         # The application is not running until something starts it, which is
         # what the real environment does too.
         self.app_started = already_running
@@ -263,6 +265,19 @@ class FakeAdapter(BackendAdapter):
             if self.terminal_refused:
                 return self._outcome(argv, 1, "", "the runtime refused a terminal")
             return self._outcome(argv, 0, ORCA_TERMINAL_REPLY, "")
+        if "terminal send" in joined:
+            self.calls.append("terminal-send")
+            return self._outcome(argv, 0, '{"ok": true}', "")
+        if "terminal read" in joined:
+            # The runner asks the terminal which machine it is on. This fake
+            # answers as the environment unless a test asks it to answer as
+            # somewhere else, which is the shape of a terminal that opened
+            # outside the environment.
+            self.calls.append("terminal-read")
+            name = self.terminal_answers or f"fake-{self.root.name}"
+            return self._outcome(
+                argv, 0, f"handle: term_fake\nstatus: running\n\ncycle-terminal:{name}\n", ""
+            )
         if "repo add" in joined:
             self.calls.append("repo-add")
             return self._outcome(argv, 0, '{"ok": true}', "")

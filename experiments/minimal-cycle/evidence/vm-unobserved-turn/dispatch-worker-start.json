@@ -1,0 +1,105 @@
+{
+  "id": "95446ad1-024d-440e-aaed-1c67b35c9ab1",
+  "ok": true,
+  "result": {
+    "runId": "run_37029bebbcb3",
+    "taskId": "task_5158753e15a3",
+    "dispatchId": "ctx_bdebab5ef0cd",
+    "state": "outcome_unknown",
+    "stage": "turn_start_unobserved",
+    "turnStart": "unobserved",
+    "lastError": "Dispatch input was written and submitted, but claude's turn start could not be verified during observation (up to 30s). This is unverifiable, not proof the worker is dead: the agent may still be starting, may be wedged (for example waiting on network), or may be holding the task unsent in its composer. If the worker recovers and reports, this Dispatch settles normally.",
+    "setup": {
+      "requested": "not_applicable",
+      "effective": "not_applicable",
+      "source": "existing_worktree",
+      "hookFound": false,
+      "startupPolicy": "start-immediately",
+      "state": "not_applicable"
+    },
+    "launch": {
+      "requested": {
+        "agent": "claude",
+        "model": "claude-opus-5",
+        "effort": "high"
+      },
+      "effective": {
+        "agent": "claude",
+        "model": "claude-opus-5",
+        "effort": "high"
+      }
+    },
+    "mode": {
+      "mode": "terminal",
+      "preferred": "terminal",
+      "reason": "user_default",
+      "detail": "Started a terminal agent worker, the default for new agent tabs in your settings."
+    },
+    "timeoutMs": 420000,
+    "effects": [
+      {
+        "kind": "worktree",
+        "action": "reused",
+        "id": "1c12506b-2db6-41c7-9271-dc3491f41355::/home/cycle/project"
+      },
+      {
+        "kind": "setup",
+        "action": "not_applicable",
+        "state": "not_applicable"
+      },
+      {
+        "kind": "terminal",
+        "role": "agent",
+        "action": "created",
+        "id": "term_918910ba-c506-47fa-87bc-14517d44ca23",
+        "surface": "visible"
+      },
+      {
+        "kind": "dispatch_input",
+        "role": "agent",
+        "id": "term_918910ba-c506-47fa-87bc-14517d44ca23",
+        "state": "accepted"
+      },
+      {
+        "kind": "dispatch_input",
+        "role": "agent",
+        "id": "term_918910ba-c506-47fa-87bc-14517d44ca23",
+        "state": "turn_unobserved"
+      }
+    ],
+    "prompt": {
+      "requestId": "fa454659-6809-4203-a92b-5c58873113be",
+      "stages": [
+        "input_accepted"
+      ],
+      "provider": "claude",
+      "observation": "supported",
+      "processIncarnation": "bd7eb2ed-9c6d-4934-ae59-6577736a25ca",
+      "generation": 2,
+      "baselineWorkingSequence": 0,
+      "baselineExplicitWorkingStartedAt": null,
+      "baselinePermissionSequence": 0
+    },
+    "residualResources": [
+      {
+        "kind": "terminal",
+        "role": "agent",
+        "action": "created",
+        "id": "term_918910ba-c506-47fa-87bc-14517d44ca23",
+        "surface": "visible"
+      }
+    ],
+    "nextCommands": [
+      "orca-ide orchestration worker-show --dispatch ctx_bdebab5ef0cd --json",
+      "orca-ide terminal read --terminal term_918910ba-c506-47fa-87bc-14517d44ca23 --screen",
+      "orca-ide orchestration worker-abandon --dispatch ctx_bdebab5ef0cd --json"
+    ],
+    "mutation": {
+      "requestId": "fa454659-6809-4203-a92b-5c58873113be",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "e885c3e7-8b3d-4fda-94ee-247976bed992"
+  }
+}

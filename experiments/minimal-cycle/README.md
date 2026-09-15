@@ -93,6 +93,8 @@ $artifact_root/<run_id>/
   preflight.json             what the host could and could not do
   backend-status.json        the environment and its declared resources
   auth-receipt.json          the method and its status, never its material
+  first-run-state.json       the questions the agent was answered, by name
+  dispatch/                  each orchestration reply, redacted, as the plane sent it
   host-before.json           the host before the run
   host-after.json            the host after it, and what changed
   identity/host-probe.txt    the probe as the host answered it
@@ -258,10 +260,21 @@ the table with the tests each row runs. The recorded sweep is in
 | An argument vector survives the transport intact | case `remote-command-is-quoted` | `evidence/counterexamples.txt` |
 | Creation waits for the guest to answer, not just to take an address | case `an-address-is-not-readiness` | `evidence/counterexamples.txt` |
 | A real machine cycle creates a domain, proves a distinct kernel, and destroys it | `./run-cycle run` on this host | `evidence/vm-blocked-on-absent-orca/manifest.json` |
+| First-run state is keyed to the project copy the agent will actually open | case `first-run-state-names-the-environment-copy` | `evidence/distrobox-settled-cycle/first-run-state.json` |
+| A receipt that names four answered questions answers four | case `first-run-answers-every-question-it-names` | `evidence/distrobox-settled-cycle/first-run-state.json` |
+| A settling message is read from the delivery, not from the request envelope | case `a-settling-message-is-read-from-the-delivery` | `evidence/distrobox-settled-cycle/dispatch-completion-wait.json` |
+| The reported outcome is the worker's own verdict, not the message type | case `the-outcome-is-the-workers-own-verdict` | `evidence/distrobox-settled-cycle/dispatch-completion-wait.json` |
+| The reply that decided the run is exported beside the verdict | case `the-reply-that-decided-the-run-is-kept` | `evidence/distrobox-settled-cycle/dispatch-worker-start.json` |
+| A dispatch the plane could not verify keeps what its agent's terminal held | case `an-unverifiable-dispatch-keeps-its-terminal` | `evidence/vm-unobserved-turn/` |
+| A worker really does the task and an independent check agrees | `./run-cycle run` on this host | `evidence/distrobox-settled-cycle/` |
 
 ## What no instrument here observes
 
-Orca starting inside either backend, a window bound to that instance, a Claude
-Code worker driven through it, or a login surviving a run. Both backends reach
-their identity gate and stop there, for the same honest reason: the image they run does not carry Orca. `evidence/README.md` says
-exactly where this host stopped and what it did prove on the way.
+A second, different task. A run on any host but this one. Isolation on the
+container backend, which mounts the host home and says so in `preflight.json`
+rather than claiming otherwise.
+
+The machine backend has not completed a cycle. It creates its domain, proves a
+distinct kernel, starts Orca, opens a coordinator terminal and dispatches a
+worker, and the worker's turn does not begin there. `evidence/README.md` says
+what each run showed and where each one stopped.

@@ -39,6 +39,20 @@ class Counterexample:
 
 CASES: tuple[Counterexample, ...] = (
     Counterexample(
+        name="the-terminal-says-which-machine-it-is-on",
+        requirement=(
+            "A coordinator terminal opened on the host looks identical to one "
+            "opened in the environment until it is asked"
+        ),
+        path="cycle_runner/orca.py",
+        original='    if expected_host:\n        inside, detail = confirm_terminal_is_inside(',
+        replacement='    if False:\n        inside, detail = confirm_terminal_is_inside(',
+        instruments=(
+            "tests.test_orca.CoordinatorTerminalIsInsideTest",
+            "tests.test_lifecycle.TerminalOutsideTheEnvironmentTest",
+        ),
+    ),
+    Counterexample(
         name="an-unverifiable-dispatch-keeps-its-terminal",
         requirement=(
             "A dispatch the plane could not verify keeps what its agent's "

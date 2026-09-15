@@ -1,0 +1,81 @@
+{
+  "backend": "vm",
+  "findings": [
+    {
+      "detail": "<host-home>/.pulumi/bin/pulumi",
+      "name": "pulumi on the path",
+      "ok": true
+    },
+    {
+      "detail": "/usr/bin/qemu-img",
+      "name": "qemu-img on the path",
+      "ok": true
+    },
+    {
+      "detail": "/usr/bin/virsh",
+      "name": "virsh on the path",
+      "ok": true
+    },
+    {
+      "detail": "/usr/bin/ssh",
+      "name": "ssh on the path",
+      "ok": true
+    },
+    {
+      "detail": "/usr/bin/scp",
+      "name": "scp on the path",
+      "ok": true
+    },
+    {
+      "detail": "/var/tmp/dely-cycle/venv/bin/python",
+      "name": "pinned environment present",
+      "ok": true
+    },
+    {
+      "detail": "state lives at file://~",
+      "name": "pulumi state backend is local",
+      "ok": true
+    },
+    {
+      "detail": "every class and field the program names exists in pulumi-libvirt@0.5.4",
+      "name": "provider schema verified",
+      "ok": true
+    },
+    {
+      "detail": "/var/tmp/dely-cycle/images/tool-image.qcow2",
+      "name": "base image present",
+      "ok": true
+    },
+    {
+      "detail": "the preserved base matches the pinned digest",
+      "name": "base image digest matches the pin",
+      "ok": true
+    },
+    {
+      "detail": "/dev/kvm",
+      "name": "hardware acceleration device",
+      "ok": true
+    },
+    {
+      "detail": "qemu:///system",
+      "name": "libvirt connection answers",
+      "ok": true
+    },
+    {
+      "detail": "dely-cycle is active",
+      "name": "storage pool active",
+      "ok": true
+    },
+    {
+      "detail": "default is active",
+      "name": "network active",
+      "ok": true
+    },
+    {
+      "detail": "vnc is among sdl, vnc, dbus",
+      "name": "graphics type supported by this emulator",
+      "ok": true
+    }
+  ],
+  "ok": true
+}
