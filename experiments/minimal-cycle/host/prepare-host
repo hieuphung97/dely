@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+"""Prepare this host for the machine backend, and verify every pin.
+
+Reads versions.json and brings the host to the state it describes: the pinned
+Pulumi with a local state backend, a python environment carrying the pinned
+software development kit and libvirt provider, the verified base image, and a
+storage pool over the image directory.
+
+    prepare-host            bring the host to the pinned state
+    prepare-host --check    report what is and is not in place, change nothing
+
+Every step reports what it observed. A digest that does not match is a refusal,
+never a warning.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import urllib.request
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
+
+ROOT = Path(os.environ.get("DELY_CYCLE_ROOT", "/var/tmp/dely-cycle"))
+IMAGES = ROOT / "images"
+VENV = ROOT / "venv"
+PULUMI_HOME = Path.home() / ".pulumi"
+PULUMI = PULUMI_HOME / "bin" / "pulumi"
+
+GREEN, AMBER = "ok    ", "BLOCK "
+
+
+class Step:
+    """One preparation step and what it observed."""
+
+    def __init__(self, name: str, ok: bool, detail: str):
+        self.name, self.ok, self.detail = name, ok, detail
+
+    def line(self) -> str:
+        return f"  {GREEN if self.ok else AMBER} {self.name}: {self.detail}"
+
+
+def run(argv, *, timeout=1800, env=None, cwd=None) -> subprocess.CompletedProcess:
+    merged = dict(os.environ)
+    merged.update(env or {})
+    return subprocess.run(
+        [str(item) for item in argv],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=merged,
+        cwd=str(cwd) if cwd else None,
+    )
+
+
+def digest_of(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+# -- steps ---------------------------------------------------------------
+
+
+def pulumi_step(check_only: bool) -> Step:
+    wanted = VERSIONS["host_tools"]["pulumi_cli"]["version"]
+    if PULUMI.is_file():
+        found = run([PULUMI, "version"], timeout=120).stdout.strip().lstrip("v")
+        if found == wanted:
+            return Step("pulumi", True, f"{PULUMI} is at {found}")
+        if check_only:
+            return Step("pulumi", False, f"{found} is installed, not the pinned {wanted}")
+    elif check_only:
+        return Step("pulumi", False, f"nothing at {PULUMI}")
+    installer = ROOT / "get-pulumi.sh"
+    installer.parent.mkdir(parents=True, exist_ok=True)
+    urllib.request.urlretrieve(VERSIONS["host_tools"]["pulumi_cli"]["installer"], installer)
+    outcome = run(["sh", str(installer), "--version", wanted])
+    if not PULUMI.is_file():
+        return Step("pulumi", False, (outcome.stderr or outcome.stdout).strip()[-200:])
+    found = run([PULUMI, "version"], timeout=120).stdout.strip().lstrip("v")
+    return Step("pulumi", found == wanted, f"installed {found}, wanted {wanted}")
+
+
+def backend_step(check_only: bool) -> Step:
+    if not PULUMI.is_file():
+        return Step("pulumi state backend", False, "pulumi is not installed yet")
+    environment = {"PULUMI_SKIP_UPDATE_CHECK": "true"}
+    if not check_only:
+        run([PULUMI, "login", "--local"], timeout=120, env=environment)
+    reported = run([PULUMI, "whoami", "-v"], timeout=120, env=environment).stdout
+    backend = ""
+    for line in reported.splitlines():
+        if line.startswith("Backend URL:"):
+            backend = line.split(":", 1)[1].strip()
+    local = backend.startswith("file://")
+    return Step(
+        "pulumi state backend",
+        local,
+        f"state lives at {backend}" if local else f"{backend or 'unknown'} is not local",
+    )
+
+
+def environment_step(check_only: bool) -> Step:
+    interpreter = VENV / "bin" / "python"
+    packages = VERSIONS["python_environment"]["packages"]
+    wanted = [f"{name}=={version}" for name, version in packages.items()]
+    if interpreter.is_file():
+        listed = run([interpreter, "-m", "pip", "list", "--format=json"], timeout=300)
+        try:
+            installed = {
+                entry["name"].lower().replace("_", "-"): entry["version"]
+                for entry in json.loads(listed.stdout or "[]")
+            }
+        except json.JSONDecodeError:
+            installed = {}
+        missing = [
+            f"{name} {version}"
+            for name, version in packages.items()
+            if installed.get(name.lower().replace("_", "-")) != version
+        ]
+        if not missing:
+            return Step(
+                "pinned environment",
+                True,
+                f"{interpreter} carries " + ", ".join(wanted),
+            )
+        if check_only:
+            return Step("pinned environment", False, "not at the pins: " + ", ".join(missing))
+    elif check_only:
+        return Step("pinned environment", False, f"no interpreter at {interpreter}")
+    VENV.parent.mkdir(parents=True, exist_ok=True)
+    run([sys.executable, "-m", "venv", str(VENV)], timeout=600)
+    outcome = run(
+        [VENV / "bin" / "pip", "install", "--disable-pip-version-check", "--quiet", *wanted],
+        timeout=1800,
+    )
+    ok = (VENV / "bin" / "python").is_file() and outcome.returncode == 0
+    return Step(
+        "pinned environment",
+        ok,
+        ", ".join(wanted) if ok else (outcome.stderr or outcome.stdout).strip()[-300:],
+    )
+
+
+def base_image_step(check_only: bool) -> Step:
+    image = VERSIONS["base_image"]
+    target = IMAGES / image["file"]
+    if target.is_file():
+        found = digest_of(target)
+        if found == image["sha256"]:
+            return Step("base image", True, f"{target} matches the pinned digest")
+        return Step(
+            "base image",
+            False,
+            f"{target} has digest {found}, not the pinned {image['sha256']}",
+        )
+    if check_only:
+        return Step("base image", False, f"nothing at {target}")
+    IMAGES.mkdir(parents=True, exist_ok=True)
+    urllib.request.urlretrieve(image["url"], target)
+    found = digest_of(target)
+    if found != image["sha256"]:
+        target.unlink()
+        return Step("base image", False, f"the download had digest {found}; it was removed")
+    return Step("base image", True, f"downloaded and verified {target}")
+
+
+def pool_step(check_only: bool) -> Step:
+    pool = VERSIONS["host_tools"]["storage_pool"]
+    uri = VERSIONS["host_tools"]["connect_uri"]
+    if shutil.which("virsh") is None:
+        return Step("storage pool", False, "virsh is not on PATH")
+    listed = run(["virsh", "--connect", uri, "pool-list", "--name"], timeout=120)
+    if pool["name"] in listed.stdout.split():
+        return Step("storage pool", True, f"{pool['name']} is active over {pool['target']}")
+    if check_only:
+        return Step("storage pool", False, f"{pool['name']} is not active")
+    Path(pool["target"]).mkdir(parents=True, exist_ok=True)
+    Path(pool["target"]).chmod(0o755)
+    run(
+        ["virsh", "--connect", uri, "pool-define-as", pool["name"], pool["type"],
+         "--target", pool["target"]],
+        timeout=120,
+    )
+    run(["virsh", "--connect", uri, "pool-build", pool["name"]], timeout=120)
+    run(["virsh", "--connect", uri, "pool-start", pool["name"]], timeout=120)
+    run(["virsh", "--connect", uri, "pool-autostart", pool["name"]], timeout=120)
+    again = run(["virsh", "--connect", uri, "pool-list", "--name"], timeout=120)
+    ok = pool["name"] in again.stdout.split()
+    return Step("storage pool", ok, f"{pool['name']} over {pool['target']}")
+
+
+def network_step(_check_only: bool) -> Step:
+    uri = VERSIONS["host_tools"]["connect_uri"]
+    wanted = VERSIONS["host_tools"]["network"]
+    if shutil.which("virsh") is None:
+        return Step("network", False, "virsh is not on PATH")
+    listed = run(["virsh", "--connect", uri, "net-list", "--name"], timeout=120)
+    ok = wanted in listed.stdout.split()
+    return Step("network", ok, f"{wanted} is active" if ok else f"{wanted} is not active")
+
+
+def accelerator_step(_check_only: bool) -> Step:
+    device = Path("/dev/kvm")
+    return Step(
+        "hardware acceleration",
+        device.exists(),
+        str(device) if device.exists() else "/dev/kvm is absent",
+    )
+
+
+STEPS = (
+    accelerator_step,
+    pulumi_step,
+    backend_step,
+    environment_step,
+    base_image_step,
+    pool_step,
+    network_step,
+)
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="verify only; change nothing")
+    arguments = parser.parse_args(argv)
+
+    print(f"root: {ROOT}")
+    results = []
+    for step in STEPS:
+        try:
+            result = step(arguments.check)
+        except Exception as error:  # a failed step is a report, not a crash
+            result = Step(step.__name__.removesuffix("_step"), False, f"{type(error).__name__}: {error}")
+        results.append(result)
+        print(result.line(), flush=True)
+
+    blocked = [result for result in results if not result.ok]
+    print()
+    if blocked:
+        print(f"{len(blocked)} of {len(results)} not in place: " + ", ".join(r.name for r in blocked))
+        return 1
+    print(f"all {len(results)} in place")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

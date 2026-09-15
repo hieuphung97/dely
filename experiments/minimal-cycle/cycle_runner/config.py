@@ -260,6 +260,7 @@ class VmConfig:
     ssh_port: int = 22
     address_timeout_seconds: int = 600
     egress: bool = True
+    qemu_agent: bool = False
     provision: tuple[tuple[str, ...], ...] = ()
 
     def to_document(self) -> dict[str, Any]:
@@ -284,6 +285,7 @@ class VmConfig:
             "ssh_port": self.ssh_port,
             "address_timeout_seconds": self.address_timeout_seconds,
             "egress": self.egress,
+            "qemu_agent": self.qemu_agent,
             "provision": [list(argv) for argv in self.provision],
         }
 
@@ -515,6 +517,7 @@ def _vm(document: Mapping[str, Any]) -> VmConfig:
             "ssh_port",
             "address_timeout_seconds",
             "egress",
+            "qemu_agent",
             "provision",
         ),
         "vm",
@@ -553,6 +556,7 @@ def _vm(document: Mapping[str, Any]) -> VmConfig:
             document, "address_timeout_seconds", "vm", 600
         ),
         egress=_flag(document, "egress", "vm", True),
+        qemu_agent=_flag(document, "qemu_agent", "vm", False),
         provision=_provision(document, "vm"),
     )
 

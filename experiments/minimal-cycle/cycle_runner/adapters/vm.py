@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import shlex
 import shutil
 import time
 from pathlib import Path
@@ -81,6 +82,7 @@ LISTEN_ADDRESS = {listen_address!r}
 MEMORY_MB = {memory_mb!r}
 VCPUS = {vcpus!r}
 OVERLAY_SIZE_BYTES = {overlay_size_bytes!r}
+QEMU_AGENT = {qemu_agent!r}
 EGRESS_XSLT = {egress_xslt!r}
 
 overlay = libvirt.Volume(
@@ -108,7 +110,7 @@ domain = libvirt.Domain(
     memory=MEMORY_MB,
     vcpu=VCPUS,
     running=True,
-    qemu_agent=True,
+    qemu_agent=QEMU_AGENT,
     cloudinit=seed.id,
     disks=[libvirt.DomainDiskArgs(volume_id=overlay.id)],
     network_interfaces=[
@@ -187,6 +189,19 @@ class VmContractError(RuntimeError):
     """The machine backend was asked for something it refuses to do."""
 
 
+def _describe(outcome: proc.CommandOutcome, *, tail: int = 600) -> str:
+    """Describe a failed command by its outcome and the end of its output.
+
+    The end, not the beginning: a tool that prints a plan before it acts puts
+    the plan first and the reason it stopped last.
+    """
+    text = (outcome.stderr.strip() or outcome.stdout.strip())[-tail:]
+    return (
+        f"exit={outcome.exit_code} timed_out={outcome.timed_out} "
+        f"elapsed={outcome.elapsed_seconds}s: ...{text}"
+    )
+
+
 def _mac(prefix: str, run_id: str) -> str:
     digest = hashlib.sha256(f"{prefix}:{run_id}".encode("utf-8")).hexdigest()
     return f"{prefix}:{digest[0:2]}:{digest[2:4]}:{digest[4:6]}"
@@ -225,8 +240,12 @@ class VmAdapter(BackendAdapter):
         self.transport_mac = _mac("52:54:00", run_id)
         self.egress_mac = _mac("52:54:01", run_id)
         self.address: str | None = None
+        # The file backend requires a passphrase even for a stack that holds no
+        # secret. It is derived from the run identifier so a failed run's stack
+        # can still be destroyed afterwards; it protects nothing, and nothing
+        # secret is ever put in this stack.
         self._passphrase = hashlib.sha256(
-            f"ephemeral:{run_id}:{id(self)}".encode("utf-8")
+            f"dely-cycle-stack:{run_id}".encode("utf-8")
         ).hexdigest()
 
     # -- per-run identity -------------------------------------------------
@@ -305,6 +324,7 @@ class VmAdapter(BackendAdapter):
             memory_mb=self.settings.memory_mb,
             vcpus=self.settings.vcpus,
             overlay_size_bytes=self.settings.overlay_size_bytes,
+            qemu_agent=self.settings.qemu_agent,
             egress_xslt=self.render_egress_xslt() if self.settings.egress else "",
         )
 
@@ -625,17 +645,21 @@ class VmAdapter(BackendAdapter):
         """Declare the domain with Pulumi, then find the address it was given."""
         self.prepare_identity()
         self.write_declarations()
-        self._pulumi(
+        initialised = self._pulumi(
             ["stack", "init", self.stack_name, "--non-interactive"], timeout=600
         )
+        if not initialised.ok:
+            raise VmContractError(
+                "pulumi stack init did not create the per-run stack: "
+                + _describe(initialised)
+            )
         applied = self._pulumi(
             ["up", "--yes", "--non-interactive", "--stack", self.stack_name],
             timeout=self.config.timeout_seconds,
         )
         if not applied.ok:
             raise VmContractError(
-                "pulumi up did not bring the domain up: "
-                + (applied.stderr or applied.stdout).strip()[:500]
+                "pulumi up did not bring the domain up: " + _describe(applied)
             )
         self.address = self.discover_address()
         if not self.address:
@@ -655,7 +679,13 @@ class VmAdapter(BackendAdapter):
         )
 
     def ssh_argv(self, argv: Sequence[str]) -> list[str]:
-        """Return the argv that runs a command inside the domain."""
+        """Return the argv that runs a command inside the domain.
+
+        ssh concatenates everything after the destination into one string and
+        the guest's shell re-parses it, so an argument vector has to be quoted
+        before it is handed over. Sending one quoted string makes that
+        concatenation a no-op and the guest sees exactly this vector.
+        """
         if not self.address:
             raise VmContractError(
                 "the domain has no known address yet; nothing may be run in it"
@@ -674,7 +704,7 @@ class VmAdapter(BackendAdapter):
             str(self.private_key_path),
             f"{self.settings.guest_user}@{self.address}",
             "--",
-            *[str(item) for item in argv],
+            shlex.join(str(item) for item in argv),
         ]
 
     def execute(
@@ -730,8 +760,7 @@ class VmAdapter(BackendAdapter):
         )
         if not outcome.ok:
             raise VmContractError(
-                "the project copy could not be placed in the domain: "
-                + (outcome.stderr or outcome.stdout).strip()[:300]
+                "the project copy could not be placed in the domain: " + _describe(outcome)
             )
 
     def fetch_tree(self, remote_dir: str, local_dir: Path) -> None:
@@ -747,8 +776,7 @@ class VmAdapter(BackendAdapter):
         )
         if not outcome.ok:
             raise VmContractError(
-                "the project tree could not be brought out of the domain: "
-                + (outcome.stderr or outcome.stdout).strip()[:300]
+                "the project tree could not be brought out of the domain: " + _describe(outcome)
             )
 
     def write_file(self, remote_path: str, content: str, *, mode: int = 0o600) -> None:

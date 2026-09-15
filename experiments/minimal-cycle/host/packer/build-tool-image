@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""Build the one tool image the machine backend runs, and record what it is.
+
+Reads ../versions.json, boots the verified base image under packer's qemu
+builder, installs the pinned Orca, Claude Code and a minimal graphical session,
+and leaves `tool-image.qcow2` in the storage pool with a metadata file naming
+every version and digest that went into it.
+
+    build-tool-image            build, replacing any previous image
+    build-tool-image --check    report whether a current image already exists
+
+The build key is generated per build, lives only in a temporary directory, and
+the provisioner removes its public half from the image before shutdown.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+VERSIONS = json.loads((HERE.parent / "versions.json").read_text(encoding="utf-8"))
+ROOT = Path(os.environ.get("DELY_CYCLE_ROOT", "/var/tmp/dely-cycle"))
+IMAGES = ROOT / "images"
+IMAGE_NAME = VERSIONS["tool_image"]["file"]
+METADATA = IMAGES / "tool-image.json"
+
+
+def digest_of(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def check() -> int:
+    """Report whether a built image and its metadata are already present."""
+    image = IMAGES / IMAGE_NAME
+    if not image.is_file():
+        print(f"BLOCK  no tool image at {image}")
+        return 1
+    if not METADATA.is_file():
+        print(f"BLOCK  {image} has no metadata beside it")
+        return 1
+    recorded = json.loads(METADATA.read_text(encoding="utf-8"))
+    found = digest_of(image)
+    if found != recorded.get("sha256"):
+        print(f"BLOCK  {image} has digest {found}, the metadata records {recorded.get('sha256')}")
+        return 1
+    print(f"ok     {image}")
+    print(f"       sha256 {found}")
+    for key in ("orca_version", "claude_code_version", "base_image_sha256", "built_at"):
+        print(f"       {key}: {recorded.get(key)}")
+    return 0
+
+
+def build() -> int:
+    """Run packer and record what the image turned out to be."""
+    base = IMAGES / VERSIONS["base_image"]["file"]
+    if not base.is_file():
+        print(f"BLOCK  no base image at {base}; run ../prepare-host first")
+        return 1
+    found = digest_of(base)
+    if found != VERSIONS["base_image"]["sha256"]:
+        print(f"BLOCK  the base image digest is {found}, not the pinned value")
+        return 1
+
+    orca = VERSIONS["tool_image"]["contents"]["orca"]
+    claude = VERSIONS["tool_image"]["contents"]["claude_code"]
+
+    with tempfile.TemporaryDirectory(prefix="dely-cycle-build-") as staging:
+        staging_path = Path(staging)
+        key = staging_path / "build_key"
+        subprocess.run(
+            ["ssh-keygen", "-t", "ed25519", "-N", "", "-C", "dely-cycle-image-build",
+             "-f", str(key)],
+            check=True, capture_output=True,
+        )
+        output = staging_path / "output"
+
+        initialised = subprocess.run(
+            ["packer", "init", str(HERE / "tool-image.pkr.hcl")],
+            capture_output=True, text=True, timeout=600, cwd=HERE,
+        )
+        if initialised.returncode != 0:
+            print("BLOCK  packer init failed:", initialised.stderr.strip()[-400:])
+            return 1
+
+        argv = [
+            "packer", "build",
+            "-var", f"base_image={base}",
+            "-var", f"base_image_sha256={VERSIONS['base_image']['sha256']}",
+            "-var", f"output_directory={output}",
+            "-var", f"image_name={IMAGE_NAME}",
+            "-var", f"build_public_key={(key.with_suffix('.pub')).read_text(encoding='utf-8').strip()}",
+            "-var", f"build_private_key_file={key}",
+            "-var", f"orca_url={orca['url']}",
+            "-var", f"orca_sha256={orca['sha256']}",
+            "-var", f"claude_code_version={claude['version']}",
+            str(HERE / "tool-image.pkr.hcl"),
+        ]
+        print("running packer; this takes a while", flush=True)
+        built = subprocess.run(argv, cwd=HERE, timeout=7200)
+        if built.returncode != 0:
+            print(f"BLOCK  packer build exited {built.returncode}")
+            return 1
+
+        produced = output / IMAGE_NAME
+        if not produced.is_file():
+            print(f"BLOCK  packer produced no {produced}")
+            return 1
+
+        IMAGES.mkdir(parents=True, exist_ok=True)
+        target = IMAGES / IMAGE_NAME
+        shutil.move(str(produced), target)
+        target.chmod(0o644)
+
+    image_digest = digest_of(target)
+    METADATA.write_text(
+        json.dumps(
+            {
+                "file": IMAGE_NAME,
+                "sha256": image_digest,
+                "size_bytes": target.stat().st_size,
+                "built_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "base_image": VERSIONS["base_image"]["file"],
+                "base_image_sha256": VERSIONS["base_image"]["sha256"],
+                "orca_version": orca["version"],
+                "orca_sha256": orca["sha256"],
+                "claude_code_version": claude["version"],
+                "carries_credentials": False,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["virsh", "--connect", VERSIONS["host_tools"]["connect_uri"],
+         "pool-refresh", VERSIONS["host_tools"]["storage_pool"]["name"]],
+        capture_output=True, timeout=120,
+    )
+    print()
+    print(f"built {target}")
+    print(f"sha256 {image_digest}")
+    print("put that digest in the configuration's vm.base_image_sha256")
+    return 0
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="report the current image only")
+    arguments = parser.parse_args(argv)
+    return check() if arguments.check else build()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -358,7 +358,7 @@ class ProviderSchemaIntegrationTest(VmTestCase):
     def test_a_field_the_provider_lacks_is_caught(self):
         adapter = self.make(venv=str(self.prepared()))
         program = adapter.render_program().replace(
-            "qemu_agent=True,", "qemu_agent=True,\n    nonexistent_field=1,"
+            "qemu_agent=QEMU_AGENT,", "qemu_agent=QEMU_AGENT,\n    nonexistent_field=1,"
         )
         ran, problems = schema.verify_with_interpreter(
             program, self.prepared() / "bin" / "python"
@@ -371,3 +371,76 @@ class ProviderSchemaIntegrationTest(VmTestCase):
         finding = adapter._schema_finding()
         self.assertTrue(finding.ok, finding.detail)
         self.assertIn("0.5.4", finding.detail)
+
+
+class GuestAgentTest(VmTestCase):
+    """The provider reads addresses through the agent when it is enabled.
+
+    Observed on a real run: with the agent declared but absent from the image,
+    creating the domain fails with "QEMU guest agent is not connected". The
+    runner discovers the address from libvirt's leases instead, so the agent is
+    off unless the image is known to run it.
+    """
+
+    def test_the_agent_is_off_by_default(self):
+        self.assertIn("QEMU_AGENT = False", self.make().render_program())
+
+    def test_an_image_that_runs_the_agent_can_declare_it(self):
+        self.assertIn("QEMU_AGENT = True", self.make(qemu_agent=True).render_program())
+
+    def test_the_program_always_passes_the_declared_value(self):
+        self.assertIn("qemu_agent=QEMU_AGENT,", self.make().render_program())
+
+
+class RemoteQuotingTest(VmTestCase):
+    """ssh joins its remaining arguments into one string the remote shell
+    re-parses, so an argument vector has to be quoted before it is sent.
+
+    Observed on a real run: the identity probe's positional argument was lost,
+    so the guest resolved an empty project path and the run blocked.
+    """
+
+    def ready(self):
+        adapter = self.make()
+        adapter.prepare_identity()
+        adapter.address = "192.168.122.11"
+        return adapter
+
+    def test_the_remote_command_is_one_quoted_argument(self):
+        argv = self.ready().ssh_argv(["sh", "-c", "echo hello world", "name", "arg one"])
+        self.assertEqual(len(argv), len(argv[: argv.index("--") + 1]) + 1)
+
+    def test_an_argument_with_spaces_survives_as_one_argument(self):
+        argv = self.ready().ssh_argv(["printf", "%s\n", "two words"])
+        remote = argv[-1]
+        self.assertIn("'two words'", remote)
+
+    def test_a_multi_line_script_survives(self):
+        script = "set -u\nprintf 'a=%s\\n' \"$1\"\n"
+        argv = self.ready().ssh_argv(["sh", "-c", script, "probe", "/home/cycle/project"])
+        remote = argv[-1]
+        self.assertIn("/home/cycle/project", remote)
+        import shlex
+
+        parsed = shlex.split(remote)
+        self.assertEqual(parsed[0], "sh")
+        self.assertEqual(parsed[1], "-c")
+        self.assertEqual(parsed[2], script)
+        self.assertEqual(parsed[3], "probe")
+        self.assertEqual(parsed[4], "/home/cycle/project")
+
+    def test_the_probe_argument_reaches_the_guest_intact(self):
+        from cycle_runner import probe
+        import shlex
+
+        argv = self.ready().ssh_argv(probe.probe_argv("/home/cycle/project"))
+        parsed = shlex.split(argv[-1])
+        self.assertEqual(parsed[-1], "/home/cycle/project")
+        self.assertEqual(parsed[2], probe.PROBE_SCRIPT)
+
+    def test_a_value_carrying_a_quote_cannot_break_out(self):
+        import shlex
+
+        argv = self.ready().ssh_argv(["echo", "it's; rm -rf /"])
+        parsed = shlex.split(argv[-1])
+        self.assertEqual(parsed, ["echo", "it's; rm -rf /"])

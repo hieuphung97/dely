@@ -230,6 +230,14 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_lifecycle.CreateFailureTest",),
     ),
     Counterexample(
+        name="remote-command-is-quoted",
+        requirement="An argument vector survives the transport intact",
+        path="cycle_runner/adapters/vm.py",
+        original="            shlex.join(str(item) for item in argv),",
+        replacement="            *[str(item) for item in argv],",
+        instruments=("tests.test_adapter_vm.RemoteQuotingTest",),
+    ),
+    Counterexample(
         name="forwarded-value-is-redacted",
         requirement="A value forwarded into the guest is redacted from captured output",
         path="cycle_runner/adapters/vm.py",
