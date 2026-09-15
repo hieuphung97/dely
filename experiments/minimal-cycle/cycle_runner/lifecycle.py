@@ -342,13 +342,19 @@ class _Cycle:
                 record.detail = reason
                 self.blocked_reason = self.blocked_reason or reason
                 return
-            # A command that resolves is not a runtime that can take a dispatch,
-            # and nothing else starts the application, so the runner does.
-            started = self.execute(
-                orca.start_argv(self.config.orca.app_argv, self.config.orca.display),
-                timeout=min(120, self.config.timeout_seconds),
+            # A command that resolves is not a runtime that can take a dispatch.
+            # Nothing else starts the application, so the runner does — but only
+            # when it is not already there, because a second one takes the
+            # singleton lock from the first and neither finishes starting.
+            runtime = orca.read_status(
+                self.adapter, self.config.orca.status_argv, timeout=120
             )
-            record.commands.append(started.to_record())
+            if not runtime.ready:
+                started = self.execute(
+                    orca.start_argv(self.config.orca.app_argv, self.config.orca.display),
+                    timeout=min(180, self.config.timeout_seconds),
+                )
+                record.commands.append(started.to_record())
             runtime = orca.wait_for_runtime(
                 self.adapter,
                 self.config.orca.status_argv,

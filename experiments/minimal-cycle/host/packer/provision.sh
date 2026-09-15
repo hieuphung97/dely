@@ -60,12 +60,11 @@ RestartSec=5
 WantedBy=graphical.target
 UNIT
 
-# The command line is a client of the runtime the application owns, so the
-# application has to be running before anything can be dispatched.
-sudo -u "${GUEST_USER}" mkdir -p "/home/${GUEST_USER}/.config/openbox"
-sudo -u "${GUEST_USER}" tee "/home/${GUEST_USER}/.config/openbox/autostart" > /dev/null <<AUTOSTART
-/opt/Orca/orca-ide &
-AUTOSTART
+# The application is deliberately NOT started by the window manager. Launched
+# from the autostart it left only a crash directory and a stale singleton lock
+# and the runtime never appeared; launched as a detached command once the
+# display is up, it reaches "ready". Starting it is the runner's step, so it is
+# one observable command with a recorded outcome.
 
 sudo systemctl set-default graphical.target
 sudo systemctl enable dely-cycle-desktop.service

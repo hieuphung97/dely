@@ -93,6 +93,7 @@ class FakeAdapter(BackendAdapter):
         orca_path_from_host: bool = False,
         runtime_ready: bool = True,
         terminal_refused: bool = False,
+        already_running: bool = False,
         create_fails: bool = False,
         task_writes_nothing: bool = False,
         host_project: Path | None = None,
@@ -114,6 +115,9 @@ class FakeAdapter(BackendAdapter):
         self.orca_path_from_host = orca_path_from_host
         self.runtime_ready = runtime_ready
         self.terminal_refused = terminal_refused
+        # The application is not running until something starts it, which is
+        # what the real environment does too.
+        self.app_started = already_running
         self.create_fails = create_fails
         self.task_writes_nothing = task_writes_nothing
         self.host_project = host_project
@@ -214,9 +218,15 @@ class FakeAdapter(BackendAdapter):
                 self.project.mkdir(parents=True, exist_ok=True)
                 (self.project / "evidence.txt").write_text(self.marker, encoding="utf-8")
             return self._outcome(argv, 0, ORCA_DISPATCH_REPLY, "")
+        if len(argv) > 3 and argv[0] == "sh" and argv[3] == "orca-start":
+            # Simulated, never executed: running this would start a desktop
+            # application on the machine running the tests.
+            self.calls.append("orca-start")
+            self.app_started = True
+            return self._outcome(argv, 0, "display ready after 0s\nstarted 1786\n", "")
         if tuple(argv[:2]) == ("orca", "status"):
             self.calls.append("orca-status")
-            up = self.orca_present and self.runtime_ready
+            up = self.orca_present and self.runtime_ready and self.app_started
             return self._outcome(argv, 0, ORCA_STATUS_REPLY if up else ORCA_STATUS_DOWN, "")
         if "terminal create" in joined:
             self.calls.append("terminal-create")

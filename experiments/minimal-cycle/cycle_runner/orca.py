@@ -123,9 +123,19 @@ def wait_for_runtime(
 #: Launched detached with its own output kept, because a window manager's
 #: autostart was observed to leave only a crash directory and a stale lock.
 START_SCRIPT = (
+    'export DISPLAY="$1"; shift; '
+    'export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"; '
+    # The graphical session starts at boot; the application must not be launched
+    # before it is there, or it leaves a crash directory and a stale lock.
+    'waited=0; '
+    'while ! xset -q >/dev/null 2>&1; do '
+    '  waited=$((waited + 2)); '
+    '  if [ "$waited" -ge 120 ]; then printf "no display after %ss\n" "$waited" >&2; exit 3; fi; '
+    '  sleep 2; '
+    'done; '
+    'printf "display ready after %ss\n" "$waited"; '
     'rm -f "$HOME/.config/orca/SingletonLock" "$HOME/.config/orca/SingletonCookie"; '
-    'export DISPLAY="$1"; export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"; '
-    'shift; nohup "$@" > "$HOME/orca-app.log" 2>&1 & '
+    'nohup "$@" > "$HOME/orca-app.log" 2>&1 & '
     'printf "started %s\n" "$!"'
 )
 

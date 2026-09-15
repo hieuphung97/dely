@@ -22,14 +22,27 @@ class FakeAdapterContainmentTest(unittest.TestCase):
         self.adapter.create()
         self.addCleanup(self._tmp.cleanup)
 
-    def test_starting_the_orca_application_is_refused(self):
+    def test_the_application_start_is_simulated_not_executed(self):
         from cycle_runner import orca
 
+        log = Path.home() / "orca-app.log"
+        existed = log.exists()
         outcome = self.adapter.execute(
             orca.start_argv(("/opt/Orca/orca-ide",), ":0"), timeout=5
         )
-        self.assertNotEqual(outcome.exit_code, 0)
-        self.assertIn("does not run", outcome.stderr)
+        self.assertIn("orca-start", self.adapter.calls)
+        self.assertIn("started 1786", outcome.stdout)
+        self.assertTrue(self.adapter.app_started)
+        # The real script would write this beside the home directory it ran in.
+        self.assertEqual(log.exists(), existed)
+
+    def test_the_allowlist_would_refuse_the_start_if_it_ever_reached_execution(self):
+        from cycle_runner import orca
+
+        refusal = self.adapter._refuse(orca.start_argv(("/opt/Orca/orca-ide",), ":0"))
+        self.assertIsNotNone(refusal)
+        self.assertEqual(refusal.exit_code, 127)
+        self.assertIn("orca-start", refusal.stderr)
 
     def test_an_arbitrary_program_is_refused(self):
         outcome = self.adapter.execute(["/usr/bin/firefox"], timeout=5)

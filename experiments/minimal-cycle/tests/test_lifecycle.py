@@ -346,12 +346,18 @@ class OrcaApplicationStartTest(CycleTestCase):
 
     def test_the_application_is_started_inside_the_environment(self):
         adapter, _ = self.run_cycle()
-        joined = [" ".join(argv) for argv in getattr(adapter, "executed", [])]
-        self.assertTrue(
-            any("orca-start" in line for line in joined)
-            or any("execute:sh" in call for call in adapter.calls),
-            adapter.calls,
-        )
+        self.assertIn("orca-start", adapter.calls)
+        self.assertLess(adapter.calls.index("orca-start"), adapter.calls.index("worker"))
+
+    def test_an_already_ready_runtime_is_not_started_again(self):
+        adapter, outcome = self.run_cycle(already_running=True)
+        self.assertNotIn("orca-start", adapter.calls)
+        self.assertEqual(outcome.run_result.status, status.RunStatus.SETTLED)
+
+    def test_a_runtime_that_stays_down_after_a_start_blocks(self):
+        adapter, outcome = self.run_cycle(runtime_ready=False)
+        self.assertIn("orca-start", adapter.calls)
+        self.assertEqual(outcome.run_result.status, status.RunStatus.BLOCKED)
 
     def test_the_start_is_recorded_as_a_command_of_the_identity_phase(self):
         _, outcome = self.run_cycle()

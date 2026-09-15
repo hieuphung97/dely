@@ -233,12 +233,14 @@ CASES: tuple[Counterexample, ...] = (
         name="the-application-is-started",
         requirement="The runner starts the application rather than hoping something did",
         path="cycle_runner/lifecycle.py",
-        original="""            started = self.execute(
-                orca.start_argv(self.config.orca.app_argv, self.config.orca.display),
-                timeout=min(120, self.config.timeout_seconds),
-            )
-            record.commands.append(started.to_record())""",
-        replacement="""            pass""",
+        original="""            if not runtime.ready:
+                started = self.execute(
+                    orca.start_argv(self.config.orca.app_argv, self.config.orca.display),
+                    timeout=min(180, self.config.timeout_seconds),
+                )
+                record.commands.append(started.to_record())""",
+        replacement="""            if False:
+                pass""",
         instruments=("tests.test_lifecycle.OrcaSessionTest",),
     ),
     Counterexample(
