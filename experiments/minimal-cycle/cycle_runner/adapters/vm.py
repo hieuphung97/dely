@@ -641,6 +641,37 @@ class VmAdapter(BackendAdapter):
                 return None
             self.sleeper(5)
 
+    def wait_for_transport(self, *, timeout: float | None = None) -> bool:
+        """Poll the guest until it answers a command, or the deadline passes.
+
+        libvirt hands out the lease while the guest is still booting, so an
+        address says only that the interface came up. Readiness is the guest
+        answering.
+        """
+        if not self.address:
+            raise VmContractError(
+                "the domain has no known address yet; readiness cannot be checked"
+            )
+        deadline = time.monotonic() + (
+            self.settings.address_timeout_seconds if timeout is None else timeout
+        )
+        while True:
+            outcome = self.runner(
+                self.ssh_argv(["true"]), timeout=60, context="environment"
+            )
+            if outcome.ok:
+                return True
+            if time.monotonic() >= deadline:
+                return False
+            self.sleeper(5)
+
+    def settle_guest(self) -> proc.CommandOutcome:
+        """Wait for the guest's first-boot configuration to finish."""
+        return self.execute(
+            ["cloud-init", "status", "--wait"],
+            timeout=min(900, self.config.timeout_seconds),
+        )
+
     def create(self) -> EnvironmentHandle:
         """Declare the domain with Pulumi, then find the address it was given."""
         self.prepare_identity()
@@ -668,6 +699,13 @@ class VmAdapter(BackendAdapter):
                 f"{self.settings.address_timeout_seconds} seconds, so nothing can be "
                 "run in it"
             )
+        if not self.wait_for_transport():
+            raise VmContractError(
+                f"{self.domain_name} took the address {self.address} but never answered "
+                f"a command within {self.settings.address_timeout_seconds} seconds; an "
+                "address is not readiness"
+            )
+        self.settle_guest()
         handle = self.plan_handle()
         return EnvironmentHandle(
             environment_id=handle.environment_id,

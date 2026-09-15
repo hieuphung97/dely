@@ -444,3 +444,63 @@ class RemoteQuotingTest(VmTestCase):
         argv = self.ready().ssh_argv(["echo", "it's; rm -rf /"])
         parsed = shlex.split(argv[-1])
         self.assertEqual(parsed, ["echo", "it's; rm -rf /"])
+
+
+class TransportReadinessTest(VmTestCase):
+    """An address is not readiness.
+
+    Observed on a real run: libvirt handed out the lease while the guest was
+    still booting, and the first command failed with "Connection refused" five
+    milliseconds later. Creation is not finished until the guest answers.
+    """
+
+    class Refusing:
+        """Refuses the first few commands, then answers, like a booting guest."""
+
+        def __init__(self, refusals):
+            self.refusals = refusals
+            self.attempts = 0
+
+        def __call__(self, argv, *, timeout, context, cwd=None, env=None,
+                     extra_values=(), stdin_text=None):
+            argv = tuple(str(item) for item in argv)
+            joined = " ".join(argv)
+            if argv[0] == "ssh-keygen":
+                return proc.run(argv, timeout=timeout, context=context)
+            if "domifaddr" in joined:
+                return self.outcome(argv, 0, " vnet0 52:54:00:x ipv4 192.168.122.11/24\n", "", context)
+            if argv[0] == "ssh":
+                self.attempts += 1
+                if self.attempts <= self.refusals:
+                    return self.outcome(
+                        argv, 255, "", "ssh: connect to host port 22: Connection refused", context
+                    )
+                return self.outcome(argv, 0, "", "", context)
+            return self.outcome(argv, 0, "", "", context)
+
+        @staticmethod
+        def outcome(argv, code, out, err, context):
+            return proc.CommandOutcome(
+                argv=argv, exit_code=code, stdout=out, stderr=err,
+                started_at="2026-09-15T14:30:00Z", finished_at="2026-09-15T14:30:00Z",
+                elapsed_seconds=0.005, timed_out=False, context=context,
+            )
+
+    def ready(self, refusals):
+        adapter = self.make(runner=self.Refusing(refusals))
+        adapter.prepare_identity()
+        adapter.address = "192.168.122.11"
+        return adapter
+
+    def test_a_guest_that_answers_after_a_few_refusals_is_reachable(self):
+        adapter = self.ready(3)
+        self.assertTrue(adapter.wait_for_transport(timeout=60))
+        self.assertGreaterEqual(adapter.runner.attempts, 4)
+
+    def test_a_guest_that_never_answers_is_not_reachable(self):
+        self.assertFalse(self.ready(1000).wait_for_transport(timeout=0))
+
+    def test_readiness_is_not_claimed_before_an_address_is_known(self):
+        adapter = self.make(runner=self.Refusing(0))
+        with self.assertRaises(vm.VmContractError):
+            adapter.wait_for_transport(timeout=0)

@@ -230,6 +230,18 @@ CASES: tuple[Counterexample, ...] = (
         instruments=("tests.test_lifecycle.CreateFailureTest",),
     ),
     Counterexample(
+        name="an-address-is-not-readiness",
+        requirement="Creation waits for the guest to answer, not just to take an address",
+        path="cycle_runner/adapters/vm.py",
+        original="""            outcome = self.runner(
+                self.ssh_argv(["true"]), timeout=60, context="environment"
+            )
+            if outcome.ok:
+                return True""",
+        replacement="""            return True""",
+        instruments=("tests.test_adapter_vm.TransportReadinessTest",),
+    ),
+    Counterexample(
         name="remote-command-is-quoted",
         requirement="An argument vector survives the transport intact",
         path="cycle_runner/adapters/vm.py",
