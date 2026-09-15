@@ -476,3 +476,78 @@ class KeptRepliesTest(WorkerTest):
         )
         for name, text in kept.items():
             self.assertNotIn("sk-ant-secret-value-here", text, name)
+
+
+class UnverifiedStartEvidenceTest(WorkerTest):
+    """When the plane cannot see the turn start, read the terminal it names."""
+
+    UNVERIFIED = json.dumps(
+        {
+            "id": "request-abcdef",
+            "ok": True,
+            "result": {
+                "runId": "run-abcdef",
+                "taskId": "task-abcdef",
+                "dispatchId": "dispatch-abcdef",
+                "state": "outcome_unknown",
+                "stage": "turn_start_unobserved",
+                # The plane names the terminal it created for the agent here,
+                # and names the command to read it in `nextCommands`.
+                "effects": [
+                    {"kind": "worktree", "action": "reused", "id": "wt"},
+                    {
+                        "kind": "terminal",
+                        "role": "agent",
+                        "action": "created",
+                        "id": "term_worker_fake",
+                    },
+                ],
+            },
+        }
+    )
+    SCREEN = "cycle@guest:~/project$ claude --dangerously-skip-permissions"
+
+    def launch_unverified(self):
+        kept = {}
+        adapter = ScriptedAdapter(
+            self.root / "run",
+            script=[
+                ("run-create", 0, READY, "", False),
+                ("worker-start", 1, self.UNVERIFIED, "", False),
+                ("check --wait", 0, delivery(), "", False),
+                ("terminal read", 0, self.SCREEN, "", False),
+            ],
+        )
+        handle = adapter.create()
+        record = worker.launch(
+            run_config=self.config,
+            adapter=adapter,
+            handle=handle,
+            timeout_seconds=self.config.timeout_seconds,
+            keep=lambda name, stdout, stderr: kept.__setitem__(name, stdout),
+        )
+        return adapter, kept, record
+
+    def test_the_agent_terminal_is_read_and_kept(self):
+        adapter, kept, _ = self.launch_unverified()
+        read = next(
+            (argv for argv in adapter.executed if "read" in argv and "--screen" in argv),
+            None,
+        )
+        self.assertIsNotNone(read, "the agent terminal was never read")
+        self.assertIn("term_worker_fake", read)
+        self.assertIn("worker-terminal", kept)
+        self.assertIn("claude", kept["worker-terminal"])
+
+    def test_a_dispatch_that_reports_normally_is_not_read(self):
+        kept = {}
+        adapter = ScriptedAdapter(self.root / "run", script=DEFAULT_SCRIPT)
+        handle = adapter.create()
+        worker.launch(
+            run_config=self.config,
+            adapter=adapter,
+            handle=handle,
+            timeout_seconds=self.config.timeout_seconds,
+            keep=lambda name, stdout, stderr: kept.__setitem__(name, stdout),
+        )
+        self.assertNotIn("worker-terminal", kept)

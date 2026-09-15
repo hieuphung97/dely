@@ -222,6 +222,28 @@ def _settling_message(document: Mapping[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def agent_terminal(document: Mapping[str, Any]) -> str | None:
+    """Return the handle of the terminal the plane created for the agent.
+
+    A dispatch whose turn start was never observed says so and nothing more.
+    What that terminal holds is the difference between an agent that is still
+    thinking, one waiting on a question nobody can answer, and a launch line
+    that was never submitted — and the plane names the handle here, and names
+    the command to read it in the same reply.
+    """
+    effects = _result(document).get("effects")
+    if not isinstance(effects, list):
+        return None
+    for effect in effects:
+        if not isinstance(effect, Mapping):
+            continue
+        if effect.get("kind") == "terminal" and effect.get("role") == "agent":
+            handle = effect.get("id")
+            if isinstance(handle, str) and handle:
+                return handle
+    return None
+
+
 def _message_outcome(message: Mapping[str, Any]) -> str | None:
     """Return what the worker said it reached, from the message's payload.
 
@@ -350,6 +372,14 @@ def launch(
     )
     record.commands.append(settled.to_record())
     remember("completion-wait", settled)
+    worker_terminal = agent_terminal(start_document)
+    if worker_terminal and (settled.timed_out or state in UNVERIFIABLE_STATES):
+        screen = adapter.execute(
+            ["orca", "terminal", "read", "--terminal", worker_terminal, "--screen"],
+            timeout=min(120, timeout_seconds),
+        )
+        record.commands.append(screen.to_record())
+        remember("worker-terminal", screen)
     if settled.timed_out:
         record.status = PhaseStatus.TIMEOUT
         record.detail = "the completion wait reached the run deadline before the worker settled"

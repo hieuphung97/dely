@@ -27,7 +27,7 @@
       "ok": true
     },
     {
-      "detail": "distrobox mounts /home/<user> into the box and offers no flag to suppress it; the configuration acknowledged this, so the run records a declared compromise rather than claiming isolation",
+      "detail": "distrobox mounts <host-home> into the box and offers no flag to suppress it; the configuration acknowledged this, so the run records a declared compromise rather than claiming isolation",
       "name": "host home reachable from the environment",
       "ok": true
     }

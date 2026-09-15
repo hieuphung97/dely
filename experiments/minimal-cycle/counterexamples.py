@@ -39,6 +39,17 @@ class Counterexample:
 
 CASES: tuple[Counterexample, ...] = (
     Counterexample(
+        name="an-unverifiable-dispatch-keeps-its-terminal",
+        requirement=(
+            "A dispatch the plane could not verify keeps what its agent's "
+            "terminal held, which is the only thing that explains it"
+        ),
+        path="cycle_runner/worker.py",
+        original='    worker_terminal = agent_terminal(start_document)\n    if worker_terminal and (settled.timed_out or state in UNVERIFIABLE_STATES):',
+        replacement='    worker_terminal = agent_terminal(start_document)\n    if worker_terminal and False:',
+        instruments=("tests.test_worker.UnverifiedStartEvidenceTest",),
+    ),
+    Counterexample(
         name="the-outcome-is-the-workers-own-verdict",
         requirement=(
             "Reporting the message type as the outcome says the worker "
