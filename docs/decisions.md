@@ -20,13 +20,21 @@ reading `scripts/dely.js` (about 6–8% of weighted context). The cut of the
 usage block from `SKILL.md`, relying on `dely` printing its own usage, is
 the cause: models read the source instead.
 
+The first candidate `147fc46` failed live row 2 because the printed usage
+named no flags, and the Codex Control in row 3 passed only by reading the
+source; so the earlier Controls read `scripts/dely.js` because it was the
+only place the flags were written.
+
 #### Decision
 
 Add one sentence to the skill: Control learns the helper's interface by
 running `scripts/dely` with no arguments, which prints its identity and
-usage, and does not read `scripts/dely.js`. Checklist rows 1, 4 and 5 are
-rerun after every Orca upgrade, before the next delivery relies on the new
-build. Row 3's waker pass condition is event order, not presence: every
+usage, and does not read `scripts/dely.js`. The helper's printed usage
+carries every subcommand's required and optional flags from one table, and
+is the interface the skill sentence points to. Missing-flag errors name the
+missing flags. Checklist rows 1, 4 and 5 are rerun after every Orca
+upgrade, before the next delivery relies on the new build. Row 3's waker
+pass condition is event order, not presence: every
 `wait_bg` is followed by `settled`, `attention` or `stalled` before its
 `notify`, and the Run's log has no `error`. Row 4's kill trigger polls
 every 1 s and fires only while Control's wait is running, the implementer
@@ -57,8 +65,12 @@ serving every role.
 #### Consequences
 
 A Sonnet 5 Claude Control preflighted before its first dispatch in 3 of 3
-runs against the skill's text; recorded and monitored, not fixed. The
-helper is unchanged.
+runs against the skill's text; recorded and monitored, not fixed.
+
+In row 3 the Codex Control did not acknowledge the implementer's batch, so
+three `wait-bg` calls for the reviewer settled within a second on the same
+stale `worker_done` (2 of 3 Codex Control runs on 2026-09-17). Recorded and
+monitored; acknowledgement belongs to Orca's orchestration guidance.
 
 ### 2026-09-16 — Harness facts move to `harnesses.json`, the skill keeps only its protocol, and the log becomes machine-readable
 
