@@ -136,7 +136,11 @@ Control read `scripts/dely.js`.
 **Pass:** the branch is on the remote, the review disposition is `ACCEPT`, and
 no human acted. For the row whose Control wakes by `waker`, every `wait_bg`
 event in that Run's log is followed by a `settled`, `attention` or `stalled`
-event before its `notify`, and the Run's log has no `error` event. Presence
+event before its `notify`, and the Run's log has no `error` event. A
+`wait_bg` event with `which: ALREADY_WAITING` starts no waiter and has no
+`notify` of its own, so it is not paired. A retried `FAILED` dispatch writes
+an `error` event, so a Run that needed that recovery does not pass row 3
+and is reported as such rather than as a waker failure. Presence
 of `wait_bg` and `notify` is not enough: on `e874990` a Codex Control launched
 `dely wait-bg` inside a new Orca terminal, the waiter watched the wrong
 terminal and failed after 1 s with "no longer bound", and the log still

@@ -156,7 +156,7 @@ against — observations, not a promised minimum:
 | Claude Code | 2.1.274 |
 | Codex CLI | 0.154.0 |
 | Cursor Agent CLI | 2026.09.15-d2fe57e |
-| Orca | 1.4.204 |
+| Orca | 1.4.205 |
 
 ## How Dely works
 

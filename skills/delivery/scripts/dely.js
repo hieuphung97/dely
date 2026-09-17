@@ -725,6 +725,7 @@ function usageLine(name) {
 function printUsage() {
   console.log("usage:");
   for (const name of Object.keys(COMMANDS)) console.log(usageLine(name));
+  console.log("  dely <subcommand> --help");
 }
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -738,11 +739,14 @@ if (!COMMANDS[cmd]) {
   printUsage();
   process.exit(2);
 }
-if (rest.includes("--help")) {
-  console.log(usageLine(cmd));
-  process.exit(0);
-}
 const f = flags(rest);
+if (f.help === true) {
+  const i = rest.indexOf("--help");
+  if (!(i > 0 && String(rest[i - 1]).startsWith("--"))) {
+    console.log(usageLine(cmd));
+    process.exit(0);
+  }
+}
 const missing = COMMANDS[cmd].required.filter(([k]) => !f[k]).map(([k]) => "--" + k);
 if (missing.length) {
   console.log("missing " + missing.join(", "));

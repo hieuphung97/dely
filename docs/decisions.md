@@ -30,7 +30,8 @@ only place the flags were written.
 Add one sentence to the skill: Control learns the helper's interface by
 running `scripts/dely` with no arguments, which prints its identity and
 usage, and does not read `scripts/dely.js`. The helper's printed usage
-carries every subcommand's required and optional flags from one table, and
+carries every subcommand's required and optional flags from one table,
+names `dely <subcommand> --help` for that subcommand's usage line, and
 is the interface the skill sentence points to. Missing-flag errors name the
 missing flags. Checklist rows 1, 4 and 5 are rerun after every Orca
 upgrade, before the next delivery relies on the new build. Row 3's waker
@@ -67,10 +68,14 @@ serving every role.
 A Sonnet 5 Claude Control preflighted before its first dispatch in 3 of 3
 runs against the skill's text; recorded and monitored, not fixed.
 
-In row 3 the Codex Control did not acknowledge the implementer's batch, so
-three `wait-bg` calls for the reviewer settled within a second on the same
-stale `worker_done` (2 of 3 Codex Control runs on 2026-09-17). Recorded and
-monitored; acknowledgement belongs to Orca's orchestration guidance.
+On both Control harnesses (Codex in two of three Codex Control runs on
+2026-09-17, and a Claude Sonnet 5 Control in live row 2 on `0364472`) a
+Control that did not acknowledge the implementer's batch had its next wait
+settle on the same stale `worker_done`, costing extra wake cycles. `dely
+wait` exits on `SETTLED` before acknowledging, by design, because the
+skill's result handling makes acknowledgement Control's step after
+processing the batch. Recorded and monitored; a helper change is out of
+this scope.
 
 ### 2026-09-16 — Harness facts move to `harnesses.json`, the skill keeps only its protocol, and the log becomes machine-readable
 
