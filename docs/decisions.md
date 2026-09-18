@@ -3,11 +3,310 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-17.
+Last updated 2026-09-18.
 
 ---
 
 ## Settled
+
+### 2026-09-18 — Live verification runs before review; review-round cost from `~/.dely/log`
+
+#### Context
+
+A Spike read the pre-0.20.0 tab-separated log at `~/.dely/log` (machine-local,
+one delivery per line). Extra review rounds recur when `probe/checklist.md`
+runs after the review: its findings produce new commits, the reviewed head is
+no longer the released head, and another review follows. This repository's
+2026-09-16 record already names two such 0.20.0 defects ("Found by live
+verification of `82aa354`, not by review"; "Also found by live verification,
+of `90fc7a9`"). `AGENTS.md` said only that live verification before a release
+is that checklist, which is true and does not order it against the review.
+
+**Measurement.** The command below was run on 2026-09-18 against this
+machine's `~/.dely/log`. A reviewer reruns it unchanged.
+
+```bash
+python3 << 'PY'
+from pathlib import Path
+import re, statistics
+from collections import Counter
+
+log = Path.home().joinpath(".dely/log").read_text().splitlines()
+TOKEN = r"(CHANGES_REQUESTED|NEEDS_REPLAN|BLOCKED|APPROVED|APPROVE|ACCEPT|REPLAN)"
+
+
+def norm(tok):
+    if tok.startswith("CHANGES_REQUESTED"):
+        return "CHANGES_REQUESTED"
+    if tok in ("ACCEPT", "APPROVE", "APPROVED"):
+        return "ACCEPT"
+    return tok
+
+
+def parse_reviews(s):
+    s = s.strip()
+    if not s:
+        return [], "empty"
+    prose = bool(
+        re.search(TOKEN + r"\s*x\d+", s)
+        or re.search(r"\d+\s+" + TOKEN, s)
+        or "each after CHANGES_REQUESTED" in s
+        or "ruled ACCEPT" in s
+    )
+    if not prose:
+        out = []
+        for p in s.split(","):
+            p = p.strip()
+            if not p:
+                continue
+            out.append(norm(p.split("(", 1)[0].strip()))
+        return out, "list"
+    rest, out = s, []
+    m = re.search(
+        r"ACCEPT\s*x(\d+)\s*\(each after CHANGES_REQUESTED\)", rest
+    )
+    if m:
+        n = int(m.group(1))
+        out.extend(["CHANGES_REQUESTED", "ACCEPT"] * n)
+        rest = rest[: m.start()] + rest[m.end() :]
+    for m in re.finditer(r"(\d+)\s+" + TOKEN, rest):
+        n, tok = int(m.group(1)), m.group(2)
+        out.extend([norm(tok)] * n)
+    for m in re.finditer(TOKEN + r"\s*x(\d+)", rest):
+        tok, n = m.group(1), int(m.group(2))
+        out.extend([norm(tok)] * n)
+    if re.search(r"\band ACCEPT\b", rest) and not re.search(
+        r"\band ACCEPT\s*x\d+|\band \d+\s+ACCEPT", rest
+    ):
+        out.append("ACCEPT")
+    return out, "prose"
+
+
+def take(fields, keyed, names, positional):
+    for n in names:
+        if n in keyed:
+            return keyed[n], n + "="
+    if len(fields) > positional:
+        return fields[positional], "positional-" + str(positional + 1)
+    return "", "missing"
+
+
+rows = []
+for i, line in enumerate(log, 1):
+    fields = line.split("\t")
+    keyed = {}
+    for f in fields[1:]:
+        if "=" in f:
+            k, _, v = f.partition("=")
+            keyed[k] = v
+    rev, rev_src = take(
+        fields, keyed, ("review-dispositions", "reviews"), 5
+    )
+    rnd, rnd_src = take(
+        fields, keyed, ("implementation-rounds", "rounds"), 4
+    )
+    reviews, kind = parse_reviews(rev)
+    m = re.search(r"\d+", rnd.strip())
+    rows.append(
+        {
+            "i": i,
+            "date": fields[0][:10],
+            "rev_src": rev_src,
+            "rnd_src": rnd_src,
+            "kind": kind,
+            "n": len(reviews),
+            "cr": sum(x == "CHANGES_REQUESTED" for x in reviews),
+            "first": bool(reviews) and reviews[0] == "ACCEPT",
+            "rounds": int(m.group(0)) if m else None,
+        }
+    )
+
+ns = [r["n"] for r in rows]
+total = sum(ns)
+cr = sum(r["cr"] for r in rows)
+stated = sum(1 for r in rows if r["n"] > 0)
+first = sum(1 for r in rows if r["first"])
+print("deliveries", len(rows))
+print("stated_dispositions", stated)
+print("reviews_median", statistics.median(ns))
+print("reviews_mean", round(statistics.mean(ns), 2))
+print("reviews_max", max(ns))
+print("reviews_total", total)
+print("changes_requested", cr)
+print("changes_requested_pct", round(100 * cr / total, 1))
+print("first_accept", first)
+print("first_accept_of", stated)
+print("first_accept_pct", round(100 * first / stated, 1))
+print("review_field_source", dict(Counter(r["rev_src"] for r in rows)))
+print("parse_kind", dict(Counter(r["kind"] for r in rows)))
+print("rounds_field_source", dict(Counter(r["rnd_src"] for r in rows)))
+for r in rows:
+    if r["i"] in (28, 29, 52, 53):
+        print(
+            f"line {r['i']} {r['date']} n={r['n']} cr={r['cr']} "
+            f"first_accept={str(r['first']).lower()} rounds={r['rounds']}"
+        )
+PY
+```
+
+Output:
+
+```
+deliveries 56
+stated_dispositions 56
+reviews_median 3.0
+reviews_mean 4.45
+reviews_max 20
+reviews_total 249
+changes_requested 107
+changes_requested_pct 43.0
+first_accept 30
+first_accept_of 56
+first_accept_pct 53.6
+review_field_source {'reviews=': 18, 'review-dispositions=': 32, 'positional-6': 6}
+parse_kind {'list': 53, 'prose': 3}
+rounds_field_source {'rounds=': 18, 'implementation-rounds=': 32, 'positional-5': 6}
+line 28 2026-09-04 n=14 cr=8 first_accept=false rounds=5
+line 29 2026-09-04 n=8 cr=3 first_accept=true rounds=7
+line 52 2026-09-12 n=18 cr=14 first_accept=false rounds=16
+line 53 2026-09-14 n=11 cr=6 first_accept=false rounds=8
+```
+
+**Counting rule.** The log is not uniform.
+
+Field extraction prefers `review-dispositions=` over `reviews=` over tab
+field 6, and `implementation-rounds=` over `rounds=` over tab field 5
+(leading integer, so line 28's `5 tasks + 6 remediations` counts as 5).
+Early lines use the short keys; later lines use the long keys. Six lines
+(2026-09-02 to 2026-09-04, lines 23 to 28) omit those keys: the named
+disposition field is empty, and dispositions sit in the sixth tab field.
+They were counted, not dropped.
+
+Comma lists split on comma, strip, take the token before `(`, then map:
+`CHANGES_REQUESTED(split)` is one `CHANGES_REQUESTED` (line 29); `APPROVE`
+and `APPROVED` count as `ACCEPT`; `BLOCKED`, `NEEDS_REPLAN`, and `REPLAN`
+count as reviews that are neither `CHANGES_REQUESTED` nor first-review
+accepts.
+
+Prose multipliers (lines 28, 52, 53) expand `N TOKEN` and `TOKEN xN`.
+`ACCEPT xN (each after CHANGES_REQUESTED)` is N pairs of
+`CHANGES_REQUESTED` then `ACCEPT`. `APPROVED ruled ACCEPT by the human` is
+one `ACCEPT`. A trailing `and ACCEPT` not already consumed adds one
+`ACCEPT`. Line 52 is 18 reviews, 14 `CHANGES_REQUESTED`. Line 53 is 11
+reviews, 6 `CHANGES_REQUESTED`. Line 28 is 14 reviews, 8
+`CHANGES_REQUESTED`.
+
+A naive comma split of the same extracted fields counts line 52 as three
+reviews with no `CHANGES_REQUESTED` and line 53 as two; it also misses
+`CHANGES_REQUESTED(split)` on line 29 and reads line 28 as two reviews with
+none. That parse reports 213 reviews, 78 `CHANGES_REQUESTED` (36.6%),
+median 2, mean 3.8. The difference is the proof that the numbers depend on
+the rule above.
+
+All 56 deliveries state review dispositions once the empty named keys are
+read as the positional sixth field. Reviews per delivery: median 3, mean
+4.45, max 20. Total reviews 249, of which 107 were `CHANGES_REQUESTED`
+(43.0%). The first review accepted on 30 of 56 deliveries (53.6%).
+
+**Expensive deliveries.** Twenty-nine deliveries cost three or more reviews
+or four or more rounds. Their `drift` / `drift-cause` fields are Control's
+own summary, so class 1 is partly self-reported. Each delivery is assigned
+one primary class.
+
+**Control asserted in its own record something it had not run the command
+to establish** (11). 2026-08-29 (dely: a decision record supplied a
+mechanism the probe had not observed); 2026-08-30 (a consumer project:
+design premises asserted rather than checked); 2026-08-31 (dely: Control's
+record amendment left a contradicting scope sentence); 2026-09-02 (a
+consumer project, three deliveries: scope reasoned from subject matter
+rather than paths; acceptance rows asserted existence where the requirement
+was correctness; a census stated as measured was eight low); 2026-09-03 (a
+consumer project: eleven censuses used a search narrower than the finding);
+2026-09-04 (dely: Control asserted extent six times without running the
+command); 2026-09-05 (dely: a rule about what the execution plane retained
+was written without measuring it); 2026-09-06 (dely, two deliveries:
+compressed release history and a shortened quoted prompt, both erring
+toward Control's argument).
+
+**The contract named an instrument that could not discriminate or could
+not exist** (8). 2026-08-26 (dely: a stored-catalogue check still passed
+after remediation); 2026-08-28 (a consumer project: every acceptance row
+measured the label rather than the painted control; dely: a falsified
+harness row passed every gate; dely: three instruments named the forbidden
+content without requiring an enumeration of how a label could evade the
+match); 2026-08-30 (a consumer project: an acceptance instrument that could
+not fail); 2026-09-06 (a consumer project, two deliveries: a literal census
+that cannot be made sound in a test file; a counterexample no type-checker
+fixture can reject); 2026-09-07 (a consumer project: an acceptance row that
+demanded the test suite reject a mutation of itself).
+
+**Real domain complexity the review existed to find** (6). 2026-08-26
+(dely: evidence defects and a replan); 2026-08-30 (a consumer project: a
+tier rule as prose judgement over hundreds of call sites, each found by
+review); 2026-09-02 (a consumer project: one rule defined two ways, so two
+non-equivalent predicates shipped); 2026-09-04 (a consumer project: every
+task's real scope exceeded its stated scope; the same drift also reports
+sections asserting their own pre-state, which is class 1 on the same
+delivery); 2026-09-05 (dely: the version rule lived only in a superseded
+record); 2026-09-09 (a consumer project: twenty reviews finding concurrency
+and coverage defects under the earlier per-task-review protocol).
+
+**Live verification landed after the review** (3). 2026-09-12 (dely:
+measured live Orca semantics forced peek-only acknowledgement and
+whole-batch consumption, and a sidecar that could not be identified on real
+Orca was removed); 2026-09-14 (dely, two deliveries: live probes found
+shapes that diverged from Orca 1.4.200; a live checklist row found a launch
+gate invisible to worker-read).
+
+One further delivery (2026-08-26, dely, four `ACCEPT` reviews, drift "No
+drift") meets the numeric bar because Architectural work had one review per
+task, not because of those classes.
+
+The first two classes already have rules in `skills/delivery/SKILL.md`. On
+extent: "Any claim about extent — a scope, a count, a set of call sites —
+names the command that produced it, reports its output, and enumerates
+rather than samples. Naming the command is not the measurement; the command
+must have been run." On instruments: "An acceptance row is invalid until
+its instrument discriminates." The first was violated again in 0.20.1: the
+review of `0364472` returned `CHANGES_REQUESTED` on record accuracy in
+Control-authored files. PR #58's body states both findings: "Orca version
+recorded as 1.4.204 though every run was 1.4.205", and "the stale-settle
+record blamed Codex only".
+
+#### Decision
+
+When a delivery requires `probe/checklist.md`, it runs before the review
+dispatch, so the reviewed head is the verified head. If remediation changes
+what a worker launch does, the affected rows rerun before the re-review.
+This ordering lives in `AGENTS.md` as a project rule for this repository,
+not in `SKILL.md`, because the checklist is this repository's live
+verification of worker launch. The portable protocol has no such file and
+must not grow a Control obligation that only this repo can observe.
+
+#### Alternatives considered
+
+**A new `SKILL.md` obligation on Control to re-run every cited command
+before dispatching review.** Rejected: the same class as the two rules that
+already exist and are already violated, with nothing new observing it.
+0.20.1's review of `0364472` is the latest instance.
+
+**A closure gate checking Control's record against the log.** Rejected:
+`~/.dely/log.jsonl` is machine-local and opt-in, so a reviewer on another
+machine cannot reproduce the gate.
+
+#### Consequences
+
+No log holds per-round token or request cost; the numbers count rounds and
+dispositions only. The 20-review delivery ran under the earlier
+per-task-review protocol, which Bounded work can no longer reach. The
+numbers reproduce only on the machine holding `~/.dely/log`.
+
+When this delivery edits `probe/checklist.md` itself, the candidate is still
+installed from a `git archive` snapshot and that snapshot's checklist runs
+before review. Circularity remains for a row whose criterion is the new
+text: running it cannot prove the criterion is the right one, so that row
+is reviewed as prose. If a later live run on the released install requires
+a commit, that commit is a new delivery, not another round of the same one.
 
 ### 2026-09-17 — Control learns helper usage from `dely`; checklist order, kill trigger, and Codex Control notes
 
