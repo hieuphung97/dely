@@ -118,6 +118,8 @@ for i, line in enumerate(log, 1):
             "cr": sum(x == "CHANGES_REQUESTED" for x in reviews),
             "first": bool(reviews) and reviews[0] == "ACCEPT",
             "rounds": int(m.group(0)) if m else None,
+            "git_root": keyed.get("git-root", ""),
+            "order_stated": "each after CHANGES_REQUESTED" in rev,
         }
     )
 
@@ -146,6 +148,45 @@ for r in rows:
             f"line {r['i']} {r['date']} n={r['n']} cr={r['cr']} "
             f"first_accept={str(r['first']).lower()} rounds={r['rounds']}"
         )
+
+print("log_first_date", rows[0]["date"])
+print("log_last_date", rows[-1]["date"])
+probe = [r for r in rows if "/dely-probe/" in r["git_root"]]
+kept = [r for r in rows if "/dely-probe/" not in r["git_root"]]
+print("probe_fixture_lines", ",".join(str(r["i"]) for r in probe))
+
+
+def emit(prefix, rs):
+    ns = [r["n"] for r in rs]
+    total = sum(ns)
+    cr = sum(r["cr"] for r in rs)
+    stated = sum(1 for r in rs if r["n"] > 0)
+    first = sum(1 for r in rs if r["first"])
+    print(prefix + "deliveries", len(rs))
+    print(prefix + "stated_dispositions", stated)
+    print(prefix + "reviews_median", statistics.median(ns))
+    print(prefix + "reviews_mean", round(statistics.mean(ns), 2))
+    print(prefix + "reviews_max", max(ns))
+    print(prefix + "reviews_total", total)
+    print(prefix + "changes_requested", cr)
+    print(prefix + "changes_requested_pct", round(100 * cr / total, 1))
+    print(prefix + "first_accept", first)
+    print(prefix + "first_accept_of", stated)
+    print(prefix + "first_accept_pct", round(100 * first / stated, 1))
+
+
+emit("without_probe_", kept)
+assumed = [
+    r for r in rows if r["kind"] == "prose" and not r["order_stated"]
+]
+print(
+    "first_accept_order_assumed_lines",
+    ",".join(str(r["i"]) for r in assumed),
+)
+print(
+    "first_accept_max_if_assumed_accept",
+    first + sum(1 for r in assumed if not r["first"]),
+)
 PY
 ```
 
@@ -170,6 +211,22 @@ line 28 2026-09-04 n=14 cr=8 first_accept=false rounds=5
 line 29 2026-09-04 n=8 cr=3 first_accept=true rounds=7
 line 52 2026-09-12 n=18 cr=14 first_accept=false rounds=16
 line 53 2026-09-14 n=11 cr=6 first_accept=false rounds=8
+log_first_date 2026-08-26
+log_last_date 2026-09-16
+probe_fixture_lines 55,56
+without_probe_deliveries 54
+without_probe_stated_dispositions 54
+without_probe_reviews_median 3.0
+without_probe_reviews_mean 4.57
+without_probe_reviews_max 20
+without_probe_reviews_total 247
+without_probe_changes_requested 107
+without_probe_changes_requested_pct 43.3
+without_probe_first_accept 28
+without_probe_first_accept_of 54
+without_probe_first_accept_pct 51.9
+first_accept_order_assumed_lines 52,53
+first_accept_max_if_assumed_accept 32
 ```
 
 **Counting rule.** The log is not uniform.
@@ -194,7 +251,10 @@ Prose multipliers (lines 28, 52, 53) expand `N TOKEN` and `TOKEN xN`.
 one `ACCEPT`. A trailing `and ACCEPT` not already consumed adds one
 `ACCEPT`. Line 52 is 18 reviews, 14 `CHANGES_REQUESTED`. Line 53 is 11
 reviews, 6 `CHANGES_REQUESTED`. Line 28 is 14 reviews, 8
-`CHANGES_REQUESTED`.
+`CHANGES_REQUESTED`. For lines 52 and 53 the log gives counts, not order;
+`first_accept=false` for them is an assumption (the parser takes the first
+token in the text as the first review). Line 28 states the order. Maximum
+effect on the first-accept figure is 32 of 56 instead of 30 of 56.
 
 A naive comma split of the same extracted fields counts line 52 as three
 reviews with no `CHANGES_REQUESTED` and line 53 as two; it also misses
@@ -206,7 +266,11 @@ the rule above.
 All 56 deliveries state review dispositions once the empty named keys are
 read as the positional sixth field. Reviews per delivery: median 3, mean
 4.45, max 20. Total reviews 249, of which 107 were `CHANGES_REQUESTED`
-(43.0%). The first review accepted on 30 of 56 deliveries (53.6%).
+(43.0%). The first review accepted on 30 of 56 deliveries (53.6%). The
+measurement includes two probe-fixture deliveries (lines 55 and 56;
+`git-root` under `~/dely-probe/`). Without them: 54 deliveries, median 3.0,
+mean 4.57, max 20, 247 reviews, 107 `CHANGES_REQUESTED` (43.3%), first
+accept 28 of 54 (51.9%).
 
 **Expensive deliveries.** Twenty-nine deliveries cost three or more reviews
 or four or more rounds. Their `drift` / `drift-cause` fields are Control's
@@ -267,11 +331,12 @@ extent: "Any claim about extent — a scope, a count, a set of call sites —
 names the command that produced it, reports its output, and enumerates
 rather than samples. Naming the command is not the measurement; the command
 must have been run." On instruments: "An acceptance row is invalid until
-its instrument discriminates." The first was violated again in 0.20.1: the
-review of `0364472` returned `CHANGES_REQUESTED` on record accuracy in
-Control-authored files. PR #58's body states both findings: "Orca version
-recorded as 1.4.204 though every run was 1.4.205", and "the stale-settle
-record blamed Codex only".
+its instrument discriminates." The 0.20.1 review of `0364472` returned
+`CHANGES_REQUESTED` with seven findings. Two of them were record-accuracy
+errors in Control-authored files: "Orca version recorded as 1.4.204 though
+every run was 1.4.205", and "the stale-settle record blamed Codex only".
+The second is an extent claim as that rule defines one (a set of call
+sites); the first is a wrong version string, not an extent claim.
 
 #### Decision
 
@@ -291,17 +356,19 @@ already exist and are already violated, with nothing new observing it.
 0.20.1's review of `0364472` is the latest instance.
 
 **A closure gate checking Control's record against the log.** Rejected:
-`~/.dely/log.jsonl` is machine-local and opt-in, so a reviewer on another
-machine cannot reproduce the gate.
+`~/.dely/log` and `~/.dely/log.jsonl` are machine-local and opt-in, so a
+reviewer on another machine cannot reproduce the gate.
 
 #### Consequences
 
 No log holds per-round token or request cost; the numbers count rounds and
 dispositions only. The 20-review delivery ran under the earlier
 per-task-review protocol, which Bounded work can no longer reach. The
-numbers reproduce only on the machine holding `~/.dely/log`.
+numbers reproduce only on the machine holding `~/.dely/log`. That file
+ends on 2026-09-16. `~/.dely/log.jsonl` holds later deliveries and is not
+measured.
 
-When this delivery edits `probe/checklist.md` itself, the candidate is still
+When a delivery edits `probe/checklist.md` itself, the candidate is still
 installed from a `git archive` snapshot and that snapshot's checklist runs
 before review. Circularity remains for a row whose criterion is the new
 text: running it cannot prove the criterion is the right one, so that row
