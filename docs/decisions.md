@@ -3,11 +3,79 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-16.
+Last updated 2026-09-17.
 
 ---
 
 ## Settled
+
+### 2026-09-17 — Control learns helper usage from `dely`; checklist order, kill trigger, and Codex Control notes
+
+#### Context
+
+After 0.20.0 shipped, a probe of the official install passed rows 1, 2, 4,
+5, 6, 7 and row 3 on rerun. A Control-cost measurement on the same task
+found all three Controls sleeping during worker waits, and every Control
+reading `scripts/dely.js` (about 6–8% of weighted context). The cut of the
+usage block from `SKILL.md`, relying on `dely` printing its own usage, is
+the cause: models read the source instead.
+
+The first candidate `147fc46` failed live row 2 because the printed usage
+named no flags, and the Codex Control in row 3 passed only by reading the
+source; so the earlier Controls read `scripts/dely.js` because it was the
+only place the flags were written.
+
+#### Decision
+
+Add one sentence to the skill: Control learns the helper's interface by
+running `scripts/dely` with no arguments, which prints its identity and
+usage, and does not read `scripts/dely.js`. The helper's printed usage
+carries every subcommand's required and optional flags from one table,
+names `dely <subcommand> --help` for that subcommand's usage line, and
+is the interface the skill sentence points to. Missing-flag errors name the
+missing flags. Checklist rows 1, 4 and 5 are rerun after every Orca
+upgrade, before the next delivery relies on the new build. Row 3's waker
+pass condition is event order, not presence: every
+`wait_bg` is followed by `settled`, `attention` or `stalled` before its
+`notify`, and the Run's log has no `error`. Row 4's kill trigger polls
+every 1 s and fires only while Control's wait is running, the implementer
+process is still alive, and no `settled` event exists yet; if the
+implementer settles first, the row is not run for that attempt. Rows 1 to 3
+collect Control harness and model, request timing during each wait, and
+whether Control read `scripts/dely.js`, as tracking data not a pass
+condition. Codex Control measurements go into the `codex` entry's `notes`.
+
+#### Alternatives considered
+
+**Helper retry when Orca closes the connection.** Rejected: it would match
+Orca's error text, the lexical classification the 2026-09-15 architecture
+review removed; Orca already prints its recovery command; one incident.
+
+**A stale-settle filter in `wait`.** Rejected: it re-implements Orca's
+batch and acknowledgement semantics.
+
+**A `wait-bg` check against the Run's coordinator.** Rejected: Orca
+already reports the mismatch within a second; one incident.
+
+**A `harnesses.json` field listing Control models that sleep.** Rejected:
+a catalogue, and sleeping is not stable per model.
+
+**Demoting Codex to worker only.** Rejected: contrary to every harness
+serving every role.
+
+#### Consequences
+
+A Sonnet 5 Claude Control preflighted before its first dispatch in 3 of 3
+runs against the skill's text; recorded and monitored, not fixed.
+
+On both Control harnesses (Codex in two of three Codex Control runs on
+2026-09-17, and a Claude Sonnet 5 Control in live row 2 on `0364472`) a
+Control that did not acknowledge the implementer's batch had its next wait
+settle on the same stale `worker_done`, costing extra wake cycles. `dely
+wait` exits on `SETTLED` before acknowledging, by design, because the
+skill's result handling makes acknowledgement Control's step after
+processing the batch. Recorded and monitored; a helper change is out of
+this scope.
 
 ### 2026-09-16 — Harness facts move to `harnesses.json`, the skill keeps only its protocol, and the log becomes machine-readable
 

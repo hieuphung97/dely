@@ -105,9 +105,12 @@ then Control loads `orca skills get orchestration` and follows its
 supervised loop. It stops only when the CLI is missing, the runtime cannot
 start, or a required capability is absent — there is no direct dispatch and
 no headless fallback of any kind. The launcher is `scripts/dely` relative
-to this skill. Control's wake mode is that harness's `controlWake` in
-`../../harnesses.json`. The preflight step runs in setup and again after a
-`NO_ACK`; a delivery does not preflight before its first dispatch.
+to this skill. Control learns the helper's interface by running
+`scripts/dely` with no arguments, which prints its identity and usage,
+and does not read `scripts/dely.js`. Control's wake mode is that harness's
+`controlWake` in `../../harnesses.json`. The preflight step runs in setup
+and again after a `NO_ACK`; a delivery does not preflight before its first
+dispatch.
 
 Write the prompt to an untracked file **inside the worktree**. Never inline
 it in a shell argument: prompts carry backticks, quotes and newlines, and a

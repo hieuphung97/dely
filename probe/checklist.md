@@ -22,7 +22,10 @@ the shipped skill. No skill references this directory.
 - `~/dely-probe/` writable. Both scripts here refuse every path outside it.
 
 Record the Orca version. A row that passed on one Orca build is not evidence
-about the next one: rows 1, 4 and 5 are worth rerunning after an Orca upgrade.
+about the next one: rows 1, 4 and 5 are rerun after every Orca upgrade,
+before the next delivery relies on the new build. Orca upgraded itself from
+1.4.203 to 1.4.204 in the middle of the 0.20.0 checklist, which is the
+reason.
 
 ## Step 1 — install the candidate from a snapshot
 
@@ -121,14 +124,30 @@ consumed the cursor. `worker-list` may also report an empty `taskTitle`, so
 identify a dispatch by its id and the order it appeared, not by its title.
 
 Collect: the SHA on the remote, the disposition in the handoff, how many times
-a human had to act and why, wall time, and per-phase time.
+a human had to act and why, wall time, and per-phase time. Also record, as
+tracking data and not as a pass condition, the Control harness and model; how
+many model requests Control made during each worker wait and when they fell
+relative to the dispatch — from `token_usage_record` lines in a Codex rollout
+under `~/.codex/sessions`, from assistant messages with `usage` in a Claude
+session under `~/.claude/projects`, and by counting assistant records in a
+Cursor agent transcript (Cursor stores no token counts locally); and whether
+Control read `scripts/dely.js`.
 
 **Pass:** the branch is on the remote, the review disposition is `ACCEPT`, and
-no human acted. For the row whose Control wakes by `waker`, the log must also
-carry `wait_bg` and `notify` events for that Run. Without them the row passed
-without exercising the path it exists to test: on `82aa354` a Codex Control
-reached `ACCEPT` with a blocking `dely wait`, and branch, disposition and
-human count could not tell.
+no human acted. For the row whose Control wakes by `waker`, every `wait_bg`
+event in that Run's log is followed by a `settled`, `attention` or `stalled`
+event before its `notify`, and the Run's log has no `error` event. A
+`wait_bg` event with `which: ALREADY_WAITING` starts no waiter and has no
+`notify` of its own, so it is not paired. A retried `FAILED` dispatch writes
+an `error` event, so a Run that needed that recovery does not pass row 3
+and is reported as such rather than as a waker failure. Presence
+of `wait_bg` and `notify` is not enough: on `e874990` a Codex Control launched
+`dely wait-bg` inside a new Orca terminal, the waiter watched the wrong
+terminal and failed after 1 s with "no longer bound", and the log still
+carried `wait_bg` and `notify`, so the old wording passed it. Without the
+events at all the row passed without exercising the path it exists to test:
+on `82aa354` a Codex Control reached `ACCEPT` with a blocking `dely wait`,
+and branch, disposition and human count could not tell.
 
 All three rows run for a release. Rows 2 and 3 rotate which harness is Control,
 implementer and reviewer, and a rotation is the only thing that exercises a
@@ -143,7 +162,12 @@ Inside one of the rows above, after the implement worker has acknowledged
 **and** Control's own wait for that Run is running
 (`pgrep -f "dely.js wait --run <run>"` for a background Control, the
 `wait-bg` waiter for a waker one), kill the worker's agent process from outside
-Orca. An acknowledgement is logged a few seconds after launch, but Control may
+Orca. The kill trigger polls every 1 s and fires when that wait is running
+**and** the implementer process is still alive **and** no `settled` event
+exists yet. If the implementer settles first, record the row as not run for
+that attempt rather than killing anything: a Sonnet 5 implementer settled
+about 30 s after dispatch, and slower triggers missed it twice. An
+acknowledgement is logged a few seconds after launch, but Control may
 not start waiting for another 20 s while it finishes its turn; a kill in that
 window measures Control's turn, not the helper. On `90fc7a9` a kill 4 s after
 the `dispatch` event read 34 s to `ATTENTION`, of which 18 s passed before any

@@ -102,8 +102,6 @@ function pin(repo, phase) {
 }
 
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-const USAGE =
-  "usage: dely preflight|dispatch|wait|wait-bg|notify | log --run ID --json OBJ";
 const out = (line, code) => {
   console.log(typeof line === "string" ? line : JSON.stringify(line));
   if (code != null) process.exit(code);
@@ -678,21 +676,81 @@ function logCmd(f) {
   process.exit(0);
 }
 
+const COMMANDS = {
+  preflight: { required: [["repo", "PATH"], ["run", "RUN"]], optional: [] },
+  dispatch: {
+    required: [
+      ["repo", "PATH"],
+      ["run", "RUN"],
+      ["phase", "implement|review"],
+      ["spec-file", "FILE"],
+    ],
+    optional: [],
+  },
+  wait: {
+    required: [["run", "RUN"], ["control", "HARNESS"]],
+    optional: [
+      ["as", "TERMINAL"],
+      ["skip", "IDS"],
+      ["stall-min", "N"],
+      ["timeout-min", "N"],
+    ],
+  },
+  "wait-bg": {
+    required: [["run", "RUN"], ["control", "HARNESS"]],
+    optional: [
+      ["out", "FILE"],
+      ["skip", "IDS"],
+      ["stall-min", "N"],
+      ["timeout-min", "N"],
+    ],
+  },
+  notify: {
+    required: [["run", "RUN"], ["out", "FILE"]],
+    optional: [["as", "TERMINAL"]],
+  },
+  log: {
+    required: [["run", "RUN"], ["json", "OBJ"]],
+    optional: [["repo", "PATH"]],
+  },
+};
+
+function usageLine(name) {
+  const spec = COMMANDS[name];
+  const bits = spec.required.map(([k, v]) => "--" + k + " " + v);
+  const opts = spec.optional.map(([k, v]) => "[--" + k + " " + v + "]");
+  return "  dely " + name + " " + bits.concat(opts).join(" ");
+}
+
+function printUsage() {
+  console.log("usage:");
+  for (const name of Object.keys(COMMANDS)) console.log(usageLine(name));
+  console.log("  dely <subcommand> --help");
+}
+
 const [cmd, ...rest] = process.argv.slice(2);
 const table = { preflight, dispatch, wait, "wait-bg": waitBg, notify, log: logCmd };
-const need = {
-  preflight: ["repo", "run"],
-  dispatch: ["repo", "run", "phase", "spec-file"],
-  wait: ["run", "control"],
-  "wait-bg": ["run", "control"],
-  notify: ["run", "out"],
-  log: ["run", "json"],
-};
 if (!cmd) {
   printIdentity();
-  out(USAGE, 0);
+  printUsage();
+  process.exit(0);
 }
-if (!table[cmd]) out(USAGE, 2);
+if (!COMMANDS[cmd]) {
+  printUsage();
+  process.exit(2);
+}
 const f = flags(rest);
-if (need[cmd].some((k) => !f[k])) out(USAGE, 2);
+if (f.help === true) {
+  const i = rest.indexOf("--help");
+  if (!(i > 0 && String(rest[i - 1]).startsWith("--"))) {
+    console.log(usageLine(cmd));
+    process.exit(0);
+  }
+}
+const missing = COMMANDS[cmd].required.filter(([k]) => !f[k]).map(([k]) => "--" + k);
+if (missing.length) {
+  console.log("missing " + missing.join(", "));
+  console.log(usageLine(cmd));
+  process.exit(2);
+}
 table[cmd](f);
