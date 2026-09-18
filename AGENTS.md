@@ -11,8 +11,12 @@ Claude Code, Codex CLI, and Cursor Agent CLI.
 - Installation and onboarding instructions are in `README.md`.
 - The closure gates below are the whole structural check. There is no test
   suite and no CI workflow; nothing runs on a pull request automatically.
-- Live verification before a release is `probe/checklist.md`, run by a separate
-  agent session against a candidate installed from a `git archive` snapshot.
+- Live verification is `probe/checklist.md`, run by a separate agent session
+  against a candidate installed from a `git archive` snapshot. When a delivery
+  requires that checklist, it runs before the review dispatch, so the reviewed
+  head is the verified head; if remediation changes what a worker launch does,
+  the affected rows rerun before the re-review. This ordering is a project
+  rule for this repository, not part of the portable protocol in `SKILL.md`.
 - `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, and `.github/`
   (issue and pull-request templates) own the human contribution, conduct,
   security, and PR contract; they need no Dely or Orca install to follow.
