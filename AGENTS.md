@@ -41,7 +41,8 @@ Repository artifacts are written in English.
   the one shipping them. Plugin caches and any live worker hook wiring are
   refreshed only between plans.
 - A delivery that changes anything under `skills/` advances the version in
-  both plugin manifests and the version gate below, within that same delivery.
+  both plugin manifests, `package.json`, and the version gate below, within
+  that same delivery.
 
 ## Phase dispatch
 
@@ -56,7 +57,7 @@ delivery run.
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
 | `implement` | Cursor Agent CLI | cursor-grok-4.6-high | default |
-| `review` | Claude Code | claude-opus-5 | medium |
+| `review` | Codex CLI | gpt-5.6-sol | high |
 <!-- dely:end -->
 
 The table is this repository's deployment selection, not the portable
@@ -77,7 +78,7 @@ git diff --check
 ```
 
 ```bash
-jq -e . harnesses.json plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json .cursor-plugin/plugin.json >/dev/null
+jq -e . harnesses.json plugin.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json .cursor-plugin/plugin.json package.json >/dev/null
 ```
 
 ```bash
@@ -86,8 +87,13 @@ git ls-files -z '*.sh' 'skills/delivery/scripts/dely' | xargs -0 -n1 bash -n
 ```
 
 ```bash
-test "$(jq -r .version .claude-plugin/plugin.json)" = 0.20.1
-test "$(jq -r .version .codex-plugin/plugin.json)" = 0.20.1
+test "$(jq -r .version .claude-plugin/plugin.json)" = 0.22.0
+test "$(jq -r .version .codex-plugin/plugin.json)" = 0.22.0
+test "$(jq -r .version package.json)" = 0.22.0
+```
+
+```bash
+test "$(jq -r 'has("type")' package.json)" = false
 ```
 
 ```bash

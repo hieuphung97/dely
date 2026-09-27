@@ -3,11 +3,274 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-18.
+Last updated 2026-09-27.
 
 ---
 
 ## Settled
+
+### 2026-09-27 — OMP is a supported harness, and its model pin travels in the spec
+
+#### Context
+
+OMP (Oh My Pi) 18.3.3 was measured under Orca 1.4.212 on 2026-09-27, in a
+fresh git root under `~/dely-probe/`, as a worker and as Control. The
+installed Dely was 0.20.1.
+
+**Orca already knows OMP.** Its agent id is `omp`, and a terminal running it
+reports `agentIdentity: "omp"`. Orca launches it as
+`omp --extension ~/.omp/agent/extensions/orca-agent-status.ts --config <orca>/omp-managed-status-extension/fresh-session.yml`,
+with no approval flag. OMP's own `tools.approvalMode` defaults to `yolo`.
+
+**Worker.** A worker started by `worker-start --agent omp` showed no trust
+dialog, received its prompt, wrote a file without an approval prompt, sent the
+`ack` heartbeat 23 s after start, and sent `worker_done --outcome succeeded`.
+Orca reads OMP's own transcript (`worker-read` source `transcript`, provider
+`omp`).
+
+**A killed worker stays live.** After `kill -9` of the OMP process, Orca kept
+`liveness.verdict` at `live` (source `agent_status`), `nextAction` at `none`
+and `attention.requiresAction` at `false` for at least six minutes. The other
+supported harnesses flip `requiresAction` to `true`
+(2026-09-16 record). `dely wait` reads that transcript, so a dead OMP worker
+reaches `STALLED` after `--stall-min`, not `ATTENTION`; this is read from the
+helper's code, not observed.
+
+**Control.** OMP's bash tool runs a command as an `async` job, ends the turn,
+and starts a new turn when the job exits: no model request was made during a
+5 min 17 s wait. A job's timeout defaults to 300 s and accepts at most
+3600 s, which is exactly `dely wait`'s default 60 min. An idle OMP session also
+starts a turn from `orca terminal send`, and a full 0.20.1 `dely wait-bg`
+cycle with a Claude Code worker settled end to end with an OMP Control.
+
+**The model cannot be pinned the way the other harnesses pin it.**
+`worker-start --agent omp --model …` is refused: "Agent omp does not support
+launch-time model selection". Orca's own new-tab picker applies `--model` to
+OMP; only orchestration refuses it. Four other routes were measured or
+examined:
+
+- A project `.omp/config.yml` with `modelRoles.default: <selector>:<thinking>`
+  is honoured by an Orca-launched worker. It is a file in the user's
+  repository, shared by both phases. An invalid selector there is silent:
+  the worker ran the model of the most recent OMP session, and the session
+  recorded `resolvedModelIsFallback: false`.
+- Orca's per-agent default arguments and OMP's global
+  `~/.omp/agent/config.yml` change every OMP session on the machine,
+  including the user's own, and cannot differ by phase.
+- Orca installs a `/orca-model` command into OMP, but the prompt is already
+  submitted when the worker starts, so the first requests would run on the
+  wrong model.
+- An OMP extension on `before_agent_start` that reads a `dely-pin:` line from
+  the prompt and calls `setModel` and `setThinkingLevel` switched the model
+  before the first request: every request ran on the pinned model, and Orca's
+  `projection.provider.model` reported it. On an invalid selector, a `throw`
+  from the handler is swallowed and the turn runs on the default model;
+  `ctx.shutdown()` lets the turn finish, `worker_done` included, before
+  closing; only `process.exit` stopped the worker before its first request,
+  with no heartbeat, leaving its message on the terminal.
+
+**How the extension reaches OMP.** OMP installs a Claude-format marketplace
+plugin and loads its `skills/`, but loads a plugin's `tools/*.ts` as custom
+tools, whose API has no `on` or `setModel`. OMP's own package format, a
+`package.json` with `omp.extensions` and `omp.skills`, installed by
+`omp plugin install <path>`, loaded both the extension with the full API and
+the skills. A local path is installed as a symlink. Uninstalling it needs
+`bun` on PATH, and so, presumably, does installing from a git URL; neither was
+measured with `bun` present.
+
+#### Decision
+
+OMP is `supported` in `harnesses.json` under id `omp`, as worker and as
+Control. Its entry carries `controlWake: waker`, `trust: none`,
+`modelFlag: false`, `effortFlag: false`, `modelPin: spec`,
+`permissionDefault: --approval-mode yolo`, and discovery from
+`omp models --json`, offering each model's `selector` and its `thinking`
+levels.
+
+`modelPin: spec` means the pin travels in the dispatch spec. When the pinned
+Model is not `default`, `dely dispatch` appends one line,
+`dely-pin: <selector>` or `dely-pin: <selector>:<effort>`. An Effort pinned
+with Model `default` is refused, as `effortRequiresModel` already refuses it
+for a flag. With Model `default`, no line is written and OMP's own default
+applies.
+
+The package ships `omp/dely-pin.ts`, declared by a root `package.json` under
+`omp.extensions` next to `omp.skills`. The extension acts only on the first
+agent start of a session, and only on a line that begins with `dely-pin:`. A
+selector OMP does not offer, or a model it cannot switch to, prints a line
+beginning `DELY-PIN-FAIL` and exits the process, so the dispatch surfaces as
+`NO_ACK` quoting that line.
+
+OMP is installed from a local checkout with `omp plugin install <path>`, not
+from the `dely` marketplace.
+
+This amends the 2026-09-16 record that dropped the code for harnesses Dely
+cannot support: Dely again ships code for one harness. It is data-driven in
+the helper (`modelPin` in `harnesses.json`, not a test of the harness id) and
+confined to one file the other harnesses never load.
+
+**Amended the same day, after an independent architecture review of the
+candidate.** The review found no defect for Claude Code, Codex CLI or Cursor
+Agent CLI (their `worker-start` argv and output byte-identical to 0.20.1 in
+every reproduced case) and eight gaps for OMP. The pin, as first built, was
+applied by the first `dely-pin:` line in the prompt, so a line inside a spec
+overrode the `AGENTS.md` pin silently; and when the extension was not loaded
+at all the pin line was ignored and nothing noticed. Both are closed by one
+check rather than two mechanisms:
+
+- The pin line is `dely-pin: <selector>` or `dely-pin: <selector> <effort>`,
+  split on whitespace, so a model id that contains `:` is not mistaken for an
+  effort. The extension applies the **last** such line; the helper's line is
+  always last.
+- After the worker acknowledges, `dely dispatch` reads `worker-show`
+  `projection.provider.model` for a `modelPin: spec` dispatch with a pinned
+  Model. If it is not the pinned selector, or Orca reports none, the helper
+  stops and releases the worker and prints `FAILED`, which the skill already
+  routes. Harnesses without `modelPin` never reach this check.
+
+`permissionDefault` for OMP is `none`: Orca passes no approval flag to `omp`,
+and an OMP worker's approvals follow the user's `tools.approvalMode`. The root
+`package.json` is a third version string and is gated with the two manifests,
+and it must not set `type`, because `dely.js` is CommonJS and resolves its
+module type from that file.
+
+#### Alternatives considered
+
+**Pin through a project `.omp/config.yml`.** Rejected: it writes a harness
+store into the user's repository, both phases share it, and a mistyped
+selector runs another model silently.
+
+**Pin through Orca's per-agent default arguments or OMP's global config.**
+Rejected: they change the user's own OMP sessions, cannot differ by phase,
+and Orca's setting has no CLI.
+
+**Send `/orca-model` to the worker after it starts.** Rejected: the prompt is
+already running, so the first requests use the wrong model.
+
+**Leave the model unpinned, as for a harness without `--model`.** Rejected:
+the user asked for a pin, and an unpinned worker is an environment that
+changes without announcing itself.
+
+**Fail the extension with `throw` or `ctx.shutdown()`.** Rejected by
+measurement: both let the worker run on the default model.
+
+**`controlWake: background`.** Rejected for now: the mechanism works, but an
+OMP background job is killed at 3600 s, which is `dely wait`'s default
+deadline, and a waker Control was measured end to end.
+
+**Ship OMP through the `dely` marketplace.** Rejected: OMP loads a marketplace
+plugin's skills but cannot load an extension from it.
+
+**Wait until Orca accepts `--model` for `omp`.** Deferred, not rejected; see
+below. Orca 1.4.212 already carries `--model` wiring for `omp`; orchestration
+refuses it only because that agent entry lacks the capability flag the other
+pinned agents carry. Orca has no effort options for `omp`.
+
+**Launch `omp --model … --thinking …` in a terminal and hand it to
+`worker-start --terminal`.** Rejected: it is the adopt path 0.19.0 deleted
+for Antigravity, with its prompt-before-ready race and residual terminal; it
+bypasses Orca's own OMP launch that carries its status extension; and
+`omp --model` fuzzy-matches, so a mistyped selector may run another model.
+
+**Refuse a spec that already contains a `dely-pin:` line.** Not needed: the
+post-acknowledgement check already fails such a dispatch when a Model is
+pinned.
+
+#### Consequences
+
+A project can pin OMP's model and effort per phase without touching its
+repository or its users' OMP configuration, and a bad pin stops the worker
+before it spends a request.
+
+The extension loads into every OMP session on a machine that installed Dely,
+including sessions that have nothing to do with a delivery. It does nothing
+unless the first prompt of the session has a line beginning `dely-pin:`; a
+person who types such a line with a bad selector ends their own session.
+With Model `default` the helper writes no line and checks nothing, so a spec
+that itself carries a `dely-pin:` line still switches that worker's model
+unnoticed; no instrument covers this, and it is accepted as rare.
+
+OMP has no workspace-trust gate. A repository's `.omp/extensions`,
+`.omp/skills` and `.omp/config.yml` take effect in an OMP worker without a
+prompt, with the approvals of the user's `tools.approvalMode`. Dely's
+`setup` and `delivery` skills are not namespaced in OMP and take precedence
+over a project's own skills of the same name.
+
+A dead OMP worker is found by `STALLED` after the stall interval, not by
+`ATTENTION`. This decision does not improve that.
+
+OMP users install from a checkout with `omp plugin install`, which links
+it rather than copying it: OMP runs whatever that checkout holds, so it must
+be a dedicated clone, never a working checkout of this repository. Updating
+is `git pull` in that clone. `omp plugin uninstall dely` needs `bun`.
+Without it, `omp plugin disable dely` only deactivates Dely and leaves it
+registered; removal is the manual steps README gives (delete the linked
+package, remove the then-empty `node_modules`, delete the `dely` key from the
+plugin lock), measured in an isolated home.
+
+The live release floor is ten rows: rows 10 and 11 check string handling in
+`start()` and the extension, and run when either changes. Rows 8, 9 and 12
+rerun after every OMP upgrade, as rows 1, 4 and 5 do after every Orca one.
+
+**Live verification ran rows 8 to 12 of `probe/checklist.md` only, on OMP
+18.3.4 and Orca 1.4.212.** OMP updated itself from 18.3.3 between the
+measurements above and the checklist. The first run, on a snapshot of
+`cdb7813`, failed rows 8 and 9. Inside OMP a registry model's `thinking` is an
+object, `{mode, efforts, requiresEffort}`; `omp models --json` flattens it to
+an array. The extension checked the array form, so every pin with an Effort
+exited. It also wrote `DELY-PIN-FAIL` with `console.error`, which OMP sends to
+its own log file, so the `NO_ACK` quote did not carry it. After the fix, which
+reads `thinking.efforts` and writes the line to stderr from an exit handler,
+rows 8, 9 and 11 were run again on a snapshot of `d69e0f5`. Row 9 passed, row
+11 passed, and row 8 showed the pinned model on every request. Its pass
+condition named the session's first `model_change`, which is always OMP's
+configured default at session start, and was reworded to the last one before
+the first user message.
+
+Rows 1 to 7 were not run. They exercise Claude Code, Codex CLI and Cursor
+Agent CLI deliveries, and for those harnesses the helper's `worker-start`
+argv and spec are byte-for-byte those of 0.20.1. The implementer's stub-`orca`
+check showed that, and the task reviewer reproduced it against a 0.20.1
+snapshot. This release names that exception here rather than moving the
+floor.
+
+After the architecture-review amendment, rows 8 to 11 ran again on a
+snapshot of `c7dbfff` (OMP 18.3.4, Orca 1.4.212, pin
+`google-vertex/gemini-3.5-flash` / `low` against the configured default
+`google-vertex/gemini-3.8-flash`), and all passed. Orca's
+`projection.provider.model` already held the pin 4.0 s before the `ack`
+heartbeat and never showed the default, so the post-acknowledgement check
+needs no lag allowance beyond its five-second bound. With the extension
+disabled, the same dispatch printed `FAILED … pin not applied: expected
+google-vertex/gemini-3.5-flash, saw google-vertex/gemini-3.8-flash`. Row 12
+was not rerun: it pins Model `default`, which the check does not reach.
+`omp plugin disable dely` deactivates Dely but leaves it registered; without
+`bun`, removal is the manual steps README gives.
+
+#### Non-goals
+
+Detecting a dead OMP worker sooner than `STALLED`.
+
+A background-wake OMP Control.
+
+Installing OMP from a git URL, or uninstalling it with `bun` through
+`omp plugin uninstall dely`; neither was measured.
+
+#### Deferred
+
+Pinning OMP's model by flag. Trigger: an Orca release whose
+`worker-start --agent omp` accepts `--model`. `modelFlag` becomes `true`, the
+spec line carries only an effort, and the post-acknowledgement check keeps
+running. The request is filed as
+[stablyai/orca#23388](https://github.com/stablyai/orca/issues/23388).
+
+Deleting `omp/dely-pin.ts`, `modelPin`, the root `package.json` and OMP's
+separate install path. Trigger: an Orca release that also accepts `--effort`
+for `omp`; `effortFlag` becomes `true`, and OMP installs from the `dely`
+marketplace, which already loads its skills.
+
+`controlWake: background` for OMP. Trigger: a measured OMP job timeout above
+`dely wait`'s deadline, or a helper deadline below it.
 
 ### 2026-09-18 — Live verification runs before review; review-round cost from `~/.dely/log`
 

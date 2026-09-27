@@ -19,13 +19,16 @@ the shipped skill. No skill references this directory.
 - the candidate SHA;
 - Orca running, with orchestration enabled;
 - Claude Code, Codex CLI and Cursor Agent CLI installed and signed in;
+- OMP installed;
 - `~/dely-probe/` writable. Both scripts here refuse every path outside it.
 
 Record the Orca version. A row that passed on one Orca build is not evidence
 about the next one: rows 1, 4 and 5 are rerun after every Orca upgrade,
 before the next delivery relies on the new build. Orca upgraded itself from
 1.4.203 to 1.4.204 in the middle of the 0.20.0 checklist, which is the
-reason.
+reason. Record the OMP version next to the result. A row that passed on one
+OMP build is not evidence about the next one: rows 8, 9 and 12 are rerun
+after every OMP upgrade, before the next delivery relies on the new build.
 
 ## Step 1 — install the candidate from a snapshot
 
@@ -62,6 +65,55 @@ Anything there with a different hash wins over the Claude cache. Until it is
 removed or refreshed, a row with Cursor in any role cannot run, and saying so is
 the correct outcome for that row — not running it against whatever Cursor has.
 On 2026-09-16 two such copies blocked every Cursor row of the 0.19.0 release.
+
+Install OMP from the snapshot. OMP has no trust step.
+
+```bash
+omp plugin install "$snap"
+omp plugin list --json
+omp skill list --json
+```
+
+Ask OMP what it resolved. `omp skill list --json` must give `delivery` and
+`setup` with `source` `omp-plugins:user` and `filePath` under the linked
+`dely` package. Then SHA-256 of those resolved `SKILL.md` files, of
+`scripts/dely.js` next to `delivery`, and of `omp/dely-pin.ts` at the
+linked package must equal the snapshot's:
+
+```bash
+omp_path=$(omp plugin list --json | jq -er '.npm[] | select(.name=="dely") | .path')
+skills_json=$(omp skill list --json)
+delivery_path=$(jq -er --arg p "$omp_path" '
+  [.skills[] | select(.name=="delivery")][0]
+  | select(.source=="omp-plugins:user")
+  | select(.filePath | startswith($p + "/"))
+  | .filePath
+' <<<"$skills_json")
+setup_path=$(jq -er --arg p "$omp_path" '
+  [.skills[] | select(.name=="setup")][0]
+  | select(.source=="omp-plugins:user")
+  | select(.filePath | startswith($p + "/"))
+  | .filePath
+' <<<"$skills_json")
+test -n "$omp_path" && test -n "$delivery_path" && test -n "$setup_path" \
+  && test "$(shasum -a 256 "$snap/skills/delivery/SKILL.md" | awk '{print $1}')" \
+       = "$(shasum -a 256 "$delivery_path" | awk '{print $1}')" \
+  && test "$(shasum -a 256 "$snap/skills/setup/SKILL.md" | awk '{print $1}')" \
+       = "$(shasum -a 256 "$setup_path" | awk '{print $1}')" \
+  && test "$(shasum -a 256 "$snap/skills/delivery/scripts/dely.js" | awk '{print $1}')" \
+       = "$(shasum -a 256 "$(dirname "$delivery_path")/scripts/dely.js" | awk '{print $1}')" \
+  && test "$(shasum -a 256 "$snap/omp/dely-pin.ts" | awk '{print $1}')" \
+       = "$(shasum -a 256 "$omp_path/omp/dely-pin.ts" | awk '{print $1}')"
+```
+
+A missing `omp_path`, a `jq` failure, a `source` other than
+`omp-plugins:user`, or a `filePath` outside the linked package is a fail:
+OMP resolved another copy (a project skill, a marketplace install, or a
+wrong `omp.skills` path), not the snapshot. A hash mismatch on
+`SKILL.md`, `dely.js`, or `omp/dely-pin.ts` is a fail: the linked tree is
+not the snapshot, or the extension was altered. Comparing only a symlink
+to `$snap` with `$snap` itself is not this check. Remove the OMP install
+in Step 13.
 
 Then verify by hash, at every location that can serve the skill:
 
@@ -151,10 +203,12 @@ and branch, disposition and human count could not tell.
 
 All three rows run for a release. Rows 2 and 3 rotate which harness is Control,
 implementer and reviewer, and a rotation is the only thing that exercises a
-harness in a role it does not hold in row 1. The release floor is all seven
-rows, not row 1: a release that ran fewer says so in its decision record and
-names which rows it skipped. The 0.19.0 release did exactly that — it ran rows
-1, 4, 5 and 7 only — and recorded the exception rather than moving the floor.
+harness in a role it does not hold in row 1. The release floor is ten rows
+(1–9 and 12), not row 1: rows 10 and 11 run when `start()` in `dely.js` or
+`omp/dely-pin.ts` changes. A release that ran fewer says so in its decision
+record and names which rows it skipped. The 0.19.0 release did exactly that
+— it ran rows 1, 4, 5 and 7 only — and recorded the exception rather than
+moving the floor.
 
 ## Step 4 — row 4, a worker that dies after it acknowledges
 
@@ -295,19 +349,97 @@ hanging because a batch was never acknowledged.
 repository registered in Orca. Remove both by hand; Orca has no command for the
 second.
 
-## Step 8 — clean up
+## Step 8 — row 8, OMP worker with a valid pin
 
-- uninstall the candidate from all three harnesses;
+Build a probe repository under `~/dely-probe/` whose `implement` pin is OMP
+with a Model `selector` from `omp models --json` and an Effort that is one of
+that model's `thinking` levels, and with the pinned model different from
+OMP's configured default.
+`probe/mkrepo.sh` writes whatever harness names it is given; OMP needs no
+trust step. From that repository run `dely dispatch` for `implement`.
+
+**Pass:** `dely dispatch` prints `DISPATCHED <id>` — the post-acknowledgement
+check passed. Record `worker-show` `result.projection.provider.model` at
+the acknowledgement; if that value is not already the pinned selector,
+record how long after the acknowledgement it became the pin. The last
+`model_change` (and `thinking_level_change`, when an Effort is pinned)
+before the first user message is the pinned model and level; every
+assistant message, the first included, is the pinned model; and
+`worker-show` `projection.provider.model` before release shows it.
+If the helper prints `DISPATCHED` but the first request ran OMP's
+configured default, the check compared a different field or format.
+
+Then keep the same pin and stop this dispatch from loading `omp/dely-pin.ts`
+without touching any user configuration beyond this plugin:
+`omp plugin disable dely`. Dispatch `implement` again. Re-enable with
+`omp plugin enable dely` before later rows.
+
+**Pass:** `dely dispatch` prints
+`FAILED <id> pin not applied: expected <selector>, saw <value or none>`
+and does not print `DISPATCHED`. A print of `DISPATCHED`, or a warning
+that still dispatches, is a fail: the helper did not stop a worker that
+was not running the pin.
+
+## Step 9 — row 9, OMP worker with an invalid pin
+
+Same probe-repository setup as row 8's first dispatch (plugin enabled), with
+a selector `omp models --json` does not offer.
+
+**Pass:** `dely dispatch` prints `NO_ACK` whose quote contains
+`DELY-PIN-FAIL`, and that session has no assistant message. If the worker
+acknowledged and completed on OMP's default model, the extension threw or
+called `ctx.shutdown()` instead of exiting the process.
+
+## Step 10 — row 10, OMP worker with Model `default`
+
+Run this row when `start()` in `dely.js` or `omp/dely-pin.ts` changes.
+Same probe-repository setup as row 8's first dispatch, with Model `default`
+and Effort `default`.
+
+**Pass:** the worker transcript's first user message has no `dely-pin:`
+line. A first user message that contains a `dely-pin:` line is a fail.
+
+## Step 11 — row 11, a second `dely-pin:` line in an interactive OMP session
+
+Run this row when `start()` in `dely.js` or `omp/dely-pin.ts` changes.
+Open an interactive OMP session (not a `dely dispatch`). After it has
+started, send a second prompt that carries a `dely-pin:` line and read its
+model.
+
+**Pass:** the session's model is unchanged from before that prompt. If the
+model switched, the extension applied the pin on a start after the first.
+
+## Step 12 — row 12, OMP as Control
+
+Launch OMP as Control. It dispatches a worker and runs `dely wait-bg` as its
+last command. Separately, `dely wait --control omp` from a shell.
+
+**Pass:** `dely wait-bg` reaches `SETTLED`, and `dely wait --control omp`
+prints `REFUSED`. If Control ran `dely wait` as a background job, that job
+is killed at 3600 s, which is `dely wait`'s default deadline.
+
+## Step 13 — clean up
+
+- uninstall the candidate from Claude Code, Codex CLI and Cursor Agent CLI;
+- remove the OMP install (`omp plugin uninstall dely`; needs `bun` on PATH;
+  when `bun` is absent, `omp plugin disable dely` stops OMP loading Dely's
+  skills and extension and leaves `dely` listed, then delete
+  `~/.omp/plugins/node_modules/dely`, `rmdir` the then-empty
+  `~/.omp/plugins/node_modules` directory, and rewrite
+  `~/.omp/plugins/omp-plugins.lock.json` with `jq 'del(.plugins.dely)'`);
 - delete the snapshot;
 - keep `r1` to `r3` so their trust entries survive;
-- remove the row 5 and row 7 paths, and their trust entries.
+- remove the row 5, row 7 and OMP-row paths, and the trust entries of the
+  first two.
 
 ## What this cannot see
 
-The deferred harnesses. Windows. A race between an acknowledgement and a
+The deferred harnesses. Installing OMP from a git URL, or uninstalling it
+with `bun` present. Windows. A race between an acknowledgement and a
 replayed batch. A quota exhausted mid-run. A Control that skips a gate because
 the model was having a bad day. A shape change between two Orca releases, until
-the rows are run again.
+the rows are run again. A Model `default` dispatch whose spec itself carries
+a pin line.
 
 ## Results
 

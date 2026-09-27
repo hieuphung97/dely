@@ -66,10 +66,10 @@ The plugin is `dely`, from the `dely` marketplace at
 `https://github.com/hieuphung97/dely.git`. The skill name is `delivery`;
 invoke it as `dely:delivery`. The runtime needs Node 18 or newer on PATH.
 
-Three harnesses are supported today: Claude Code, Codex CLI, and Cursor
-Agent CLI. That list is not closed. `harnesses.json` at the repository
-root carries four more as `deferred`: GitHub Copilot CLI, Antigravity
-CLI, Grok Build, and Kiro CLI.
+Four harnesses are supported today: Claude Code, Codex CLI, Cursor
+Agent CLI, and OMP. That list is not closed. `harnesses.json` at the
+repository root carries four more as `deferred`: GitHub Copilot CLI,
+Antigravity CLI, Grok Build, and Kiro CLI.
 
 ### Claude Code
 
@@ -146,6 +146,47 @@ entry and leaves the plugin installed.
 
 Type `/dely` to filter the palette to Dely's `/delivery` and `/setup`.
 
+### OMP
+
+Install from a dedicated clone, or unpack a git-archive snapshot. Never
+point `omp plugin install` at a working checkout of this repository: that
+command links the path rather than copying it, so OMP runs whatever the
+checkout holds.
+
+```bash
+git clone https://github.com/hieuphung97/dely.git
+# or unpack a git archive snapshot
+omp plugin install /path/to/dely
+
+omp plugin list --json             # verify it is installed
+omp skill list --json              # verify the skills loaded
+
+# update: git pull in that dedicated clone, then a new OMP session
+omp plugin uninstall dely          # uninstall; needs bun on PATH
+omp plugin disable dely            # stop OMP loading Dely's skills and extension
+```
+
+When `bun` is absent, `omp plugin uninstall dely` is unavailable.
+`omp plugin disable dely` stops OMP loading Dely's skills and extension; it
+leaves `dely` in `omp plugin list`. Then delete
+`~/.omp/plugins/node_modules/dely`, `rmdir` the then-empty
+`~/.omp/plugins/node_modules` directory, and rewrite
+`~/.omp/plugins/omp-plugins.lock.json` with `jq 'del(.plugins.dely)'`.
+
+The `dely` marketplace does not install OMP's extension. Installing from a
+git URL was not checked.
+
+Dely's `setup` and `delivery` are not namespaced in OMP and take precedence
+over a project's own skills of those names. OMP has no workspace-trust gate:
+a repository's `.omp/extensions`, `.omp/skills` and `.omp/config.yml` take
+effect without a prompt, and approvals follow the user's
+`tools.approvalMode`.
+
+To pin OMP, set Model to a `selector` from `omp models --json` and Effort
+to one of that model's `thinking` levels. The helper appends
+`dely-pin: <selector>` or `dely-pin: <selector> <effort>` to the spec.
+No `.omp/config.yml` is needed.
+
 ### Checked versions
 
 These are the versions this README's commands were last locally checked
@@ -156,7 +197,8 @@ against — observations, not a promised minimum:
 | Claude Code | 2.1.274 |
 | Codex CLI | 0.154.0 |
 | Cursor Agent CLI | 2026.09.15-d2fe57e |
-| Orca | 1.4.205 |
+| OMP | 18.3.4 |
+| Orca | 1.4.212 |
 
 ## How Dely works
 

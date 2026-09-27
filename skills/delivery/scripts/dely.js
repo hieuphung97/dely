@@ -11,6 +11,17 @@ const ACK_S = Number(process.env.DELY_ACK_S || 60);
 const POLL_S = Number(process.env.DELY_POLL_S || 15);
 const PROGRESS_S = Number(process.env.DELY_PROGRESS_S || 60);
 const seconds = (v, d) => (Number.isFinite(+v) && +v > 0 ? +v : d);
+// Measured 2026-09-27 on OMP 18.3.4 / Orca 1.4.212: worker-show
+// projection.provider.model already equalled the pinned selector 1 ms after
+// worker-start returned ready, and still equalled it when heartbeat `ack`
+// arrived 7.4 s later. Five seconds is a safety bound, not a wait for lag.
+const PIN_CHECK_DEFAULT_S = 5;
+function pinCheckMs() {
+  const raw = process.env.DELY_PIN_CHECK_S;
+  if (raw == null || raw === "") return PIN_CHECK_DEFAULT_S * 1000;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n * 1000 : PIN_CHECK_DEFAULT_S * 1000;
+}
 const PREFLIGHT_S = seconds(process.env.DELY_PREFLIGHT_S, 150);
 const NOTIFY_RETRY_S = seconds(process.env.DELY_NOTIFY_RETRY_S, 30);
 const NOTIFY_GIVEUP_S = seconds(process.env.DELY_NOTIFY_GIVEUP_S, 1800);
@@ -98,7 +109,7 @@ function pin(repo, phase) {
   const [, harness, model, effort] = row.split("|").slice(1).map((c) => c.trim().replace(/`/g, ""));
   const h = loadHarnesses().find((x) => x.name === harness);
   if (!h) throw new Error("unknown harness " + harness);
-  return { phase, agent: h.id, model, effort, modelFlag: h.modelFlag, effortFlag: h.effortFlag };
+  return { phase, agent: h.id, model, effort, modelFlag: h.modelFlag, effortFlag: h.effortFlag, modelPin: h.modelPin };
 }
 
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -186,6 +197,19 @@ function printIdentity() {
 }
 
 function start(repo, run, p, spec, title) {
+  const wantsModel = p.modelFlag && p.model !== "default";
+  const wantsEffort = p.effortFlag && p.effort !== "default";
+  const specPin = p.modelPin === "spec";
+  const specModel = specPin && p.model !== "default";
+  const specEffort = specPin && p.effort !== "default";
+  if (effortRequiresModel() && (wantsEffort || specEffort) && !(wantsModel || specModel)) {
+    return {
+      error:
+        "effort " + p.effort + " pinned with model default for " + p.agent +
+        "; a pinned Effort requires a pinned Model",
+    };
+  }
+  if (specModel) spec += "\ndely-pin: " + p.model + (specEffort ? " " + p.effort : "");
   const args = [
     "orchestration",
     "worker-start",
@@ -200,15 +224,6 @@ function start(repo, run, p, spec, title) {
     "--agent",
     p.agent,
   ];
-  const wantsModel = p.modelFlag && p.model !== "default";
-  const wantsEffort = p.effortFlag && p.effort !== "default";
-  if (effortRequiresModel() && wantsEffort && !wantsModel) {
-    return {
-      error:
-        "effort " + p.effort + " pinned with model default for " + p.agent +
-        "; --effort requires --model, so set a model or set effort to default",
-    };
-  }
   if (wantsModel) args.push("--model", p.model);
   if (wantsEffort) args.push("--effort", p.effort);
   const r = orca(args);
@@ -369,6 +384,27 @@ function preflight(f) {
   process.exit(failed ? 1 : 0);
 }
 
+function shownModel(id) {
+  const v = (((orca(["orchestration", "worker-show", "--dispatch", id]).result || {}).projection || {}).provider || {}).model;
+  return v == null || v === "" ? null : v;
+}
+
+function waitShownModel(id, expected) {
+  const ms = pinCheckMs();
+  const t0 = Date.now();
+  let saw = shownModel(id);
+  while (saw !== expected && Date.now() - t0 < ms) {
+    sleep(250);
+    saw = shownModel(id);
+  }
+  return saw;
+}
+
+function dropWorker(id) {
+  orca(["orchestration", "worker-stop", "--dispatch", id]);
+  orca(["orchestration", "worker-release", "--dispatch", id]);
+}
+
 function dispatch(f) {
   const p = pin(f.repo, f.phase);
   const spec =
@@ -392,6 +428,23 @@ function dispatch(f) {
         dispatchId: s.id,
         seconds: Math.round((Date.now() - t0) / 1000),
       });
+      if (p.modelPin === "spec" && p.model !== "default") {
+        const saw = waitShownModel(s.id, p.model);
+        if (saw !== p.model) {
+          dropWorker(s.id);
+          logEvent("pin_not_applied", {
+            run: f.run,
+            repo: f.repo,
+            dispatchId: s.id,
+            expected: p.model,
+            saw,
+          });
+          out(
+            "FAILED " + s.id + " pin not applied: expected " + p.model + ", saw " + (saw == null ? "none" : saw),
+            5
+          );
+        }
+      }
       out("DISPATCHED " + s.id, 0);
     }
     const row = ((orca(["orchestration", "worker-list", "--run", f.run]).result || {}).workers || []).find((w) => w.dispatchId === s.id);
@@ -399,8 +452,7 @@ function dispatch(f) {
   }
   const raw = screenText(s.id);
   const secs = Math.round((Date.now() - t0) / 1000);
-  orca(["orchestration", "worker-stop", "--dispatch", s.id]);
-  orca(["orchestration", "worker-release", "--dispatch", s.id]);
+  dropWorker(s.id);
   logEvent("no_ack", { run: f.run, repo: f.repo, dispatchId: s.id, seconds: secs, text: raw });
   out("NO_ACK " + s.id + " stopped after " + secs + "s; last output: " + clip(raw), 4);
 }
