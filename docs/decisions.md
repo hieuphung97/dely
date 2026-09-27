@@ -202,8 +202,11 @@ A dead OMP worker is found by `STALLED` after the stall interval, not by
 OMP users install from a checkout with `omp plugin install`, which links
 it rather than copying it: OMP runs whatever that checkout holds, so it must
 be a dedicated clone, never a working checkout of this repository. Updating
-is `git pull` in that clone. Without `bun`, `omp plugin disable dely` stands
-in for uninstalling.
+is `git pull` in that clone. `omp plugin uninstall dely` needs `bun`.
+Without it, `omp plugin disable dely` only deactivates Dely and leaves it
+registered; removal is the manual steps README gives (delete the linked
+package, remove the then-empty `node_modules`, delete the `dely` key from the
+plugin lock), measured in an isolated home.
 
 The live release floor is ten rows: rows 10 and 11 check string handling in
 `start()` and the extension, and run when either changes. Rows 8, 9 and 12
@@ -250,7 +253,8 @@ Detecting a dead OMP worker sooner than `STALLED`.
 
 A background-wake OMP Control.
 
-Installing OMP from a git URL, or uninstalling without `bun`.
+Installing OMP from a git URL, or uninstalling it with `bun` through
+`omp plugin uninstall dely`; neither was measured.
 
 #### Deferred
 
