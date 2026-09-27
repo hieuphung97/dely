@@ -148,23 +148,37 @@ Type `/dely` to filter the palette to Dely's `/delivery` and `/setup`.
 
 ### OMP
 
+Install from a dedicated clone, or unpack a git-archive snapshot. Never
+point `omp plugin install` at a working checkout of this repository: that
+command links the path rather than copying it, so OMP runs whatever the
+checkout holds.
+
 ```bash
 git clone https://github.com/hieuphung97/dely.git
 # or unpack a git archive snapshot
 omp plugin install /path/to/dely
 
 omp plugin list --json             # verify it is installed
-omp skill list                     # verify the skills loaded
+omp skill list --json              # verify the skills loaded
 
-# update: git pull in that checkout, then a new OMP session
+# update: git pull in that dedicated clone, then a new OMP session
 omp plugin uninstall dely          # uninstall; needs bun on PATH
+omp plugin disable dely            # removal when bun is absent
 ```
 
 The `dely` marketplace does not install OMP's extension. Installing from a
 git URL was not checked.
 
+Dely's `setup` and `delivery` are not namespaced in OMP and take precedence
+over a project's own skills of those names. OMP has no workspace-trust gate:
+a repository's `.omp/extensions`, `.omp/skills` and `.omp/config.yml` take
+effect without a prompt, and approvals follow the user's
+`tools.approvalMode`.
+
 To pin OMP, set Model to a `selector` from `omp models --json` and Effort
-to one of that model's `thinking` levels. No `.omp/config.yml` is needed.
+to one of that model's `thinking` levels. The helper appends
+`dely-pin: <selector>` or `dely-pin: <selector> <effort>` to the spec.
+No `.omp/config.yml` is needed.
 
 ### Checked versions
 
@@ -176,7 +190,7 @@ against — observations, not a promised minimum:
 | Claude Code | 2.1.274 |
 | Codex CLI | 0.154.0 |
 | Cursor Agent CLI | 2026.09.15-d2fe57e |
-| OMP | 18.3.3 |
+| OMP | 18.3.4 |
 | Orca | 1.4.212 |
 
 ## How Dely works
