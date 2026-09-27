@@ -193,7 +193,7 @@
       "modelFlag": false,
       "effortFlag": false,
       "modelPin": "spec",
-      "permissionDefault": "--approval-mode yolo",
+      "permissionDefault": "none",
       "forbiddenHeadless": [
         "omp -p",
         "omp --print",
@@ -205,7 +205,7 @@
         "readsAgentsMd": true,
         "needsImport": false
       },
-      "notes": "OMP 18.3.3 under Orca 1.4.212, measured 2026-09-27. worker-start --agent omp --model is refused: 'Agent omp does not support launch-time model selection'; the pin travels as a dely-pin spec line that omp/dely-pin.ts applies on the first before_agent_start. Trust is none: a worker showed no trust dialog and wrote a file without an approval prompt. Control wakes by waker; bash runs as an async job (timeout default 300 s, max 3600 s, equal to dely wait's default 60 min); a full 0.20.1 wait-bg cycle with a Claude Code worker settled end to end. A killed OMP worker keeps liveness.verdict live (source agent_status), nextAction none and attention.requiresAction false for at least six minutes, so dely wait reaches STALLED after --stall-min, not ATTENTION. tools.approvalMode defaults to yolo. Install is omp plugin install of a local checkout (package.json omp.extensions and omp.skills); the dely marketplace does not load the extension. An unresolvable pin must process.exit: throw is swallowed and the turn runs on the default model; ctx.shutdown() lets the turn finish, worker_done included. Discovery: omp models --json, offer selector, effort from thinking."
+      "notes": "OMP 18.3.3 under Orca 1.4.212, measured 2026-09-27. worker-start --agent omp --model is refused: 'Agent omp does not support launch-time model selection'; the pin travels as a spec line `dely-pin: <selector>` or `dely-pin: <selector> <effort>` that omp/dely-pin.ts applies on the first before_agent_start. Trust is none: OMP has no workspace-trust gate, so a repository's `.omp/extensions`, `.omp/skills` and `.omp/config.yml` take effect without a prompt; a worker showed no trust dialog and wrote a file without an approval prompt. Approvals follow the user's `tools.approvalMode` (defaults to yolo). Control wakes by waker; bash runs as an async job (timeout default 300 s, max 3600 s, equal to dely wait's default 60 min); a full 0.20.1 wait-bg cycle with a Claude Code worker settled end to end. A killed OMP worker keeps liveness.verdict live (source agent_status), nextAction none and attention.requiresAction false for at least six minutes, so dely wait reaches STALLED after --stall-min, not ATTENTION. Install is omp plugin install of a local checkout (package.json omp.extensions and omp.skills); the dely marketplace does not load the extension. An unresolvable pin must process.exit: throw is swallowed and the turn runs on the default model; ctx.shutdown() lets the turn finish, worker_done included. Discovery: omp models --json, offer selector, effort from thinking."
     }
   ]
 }

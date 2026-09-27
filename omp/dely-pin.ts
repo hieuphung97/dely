@@ -4,19 +4,12 @@ export default function (pi) {
     if (!first) return;
     first = false;
     const prompt = String((event && event.prompt) || "");
-    const matched = prompt.match(/^dely-pin:\s*(\S+)\s*$/m);
+    const matched = [
+      ...prompt.matchAll(/^dely-pin:[ \t]+(\S+)(?:[ \t]+(\S+))?[ \t]*$/gm),
+    ].pop();
     if (!matched) return;
-    const raw = matched[1];
-    const slash = raw.indexOf("/");
-    let selector = raw;
-    let level = "";
-    if (slash >= 0) {
-      const colon = raw.lastIndexOf(":");
-      if (colon > slash) {
-        selector = raw.slice(0, colon);
-        level = raw.slice(colon + 1);
-      }
-    }
+    const selector = matched[1];
+    const level = matched[2] || "";
     const fail = () => {
       const msg = "DELY-PIN-FAIL " + selector;
       process.on("exit", () => process.stderr.write("\n" + msg + "\n"));
