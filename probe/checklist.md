@@ -422,7 +422,11 @@ is killed at 3600 s, which is `dely wait`'s default deadline.
 
 - uninstall the candidate from Claude Code, Codex CLI and Cursor Agent CLI;
 - remove the OMP install (`omp plugin uninstall dely`; needs `bun` on PATH;
-  when `bun` is absent, `omp plugin disable dely`);
+  when `bun` is absent, `omp plugin disable dely` stops OMP loading Dely's
+  skills and extension and leaves `dely` listed, then delete
+  `~/.omp/plugins/node_modules/dely`, `rmdir` the then-empty
+  `~/.omp/plugins/node_modules` directory, and rewrite
+  `~/.omp/plugins/omp-plugins.lock.json` with `jq 'del(.plugins.dely)'`);
 - delete the snapshot;
 - keep `r1` to `r3` so their trust entries survive;
 - remove the row 5, row 7 and OMP-row paths, and the trust entries of the

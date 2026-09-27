@@ -163,8 +163,15 @@ omp skill list --json              # verify the skills loaded
 
 # update: git pull in that dedicated clone, then a new OMP session
 omp plugin uninstall dely          # uninstall; needs bun on PATH
-omp plugin disable dely            # removal when bun is absent
+omp plugin disable dely            # stop OMP loading Dely's skills and extension
 ```
+
+When `bun` is absent, `omp plugin uninstall dely` is unavailable.
+`omp plugin disable dely` stops OMP loading Dely's skills and extension; it
+leaves `dely` in `omp plugin list`. Then delete
+`~/.omp/plugins/node_modules/dely`, `rmdir` the then-empty
+`~/.omp/plugins/node_modules` directory, and rewrite
+`~/.omp/plugins/omp-plugins.lock.json` with `jq 'del(.plugins.dely)'`.
 
 The `dely` marketplace does not install OMP's extension. Installing from a
 git URL was not checked.
