@@ -19,13 +19,15 @@ the shipped skill. No skill references this directory.
 - the candidate SHA;
 - Orca running, with orchestration enabled;
 - Claude Code, Codex CLI and Cursor Agent CLI installed and signed in;
+- OMP installed;
 - `~/dely-probe/` writable. Both scripts here refuse every path outside it.
 
 Record the Orca version. A row that passed on one Orca build is not evidence
 about the next one: rows 1, 4 and 5 are rerun after every Orca upgrade,
 before the next delivery relies on the new build. Orca upgraded itself from
 1.4.203 to 1.4.204 in the middle of the 0.20.0 checklist, which is the
-reason.
+reason. Record the OMP version: a row that passed on 18.3.3 is not evidence
+about another OMP build.
 
 ## Step 1 — install the candidate from a snapshot
 
@@ -62,6 +64,29 @@ Anything there with a different hash wins over the Claude cache. Until it is
 removed or refreshed, a row with Cursor in any role cannot run, and saying so is
 the correct outcome for that row — not running it against whatever Cursor has.
 On 2026-09-16 two such copies blocked every Cursor row of the 0.19.0 release.
+
+Install OMP from the snapshot. OMP has no trust step.
+
+```bash
+omp plugin install "$snap"
+omp plugin list --json
+omp skill list
+```
+
+`omp skill list` must show `delivery` and `setup`. Then SHA-256 of
+`skills/delivery/SKILL.md` and `skills/delivery/scripts/dely.js` at the path
+OMP linked must equal the snapshot's:
+
+```bash
+shasum -a 256 "$snap/skills/delivery/SKILL.md" \
+              "$snap/skills/delivery/scripts/dely.js"
+# same two files at the path OMP linked
+```
+
+A mismatch, a missing file, or `omp skill list` without `delivery` and
+`setup` is a fail: `package.json` pointed `skills` or `extensions` at a
+wrong path, or the marketplace was installed instead of the snapshot.
+Remove the OMP install in Step 13.
 
 Then verify by hash, at every location that can serve the skill:
 
@@ -151,7 +176,7 @@ and branch, disposition and human count could not tell.
 
 All three rows run for a release. Rows 2 and 3 rotate which harness is Control,
 implementer and reviewer, and a rotation is the only thing that exercises a
-harness in a role it does not hold in row 1. The release floor is all seven
+harness in a role it does not hold in row 1. The release floor is all twelve
 rows, not row 1: a release that ran fewer says so in its decision record and
 names which rows it skipped. The 0.19.0 release did exactly that — it ran rows
 1, 4, 5 and 7 only — and recorded the exception rather than moving the floor.
@@ -295,16 +320,68 @@ hanging because a batch was never acknowledged.
 repository registered in Orca. Remove both by hand; Orca has no command for the
 second.
 
-## Step 8 — clean up
+## Step 8 — row 8, OMP worker with a valid pin
 
-- uninstall the candidate from all three harnesses;
+Build a probe repository under `~/dely-probe/` whose `implement` pin is OMP
+with a Model `selector` from `omp models --json` and an Effort that is one of
+that model's `thinking` levels, and with the pinned model different from
+OMP's configured default.
+`probe/mkrepo.sh` writes whatever harness names it is given; OMP needs no
+trust step. From that repository run `dely dispatch` for `implement`.
+
+**Pass:** the worker session's first `model_change` and first assistant
+message, and `worker-show` `projection.provider.model` before release, show
+the pinned model. If the first request ran OMP's configured default instead,
+the helper appended the pin line but the installed package did not load the
+extension.
+
+## Step 9 — row 9, OMP worker with an invalid pin
+
+Same shape as row 8, with a selector `omp models --json` does not offer.
+
+**Pass:** `dely dispatch` prints `NO_ACK` whose quote contains
+`DELY-PIN-FAIL`, and that session has no assistant message. If the worker
+acknowledged and completed on OMP's default model, the extension threw or
+called `ctx.shutdown()` instead of exiting the process.
+
+## Step 10 — row 10, OMP worker with Model `default`
+
+Same shape as row 8, with Model `default` and Effort `default`.
+
+**Pass:** the worker transcript's first user message has no `dely-pin:`
+line. A first user message that contains a `dely-pin:` line is a fail.
+
+## Step 11 — row 11, a second `dely-pin:` line in an interactive OMP session
+
+Open an interactive OMP session (not a `dely dispatch`). After it has
+started, send a second prompt that carries a `dely-pin:` line and read its
+model.
+
+**Pass:** the session's model is unchanged from before that prompt. If the
+model switched, the extension applied the pin on a start after the first.
+
+## Step 12 — row 12, OMP as Control
+
+Launch OMP as Control. It dispatches a worker and runs `dely wait-bg` as its
+last command. Separately, `dely wait --control omp` from a shell.
+
+**Pass:** `dely wait-bg` reaches `SETTLED`, and `dely wait --control omp`
+prints `REFUSED`. If Control ran `dely wait` as a background job, that job
+is killed at 3600 s, which is `dely wait`'s default deadline.
+
+## Step 13 — clean up
+
+- uninstall the candidate from Claude Code, Codex CLI and Cursor Agent CLI;
+- remove the OMP install (`omp plugin uninstall dely`; needs `bun` on PATH);
 - delete the snapshot;
 - keep `r1` to `r3` so their trust entries survive;
-- remove the row 5 and row 7 paths, and their trust entries.
+- remove the row 5, row 7 and OMP-row paths, and the trust entries of the
+  first two.
 
 ## What this cannot see
 
-The deferred harnesses. Windows. A race between an acknowledgement and a
+The deferred harnesses. Installing OMP from a git URL, or uninstalling it
+when `bun` is absent. Windows. A race between an acknowledgement and a
 replayed batch. A quota exhausted mid-run. A Control that skips a gate because
 the model was having a bad day. A shape change between two Orca releases, until
 the rows are run again.
