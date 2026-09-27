@@ -231,6 +231,19 @@ check showed that, and the task reviewer reproduced it against a 0.20.1
 snapshot. This release names that exception here rather than moving the
 floor.
 
+After the architecture-review amendment, rows 8 to 11 ran again on a
+snapshot of `c7dbfff` (OMP 18.3.4, Orca 1.4.212, pin
+`google-vertex/gemini-3.5-flash` / `low` against the configured default
+`google-vertex/gemini-3.8-flash`), and all passed. Orca's
+`projection.provider.model` already held the pin 4.0 s before the `ack`
+heartbeat and never showed the default, so the post-acknowledgement check
+needs no lag allowance beyond its five-second bound. With the extension
+disabled, the same dispatch printed `FAILED … pin not applied: expected
+google-vertex/gemini-3.5-flash, saw google-vertex/gemini-3.8-flash`. Row 12
+was not rerun: it pins Model `default`, which the check does not reach.
+`omp plugin disable dely` deactivates Dely but leaves it registered; without
+`bun`, removal is the manual steps README gives.
+
 #### Non-goals
 
 Detecting a dead OMP worker sooner than `STALLED`.
@@ -244,7 +257,8 @@ Installing OMP from a git URL, or uninstalling without `bun`.
 Pinning OMP's model by flag. Trigger: an Orca release whose
 `worker-start --agent omp` accepts `--model`. `modelFlag` becomes `true`, the
 spec line carries only an effort, and the post-acknowledgement check keeps
-running.
+running. The request is filed as
+[stablyai/orca#23388](https://github.com/stablyai/orca/issues/23388).
 
 Deleting `omp/dely-pin.ts`, `modelPin`, the root `package.json` and OMP's
 separate install path. Trigger: an Orca release that also accepts `--effort`
