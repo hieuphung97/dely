@@ -196,7 +196,9 @@
       "permissionDefault": "--approval-mode yolo",
       "forbiddenHeadless": [
         "omp -p",
-        "omp --print"
+        "omp --print",
+        "omp --mode rpc",
+        "omp acp"
       ],
       "instructionsFile": {
         "file": "AGENTS.md",
