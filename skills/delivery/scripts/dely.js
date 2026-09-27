@@ -98,7 +98,7 @@ function pin(repo, phase) {
   const [, harness, model, effort] = row.split("|").slice(1).map((c) => c.trim().replace(/`/g, ""));
   const h = loadHarnesses().find((x) => x.name === harness);
   if (!h) throw new Error("unknown harness " + harness);
-  return { phase, agent: h.id, model, effort, modelFlag: h.modelFlag, effortFlag: h.effortFlag };
+  return { phase, agent: h.id, model, effort, modelFlag: h.modelFlag, effortFlag: h.effortFlag, modelPin: h.modelPin };
 }
 
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -186,6 +186,19 @@ function printIdentity() {
 }
 
 function start(repo, run, p, spec, title) {
+  const wantsModel = p.modelFlag && p.model !== "default";
+  const wantsEffort = p.effortFlag && p.effort !== "default";
+  const specPin = p.modelPin === "spec";
+  const specModel = specPin && p.model !== "default";
+  const specEffort = specPin && p.effort !== "default";
+  if (effortRequiresModel() && (wantsEffort || specEffort) && !(wantsModel || specModel)) {
+    return {
+      error:
+        "effort " + p.effort + " pinned with model default for " + p.agent +
+        "; --effort requires --model, so set a model or set effort to default",
+    };
+  }
+  if (specModel) spec += "\ndely-pin: " + p.model + (specEffort ? ":" + p.effort : "");
   const args = [
     "orchestration",
     "worker-start",
@@ -200,15 +213,6 @@ function start(repo, run, p, spec, title) {
     "--agent",
     p.agent,
   ];
-  const wantsModel = p.modelFlag && p.model !== "default";
-  const wantsEffort = p.effortFlag && p.effort !== "default";
-  if (effortRequiresModel() && wantsEffort && !wantsModel) {
-    return {
-      error:
-        "effort " + p.effort + " pinned with model default for " + p.agent +
-        "; --effort requires --model, so set a model or set effort to default",
-    };
-  }
   if (wantsModel) args.push("--model", p.model);
   if (wantsEffort) args.push("--effort", p.effort);
   const r = orca(args);

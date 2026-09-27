@@ -176,6 +176,34 @@
         ]
       },
       "notes": "Deferred. Control wakes by background. --allow-all is the documented equivalent of --allow-all-tools --allow-all-paths --allow-all-urls, with --yolo as its alias. No non-interactive model listing: copilot models fails with Invalid command format; copilot -p \"/model\" dispatched a real turn (auto-routed to claude-haiku-4.5). An unavailable --model value prints Using \"auto\" instead and continues. Effort while supported was from copilot --help: none|minimal|low|medium|high|xhigh|max. Native AGENTS.md and CLAUDE.md reader (--no-custom-instructions disables both). Trust: Confirm folder trust still opens with --allow-all (1. Yes preselected; never 2, which remembers the folder). Restore interrupted sessions then lists sessions from other folders; Esc starts fresh, Enter is a wrong-session hazard. Measured 2026-08-31 on Copilot CLI 1.0.82: Orca documented no copilot launcher id, so Control composed copilot --allow-all --effort high by hand. Install uses existing manifests into ~/.copilot/installed-plugins/dely/dely/; no sidecar. worker-start --model does not support this id; models come from Orca's per-agent default arguments."
+    },
+    {
+      "name": "OMP",
+      "id": "omp",
+      "binary": "omp",
+      "status": "supported",
+      "controlWake": "waker",
+      "trust": "none",
+      "discovery": {
+        "models": "omp models --json",
+        "effort": null,
+        "modelField": "selector",
+        "effortFrom": "thinking"
+      },
+      "modelFlag": false,
+      "effortFlag": false,
+      "modelPin": "spec",
+      "permissionDefault": "--approval-mode yolo",
+      "forbiddenHeadless": [
+        "omp -p",
+        "omp --print"
+      ],
+      "instructionsFile": {
+        "file": "AGENTS.md",
+        "readsAgentsMd": true,
+        "needsImport": false
+      },
+      "notes": "OMP 18.3.3 under Orca 1.4.212, measured 2026-09-27. worker-start --agent omp --model is refused: 'Agent omp does not support launch-time model selection'; the pin travels as a dely-pin spec line that omp/dely-pin.ts applies on the first before_agent_start. Trust is none: a worker showed no trust dialog and wrote a file without an approval prompt. Control wakes by waker; bash runs as an async job (timeout default 300 s, max 3600 s, equal to dely wait's default 60 min); a full 0.20.1 wait-bg cycle with a Claude Code worker settled end to end. A killed OMP worker keeps liveness.verdict live (source agent_status), nextAction none and attention.requiresAction false for at least six minutes, so dely wait reaches STALLED after --stall-min, not ATTENTION. tools.approvalMode defaults to yolo. Install is omp plugin install of a local checkout (package.json omp.extensions and omp.skills); the dely marketplace does not load the extension. An unresolvable pin must process.exit: throw is swallowed and the turn runs on the default model; ctx.shutdown() lets the turn finish, worker_done included. Discovery: omp models --json, offer selector, effort from thinking."
     }
   ]
 }

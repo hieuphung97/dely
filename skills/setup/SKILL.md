@@ -82,6 +82,8 @@ When `discovery.omitVisibility` is set, slugs whose `visibility` equals that
 value are not offered. When `discovery.effortFrom` is set, effort levels are
 that field on each slug, not one vocabulary per harness. When
 `discovery.modelSlugBefore` is set, offer the slug before that separator.
+When `discovery.modelField` is set, each model's value is that field rather
+than `slug`.
 
 When `effortFlag` is false and `discovery.effort` and `discovery.effortFrom`
 are both absent, write the literal `default` for Effort. Do not invent an

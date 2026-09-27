@@ -86,8 +86,8 @@ git ls-files -z '*.sh' 'skills/delivery/scripts/dely' | xargs -0 -n1 bash -n
 ```
 
 ```bash
-test "$(jq -r .version .claude-plugin/plugin.json)" = 0.20.1
-test "$(jq -r .version .codex-plugin/plugin.json)" = 0.20.1
+test "$(jq -r .version .claude-plugin/plugin.json)" = 0.21.0
+test "$(jq -r .version .codex-plugin/plugin.json)" = 0.21.0
 ```
 
 ```bash
