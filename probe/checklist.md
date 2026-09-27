@@ -80,7 +80,14 @@ OMP linked must equal the snapshot's:
 ```bash
 shasum -a 256 "$snap/skills/delivery/SKILL.md" \
               "$snap/skills/delivery/scripts/dely.js"
-# same two files at the path OMP linked
+omp_path=$(omp plugin list --json | jq -er '.npm[] | select(.name=="dely") | .path')
+test -n "$omp_path" \
+  && shasum -a 256 "$omp_path/skills/delivery/SKILL.md" \
+                   "$omp_path/skills/delivery/scripts/dely.js" \
+  && test "$(shasum -a 256 "$snap/skills/delivery/SKILL.md" | awk '{print $1}')" \
+       = "$(shasum -a 256 "$omp_path/skills/delivery/SKILL.md" | awk '{print $1}')" \
+  && test "$(shasum -a 256 "$snap/skills/delivery/scripts/dely.js" | awk '{print $1}')" \
+       = "$(shasum -a 256 "$omp_path/skills/delivery/scripts/dely.js" | awk '{print $1}')"
 ```
 
 A mismatch, a missing file, or `omp skill list` without `delivery` and
