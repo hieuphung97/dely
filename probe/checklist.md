@@ -336,10 +336,12 @@ OMP's configured default.
 `probe/mkrepo.sh` writes whatever harness names it is given; OMP needs no
 trust step. From that repository run `dely dispatch` for `implement`.
 
-**Pass:** the worker session's first `model_change` and first assistant
-message, and `worker-show` `projection.provider.model` before release, show
-the pinned model. If the first request ran OMP's configured default instead,
-the helper appended the pin line but the installed package did not load the
+**Pass:** the last `model_change` (and `thinking_level_change`, when an
+Effort is pinned) before the first user message is the pinned model and
+level; every assistant message, the first included, is the pinned model;
+and `worker-show` `projection.provider.model` before release shows it.
+If the first request ran OMP's configured default instead, the helper
+appended the pin line but the installed package did not load the
 extension.
 
 ## Step 9 — row 9, OMP worker with an invalid pin
