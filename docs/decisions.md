@@ -157,6 +157,28 @@ OMP users install twice as many things by hand as other harnesses need: a
 checkout, then `omp plugin install` of it. Updating is `git pull` in that
 checkout; the link follows it.
 
+**Live verification ran rows 8 to 12 of `probe/checklist.md` only, on OMP
+18.3.4 and Orca 1.4.212.** OMP updated itself from 18.3.3 between the
+measurements above and the checklist. The first run, on a snapshot of
+`cdb7813`, failed rows 8 and 9. Inside OMP a registry model's `thinking` is an
+object, `{mode, efforts, requiresEffort}`; `omp models --json` flattens it to
+an array. The extension checked the array form, so every pin with an Effort
+exited. It also wrote `DELY-PIN-FAIL` with `console.error`, which OMP sends to
+its own log file, so the `NO_ACK` quote did not carry it. After the fix, which
+reads `thinking.efforts` and writes the line to stderr from an exit handler,
+rows 8, 9 and 11 were run again on a snapshot of `d69e0f5`. Row 9 passed, row
+11 passed, and row 8 showed the pinned model on every request. Its pass
+condition named the session's first `model_change`, which is always OMP's
+configured default at session start, and was reworded to the last one before
+the first user message.
+
+Rows 1 to 7 were not run. They exercise Claude Code, Codex CLI and Cursor
+Agent CLI deliveries, and for those harnesses the helper's `worker-start`
+argv and spec are byte-for-byte those of 0.20.1. The implementer's stub-`orca`
+check showed that, and the task reviewer reproduced it against a 0.20.1
+snapshot. The release floor stays twelve rows; this release names the
+exception here rather than moving it.
+
 #### Non-goals
 
 Detecting a dead OMP worker sooner than `STALLED`.
