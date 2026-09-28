@@ -144,11 +144,11 @@ names `modelPin: spec` or `modelPin: spec-unchecked` receives its pin as a
 spec line instead of flags, and the helper verifies the reported model
 only for `spec`; a pin such a harness cannot resolve stops the worker
 before its first request and surfaces as `NO_ACK`. On a harness that takes
-pin, a Model written there is silently not applied: write `default` and set
-the model in Orca's agent default arguments. A worker left on a harness
-default is an unpinned environment: it lives in the harness's own config,
-it changes without announcing itself, and the dispatch that relies on it
-looks identical to one that pinned the same value deliberately.
+neither flags nor a spec pin, a Model written there is silently not applied:
+write `default` and set the model in Orca's agent default arguments. A worker
+left on a harness default is an unpinned environment: it lives in the harness's
+own config, it changes without announcing itself, and the dispatch that relies
+on it looks identical to one that pinned the same value deliberately.
 
 **Never act on an Orca nudge.** After `DISPATCHED`, wait by the wake mode
 of **this Control's own harness** — not the harness of the worker being
