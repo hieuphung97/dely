@@ -180,6 +180,21 @@ needs one.
 **Focused verification.** A human-equivalent read against the decision
 record; `git diff --check` and the disclosure greps.
 
+### 3. Two wording defects left by the Task 2 remediation are fixed
+
+Replanned after the scoped re-review of `b7e6add` did not accept
+(`.dely-pi-rereview2-report.md`, findings A and B).
+
+**Behaviour.** `README.md` again gives the git-source removal example,
+`pi remove git:github.com/hieuphung97/dely@v0.23.0`, next to the path form.
+`probe/checklist.md` row 13's setup requires the pinned Effort to differ from
+Pi's configured default thinking level, as its pass condition already assumes.
+
+**Files.** `README.md`, `probe/checklist.md`.
+
+**Focused verification.** A human-equivalent read of the diff against
+findings A and B; `git diff --check` and the disclosure greps.
+
 ## Acceptance
 
 | Requirement | Instrument | Counterexample | Observed red |
