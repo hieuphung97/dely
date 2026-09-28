@@ -199,7 +199,7 @@ function printIdentity() {
 function start(repo, run, p, spec, title) {
   const wantsModel = p.modelFlag && p.model !== "default";
   const wantsEffort = p.effortFlag && p.effort !== "default";
-  const specPin = p.modelPin === "spec";
+  const specPin = p.modelPin === "spec" || p.modelPin === "spec-unchecked";
   const specModel = specPin && p.model !== "default";
   const specEffort = specPin && p.effort !== "default";
   if (effortRequiresModel() && (wantsEffort || specEffort) && !(wantsModel || specModel)) {

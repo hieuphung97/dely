@@ -205,7 +205,38 @@
         "readsAgentsMd": true,
         "needsImport": false
       },
-      "notes": "OMP 18.3.3 under Orca 1.4.212, measured 2026-09-27. worker-start --agent omp --model is refused: 'Agent omp does not support launch-time model selection'; the pin travels as a spec line `dely-pin: <selector>` or `dely-pin: <selector> <effort>` that omp/dely-pin.ts applies on the first before_agent_start. Trust is none: OMP has no workspace-trust gate, so a repository's `.omp/extensions`, `.omp/skills` and `.omp/config.yml` take effect without a prompt; a worker showed no trust dialog and wrote a file without an approval prompt. Approvals follow the user's `tools.approvalMode` (defaults to yolo). Control wakes by waker; bash runs as an async job (timeout default 300 s, max 3600 s, equal to dely wait's default 60 min); a full 0.20.1 wait-bg cycle with a Claude Code worker settled end to end. A killed OMP worker keeps liveness.verdict live (source agent_status), nextAction none and attention.requiresAction false for at least six minutes, so dely wait reaches STALLED after --stall-min, not ATTENTION. Install is omp plugin install of a local checkout (package.json omp.extensions and omp.skills); the dely marketplace does not load the extension. An unresolvable pin must process.exit: throw is swallowed and the turn runs on the default model; ctx.shutdown() lets the turn finish, worker_done included. Discovery: omp models --json, offer selector, effort from thinking."
+      "notes": "OMP 18.3.3 under Orca 1.4.212, measured 2026-09-27. worker-start --agent omp --model is refused: 'Agent omp does not support launch-time model selection'; the pin travels as a spec line `dely-pin: <selector>` or `dely-pin: <selector> <effort>` that extensions/dely-pin.ts applies on the first before_agent_start. Trust is none: OMP has no workspace-trust gate, so a repository's `.omp/extensions`, `.omp/skills` and `.omp/config.yml` take effect without a prompt; a worker showed no trust dialog and wrote a file without an approval prompt. Approvals follow the user's `tools.approvalMode` (defaults to yolo). Control wakes by waker; bash runs as an async job (timeout default 300 s, max 3600 s, equal to dely wait's default 60 min); a full 0.20.1 wait-bg cycle with a Claude Code worker settled end to end. A killed OMP worker keeps liveness.verdict live (source agent_status), nextAction none and attention.requiresAction false for at least six minutes, so dely wait reaches STALLED after --stall-min, not ATTENTION. Install is omp plugin install of a local checkout (package.json pi.extensions and pi.skills); the dely marketplace does not load the extension. An unresolvable pin must process.exit: throw is swallowed and the turn runs on the default model; ctx.shutdown() lets the turn finish, worker_done included. The level check sets the level and reads it back with getThinkingLevel() rather than reading registry shapes. Discovery: omp models --json, offer selector, effort from thinking."
+    },
+    {
+      "name": "Pi",
+      "id": "pi",
+      "binary": "pi",
+      "status": "supported",
+      "controlWake": "waker",
+      "trust": "dialog",
+      "discovery": {
+        "models": "pi --list-models | awk 'NR>1 && $1!=\"\" {print $1\"/\"$2}'",
+        "effort": "pi --help | sed -n 's/.*--thinking <level> *Set thinking level: //p' | tr -d ' ' | tr ',' '\\n'"
+      },
+      "modelFlag": false,
+      "effortFlag": false,
+      "modelPin": "spec-unchecked",
+      "permissionDefault": "none",
+      "forbiddenHeadless": [
+        "pi -p",
+        "pi --print",
+        "pi --mode json",
+        "pi --mode rpc"
+      ],
+      "instructionsFile": {
+        "file": "AGENTS.md",
+        "readsAgentsMd": true,
+        "needsImport": false,
+        "alsoApplies": [
+          "CLAUDE.md"
+        ]
+      },
+      "notes": "Pi 0.87.1 under Orca 1.4.215, measured 2026-09-28. worker-start --agent pi --model is refused: 'Agent pi does not support launch-time model selection'; the pin travels as a spec line `dely-pin: <selector>` or `dely-pin: <selector> <effort>` that extensions/dely-pin.ts applies on the first before_agent_start. Orca reports neither the model (projection.provider has model: null) nor a transcript (worker-read returns provider_unsupported and falls back to terminal). modelPin is spec-unchecked so dispatch skips the projection check. Trust is a dialog ('Trust project folder?' with Trust preselected), shown only when the directory or an ancestor holds .pi/ (settings.json, extensions, skills, prompts, themes, SYSTEM.md) or .agents/skills; a clean repository shows no dialog. Orca passes the prompt on the command line, so a worker held by the trust dialog never acknowledges. A worker has no approval step and wrote files without a prompt. Killing its process sets attention.requiresAction true within 3 s, so dely wait reaches ATTENTION. Control wakes by waker; a full dely wait-bg cycle settled. Install is pi install git:github.com/hieuphung97/dely@v<version> or pi install of a local path (reads package.json pi.extensions and pi.skills). The extension sets the level and reads it back via getThinkingLevel(), failing on mismatch. Discovery: models via pi --list-models, effort levels via pi --help."
     }
   ]
 }

@@ -21,23 +21,17 @@ export default function (pi) {
       fail();
       return;
     }
-    if (level) {
-      const thinking = model.thinking;
-      const offered = Array.isArray(thinking)
-        ? thinking
-        : thinking && Array.isArray(thinking.efforts)
-          ? thinking.efforts
-          : [];
-      if (offered.indexOf(level) < 0) {
-        fail();
-        return;
-      }
-    }
     const ok = await pi.setModel(model);
     if (!ok) {
       fail();
       return;
     }
-    if (level) pi.setThinkingLevel(level);
+    if (level) {
+      pi.setThinkingLevel(level);
+      if (pi.getThinkingLevel() !== level) {
+        fail();
+        return;
+      }
+    }
   });
 }

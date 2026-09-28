@@ -140,9 +140,10 @@ did not pin.
 **Name the model and effort on every dispatch.** The helper passes
 `--model`/`--effort` when `../../harnesses.json` says that harness takes
 them, and omits a flag whose value is `default`. A harness whose entry
-names `modelPin: spec` receives its pin as a spec line instead of flags; a
-pin such a harness cannot resolve stops the worker before its first request
-and surfaces as `NO_ACK`. On a harness that takes neither flags nor a spec
+names `modelPin: spec` or `modelPin: spec-unchecked` receives its pin as a
+spec line instead of flags, and the helper verifies the reported model
+only for `spec`; a pin such a harness cannot resolve stops the worker
+before its first request and surfaces as `NO_ACK`. On a harness that takes
 pin, a Model written there is silently not applied: write `default` and set
 the model in Orca's agent default arguments. A worker left on a harness
 default is an unpinned environment: it lives in the harness's own config,
