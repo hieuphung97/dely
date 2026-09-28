@@ -20,7 +20,7 @@ the shipped skill. No skill references this directory.
 - Orca running, with orchestration enabled;
 - Claude Code, Codex CLI and Cursor Agent CLI installed and signed in;
 - OMP installed;
-- Pi installed;
+- Pi installed and signed in;
 - `~/dely-probe/` writable. Both scripts here refuse every path outside it.
 
 Record the Orca version. A row that passed on one Orca build is not evidence
@@ -112,7 +112,7 @@ test -n "$omp_path" && test -n "$delivery_path" && test -n "$setup_path" \
 A missing `omp_path`, a `jq` failure, a `source` other than
 `omp-plugins:user`, or a `filePath` outside the linked package is a fail:
 OMP resolved another copy (a project skill, a marketplace install, or a
-wrong `omp.skills` path), not the snapshot. A hash mismatch on
+wrong `pi.skills` path), not the snapshot. A hash mismatch on
 `SKILL.md`, `dely.js`, or `extensions/dely-pin.ts` is a fail: the linked tree is
 not the snapshot, or the extension was altered. Comparing only a symlink
 to `$snap` with `$snap` itself is not this check. Remove the OMP install
@@ -126,12 +126,18 @@ pi list
 ```
 
 Check that Pi's startup listing names both skills (`delivery`, `setup`) and
-`extensions/dely-pin.ts` under the snapshot path. Pi shows a "Trust project
-folder?" dialog when the working directory or an ancestor holds `.pi/…`
-resources or a project `.agents/skills`. A scratch home under the real home
-directory makes the real `~/.agents/skills` such an ancestor: run Pi's
-startup listing with `--approve` (or keep any scratch home outside the home
-directory) so the check does not hang on that dialog.
+`extensions/dely-pin.ts` under the snapshot path (`$snap/skills/delivery/SKILL.md`,
+`$snap/skills/setup/SKILL.md`, and `$snap/extensions/dely-pin.ts`), and that no
+second `delivery`, `setup` or `dely-pin.ts` appears (for example an older
+`pi install git:…` copy under `~/.pi/agent/git/`, which loads alongside the
+snapshot). Run `pi --verbose --approve` in an Orca terminal from a directory
+under `~/dely-probe/`, read the screen with `orca terminal read --screen`, then
+exit with `ctrl+d`. Pi's default startup listing prints names only; only
+`--verbose` prints the resolved paths. Pi shows a "Trust project folder?"
+dialog when the working directory or an ancestor holds `.pi/…` resources or a
+project `.agents/skills`. A scratch home under the real home directory makes
+the real `~/.agents/skills` such an ancestor: `--approve` (or keeping any scratch
+home outside the home directory) ensures startup does not hang on that dialog.
 
 Remove the Pi install in Step 18 with `pi remove "$snap"`.
 
@@ -446,16 +452,20 @@ Run this row when `start()` in `dely.js`, the extension or the `pi` entry
 changes, and after a Pi upgrade.
 Build a probe repository under `~/dely-probe/` whose `implement` pin is Pi
 with a Model `<provider>/<model>` from `pi --list-models` and an Effort
-that is one of that model's `--thinking` levels (from `pi --help`), and with
-the pinned model different from Pi's configured default.
+that is one of the `--thinking` levels (from `pi --help`, which lists the
+global levels; a model's own support shows only when the extension's read-back
+fails), and with the pinned model different from Pi's configured default.
 Pi needs no trust step when the probe repository has no `.pi/` resources or
 `.agents/skills`. From that repository run `dely dispatch` for `implement`.
 
 **Pass:** `dely dispatch` prints `DISPATCHED <id>` without a model check,
 because Orca does not report Pi's model. In the Pi session JSONL under
-`~/.pi/agent/sessions/`, the last `model_change` and `thinking_level_change`
-before the first user message, and every assistant message, are the pin,
-which must differ from Pi's configured default.
+`~/.pi/agent/sessions/`: the last `model_change` before the first user message
+and every assistant message, the first included, is the pinned model; and the
+last `thinking_level_change` before the first user message is the pinned effort
+level. The pinned model and level must differ from Pi's configured defaults.
+If the helper prints `DISPATCHED` but the first request ran Pi's configured
+default, the pin was not applied before the first request.
 
 ## Step 14 — row 14, Pi worker with an unknown selector
 
@@ -482,11 +492,14 @@ and an effort level that the model does not offer (for example `max` on
 
 Run this row when `start()` in `dely.js`, the extension or the `pi` entry
 changes, and after a Pi upgrade.
-Inside a dispatch with a Pi worker, after the worker has acknowledged and
-while Control's wait is running, kill the Pi worker process from outside Orca.
+Follow row 4's procedure inside a dispatch with a Pi worker: kill the Pi worker
+process from outside Orca under row 4's kill guard (kill only while Control's
+wait is running, the implementer process is still alive, and no `settled` event
+exists yet; otherwise record "not run"). Sample `worker-show` at 1 s or less.
 
-**Pass:** Control reports `ATTENTION` within 30 s. Killing the Pi worker
-process turns `attention.requiresAction` true within 3 s.
+**Pass:** Control reports `ATTENTION` within 30 s and dispatches the same task
+again exactly once. Killing the Pi worker process turns
+`attention.requiresAction` true within 3 s.
 
 ## Step 17 — row 17, Pi as Control
 
@@ -495,7 +508,10 @@ changes, and after a Pi upgrade.
 Launch Pi as Control. It dispatches a worker and runs `dely wait-bg` as its
 last command. Separately, run `dely wait --control pi` from a shell.
 
-**Pass:** the `dely wait-bg --control pi` cycle completes to `SETTLED`, and
+**Pass:** the `dely wait-bg --control pi` cycle completes to `SETTLED`, meeting
+row 3's event-order criterion (every `wait_bg` event in that Run's log is
+followed by a `settled`, `attention` or `stalled` event before its `notify`,
+and the Run's log has no `error` event), Pi's next turn acted on the wake, and
 `dely wait --control pi` prints `REFUSED`.
 
 ## Step 18 — clean up
@@ -520,7 +536,8 @@ with `bun` present. Windows. A race between an acknowledgement and a
 replayed batch. A quota exhausted mid-run. A Control that skips a gate because
 the model was having a bad day. A shape change between two Orca releases, until
 the rows are run again. A Model `default` dispatch whose spec itself carries
-a pin line.
+a pin line. A stuck live Pi worker before `DEADLINE`. Pi versions other than
+0.87.1. Pi's trust layout on other machines.
 
 ## Results
 

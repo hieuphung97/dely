@@ -199,10 +199,10 @@ pi list                            # verify it is installed
 ```
 
 Verify that the `[Skills]` and `[Extensions]` blocks Pi prints at startup
-name both skills (`delivery`, `setup`) and `extensions/dely-pin.ts`. Update
-by installing the new tag (`pi install git:github.com/hieuphung97/dely@v<version>`).
-Remove with `pi remove <source>` (for example
-`pi remove git:github.com/hieuphung97/dely@v0.23.0` or
+name both skills (`delivery`, `setup`) and `dely-pin.ts` (or run `pi --verbose`
+to see their full paths). Update by installing the new tag
+(`pi install git:github.com/hieuphung97/dely@v<version>`). Remove with
+`pi remove <source>` (for example
 `pi remove /path/to/dely`).
 
 Pi shows a "Trust project folder?" dialog (with Trust preselected) when the
@@ -214,8 +214,9 @@ on the command line, so a worker held by the trust dialog never acknowledges.
 Invoke Dely's skills in Pi as `/skill:delivery` and `/skill:setup`.
 
 To pin Pi, set Model to `<provider>/<model>` from `pi --list-models` and
-Effort to one of that model's `--thinking` levels (from `pi --help`). The
-helper appends `dely-pin: <selector>` or `dely-pin: <selector> <effort>`
+Effort to one of the `--thinking` levels (from `pi --help`, which lists the
+global levels; a model's own support shows only when the extension's read-back
+fails). The helper appends `dely-pin: <selector>` or `dely-pin: <selector> <effort>`
 to the spec, which `extensions/dely-pin.ts` applies before the first request.
 When Pi does not load the extension, a pinned Pi worker runs its own
 default and Dely cannot see it.
