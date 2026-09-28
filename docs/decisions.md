@@ -46,9 +46,10 @@ and `skills` is loaded by Pi (`pi install <path>` or
 `omp ?? pi`. With only the `omp` key that 0.22.0 ships, Pi loads the skills
 from `skills/` by convention but not the extension. Pi also loads a package's
 `extensions/` directory by convention, whatever the manifest key says (found
-by the task review): what makes Pi load the extension is the file's move to
-`extensions/`, and the key serves OMP, which without an `omp` or `pi` key
-treats the package as no plugin at all.
+by the task review). Pi therefore loads the extension from the `pi` key and
+also, whatever the key, from `extensions/`; the 0.22.0 layout (`omp` key,
+`omp/dely-pin.ts`) gives Pi neither. OMP needs the key: without an `omp` or
+`pi` key it treats the package as no plugin at all.
 
 **The pin extension fails every Pi pin that names an effort.** Inside Pi a
 registry model describes its levels as `thinkingLevelMap`
