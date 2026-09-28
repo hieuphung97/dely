@@ -3,11 +3,141 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-27.
+Last updated 2026-09-28.
 
 ---
 
 ## Settled
+
+### 2026-09-28 — Pi is a supported harness and shares OMP's package and pin extension
+
+#### Context
+
+Pi (`pi-coding-agent`) 0.87.1 was measured under Orca 1.4.215 on 2026-09-28,
+in fresh git roots under `~/dely-probe/`, as a worker and as Control, with
+Dely 0.22.0 installed. OMP is a fork of Pi, and Orca's own status extension
+for both says they "expose the same extension API".
+
+**Orca launches Pi but cannot pin or observe its model.**
+`worker-start --agent pi --model …` is refused ("Agent pi does not support
+launch-time model selection"): Orca's model-capability map has no `pi` entry
+at all. For a Pi worker, `worker-show` reports `projection.provider` as
+`{"id":"pi","model":null}`, because Orca's status extension adds the model to
+its posts only for OMP. `worker-read` has no transcript for Pi
+(`provider_unsupported`); it falls back to the terminal.
+
+**Worker.** Orca launches bare `pi`. A worker acknowledged 12 s after start,
+wrote a file without an approval prompt (Pi has no approval step), and sent
+`worker_done`. Killing its process turned `attention.requiresAction` true
+within 3 s, so `dely wait` reaches `ATTENTION` for Pi, which it does not for
+OMP.
+
+**Trust.** Pi asks "Trust project folder?", with Trust preselected, only when
+the working directory or an ancestor holds `.pi/settings.json`,
+`.pi/extensions`, `.pi/skills`, `.pi/prompts`, `.pi/themes`, `.pi/SYSTEM.md`
+or a project `.agents/skills`. A fresh repository with none of these started
+without a dialog. Orca delivers Pi's prompt on the command line, so a worker
+held by the dialog never acknowledges.
+
+**Package.** A root `package.json` with a `pi` key declaring `extensions`
+and `skills` is loaded by Pi (`pi install <path>` or
+`pi install git:github.com/<owner>/<repo>@<ref>`, which clones that ref under
+`~/.pi/agent/git/`) and, measured the same day, by OMP, which reads
+`omp ?? pi`. With only the `omp` key that 0.22.0 ships, Pi loads the skills
+from `skills/` by convention but not the extension.
+
+**The pin extension fails every Pi pin that names an effort.** Inside Pi a
+registry model describes its levels as `thinkingLevelMap`
+(`{off: null, minimal: "minimal", …, max: null}`), a third shape after OMP's
+`thinking.efforts` and the array `omp models --json` prints. The 0.22.0
+extension checks only the other two, and printed `DELY-PIN-FAIL` for the valid
+pin `google-vertex/gemini-3.5-flash low`. On both Pi and OMP, calling
+`setThinkingLevel(level)` and reading `getThinkingLevel()` back returned the
+requested level when the model offers it and something else when it does not:
+`max` came back as `high` on both, and an unknown level as `minimal` on Pi and
+as nothing on OMP.
+
+**Control.** Pi has no background job that ends a turn and wakes it; asked to
+run one, the model used `nohup … &`, and nothing woke it when the job ended. A
+full `dely wait-bg --control pi` cycle with an OMP worker settled, and Pi
+processed the wake.
+
+**Discovery.** `pi --list-models` prints a table (`provider`, `model`, …),
+not JSON. `pi --help` lists the `--thinking` levels.
+
+#### Decision
+
+Pi is `supported` in `harnesses.json` under id `pi`, as worker and as Control:
+`controlWake: waker`, `trust: dialog`, `modelFlag: false`,
+`effortFlag: false`, `modelPin: spec-unchecked`, `permissionDefault: none`,
+and discovery by two commands whose output is already the catalogue:
+`pi --list-models` reduced to `<provider>/<model>` lines, and the `--thinking`
+levels read from `pi --help`.
+
+`modelPin: spec-unchecked` carries the pin exactly as `spec` does, a
+`dely-pin:` line in the spec applied by the shipped extension, but
+`dely dispatch` skips the post-acknowledgement check of
+`projection.provider.model`, because Orca does not report Pi's model. OMP
+keeps `spec` and the check. No other harness names `modelPin`.
+
+One package serves both. The root `package.json` declares the extension and
+the skills under `pi`, which OMP also reads, and the extension moves from
+`omp/dely-pin.ts` to `extensions/dely-pin.ts`. The extension no longer reads a
+harness's registry shape for levels: it sets the level, reads it back, and
+fails the same way on a mismatch as on an unknown selector.
+
+Pi installs from a tag with `pi install git:github.com/hieuphung97/dely@v<version>`.
+
+This amends the 2026-09-27 OMP record's package key, extension path and level
+check; its reasoning stands.
+
+#### Alternatives considered
+
+**Treat a present provider with a null model as unverifiable for every
+`modelPin` harness.** Rejected: it would weaken the check that was reviewed
+and measured for OMP, where Orca does report the model.
+
+**Leave Pi unpinned until Orca supports it.** Rejected: pinning works now and
+fails closed on a bad pin; only the missing-extension case is unseen.
+
+**Add a third registry shape to the extension.** Rejected: the read-back is
+shape-agnostic and removes code; a fourth shape would need another branch.
+
+**A discovery field that joins table columns.** Rejected: `discovery.models`
+is already a command, so a pipeline yields selectors with no schema change.
+
+**A second `package.json` key, or a Pi-only package.** Rejected: OMP reads the
+`pi` key, so one manifest is enough.
+
+#### Consequences
+
+A project can pin Pi's model and effort per phase. A bad selector or level
+stops the worker before its first request and surfaces as `NO_ACK`.
+
+**If Pi does not load the extension, a pinned Pi worker runs its own default
+and nothing reports it.** OMP catches this case through Orca's projection; Pi
+cannot until Orca reports its model.
+
+A repository with `.pi/` resources or `.agents/skills` holds a Pi worker at
+Pi's trust dialog until a human opens Pi there once.
+
+A dead Pi worker is seen by `ATTENTION`. A stuck but live one is seen only by
+`DEADLINE`, because Orca has no Pi transcript for `STALLED` to read.
+
+Pi rows join the live checklist. They run when `start()`, the extension or the
+`pi` entry changes, and after a Pi upgrade; the release floor stays ten rows.
+
+#### Non-goals
+
+Verifying a Pi worker's model without Orca's help. A background-wake Pi
+Control. Detecting a stuck Pi worker before `DEADLINE`.
+
+#### Deferred
+
+`modelPin: spec` for Pi, then `modelFlag: true`. Trigger: an Orca release
+that reports Pi's model in `projection.provider.model`, then one whose
+`worker-start --agent pi` accepts `--model`. Requested on
+[stablyai/orca#23388](https://github.com/stablyai/orca/issues/23388#issuecomment-5871097741).
 
 ### 2026-09-27 — OMP is a supported harness, and its model pin travels in the spec
 
@@ -100,6 +230,11 @@ agent start of a session, and only on a line that begins with `dely-pin:`. A
 selector OMP does not offer, or a model it cannot switch to, prints a line
 beginning `DELY-PIN-FAIL` and exits the process, so the dispatch surfaces as
 `NO_ACK` quoting that line.
+
+Amended 2026-09-28 (see the Pi record above): the extension is now
+`extensions/dely-pin.ts`, declared under the `pi` key that OMP also reads, and
+it checks a level by setting it and reading it back rather than by reading
+OMP's registry shape.
 
 OMP is installed from a local checkout with `omp plugin install <path>`, not
 from the `dely` marketplace.
@@ -264,9 +399,9 @@ spec line carries only an effort, and the post-acknowledgement check keeps
 running. The request is filed as
 [stablyai/orca#23388](https://github.com/stablyai/orca/issues/23388).
 
-Deleting `omp/dely-pin.ts`, `modelPin`, the root `package.json` and OMP's
-separate install path. Trigger: an Orca release that also accepts `--effort`
-for `omp`; `effortFlag` becomes `true`, and OMP installs from the `dely`
+Deleting OMP's use of `extensions/dely-pin.ts` and `modelPin`, and its
+separate install path; the package stays while Pi needs it. Trigger: an Orca
+release that also accepts `--effort` for `omp`; `effortFlag` becomes `true`, and OMP installs from the `dely`
 marketplace, which already loads its skills.
 
 `controlWake: background` for OMP. Trigger: a measured OMP job timeout above
