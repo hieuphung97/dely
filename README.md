@@ -203,6 +203,7 @@ name both skills (`delivery`, `setup`) and `dely-pin.ts` (or run `pi --verbose`
 to see their full paths). Update by installing the new tag
 (`pi install git:github.com/hieuphung97/dely@v<version>`). Remove with
 `pi remove <source>` (for example
+`pi remove git:github.com/hieuphung97/dely@v0.23.0` or
 `pi remove /path/to/dely`).
 
 Pi shows a "Trust project folder?" dialog (with Trust preselected) when the

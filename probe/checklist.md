@@ -454,7 +454,10 @@ Build a probe repository under `~/dely-probe/` whose `implement` pin is Pi
 with a Model `<provider>/<model>` from `pi --list-models` and an Effort
 that is one of the `--thinking` levels (from `pi --help`, which lists the
 global levels; a model's own support shows only when the extension's read-back
-fails), and with the pinned model different from Pi's configured default.
+fails), with the pinned model different from Pi's configured default, and
+with the pinned Effort different from Pi's configured default thinking level
+(the prober learns the default from the first `thinking_level_change` of an
+unpinned Pi session).
 Pi needs no trust step when the probe repository has no `.pi/` resources or
 `.agents/skills`. From that repository run `dely dispatch` for `implement`.
 
