@@ -57,7 +57,7 @@ delivery run.
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
 | `implement` | OMP | google-vertex/gemini-3.8-flash | high |
-| `review` | Codex CLI | gpt-5.6-sol | high |
+| `review` | Claude Code | claude-opus-5-5 | high |
 <!-- dely:end -->
 
 The table is this repository's deployment selection, not the portable
