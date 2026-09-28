@@ -184,7 +184,7 @@ record; `git diff --check` and the disclosure greps.
 
 | Requirement | Instrument | Counterexample | Observed red |
 | --- | --- | --- | --- |
-| A valid Pi pin applies before the first request | Task 1 real Pi check; live Pi row | Package keeps `omp` key so Pi skips the extension; extension still reads a registry shape and fails a valid pin | |
+| A valid Pi pin applies before the first request | Task 1 real Pi check; live Pi row | Extension outside `extensions/` (the 0.22.0 layout) so Pi skips it; extension still reads a registry shape and fails a valid pin | |
 | A level the model does not offer fails on both harnesses | Fake `pi` with clamping read-back; real `max` check on Pi and OMP | No read-back: `max` silently runs as `high` | |
 | OMP behaves as in 0.22.0 | Scratch-home OMP package check; live OMP rows 8 and 9 | OMP does not load the extension from the `pi` key → `FAILED pin not applied` | |
 | `spec-unchecked` skips only Pi's check | Stub `orca`: Pi `null` → `DISPATCHED`, OMP `null` → `FAILED` | Check skipped for every `modelPin` harness, or kept for Pi | |

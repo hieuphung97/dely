@@ -44,7 +44,11 @@ and `skills` is loaded by Pi (`pi install <path>` or
 `pi install git:github.com/<owner>/<repo>@<ref>`, which clones that ref under
 `~/.pi/agent/git/`) and, measured the same day, by OMP, which reads
 `omp ?? pi`. With only the `omp` key that 0.22.0 ships, Pi loads the skills
-from `skills/` by convention but not the extension.
+from `skills/` by convention but not the extension. Pi also loads a package's
+`extensions/` directory by convention, whatever the manifest key says (found
+by the task review): what makes Pi load the extension is the file's move to
+`extensions/`, and the key serves OMP, which without an `omp` or `pi` key
+treats the package as no plugin at all.
 
 **The pin extension fails every Pi pin that names an effort.** Inside Pi a
 registry model describes its levels as `thinkingLevelMap`
