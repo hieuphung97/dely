@@ -56,7 +56,7 @@ delivery run.
 
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
-| `implement` | Cursor Agent CLI | cursor-grok-4.6-high | default |
+| `implement` | OMP | google-vertex/gemini-3.8-flash | high |
 | `review` | Codex CLI | gpt-5.6-sol | high |
 <!-- dely:end -->
 
