@@ -66,8 +66,8 @@ The plugin is `dely`, from the `dely` marketplace at
 `https://github.com/hieuphung97/dely.git`. The skill name is `delivery`;
 invoke it as `dely:delivery`. The runtime needs Node 18 or newer on PATH.
 
-Four harnesses are supported today: Claude Code, Codex CLI, Cursor
-Agent CLI, and OMP. That list is not closed. `harnesses.json` at the
+Five harnesses are supported today: Claude Code, Codex CLI, Cursor
+Agent CLI, OMP, and Pi. That list is not closed. `harnesses.json` at the
 repository root carries four more as `deferred`: GitHub Copilot CLI,
 Antigravity CLI, Grok Build, and Kiro CLI.
 
@@ -173,8 +173,8 @@ leaves `dely` in `omp plugin list`. Then delete
 `~/.omp/plugins/node_modules` directory, and rewrite
 `~/.omp/plugins/omp-plugins.lock.json` with `jq 'del(.plugins.dely)'`.
 
-The `dely` marketplace does not install OMP's extension. Installing from a
-git URL was not checked.
+The `dely` marketplace does not install OMP's extension
+(`extensions/dely-pin.ts`). Installing from a git URL was not checked.
 
 Dely's `setup` and `delivery` are not namespaced in OMP and take precedence
 over a project's own skills of those names. OMP has no workspace-trust gate:
@@ -184,8 +184,41 @@ effect without a prompt, and approvals follow the user's
 
 To pin OMP, set Model to a `selector` from `omp models --json` and Effort
 to one of that model's `thinking` levels. The helper appends
-`dely-pin: <selector>` or `dely-pin: <selector> <effort>` to the spec.
+`dely-pin: <selector>` or `dely-pin: <selector> <effort>` to the spec,
+which `extensions/dely-pin.ts` applies before the first request.
 No `.omp/config.yml` is needed.
+
+### Pi
+
+```bash
+pi install git:github.com/hieuphung97/dely@v0.23.0
+# or unpack a git archive snapshot or point to a local path
+pi install /path/to/dely
+
+pi list                            # verify it is installed
+```
+
+Verify that the `[Skills]` and `[Extensions]` blocks Pi prints at startup
+name both skills (`delivery`, `setup`) and `extensions/dely-pin.ts`. Update
+by installing the new tag (`pi install git:github.com/hieuphung97/dely@v<version>`).
+Remove with `pi remove <source>` (for example
+`pi remove git:github.com/hieuphung97/dely@v0.23.0` or
+`pi remove /path/to/dely`).
+
+Pi shows a "Trust project folder?" dialog (with Trust preselected) when the
+working directory or an ancestor holds `.pi/settings.json`, `.pi/extensions`,
+`.pi/skills`, `.pi/prompts`, `.pi/themes`, `.pi/SYSTEM.md` or a project
+`.agents/skills`. A clean repository shows no dialog. Orca passes the prompt
+on the command line, so a worker held by the trust dialog never acknowledges.
+
+Invoke Dely's skills in Pi as `/skill:delivery` and `/skill:setup`.
+
+To pin Pi, set Model to `<provider>/<model>` from `pi --list-models` and
+Effort to one of that model's `--thinking` levels (from `pi --help`). The
+helper appends `dely-pin: <selector>` or `dely-pin: <selector> <effort>`
+to the spec, which `extensions/dely-pin.ts` applies before the first request.
+When Pi does not load the extension, a pinned Pi worker runs its own
+default and Dely cannot see it.
 
 ### Checked versions
 
@@ -198,7 +231,8 @@ against — observations, not a promised minimum:
 | Codex CLI | 0.154.0 |
 | Cursor Agent CLI | 2026.09.15-d2fe57e |
 | OMP | 18.3.4 |
-| Orca | 1.4.212 |
+| Pi | 0.87.1 |
+| Orca | 1.4.215 |
 
 ## How Dely works
 

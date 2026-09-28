@@ -20,6 +20,7 @@ the shipped skill. No skill references this directory.
 - Orca running, with orchestration enabled;
 - Claude Code, Codex CLI and Cursor Agent CLI installed and signed in;
 - OMP installed;
+- Pi installed;
 - `~/dely-probe/` writable. Both scripts here refuse every path outside it.
 
 Record the Orca version. A row that passed on one Orca build is not evidence
@@ -29,6 +30,8 @@ before the next delivery relies on the new build. Orca upgraded itself from
 reason. Record the OMP version next to the result. A row that passed on one
 OMP build is not evidence about the next one: rows 8, 9 and 12 are rerun
 after every OMP upgrade, before the next delivery relies on the new build.
+Record the Pi version next to the result. Pi rows are rerun after every
+Pi upgrade, before the next delivery relies on the new build.
 
 ## Step 1 — install the candidate from a snapshot
 
@@ -77,7 +80,7 @@ omp skill list --json
 Ask OMP what it resolved. `omp skill list --json` must give `delivery` and
 `setup` with `source` `omp-plugins:user` and `filePath` under the linked
 `dely` package. Then SHA-256 of those resolved `SKILL.md` files, of
-`scripts/dely.js` next to `delivery`, and of `omp/dely-pin.ts` at the
+`scripts/dely.js` next to `delivery`, and of `extensions/dely-pin.ts` at the
 linked package must equal the snapshot's:
 
 ```bash
@@ -102,18 +105,35 @@ test -n "$omp_path" && test -n "$delivery_path" && test -n "$setup_path" \
        = "$(shasum -a 256 "$setup_path" | awk '{print $1}')" \
   && test "$(shasum -a 256 "$snap/skills/delivery/scripts/dely.js" | awk '{print $1}')" \
        = "$(shasum -a 256 "$(dirname "$delivery_path")/scripts/dely.js" | awk '{print $1}')" \
-  && test "$(shasum -a 256 "$snap/omp/dely-pin.ts" | awk '{print $1}')" \
-       = "$(shasum -a 256 "$omp_path/omp/dely-pin.ts" | awk '{print $1}')"
+  && test "$(shasum -a 256 "$snap/extensions/dely-pin.ts" | awk '{print $1}')" \
+       = "$(shasum -a 256 "$omp_path/extensions/dely-pin.ts" | awk '{print $1}')"
 ```
 
 A missing `omp_path`, a `jq` failure, a `source` other than
 `omp-plugins:user`, or a `filePath` outside the linked package is a fail:
 OMP resolved another copy (a project skill, a marketplace install, or a
 wrong `omp.skills` path), not the snapshot. A hash mismatch on
-`SKILL.md`, `dely.js`, or `omp/dely-pin.ts` is a fail: the linked tree is
+`SKILL.md`, `dely.js`, or `extensions/dely-pin.ts` is a fail: the linked tree is
 not the snapshot, or the extension was altered. Comparing only a symlink
 to `$snap` with `$snap` itself is not this check. Remove the OMP install
-in Step 13.
+in Step 18.
+
+Install Pi from the snapshot:
+
+```bash
+pi install "$snap"
+pi list
+```
+
+Check that Pi's startup listing names both skills (`delivery`, `setup`) and
+`extensions/dely-pin.ts` under the snapshot path. Pi shows a "Trust project
+folder?" dialog when the working directory or an ancestor holds `.pi/…`
+resources or a project `.agents/skills`. A scratch home under the real home
+directory makes the real `~/.agents/skills` such an ancestor: run Pi's
+startup listing with `--approve` (or keep any scratch home outside the home
+directory) so the check does not hang on that dialog.
+
+Remove the Pi install in Step 18 with `pi remove "$snap"`.
 
 Then verify by hash, at every location that can serve the skill:
 
@@ -204,8 +224,10 @@ and branch, disposition and human count could not tell.
 All three rows run for a release. Rows 2 and 3 rotate which harness is Control,
 implementer and reviewer, and a rotation is the only thing that exercises a
 harness in a role it does not hold in row 1. The release floor is ten rows
-(1–9 and 12), not row 1: rows 10 and 11 run when `start()` in `dely.js` or
-`omp/dely-pin.ts` changes. A release that ran fewer says so in its decision
+(1–9 and 12), not row 1: rows 10 and 11 run when
+`start()` in `dely.js` or `extensions/dely-pin.ts` changes. The Pi rows run
+when `start()`, the extension or the `pi` entry changes, and after a Pi upgrade;
+the release floor stays ten rows. A release that ran fewer says so in its decision
 record and names which rows it skipped. The 0.19.0 release did exactly that
 — it ran rows 1, 4, 5 and 7 only — and recorded the exception rather than
 moving the floor.
@@ -369,7 +391,7 @@ assistant message, the first included, is the pinned model; and
 If the helper prints `DISPATCHED` but the first request ran OMP's
 configured default, the check compared a different field or format.
 
-Then keep the same pin and stop this dispatch from loading `omp/dely-pin.ts`
+Then keep the same pin and stop this dispatch from loading `extensions/dely-pin.ts`
 without touching any user configuration beyond this plugin:
 `omp plugin disable dely`. Dispatch `implement` again. Re-enable with
 `omp plugin enable dely` before later rows.
@@ -392,7 +414,7 @@ called `ctx.shutdown()` instead of exiting the process.
 
 ## Step 10 — row 10, OMP worker with Model `default`
 
-Run this row when `start()` in `dely.js` or `omp/dely-pin.ts` changes.
+Run this row when `start()` in `dely.js` or `extensions/dely-pin.ts` changes.
 Same probe-repository setup as row 8's first dispatch, with Model `default`
 and Effort `default`.
 
@@ -401,7 +423,7 @@ line. A first user message that contains a `dely-pin:` line is a fail.
 
 ## Step 11 — row 11, a second `dely-pin:` line in an interactive OMP session
 
-Run this row when `start()` in `dely.js` or `omp/dely-pin.ts` changes.
+Run this row when `start()` in `dely.js` or `extensions/dely-pin.ts` changes.
 Open an interactive OMP session (not a `dely dispatch`). After it has
 started, send a second prompt that carries a `dely-pin:` line and read its
 model.
@@ -418,7 +440,65 @@ last command. Separately, `dely wait --control omp` from a shell.
 prints `REFUSED`. If Control ran `dely wait` as a background job, that job
 is killed at 3600 s, which is `dely wait`'s default deadline.
 
-## Step 13 — clean up
+## Step 13 — row 13, Pi worker with a valid pin
+
+Run this row when `start()` in `dely.js`, the extension or the `pi` entry
+changes, and after a Pi upgrade.
+Build a probe repository under `~/dely-probe/` whose `implement` pin is Pi
+with a Model `<provider>/<model>` from `pi --list-models` and an Effort
+that is one of that model's `--thinking` levels (from `pi --help`), and with
+the pinned model different from Pi's configured default.
+Pi needs no trust step when the probe repository has no `.pi/` resources or
+`.agents/skills`. From that repository run `dely dispatch` for `implement`.
+
+**Pass:** `dely dispatch` prints `DISPATCHED <id>` without a model check,
+because Orca does not report Pi's model. In the Pi session JSONL under
+`~/.pi/agent/sessions/`, the last `model_change` and `thinking_level_change`
+before the first user message, and every assistant message, are the pin,
+which must differ from Pi's configured default.
+
+## Step 14 — row 14, Pi worker with an unknown selector
+
+Run this row when `start()` in `dely.js`, the extension or the `pi` entry
+changes, and after a Pi upgrade.
+Same probe-repository setup as row 13's dispatch, with a selector
+`pi --list-models` does not offer.
+
+**Pass:** `dely dispatch` prints `NO_ACK` whose quote contains
+`DELY-PIN-FAIL`, and that session has no assistant message.
+
+## Step 15 — row 15, Pi worker with a level the model does not offer
+
+Run this row when `start()` in `dely.js`, the extension or the `pi` entry
+changes, and after a Pi upgrade.
+Same probe-repository setup as row 13's dispatch, with a valid model selector
+and an effort level that the model does not offer (for example `max` on
+`google-vertex/gemini-3.5-flash`).
+
+**Pass:** `dely dispatch` prints `NO_ACK` whose quote contains
+`DELY-PIN-FAIL`, and that session has no assistant message.
+
+## Step 16 — row 16, a Pi worker that dies after it acknowledges
+
+Run this row when `start()` in `dely.js`, the extension or the `pi` entry
+changes, and after a Pi upgrade.
+Inside a dispatch with a Pi worker, after the worker has acknowledged and
+while Control's wait is running, kill the Pi worker process from outside Orca.
+
+**Pass:** Control reports `ATTENTION` within 30 s. Killing the Pi worker
+process turns `attention.requiresAction` true within 3 s.
+
+## Step 17 — row 17, Pi as Control
+
+Run this row when `start()` in `dely.js`, the extension or the `pi` entry
+changes, and after a Pi upgrade.
+Launch Pi as Control. It dispatches a worker and runs `dely wait-bg` as its
+last command. Separately, run `dely wait --control pi` from a shell.
+
+**Pass:** the `dely wait-bg --control pi` cycle completes to `SETTLED`, and
+`dely wait --control pi` prints `REFUSED`.
+
+## Step 18 — clean up
 
 - uninstall the candidate from Claude Code, Codex CLI and Cursor Agent CLI;
 - remove the OMP install (`omp plugin uninstall dely`; needs `bun` on PATH;
@@ -427,9 +507,10 @@ is killed at 3600 s, which is `dely wait`'s default deadline.
   `~/.omp/plugins/node_modules/dely`, `rmdir` the then-empty
   `~/.omp/plugins/node_modules` directory, and rewrite
   `~/.omp/plugins/omp-plugins.lock.json` with `jq 'del(.plugins.dely)'`);
+- remove the Pi install (`pi remove "$snap"`);
 - delete the snapshot;
 - keep `r1` to `r3` so their trust entries survive;
-- remove the row 5, row 7 and OMP-row paths, and the trust entries of the
+- remove the row 5, row 7, OMP-row and Pi-row paths, and the trust entries of the
   first two.
 
 ## What this cannot see
