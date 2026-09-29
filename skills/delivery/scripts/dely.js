@@ -284,6 +284,7 @@ function lastText(id) {
 }
 
 function preflight(f) {
+  f.repo = path.resolve(f.repo);
   const pins = ["implement", "review"].map((ph) => pin(f.repo, ph));
   const uniq = pins.filter(
     (p, i) => pins.findIndex((q) => q.agent === p.agent && q.model === p.model && q.effort === p.effort) === i
@@ -406,6 +407,7 @@ function dropWorker(id) {
 }
 
 function dispatch(f) {
+  f.repo = path.resolve(f.repo);
   const p = pin(f.repo, f.phase);
   const spec =
     fs.readFileSync(path.resolve(f.repo, f["spec-file"]), "utf8") +
@@ -715,6 +717,7 @@ function notify(f) {
 }
 
 function logCmd(f) {
+  if (f.repo) f.repo = path.resolve(f.repo);
   let payload;
   try {
     payload = JSON.parse(f.json);
