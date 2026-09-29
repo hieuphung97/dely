@@ -540,7 +540,8 @@ replayed batch. A quota exhausted mid-run. A Control that skips a gate because
 the model was having a bad day. A shape change between two Orca releases, until
 the rows are run again. A Model `default` dispatch whose spec itself carries
 a pin line. A stuck live Pi worker before `DEADLINE`. Pi versions other than
-0.87.1. Pi's trust layout on other machines.
+0.87.1. Pi's trust layout on other machines. A pinned Pi worker that did not
+load the extension, which runs its own default unseen.
 
 ## Results
 
