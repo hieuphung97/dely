@@ -141,6 +141,26 @@ A dead Pi worker is seen by `ATTENTION`. A stuck but live one is seen only by
 Pi rows join the live checklist. They run when `start()`, the extension or the
 `pi` entry changes, and after a Pi upgrade; the release floor stays ten rows.
 
+**Live verification, on Pi 0.87.1, OMP 18.3.4 and Orca 1.4.215.** On a
+snapshot of `c436785`: the OMP and Pi install checks passed; OMP rows 8 to 11
+passed (row 8's projection held the pin 6.2 s before the acknowledgement, and
+with the extension disabled the dispatch printed `FAILED … pin not applied`);
+Pi rows 13 to 16 passed (every request of row 13 ran the pinned
+`google-vertex/gemini-3.5-flash` `low`, rows 14 and 15 stopped at `NO_ACK`
+quoting `DELY-PIN-FAIL` with no request, and a killed Pi worker reached
+`ATTENTION` 0.2 s after the kill); row 17 failed on the relative `--repo`
+described above. After the helper fix, row 17 ran again on a snapshot of
+`5fecbc1` and passed in both Runs, with no `error` event and every `dispatch`
+recording an absolute `repo`. Rows 1 to 7 and 12 were not run: Claude Code,
+Codex CLI and Cursor Agent CLI launch byte-identical to 0.22.0 for an absolute
+`--repo`, which task reviews reproduced against a 0.22.0 snapshot, and row 12
+pins OMP's Model `default`, which the changed code does not reach.
+
+Under Orca 1.4.215, `dely wait` reported `ATTENTION` with `missing_status` four
+times for OMP workers that were alive and working, and once `STALLED` on
+`transcript_parse_failed`. Control confirmed the process and its output each
+time and waited again with `--skip`. This decision does not change that.
+
 #### Non-goals
 
 Verifying a Pi worker's model without Orca's help. A background-wake Pi
