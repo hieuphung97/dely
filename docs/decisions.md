@@ -96,8 +96,11 @@ Pi installs from a tag with `pi install git:github.com/hieuphung97/dely@v<versio
 `dely` resolves `--repo` to an absolute path before any use. Live row 17 on
 the first candidate failed because a Pi Control passed `--repo .` and the
 helper handed Orca the selector `path:.`, which Orca cannot match; the defect
-predated Pi and applied to every Control. An absolute path is passed through
-unchanged, without resolving symlinks.
+predated Pi and applied to every Control. The path is normalized lexically
+with `path.resolve`, without resolving symlinks: a canonical absolute path,
+such as `$(pwd)` prints, reaches Orca unchanged, while a trailing slash or a
+`.` or `..` segment is collapsed, and `--repo .` yields the working
+directory's physical path.
 
 This amends the 2026-09-27 OMP record's package key, extension path and level
 check; its reasoning stands.
