@@ -195,6 +195,28 @@ Pi's configured default thinking level, as its pass condition already assumes.
 **Focused verification.** A human-equivalent read of the diff against
 findings A and B; `git diff --check` and the disclosure greps.
 
+### 4. The helper resolves `--repo` to an absolute path
+
+Added after live row 17 failed on `c436785`
+(`/Users/hieuphung/dely-probe/checklist-pi-c436785.md`): a Pi Control ran
+`dely dispatch --repo .`, the helper passed `--worktree path:.` to Orca, and
+Orca answered `selector_not_found`, writing an `error` event. The defect
+predates this delivery and affects every Control.
+
+**Behaviour.** Every subcommand that takes `--repo` resolves it once with
+`path.resolve` (not `fs.realpath`, which would rewrite an absolute path that
+passes through a symlink) before any use, so Orca receives an absolute
+`path:` selector and log events record the absolute path. An absolute
+`--repo` is passed through unchanged.
+
+**Files.** `skills/delivery/scripts/dely.js`.
+
+**Focused verification.** Stub `orca`: `--repo .` from inside a repository
+gives `worker-start --worktree path:<absolute>` for `dispatch` and
+`preflight`; an absolute `--repo`, including one under a symlinked directory
+such as `/tmp`, gives argv, spec and stdout byte-identical to the `3155c22`
+helper for Claude Code, Codex CLI and Cursor Agent CLI. Live row 17 reruns.
+
 ## Acceptance
 
 | Requirement | Instrument | Counterexample | Observed red |
@@ -207,6 +229,7 @@ findings A and B; `git diff --check` and the disclosure greps.
 | Pi discovery yields selectors and levels | Run both commands | `$2` alone, without the provider, which the extension rejects | none: a human reads the output |
 | Pi worker death and Pi Control | Live Pi rows | Entry says `background`; ATTENTION route broken | |
 | Version and package | `AGENTS.md` gates | A manifest left at `0.22.0` | |
+| A relative `--repo` reaches Orca as an absolute path | Stub `orca` for `dispatch` and `preflight`; live row 17 | Resolved in one subcommand only; `realpath` rewriting an absolute path through a symlink | |
 
 **Cannot be observed:** a Pi worker that did not load the extension; Pi
 versions other than 0.87.1; whether Pi's trust dialog appears on another

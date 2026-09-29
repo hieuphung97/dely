@@ -93,6 +93,12 @@ fails the same way on a mismatch as on an unknown selector.
 
 Pi installs from a tag with `pi install git:github.com/hieuphung97/dely@v<version>`.
 
+`dely` resolves `--repo` to an absolute path before any use. Live row 17 on
+the first candidate failed because a Pi Control passed `--repo .` and the
+helper handed Orca the selector `path:.`, which Orca cannot match; the defect
+predated Pi and applied to every Control. An absolute path is passed through
+unchanged, without resolving symlinks.
+
 This amends the 2026-09-27 OMP record's package key, extension path and level
 check; its reasoning stands.
 
