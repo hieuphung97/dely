@@ -65,7 +65,14 @@ as nothing on OMP.
 **Control.** Pi has no background job that ends a turn and wakes it; asked to
 run one, the model used `nohup … &`, and nothing woke it when the job ended. A
 full `dely wait-bg --control pi` cycle with an OMP worker settled, and Pi
-processed the wake.
+processed the wake. Pi's bash tool runs a command under a timeout the model
+chooses: Pi Controls in the live checklist chose 10 s, 20 s and 30 s, and in 2
+of 6 Control sessions that timeout killed the helper mid-command (found by
+the integration review). It killed `dely preflight` twice and a review
+`dely dispatch` once in one session, leaving unreleased preflight workers
+whose stale `worker_done` then settled the next `wait-bg` at once; in the
+other it killed an implement `dely dispatch` during its 60 s acknowledgement
+wait, so that dispatch wrote no `dispatch`, `NO_ACK` or stop event.
 
 **Discovery.** `pi --list-models` prints a table (`provider`, `model`, …),
 not JSON. `pi --help` lists the `--thinking` levels.
@@ -138,6 +145,20 @@ Pi's trust dialog until a human opens Pi there once.
 A dead Pi worker is seen by `ATTENTION`. A stuck but live one is seen only by
 `DEADLINE`, because Orca has no Pi transcript for `STALLED` to read.
 
+**A Pi Control can kill its own helper.** When the model gives `dely dispatch`
+or `dely preflight` a bash timeout shorter than the helper needs (`ACK_S`,
+60 s, plus the pin check for `dispatch`; `PREFLIGHT_S`, 150 s, for
+`preflight`), the helper dies without recording or cleaning up. A dispatch of
+an OMP worker killed that way also skips OMP's post-acknowledgement pin check.
+This decision does not guard against it; the Control must not run the helper
+under such a timeout.
+
+A Model or Effort cell that contains whitespace yields a pin line the
+extension does not recognize, so no pin applies. OMP's projection check
+catches this; on Pi the worker runs its default unseen. `setup` writes
+discovered tokens, which contain no whitespace, so only a hand edit reaches
+it.
+
 Pi rows join the live checklist. They run when `start()`, the extension or the
 `pi` entry changes, and after a Pi upgrade; the release floor stays ten rows.
 
@@ -151,14 +172,21 @@ quoting `DELY-PIN-FAIL` with no request, and a killed Pi worker reached
 `ATTENTION` 0.2 s after the kill); row 17 failed on the relative `--repo`
 described above. After the helper fix, row 17 ran again on a snapshot of
 `5fecbc1` and passed in both Runs, with no `error` event and every `dispatch`
-recording an absolute `repo`. Rows 1 to 7 and 12 were not run: Claude Code,
+recording an absolute `repo` (see below). Rows 1 to 7 and 12 were not run: Claude Code,
 Codex CLI and Cursor Agent CLI launch byte-identical to 0.22.0 for an absolute
 `--repo`, which task reviews reproduced against a 0.22.0 snapshot, and row 12
-pins OMP's Model `default`, which the changed code does not reach.
+(OMP as Control) runs `dispatch`, `preflight` and `log`, whose only change is
+that an absolute `--repo` passes unchanged and a relative one now works, while
+`start()` and the pin check are unchanged for `spec` harnesses. In row 17's
+first Run on `5fecbc1`, the Pi Control's 30 s bash timeout killed the
+implement `dely dispatch`, so that dispatch recorded nothing; the review
+dispatch and both of the second Run's dispatches recorded an absolute `repo`.
 
-Under Orca 1.4.215, `dely wait` reported `ATTENTION` with `missing_status` four
-times for OMP workers that were alive and working, and once `STALLED` on
-`transcript_parse_failed`. Control confirmed the process and its output each
+Under Orca 1.4.215, `dely wait` reported `ATTENTION` with `missing_status`
+three times for OMP workers that were alive and working (Run
+`run_e7119838e66e`: 13:45:29Z, 15:34:02Z and 00:05:28Z), and once `STALLED`
+(15:21:35Z), whose printed reason was `transcript_parse_failed` while the log
+line records only `idleMinutes: 10`. Control confirmed the process and its output each
 time and waited again with `--skip`. This decision does not change that.
 
 #### Non-goals
