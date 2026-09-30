@@ -37,9 +37,9 @@ for launch settings and measured versions; the list can grow.
 ## Install Dely
 
 **Install Dely only in the harness you use as the Control session.** A harness
-used only as implementer or reviewer needs Orca and its own login, not a Dely
-install. Workers read no Dely skill. For OMP or Pi model pins, load the pin
-extension as described below.
+used only as implementer or reviewer needs Orca and its own login. Workers
+read no Dely skill. **A pinned OMP or Pi worker also needs that harness's
+Dely install below**, which loads `dely-pin.ts`.
 
 Have Node 18 or newer on PATH. Open Control in your project, invoke `dely:setup`
 (optional) to choose implementer and reviewer harnesses, models and efforts,
@@ -69,7 +69,10 @@ codex plugin remove dely@dely       # remove
 ```
 
 If add keeps a stale marketplace, remove the marketplace and plugin, then add
-again. Use marketplace upgrade for updates; Codex has no plugin update command.
+again. Pin a tag or full commit SHA with
+`codex plugin marketplace add --ref <ref> https://github.com/hieuphung97/dely.git`.
+Codex has no plugin update command; use marketplace upgrade.
+Do not use `codex plugin install`.
 
 ### Cursor Agent CLI
 
@@ -157,38 +160,53 @@ pi remove git:github.com/hieuphung97/dely@v<version>
 pi remove /path/to/dely                    # remove local install
 ```
 
+Find `<version>` in [releases](https://github.com/hieuphung97/dely/releases).
 Update by installing the new tag. At startup, check that Skills names
 `delivery` and `setup`, and Extensions names `dely-pin.ts`.
 Invoke `/skill:delivery` or `/skill:setup`.
 
 Kiro CLI was measured but is not supported: workers never became ready.
 
+Checked versions (observations, not minimums): Orca 1.4.217; Claude Code
+2.1.274; Codex CLI 0.154.0 (install), 0.157.1 (Control), 0.159.2 (worker);
+Cursor Agent CLI 2026.09.15-d2fe57e; Copilot CLI 1.0.89; Antigravity CLI
+1.2.13; Grok Build 1.0.44; OMP 18.3.4 (install), 18.3.3 (worker); Pi 0.87.1.
+
 ## Pin a model
 
 Invoke setup to select live model and effort values for each phase. Copilot
-and Grok have no model pin; Cursor and Antigravity have no effort pin.
+and Grok have neither model nor effort pins; Cursor and Antigravity have no
+effort pin.
 
-For OMP or Pi workers, load `extensions/dely-pin.ts` from a dedicated Dely
-clone or snapshot in the worker harness. Check that the worker loads it before
-requesting a pin. OMP uses a selector from `omp models --json` and that model's
+For pinned OMP workers, install above and check `omp plugin list --json`.
+For pinned Pi workers, install above and check `dely-pin.ts` in the startup
+Extensions listing. OMP uses a selector from `omp models --json` and that model's
 `thinking` levels. Pi uses `<provider>/<model>` from `pi --list-models` and
 levels from `pi --help`. Pi's pin is unchecked by Orca; verify it in the
-session transcript. Run the helper without a tool timeout in a Pi Control.
+session transcript under `~/.pi/agent/sessions/`. For Pi, instruct Control
+to run the helper with no tool timeout.
 
 ## Troubleshooting
 
 - **Worker stays at startup:** read its screen. Answer shell startup prompts
   such as an oh-my-zsh update, then retry.
 - **Orca disconnects:** reopen Orca, check the commands under Install Orca,
-  and inspect the worker before retrying.
+  and inspect workers with `orca orchestration worker-list --run <run>`
+  before retrying.
 - **First launch stops at trust:** open that harness in the same path and
   answer its dialog, then retry. Copilot can report only `NO_ACK`;
-  Antigravity can lose the first prompt even after trust. Pi asks when the
-  path or an ancestor has `.pi/` resources or `.agents/skills`.
-- **Codex helper reports no terminal handle:** pass your own terminal's
-  handle through `ORCA_TERMINAL_HANDLE`; never use another pane's handle.
-- **Old behavior after update:** open a new Control session. Check every
-  resolved skill path, including marketplace sources, for stale copies.
+  Antigravity lost the prompt on 3 of 4 fresh-path launches and 0 of 6
+  trusted-path launches; retry once. Pi asks when the path or an ancestor
+  has `.pi/` resources or `.agents/skills`.
+- **Codex helper says "not inside an Orca terminal":** give Control its
+  terminal handle to prefix helper commands with `ORCA_TERMINAL_HANDLE=<handle>`.
+  Control can look it up with `orca terminal list --worktree active --json`
+  only when that worktree has one agent terminal; never use another pane's handle.
+- **Old behavior after update:** open a new Control session. Run `dely`
+  with no arguments to identify the running copy. Compare `skills/delivery/SKILL.md`
+  by SHA-256 at every skill location, including `~/.agents/skills`, project and
+  personal skills, plugin caches and marketplace sources; update or remove
+  mismatched copies. Install success alone does not identify the running copy.
   Codex personal skills can shadow plugins; Cursor copies can override the
   Claude cache; Copilot project and personal skills can hide its plugin.
 

@@ -26,7 +26,8 @@ message stub row. Rows 10–11 run when `start()` or the pin extension changes.
 Rows 13–16 run when `start()`, the extension or the Pi entry changes, or Pi
 upgrades. The parameterized Control row replaces the former OMP and Pi
 Control rows. Rerun the parameterized rows and rows 4–5 after an Orca upgrade;
-rerun OMP pin rows after an OMP upgrade and Pi pin rows after a Pi upgrade.
+rerun OMP pin rows and its parameterized Control row after an OMP upgrade;
+rerun Pi pin rows and its parameterized Control row after a Pi upgrade.
 A release that skips required rows names them and the reason in its decision
 record; structural gates cannot substitute for them.
 
@@ -184,23 +185,28 @@ an old branch for ten merges while reporting success every time.
 
 ## Parameterized worker row
 
-Vary exactly: `id`, `name`, `binary`, `permissionDefault`, `discovery`, Model
+Vary exactly: `id`, `name`, `discovery`, Model
 and Effort from the candidate's entry; the probe path `worker-<id>`; and phase
 (`implement`, then `review`). Use `default` where no pin is supported; for
 `modelPin` entries use a discovered selector and level, with the extension
 loaded. Record the actual default model and effort when no pin is requested.
-Use the candidate helper from the verified Control install. Run preflight and
-dispatch with no tool timeout, or one of at least 300 s.
+Use `"$snap/skills/delivery/scripts/dely"` as `dely` below, including waits.
+Run preflight and dispatch with no tool timeout, or one of at least 300 s.
 
 ```bash
 probe/mkrepo.sh worker-<id> "<name>" <model> <effort> "<name>" <model> <effort>
 ```
 
-From a Control terminal in this repository, create and bind a probe Run using
-Orca's orchestration commands. Answer the tested harness's trust dialog at
-this path before dispatch (by hand except for Claude's `probe/trust.sh`).
-Install Dely only in Control; OMP and Pi workers additionally need the pin
-extension loaded. Create two spec files under the probe path:
+Run `probe/mkrepo.sh` from the candidate Dely checkout. In an observer agent
+terminal at `~/dely-probe/worker-<id>`, run
+`orca orchestration run-create --objective "worker-<id> probe" --json`, which
+creates and binds the Run; record its id as `<run>`. To resume an existing
+probe Run there, use `orca orchestration run-use --id <run>`. Record the
+observer's harness id as `<control-id>` for every wait's `--control`.
+Answer the tested harness's trust dialog at this probe path before dispatch
+(by hand except for Claude's `probe/trust.sh`). OMP and Pi pinned workers
+need their README Dely install, which loads the pin extension. Create two
+spec files under the probe path:
 
 - Implement: fix the `REQUEST.md` defect, add a regression test, run
   `node --test test/`, and commit. Report through the dispatched lifecycle
@@ -216,7 +222,9 @@ dely dispatch --repo <absolute probe path> --run <run> --phase implement --spec-
 dely dispatch --repo <absolute probe path> --run <run> --phase review --spec-file <review spec>
 ```
 
-Use the Control wait below for each dispatch. **Pass:** preflight passes both
+Use the Control wait below for each dispatch, replacing `--control <id>`
+with `--control <control-id>` for the observer and using the snapshot helper.
+**Pass:** preflight passes both
 pins; both dispatches print `DISPATCHED` after a valid acknowledgement, both
 settle on accepted `worker_done`, the regression passes and the review reports
 `ACCEPT`. Record prompt retries and trust intervention separately; a launch
@@ -228,10 +236,12 @@ A successful helper print alone does not prove the worker ran the task.
 ## Parameterized Control row
 
 Vary exactly: Control `id`, `binary`, `permissionDefault`, its discovered
-model and effort launch arguments (only flags the entry supports), its
-`controlWake`, the invocation spelling from README, and path `control-<id>`.
+model and effort launch arguments (from that Control CLI's `--help`, not
+Orca's `modelFlag`/`effortFlag`), its `controlWake`, the invocation spelling from README, and path `control-<id>`.
 Keep both worker pins Claude Code with the same discovered model and effort
-for all Control variants. Record Control's actual model and effort.
+for all Control variants. `permissionDefault: none` means omit the argument,
+not the word `none`. Record Control's actual model and effort. Run the script
+from the candidate Dely checkout; the new terminal runs in the probe repository.
 
 ```bash
 probe/mkrepo.sh control-<id> "Claude Code" <model> <effort> "Claude Code" <model> <effort>
@@ -244,8 +254,12 @@ hashes. Pre-trust Claude workers with `probe/trust.sh` at this path; answer
 Control's own dialog by hand. Wait for the composer before sending a prompt.
 Tell Control: use the delivery skill for `REQUEST.md`, treat the design as
 pre-approved Bounded, dispatch implement and review, push to the bare remote,
-and stop only where the skill requires a human. Control creates or binds its
-own Run. Do not bind it from the observer terminal.
+and stop only where the skill requires a human. Control uses
+`orca orchestration run-create --objective "control-<id> probe" --json`
+to create and bind its Run, or `orca orchestration run-use --id <run>`
+to resume one. Do not bind it from the observer terminal. Control uses
+`$snap/skills/delivery/scripts/dely` from its verified install; pass the
+actual snapshot path to Control.
 
 For `background`, Control runs `dely wait --run <run> --control <id>` as a
 background tool command and ends its turn. For `waker`, Control runs
@@ -283,7 +297,8 @@ const fs = require('fs'), path = require('path'), assert = require('assert');
 const {spawnSync} = require('child_process');
 const [snap, root] = process.argv.slice(2);
 const helper = path.join(snap, 'skills/delivery/scripts/dely.js');
-fs.mkdirSync(path.join(root, 'home/.dely'), {recursive: true});
+for (const home of ['red-home', 'green-home'])
+  fs.mkdirSync(path.join(root, home, '.dely'), {recursive: true});
 fs.mkdirSync(path.join(root, 'repo'));
 fs.writeFileSync(path.join(root, 'repo/AGENTS.md'),
   '| implement | Claude Code | default | default |\n' +
@@ -322,7 +337,7 @@ function run(file, verb, mode) {
   else args.push('--repo', path.join(root, 'repo'));
   if (verb === 'dispatch') args.push('--phase', 'implement', '--spec-file', 'spec.md');
   const r = spawnSync(process.execPath, args, {encoding:'utf8', timeout:10000,
-    env:{...process.env, HOME:path.join(root,'home'),
+    env:{...process.env, HOME:path.join(root,file === wrong ? 'red-home' : 'green-home'),
       ORCA_TERMINAL_HANDLE:'fixture-terminal', ORCA_CLI_COMMAND:path.join(root,'orca.js'),
       FIXTURE_ROOT:root, FIXTURE_MODE:mode, DELY_ACK_S:'0.2',
       DELY_PREFLIGHT_S:'0.2', DELY_POLL_S:'0.02'}});
@@ -335,8 +350,20 @@ for (const file of [wrong, helper]) {
   assert.equal(run(file,'preflight','reject').includes(' PASS '), red);
   const settled = JSON.parse(run(file,'wait','sequence'));
   assert.equal(settled.SETTLED, red ? 'rejected-batch' : 'accepted-batch');
-  if (!red) assert(fs.readFileSync(path.join(root,'calls.jsonl'),'utf8')
-    .includes('"--ack","rejected-batch"'));
+  if (!red) {
+    assert(fs.readFileSync(path.join(root,'calls.jsonl'),'utf8')
+      .includes('"--ack","rejected-batch"'));
+    const events = fs.readFileSync(path.join(root,'green-home/.dely/log.jsonl'),'utf8')
+      .trim().split('\n').map(line => JSON.parse(line));
+    const rejected = events.findIndex(e => e.event === 'rejected' &&
+      e.deliveryId === 'rejected-batch');
+    const accepted = events.findIndex(e => e.event === 'settled' &&
+      e.deliveryId === 'accepted-batch');
+    assert(rejected >= 0 && accepted > rejected, 'rejection must precede settlement');
+    assert(!events.some(e => e.event === 'settled' && e.deliveryId === 'rejected-batch'),
+      'candidate must never settle the rejected batch');
+    console.log('LOG PASS: green rejection precedes accepted settlement; no rejected settlement');
+  }
   assert(run(file,'dispatch','accept').includes('DISPATCHED'));
   assert(run(file,'preflight','accept').includes(' PASS '));
   console.log(red ? 'RED: wrong copy advances on rejected messages' :
@@ -347,14 +374,16 @@ node "$stub/check.cjs" "$snap" "$stub"
 ```
 
 **Pass:** both RED and GREEN print, all assertions pass, and the candidate's
-wait log in `$stub/home/.dely/log.jsonl` records the rejected batch before
-settling the accepted batch. Keep the fixture directory and output with the
-probe report; remove it after recording the result. The accepted message's
+wait log in `$stub/green-home/.dely/log.jsonl` mechanically asserts rejection
+before accepted settlement, with no rejected settlement. The wrong copy logs
+separately in `$stub/red-home/.dely/log.jsonl`. Keep the fixture directory
+and output with the probe report; remove it after recording the result. The accepted message's
 subject intentionally begins `Rejected `; only the payload marker rejects it.
 
 ## Step 4 — row 4, a worker that dies after it acknowledges
 
-Inside the parameterized Control row, after the implement worker has acknowledged
+Run row 4 once for each harness required by the parameterized Control row.
+Inside that row, after the implement worker has acknowledged
 **and** Control's own wait for that Run is running
 (`pgrep -f "dely.js wait --run <run>"` for a background Control, the
 `wait-bg` waiter for a waker one), kill the worker's agent process from outside
@@ -627,6 +656,7 @@ again exactly once. Killing the Pi worker process turns
 
 ## What this cannot see
 
+Copilot, Antigravity and Grok on versions other than the ones measured.
 The deferred harnesses. Installing OMP from a git URL, or uninstalling it
 with `bun` present. Windows. A race between an acknowledgement and a
 replayed batch in a live session (the stub covers only its fixtures). A quota exhausted mid-run. A Control that skips a gate because
