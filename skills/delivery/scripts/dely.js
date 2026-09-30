@@ -171,8 +171,10 @@ function logEvent(event, extra) {
 }
 
 function fail(reason, extra) {
-  logEvent("error", Object.assign({ reason }, extra || {}));
-  out("ERROR " + reason, 9);
+  extra = extra || {};
+  const text = orcaHint(reason, extra.run);
+  logEvent("error", Object.assign({ reason: text }, extra));
+  out("ERROR " + text, 9);
 }
 
 function printIdentity() {
@@ -229,13 +231,68 @@ function start(repo, run, p, spec, title) {
   const r = orca(args);
   const id = r.result && r.result.dispatchId;
   if (!id) {
-    return { error: (r.error && r.error.message) || String((r.result && r.result.failedStage) || "worker-start") };
+    return {
+      error: orcaHint(
+        (r.error && r.error.message) || String((r.result && r.result.failedStage) || "worker-start"),
+        run
+      ),
+    };
   }
   return { id };
 }
 
 function namesDispatch(m, id) {
   return JSON.stringify(m).includes(id);
+}
+
+function payloadOf(m) {
+  const p = m && m.payload;
+  if (p && typeof p === "object" && !Array.isArray(p)) return p;
+  if (typeof p === "string") {
+    try {
+      const j = JSON.parse(p);
+      return j && typeof j === "object" && !Array.isArray(j) ? j : {};
+    } catch (_) {
+      return {};
+    }
+  }
+  return {};
+}
+
+function isRejected(m) {
+  if (!m) return false;
+  if (String(m.subject || "").startsWith("Rejected ")) return true;
+  return payloadOf(m)._orcaLifecycleRejection != null;
+}
+
+function liveNamesDispatch(m, id) {
+  return !isRejected(m) && namesDispatch(m, id);
+}
+
+function messageDispatchId(m) {
+  const id = payloadOf(m).dispatchId;
+  return id == null || id === "" ? null : id;
+}
+
+function settling(m) {
+  return !isRejected(m) && ["worker_done", "escalation", "question"].includes(m.type);
+}
+
+function orcaHint(msg, run) {
+  const text = String(msg || "");
+  if (text.includes("requires the coordinator terminal currently bound")) {
+    return text + "\nrun orca orchestration run-use --id " + run + " from this terminal";
+  }
+  if (text.includes("already has an active actionable waiter")) {
+    return text + "\na dely wait for this Run is still running";
+  }
+  return text;
+}
+
+function requireHandle(extra) {
+  if (process.env.ORCA_TERMINAL_HANDLE) return;
+  logEvent("error", Object.assign({ reason: "not inside an Orca terminal" }, extra || {}));
+  out("FAILED not inside an Orca terminal", 5);
 }
 
 function clip(s) {
@@ -284,6 +341,7 @@ function lastText(id) {
 }
 
 function preflight(f) {
+  requireHandle({ run: f.run, repo: f.repo });
   f.repo = path.resolve(f.repo);
   const pins = ["implement", "review"].map((ph) => pin(f.repo, ph));
   const uniq = pins.filter(
@@ -351,14 +409,14 @@ function preflight(f) {
       String(Math.max(1, Math.floor(POLL_S * 1000))),
     ]);
     if (r.ok === false) {
-      const why = (r.error && r.error.message) || "check failed";
+      const why = orcaHint((r.error && r.error.message) || "check failed", f.run);
       for (const [id, rec] of Object.entries(open)) drop(id, rec, "PREFLIGHT " + rec.phase + " " + rec.agent + " FAIL " + why);
       process.exit(failed ? 1 : 0);
     }
     const res = r.result || {};
     if (res.deliveryId) {
       for (const m of res.messages || []) {
-        const hit = Object.keys(open).find((id) => namesDispatch(m, id));
+        const hit = Object.keys(open).find((id) => liveNamesDispatch(m, id));
         if (hit) open[hit].messaged = true;
         if (hit && m.type === "worker_done") {
           const secs = Math.round((Date.now() - t0) / 1000);
@@ -407,6 +465,7 @@ function dropWorker(id) {
 }
 
 function dispatch(f) {
+  requireHandle({ run: f.run, repo: f.repo });
   f.repo = path.resolve(f.repo);
   const p = pin(f.repo, f.phase);
   const spec =
@@ -421,7 +480,7 @@ function dispatch(f) {
   const t0 = Date.now();
   for (; Date.now() - t0 < ACK_S * 1000; sleep(interval)) {
     const peek = orca(["orchestration", "check", "--peek", "--run", f.run]);
-    if (((peek.result || {}).messages || []).some((m) => namesDispatch(m, s.id))) {
+    if (((peek.result || {}).messages || []).some((m) => liveNamesDispatch(m, s.id))) {
       logEvent("dispatch", {
         run: f.run,
         repo: f.repo,
@@ -495,8 +554,8 @@ function selfHarness() {
 }
 
 function wait(f) {
+  const self = selfHarness();
   if (process.env.DELY_WAITER !== "1") {
-    const self = selfHarness();
     const who = self || f.control;
     const wake = (harnessById(who) || {}).controlWake || "unknown";
     if (wake !== "background") {
@@ -504,10 +563,15 @@ function wait(f) {
       out("REFUSED " + who + " wakes by " + wake + said + "; use dely wait-bg", 3);
     }
   }
+  const as = f.as ? ["--terminal", f.as] : [];
+  if (typeof f.ack === "string") {
+    orca(["orchestration", "check", ...as, "--run", f.run, "--ack", f.ack]);
+  }
+  const control = self || f.control || null;
+  logEvent("wait", { run: f.run, control });
   const deadline = Date.now() + Number(f["timeout-min"] || 60) * 60000;
   const stallMin = Number(f["stall-min"] || 10);
   const skip = String(f.skip || "").split(",").filter(Boolean);
-  const as = f.as ? ["--terminal", f.as] : [];
   const track = {};
   let lastProgressCheck = 0;
   while (Date.now() < deadline) {
@@ -525,11 +589,16 @@ function wait(f) {
     const res = r.result || {};
     if (res.deliveryId) {
       const msgs = res.messages || [];
-      if (msgs.some((m) => ["worker_done", "escalation", "question"].includes(m.type))) {
+      if (msgs.some(settling)) {
         logEvent("settled", {
           run: f.run,
           deliveryId: res.deliveryId,
-          messages: msgs.map((m) => ({ type: m.type, subject: m.subject })),
+          control,
+          messages: msgs.map((m) => ({
+            type: m.type,
+            subject: m.subject,
+            dispatchId: messageDispatchId(m),
+          })),
         });
         out(
           {
@@ -544,6 +613,18 @@ function wait(f) {
           },
           0
         );
+      }
+      if (msgs.some((m) => ["worker_done", "escalation", "question"].includes(m.type)) && !msgs.some(settling)) {
+        logEvent("rejected", {
+          run: f.run,
+          deliveryId: res.deliveryId,
+          control,
+          messages: msgs.map((m) => ({
+            type: m.type,
+            subject: m.subject,
+            dispatchId: messageDispatchId(m),
+          })),
+        });
       }
       orca(["orchestration", "check", ...as, "--run", f.run, "--ack", res.deliveryId]);
       continue;
@@ -634,7 +715,7 @@ function waitBg(f) {
     fs.writeFileSync(lock, JSON.stringify({ terminal: "" }), { flag: "wx" });
   } catch (_) {
     if (live(recorded())) {
-      logEvent("wait_bg", { run: f.run, which: "ALREADY_WAITING", path: file });
+      logEvent("wait_bg", { run: f.run, which: "ALREADY_WAITING", path: file, control: selfHarness() || f.control || null });
       out("ALREADY_WAITING: a dely wait is running for this Run; end your turn, it will wake you.", 0);
     }
     writeLock("");
@@ -647,7 +728,7 @@ function waitBg(f) {
   const q = JSON.stringify;
   const self = q(__filename);
   const bin = q(process.execPath);
-  const extra = ["control", "skip", "stall-min", "timeout-min"]
+  const extra = ["control", "skip", "stall-min", "timeout-min", "ack"]
     .filter((k) => f[k] && f[k] !== true)
     .map((k) => " --" + k + " " + q(f[k]))
     .join("");
@@ -686,7 +767,7 @@ function waitBg(f) {
     fail((r.error && r.error.message) || "terminal create failed", { run: f.run });
   }
   writeLock((r.result && r.result.terminal && r.result.terminal.handle) || "");
-  logEvent("wait_bg", { run: f.run, which: "WAITING", path: file });
+  logEvent("wait_bg", { run: f.run, which: "WAITING", path: file, control: selfHarness() || f.control || null });
   out("WAITING", 0);
 }
 
@@ -717,7 +798,8 @@ function notify(f) {
 }
 
 function logCmd(f) {
-  if (f.repo) f.repo = path.resolve(f.repo);
+  if (typeof f.repo === "string") f.repo = path.resolve(f.repo);
+  else delete f.repo;
   let payload;
   try {
     payload = JSON.parse(f.json);
@@ -749,6 +831,7 @@ const COMMANDS = {
       ["skip", "IDS"],
       ["stall-min", "N"],
       ["timeout-min", "N"],
+      ["ack", "DELIVERY"],
     ],
   },
   "wait-bg": {
@@ -758,6 +841,7 @@ const COMMANDS = {
       ["skip", "IDS"],
       ["stall-min", "N"],
       ["timeout-min", "N"],
+      ["ack", "DELIVERY"],
     ],
   },
   notify: {

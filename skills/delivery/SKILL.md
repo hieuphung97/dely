@@ -110,7 +110,8 @@ to this skill. Control learns the helper's interface by running
 and does not read `scripts/dely.js`. Control's wake mode is that harness's
 `controlWake` in `../../harnesses.json`. The preflight step runs in setup
 and again after a `NO_ACK`; a delivery does not preflight before its first
-dispatch.
+dispatch. Run `dely preflight` and `dely dispatch` with no tool timeout, or
+one of at least 300 s.
 
 Write the prompt to an untracked file **inside the worktree**. Never inline
 it in a shell argument: prompts carry backticks, quotes and newlines, and a
@@ -162,7 +163,9 @@ terminal it runs in and refuses a waker even when `--control` names another
 one, so `REFUSED … (called with --control …)` means use `wait-bg`.
 
 **Result handling.** `SETTLED`: process the batch, do the guide's completion
-accounting, and acknowledge. `ATTENTION` has two routes, and the difference
+accounting, and pass the settled `deliveryId` as `--ack` to the next
+`dely wait` or `wait-bg`, or run `orca orchestration check --ack` when no
+wait follows. `ATTENTION` has two routes, and the difference
 is whether the plane can still see the worker. With `nextAction.kind` other
 than `none`, run the argv Orca printed and skip that id next time. With
 `nextAction: none` and `attention.requiresAction`, the plane has lost sight
