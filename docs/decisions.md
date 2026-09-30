@@ -3,11 +3,151 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-28.
+Last updated 2026-09-30.
 
 ---
 
 ## Settled
+
+### 2026-09-30 — Each harness states what it can do per role, with limits; Copilot, Antigravity and Grok are supported
+
+#### Context
+
+The question "which harness can be Control, implementer or reviewer" had no
+honest answer in the package. `status` said `supported` for Pi, whose Control
+kills its own helper under a model-chosen timeout, and `deferred` for three
+harnesses whose last measurement was a month and several releases old.
+
+**Measurement, 2026-09-29, Orca 1.4.215.** Two probe sessions measured every
+harness in every role. The reports are
+`~/dely-probe/role-spike/A-report.md` (Copilot, Antigravity, Grok, Kiro) and
+`~/dely-probe/role-spike/B-report.md` (OMP and Pi as reviewer, Claude Code's
+Bash timeout, Codex and Cursor as Control). Per role, n = 1:
+
+- Copilot CLI 1.0.89 (it self-updated from 1.0.83 during the run): Control by
+  background wake worked. As implementer and reviewer it worked once the
+  path was trusted. Its trust dialog is not detected by Orca, which accepts the
+  input, so the helper sees only `NO_ACK` after 60 s; 2 of 7 launches left the
+  prompt unsent. Orca refuses `--model`.
+- Antigravity CLI 1.2.13: Control by waker worked. As implementer and reviewer
+  it worked, but the first launch on a new path lost the prompt 3 of 4 times
+  (0 of 6 once trusted). Orca now accepts `--model` for it; `--effort` is
+  rejected or silently drops the pin.
+- Grok Build 1.0.44: Control by waker worked with no model request during the
+  wait. As implementer and reviewer it worked after one trust answer per path;
+  1.0.44 asks in every repository that has an `AGENTS.md`, and Orca detects the
+  dialog within about 2 s. Orca refuses `--model`.
+- Kiro CLI 2.21.0: a worker never became ready in Orca (3 of 3); Control by
+  `wait-bg` worked once, but only with a global confirmation setting whose
+  default exits.
+- Codex CLI 0.157.1 as Control: the wake worked (1 request per wait), but its
+  tool shell had no `ORCA_TERMINAL_HANDLE`, so the helper failed until the
+  model found its own handle. Not re-measured on 0.159.1.
+- Claude Code as Control: a long command moved to the background instead of
+  being killed, and `dely preflight` completed.
+- OMP and Pi as reviewer: both found a planted defect.
+
+Killed Copilot, Antigravity and Grok workers reached `attention.requiresAction`
+within 1.5 s. The same probes found two helper defects that apply to every
+harness: an Orca-rejected heartbeat counted as the acknowledgement, and an
+Orca-rejected `worker_done` settled a wait (a Cursor Control released a live
+worker on it).
+
+**Real use, `~/.dely/log.jsonl`**, counting only Runs in the owner's
+repositories and dropping stub lines (a design review corrected Control's
+first counts):
+
+- 37 Runs.
+- Implementer: Cursor about 211. Reviewers: Cursor about 133, Codex about 92,
+  Claude 12. OMP implemented 7 times, all in this repository. Pi: none.
+- Every real Control waited in the background.
+- Six batches settled twice because they were never acknowledged.
+- Real `preflight` failures: a wait already active on the Run (4), the Run
+  bound to another terminal (4), a relative `--repo` (2), and a shell startup
+  prompt (oh-my-zsh) holding a Cursor worker (2).
+
+**A design review** (`~/dely-probe/arch-review/refactor-design-review.md`)
+rejected the first proposal, a `roles` object with per-role statuses, as a
+re-encoding of fields that already exist.
+
+#### Decision
+
+The schema keeps `status` (whether a harness is offered as a worker) and
+`controlWake` (how it can be Control, or `unsupported`). An entry may carry
+`limits`, one short sentence of what a user must know, which `setup` prints
+next to the harness it offers. The values are:
+
+- **Copilot CLI:** supported, `controlWake: background`.
+- **Antigravity CLI:** supported, `controlWake: waker`, `modelFlag: true`,
+  `effortFlag: false`, discovery `agy models`.
+- **Grok Build:** supported, `controlWake: waker`.
+- **Kiro CLI:** stays `deferred`, because a worker never becomes ready;
+  `controlWake` becomes `waker`, as measured.
+
+Each of the first three carries its launch limits. Existing entries gain
+limits too:
+
+- Codex: its Control's shell may lack the terminal handle.
+- Pi: its Control must run the helper without a tool timeout, and its pin is
+  unchecked.
+- OMP: a dead worker surfaces only at `STALLED`.
+- Cursor: no effort pin.
+
+The helper:
+
+- ignores messages Orca rejected when it looks for an acknowledgement or a
+  settling message;
+- takes `--ack <deliveryId>` on `wait` and `wait-bg`, to acknowledge the
+  previous batch the way Orca does, instead of acknowledging by itself;
+- checks for `ORCA_TERMINAL_HANDLE` before it dispatches;
+- adds a one-line hint to Orca's "bound to another terminal" and "active
+  waiter" errors;
+- records the `dispatchId` of a settling message and the Control harness of a
+  wait.
+
+The pin extension stops the worker when it cannot apply a pin, including a
+`setModel` that throws and a `dely-pin:` line it cannot parse. `SKILL.md`
+tells Control to run the helper with no tool timeout and to pass the settled
+id to its next wait. A gate checks the enumerated values in `harnesses.json`.
+
+#### Alternatives considered
+
+**A `roles` object with `supported`/`limited`/`unsupported` per role.**
+Rejected: `status` and `controlWake` already hold both axes; no consumer
+would branch on `limited`; implementer and reviewer never differed in any
+measurement or code path.
+
+**Refusing a dispatch or a wait for an unsupported role in the helper.**
+Rejected: Orca's own readiness gate already fails a worker that cannot start,
+and a hand-kept refusal would outlive the harness's fix and block
+re-measuring.
+
+**`wait` acknowledging by itself.** Rejected: it reverses Orca's documented
+process-then-acknowledge order; `--ack` on the next wait is Orca's own idiom.
+
+**A fixed log schema with an outcome enum.** Rejected: Orca's own dispatch
+record holds agent, model and outcome; only the `dispatchId` and the Control
+harness were missing.
+
+**Leaving Copilot, Antigravity and Grok deferred.** Rejected by the owner:
+each worked in every role it was measured in, and its limits can be stated.
+
+#### Consequences
+
+A user reading `setup` or README sees what each harness can do and what it
+costs. Three more harnesses are supported on one measurement per role, and
+all three self-update often; their `notes` name the measured versions, and
+their live rows run when their entry or the shared launch code changes.
+
+Kiro stays out, and its Control result is recorded, not offered.
+
+#### Deferred
+
+A Kiro worker. Trigger: an Orca release in which `worker-start --agent kiro`
+becomes ready.
+
+A pinned Copilot or Grok worker. Trigger: an Orca release whose
+`worker-start` accepts `--model` for them.
 
 ### 2026-09-28 — Pi is a supported harness and shares OMP's package and pin extension
 
