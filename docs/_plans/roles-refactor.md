@@ -5,7 +5,8 @@ states what it can do per role, with limits; Copilot, Antigravity and Grok are
 supported". It builds on the 2026-09-28 Pi and 2026-09-27 OMP records, still
 unreleased on this branch.
 
-**Baseline:**
+**Baseline:** `ec353bc` for Task A; each later task's baseline is the
+previous task's accepted commit.
 
 ## Goal
 
@@ -49,15 +50,16 @@ and then removes.
 ## Execution envelope
 
 Protected dirty paths: none. The owner's pin commits are separate (`abc9a2a`,
-`9069365`, `0765b79`).
+`9069365`, `0765b79`, `e5248fb`).
 
-Branch: `feat/pi-harness` at `0765b79`, remote `origin`. Pull request #61 is
+Branch: `feat/pi-harness` at `ec353bc`, remote `origin`. Pull request #61 is
 retitled and updated to cover this work.
 
 Resolved pins, from `AGENTS.md` and checked 2026-09-30:
 
-- `implement`: Codex CLI `gpt-6.1-sol` `medium`. Codex 0.159.1 lists
-  `gpt-6.1-sol` with `medium`.
+- `implement`: Cursor Agent CLI `cursor-grok-4.6-high`, effort `default`
+  (owner, `e5248fb`), because Codex 0.159.2 cannot start as a worker (Task A's
+  Codex bullet). Preflight passed on 2026-09-30.
 - `review`: Claude Code `claude-opus-5-5` `high`.
 
 Authority: commit owned paths, run gates, push `feat/pi-harness`, update pull
@@ -87,7 +89,12 @@ request #61. No merge, force-push, stash, reset or clean.
   - `codex`: its Control's shell may lack `ORCA_TERMINAL_HANDLE`, measured on
     0.157.1; and Codex 0.159.2 never passes Orca 1.4.215's readiness check as
     a worker (`agent_readiness` timeout, with and without `-c`, measured
-    2026-09-30), so it is not usable as a worker on that pair;
+    2026-09-30), so it is not usable as a worker on that pair. Cause, measured
+    2026-09-30 in `~/dely-probe/roles-taskA/codex-readiness/`: Orca 1.4.215
+    recognises a ready Codex by the screen text `OpenAI Codex` followed by
+    `model:` and `directory:`, and the 0.159.2 start screen shows
+    `OpenAI Codex (v0.159.2)` and the path with neither label. `worker-start`
+    sends no prompt until that check passes, and nothing skips it;
   - `pi`: as Control, run the helper with no tool timeout; the pin is
     unchecked;
   - `omp`: a dead worker surfaces only at `STALLED`;
