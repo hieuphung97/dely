@@ -56,7 +56,7 @@ delivery run.
 
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
-| `implement` | OMP | google-vertex/gemini-3.8-flash | high |
+| `implement` | Codex CLI | gpt-6.1-sol | medium |
 | `review` | Claude Code | claude-opus-5-5 | high |
 <!-- dely:end -->
 
