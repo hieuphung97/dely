@@ -82,6 +82,10 @@ jq -e . harnesses.json plugin.json .claude-plugin/plugin.json .claude-plugin/mar
 ```
 
 ```bash
+jq -e '.harnesses | all((.status == "supported" or .status == "deferred") and (.controlWake == "background" or .controlWake == "waker" or .controlWake == "unsupported") and ((has("modelPin") | not) or .modelPin == "spec" or .modelPin == "spec-unchecked"))' harnesses.json >/dev/null
+```
+
+```bash
 node --check skills/delivery/scripts/dely.js
 git ls-files -z '*.sh' 'skills/delivery/scripts/dely' | xargs -0 -n1 bash -n
 ```

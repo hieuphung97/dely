@@ -66,7 +66,8 @@ not, append the block. Touch nothing else.
 ## Discovery
 
 Offer only entries whose `status` is `supported`. A `deferred` entry is
-omitted, not an error.
+omitted, not an error. When an offered entry has `limits`, print it next
+to that harness.
 
 For each supported entry whose `binary` is installed, run that entry's
 `discovery`. `discovery` is `null` when the harness has no listing command;
