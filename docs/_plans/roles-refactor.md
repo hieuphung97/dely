@@ -57,10 +57,14 @@ retitled and updated to cover this work.
 
 Resolved pins, from `AGENTS.md` and checked 2026-09-30:
 
-- `implement`: Cursor Agent CLI `cursor-grok-4.6-high`, effort `default`
-  (owner, `e5248fb`), because Codex 0.159.2 cannot start as a worker (Task A's
-  Codex bullet). Preflight passed on 2026-09-30.
+- `implement`: Codex CLI `gpt-6.1-sol` `medium` (owner, `33d10d1`). Tasks A
+  and B ran on Cursor Agent CLI `cursor-grok-4.6-high` (`e5248fb`) while Codex
+  0.159.2 could not start as a worker on Orca 1.4.215. Orca 1.4.217 fixes that
+  (stablyai/orca#23766); `dely preflight` passed for Codex on 1.4.217,
+  2026-09-30.
 - `review`: Claude Code `claude-opus-5-5` `high`.
+
+Orca is 1.4.217 from Task B's remediation on. Every live row runs on it.
 
 Authority: commit owned paths, run gates, push `feat/pi-harness`, update pull
 request #61. No merge, force-push, stash, reset or clean.
@@ -159,6 +163,21 @@ discovery command.
 - Node fake-`pi` extension check for the two new failure cases.
 - Observe each red against a present-but-wrong variant first.
 
+**Remediation (Task B review of `15417d8`, Minors 1 to 4).**
+
+- **Rejected messages:** test the payload marker only. Orca 1.4.217 writes the
+  `Rejected <type>: ` subject and the `_orcaLifecycleRejection` payload in one
+  `UPDATE`, so the subject test catches nothing more. It also drops a genuine
+  message whose subject starts `Rejected `. Evidence:
+  `~/dely-probe/roles-taskB/orca-1.4.217/rejection-shape.js.txt`.
+- **`--ack`:** a bare `--ack`, or a `check --ack` that Orca refuses, prints
+  `ERROR` with Orca's text and does not wait.
+- **Terminal handle:** an unset `ORCA_TERMINAL_HANDLE` in `dispatch` and
+  `preflight` prints `ERROR`, not `FAILED`. `FAILED` routes to a retry that
+  repeats the cause; `ERROR` goes to the human.
+- **Log:** the waiter's `wait` and `settled` events record the Control's
+  harness from the `--as` terminal's `agentIdentity`, else `--control`.
+
 ### C. README and checklist
 
 **Behaviour.**
@@ -193,6 +212,11 @@ discovery command.
   did not disprove, verbatim from `git show ec353bc:harnesses.json`: the
   unavailable `--model` value falling back to `auto`, and the effort values
   from `copilot --help`. (Task A re-review, Minor 2; `notes` only.)
+
+- **`harnesses.json` `codex`:** on Orca 1.4.217, Codex 0.159.2 passed
+  `dely preflight` as a worker (2026-09-30). Remove the worker clause from
+  `limits`, and keep the Control clause. `notes` record both results: the
+  failure on 1.4.215 and the pass on 1.4.217.
 
 **Focused verification.** A human-equivalent read against the decision record
 and the install probe report; `git diff --check`; the disclosure greps.
