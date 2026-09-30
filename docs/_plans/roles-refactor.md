@@ -221,6 +221,45 @@ discovery command.
 **Focused verification.** A human-equivalent read against the decision record
 and the install probe report; `git diff --check`; the disclosure greps.
 
+### D. README and checklist corrections (replan of Task C)
+
+The scoped re-review of the Task C remediation (`edfb646`) did not accept, so
+this replaces a further repair loop. Report:
+`~/dely-probe/roles-taskC/rereviewC-edfb646.md`. Files: `README.md`,
+`probe/checklist.md`.
+
+**Behaviour.**
+
+- **Checked versions:** Orca is `1.4.215`, and Codex CLI 0.159.2 as a worker
+  needs Orca `1.4.217`. After the live verification, Control updates this line
+  in the release commit to the versions the live rows observed.
+- **Control row:** delete "Control uses `$snap/skills/delivery/scripts/dely`
+  from its verified install; pass the actual snapshot path to Control." The
+  Control uses its installed skill's `scripts/dely`, whose hash the row
+  already checks. The worker row keeps `$snap`.
+- **Row 4:** runs once per Control wake mode, `background` and `waker`: two
+  runs, each on a harness the parameterized Control row covers.
+- **`dely` with no arguments:** "ask Control to run its `scripts/dely` with no
+  arguments".
+- **Codex handle item:**
+  - prefix helper and `orca` commands;
+  - Control looks the handle up with
+    `orca terminal list --worktree active --json`, only when that worktree has
+    one agent terminal;
+  - otherwise, use another Control harness;
+  - never use another pane's handle.
+- **Cut explanation:**
+  - Antigravity: "Antigravity can lose the prompt on a new path; retry once."
+  - Keep the pinned OMP or Pi worker install and its check in one place.
+  - Drop "Install success alone does not identify the running copy."
+  - Drop the repeated Codex update sentence under its commands.
+
+**Focused verification.**
+
+- `git diff edfb646` limited to these items;
+- `wc -l README.md`;
+- every closure gate.
+
 ## Acceptance
 
 | Requirement | Instrument | Counterexample | Observed red |
