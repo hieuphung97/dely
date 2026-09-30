@@ -257,9 +257,7 @@ pre-approved Bounded, dispatch implement and review, push to the bare remote,
 and stop only where the skill requires a human. Control uses
 `orca orchestration run-create --objective "control-<id> probe" --json`
 to create and bind its Run, or `orca orchestration run-use --id <run>`
-to resume one. Do not bind it from the observer terminal. Control uses
-`$snap/skills/delivery/scripts/dely` from its verified install; pass the
-actual snapshot path to Control.
+to resume one. Do not bind it from the observer terminal.
 
 For `background`, Control runs `dely wait --run <run> --control <id>` as a
 background tool command and ends its turn. For `waker`, Control runs
@@ -382,7 +380,8 @@ subject intentionally begins `Rejected `; only the payload marker rejects it.
 
 ## Step 4 — row 4, a worker that dies after it acknowledges
 
-Run row 4 once for each harness required by the parameterized Control row.
+Run row 4 once per Control wake mode, `background` and `waker`: two runs,
+each on a harness covered by the parameterized Control row.
 Inside that row, after the implement worker has acknowledged
 **and** Control's own wait for that Run is running
 (`pgrep -f "dely.js wait --run <run>"` for a background Control, the

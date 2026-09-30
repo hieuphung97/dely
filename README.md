@@ -71,7 +71,6 @@ codex plugin remove dely@dely       # remove
 If add keeps a stale marketplace, remove the marketplace and plugin, then add
 again. Pin a tag or full commit SHA with
 `codex plugin marketplace add --ref <ref> https://github.com/hieuphung97/dely.git`.
-Codex has no plugin update command; use marketplace upgrade.
 Do not use `codex plugin install`.
 
 ### Cursor Agent CLI
@@ -137,7 +136,7 @@ Use a dedicated clone or an unpacked snapshot; install links the source path.
 ```bash
 git clone https://github.com/hieuphung97/dely.git
 omp plugin install /path/to/dely
-omp plugin list --json                    # verify
+omp plugin list --json                    # verify dely-pin.ts
 omp skill list --json                     # verify loaded skills
 omp plugin uninstall dely                 # remove; needs bun on PATH
 omp plugin disable dely                   # disable skills and extension
@@ -167,10 +166,11 @@ Invoke `/skill:delivery` or `/skill:setup`.
 
 Kiro CLI was measured but is not supported: workers never became ready.
 
-Checked versions (observations, not minimums): Orca 1.4.217; Claude Code
-2.1.274; Codex CLI 0.154.0 (install), 0.157.1 (Control), 0.159.2 (worker);
-Cursor Agent CLI 2026.09.15-d2fe57e; Copilot CLI 1.0.89; Antigravity CLI
-1.2.13; Grok Build 1.0.44; OMP 18.3.4 (install), 18.3.3 (worker); Pi 0.87.1.
+Checked versions (observations, not minimums): Orca 1.4.215 (Codex CLI 0.159.2
+as a worker needs 1.4.217); Claude Code 2.1.274; Codex CLI 0.154.0 (install),
+0.157.1 (Control), 0.159.2 (worker); Cursor Agent CLI 2026.09.15-d2fe57e;
+Copilot CLI 1.0.89; Antigravity CLI 1.2.13; Grok Build 1.0.44;
+OMP 18.3.4 (install), 18.3.3 (worker); Pi 0.87.1.
 
 ## Pin a model
 
@@ -178,10 +178,8 @@ Invoke setup to select live model and effort values for each phase. Copilot
 and Grok have neither model nor effort pins; Cursor and Antigravity have no
 effort pin.
 
-For pinned OMP workers, install above and check `omp plugin list --json`.
-For pinned Pi workers, install above and check `dely-pin.ts` in the startup
-Extensions listing. OMP uses a selector from `omp models --json` and that model's
-`thinking` levels. Pi uses `<provider>/<model>` from `pi --list-models` and
+OMP uses a selector from `omp models --json` and that model's `thinking`
+levels. Pi uses `<provider>/<model>` from `pi --list-models` and
 levels from `pi --help`. Pi's pin is unchecked by Orca; verify it in the
 session transcript under `~/.pi/agent/sessions/`. For Pi, instruct Control
 to run the helper with no tool timeout.
@@ -195,18 +193,18 @@ to run the helper with no tool timeout.
   before retrying.
 - **First launch stops at trust:** open that harness in the same path and
   answer its dialog, then retry. Copilot can report only `NO_ACK`;
-  Antigravity lost the prompt on 3 of 4 fresh-path launches and 0 of 6
-  trusted-path launches; retry once. Pi asks when the path or an ancestor
-  has `.pi/` resources or `.agents/skills`.
-- **Codex helper says "not inside an Orca terminal":** give Control its
-  terminal handle to prefix helper commands with `ORCA_TERMINAL_HANDLE=<handle>`.
-  Control can look it up with `orca terminal list --worktree active --json`
-  only when that worktree has one agent terminal; never use another pane's handle.
-- **Old behavior after update:** open a new Control session. Run `dely`
-  with no arguments to identify the running copy. Compare `skills/delivery/SKILL.md`
-  by SHA-256 at every skill location, including `~/.agents/skills`, project and
-  personal skills, plugin caches and marketplace sources; update or remove
-  mismatched copies. Install success alone does not identify the running copy.
+  Antigravity can lose the prompt on a new path; retry once. Pi asks when
+  the path or an ancestor has `.pi/` resources or `.agents/skills`.
+- **Codex helper says "not inside an Orca terminal":** ask Control to look up
+  its handle with `orca terminal list --worktree active --json` only when
+  that worktree has one agent terminal, then prefix helper and `orca` commands
+  with `ORCA_TERMINAL_HANDLE=<handle>`. Otherwise, use another Control harness.
+  Never use another pane's handle.
+- **Old behavior after update:** open a new Control session. Ask Control to run
+  its `scripts/dely` with no arguments to identify the running copy. Compare
+  `skills/delivery/SKILL.md` by SHA-256 at every skill location, including
+  `~/.agents/skills`, project and personal skills, plugin caches and
+  marketplace sources; update or remove mismatched copies.
   Codex personal skills can shadow plugins; Cursor copies can override the
   Claude cache; Copilot project and personal skills can hide its plugin.
 
