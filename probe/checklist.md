@@ -1,37 +1,34 @@
 # Live checklist
 
-This replaces the structural suite that Dely deleted in 0.19.0. A structural
-suite told us the files had the shape we last agreed on. It never told us a
-worker started, acknowledged, stalled, died, or hit a dialog. Everything that
-actually broke in the 0.18.0 series was found by running the real thing, so
-that is what is run now.
+A separate agent session runs this against a candidate installed from a
+`git archive` snapshot, before review. Record every row's candidate SHA,
+Orca version, harness version, model, effort, verdict and residue. A human
+answers first-launch trust dialogs; Dely never answers them. `trust.sh`
+can stand in for the human only for Claude Code.
 
-A separate agent session runs this before a release, against a candidate
-installed for real. A human is needed for the first trust of each probe
-repository, and otherwise only when a row goes wrong.
+## Input and release floor
 
-Dely itself never answers a harness dialog. `trust.sh` in this directory does,
-because a probe has to stand in for the human somewhere, and it is not part of
-the shipped skill. No skill references this directory.
+- candidate SHA and checkout path;
+- Orca running with orchestration enabled;
+- each harness being tested installed and signed in;
+- Node and `~/dely-probe/` writable.
 
-## Input
+Run the parameterized worker and Control rows for every supported harness
+whose entry changed. If shared worker-launch code changed, run both rows for
+**every supported harness** in the candidate's `harnesses.json`; skip Control
+only when `controlWake` is `unsupported`, and record that reason. Each worker
+row covers implementer and reviewer in separate sessions. For this candidate,
+the shared launch changes require Claude, Codex, Cursor, Copilot, Antigravity,
+Grok, OMP and Pi. Kiro stays deferred.
 
-- the candidate SHA;
-- Orca running, with orchestration enabled;
-- Claude Code, Codex CLI and Cursor Agent CLI installed and signed in;
-- OMP installed;
-- Pi installed and signed in;
-- `~/dely-probe/` writable. Both scripts here refuse every path outside it.
-
-Record the Orca version. A row that passed on one Orca build is not evidence
-about the next one: rows 1, 4 and 5 are rerun after every Orca upgrade,
-before the next delivery relies on the new build. Orca upgraded itself from
-1.4.203 to 1.4.204 in the middle of the 0.20.0 checklist, which is the
-reason. Record the OMP version next to the result. A row that passed on one
-OMP build is not evidence about the next one: rows 8, 9 and 12 are rerun
-after every OMP upgrade, before the next delivery relies on the new build.
-Record the Pi version next to the result. Pi rows are rerun after every
-Pi upgrade, before the next delivery relies on the new build.
+The release floor is those parameterized rows plus rows 4–9 and the rejected
+message stub row. Rows 10–11 run when `start()` or the pin extension changes.
+Rows 13–16 run when `start()`, the extension or the Pi entry changes, or Pi
+upgrades. The parameterized Control row replaces the former OMP and Pi
+Control rows. Rerun the parameterized rows and rows 4–5 after an Orca upgrade;
+rerun OMP pin rows after an OMP upgrade and Pi pin rows after a Pi upgrade.
+A release that skips required rows names them and the reason in its decision
+record; structural gates cannot substitute for them.
 
 ## Step 1 — install the candidate from a snapshot
 
@@ -45,8 +42,8 @@ rm -rf "$snap" && mkdir -p "$snap"
 git -C <checkout> archive "$sha" | tar -x -C "$snap"
 ```
 
-Install from `$snap` with the commands the README gives, for Claude Code and
-Codex CLI. Watch the Codex marketplace: `codex plugin marketplace add` was
+Install Claude Code and Codex CLI with their marketplace commands using
+`"$snap"` as the marketplace source instead of the git URL. Watch the Codex marketplace: `codex plugin marketplace add` was
 observed keeping a stale marketplace of the same name, installing the previous
 version, and reporting success. Remove the marketplace and the plugin, then add
 and install again.
@@ -69,7 +66,26 @@ removed or refreshed, a row with Cursor in any role cannot run, and saying so is
 the correct outcome for that row — not running it against whatever Cursor has.
 On 2026-09-16 two such copies blocked every Cursor row of the 0.19.0 release.
 
-Install OMP from the snapshot. OMP has no trust step.
+For Copilot, Antigravity and Grok Controls, use the measured local installs:
+
+```bash
+copilot plugin install "$snap"
+copilot skill list --json
+agy plugin install "$snap"
+agy plugin list
+grok plugin install "$snap" --trust
+grok inspect --json
+```
+
+Run only the commands for the harness under test. Verify both loaded skills
+against the snapshot; for Grok check the resolved paths so a Claude import
+does not substitute for the candidate. Copilot project or personal skills can
+hide the plugin. Check Antigravity's fixed install directory
+`~/.gemini/config/plugins/dely/` by hash and confirm `/dely:delivery` and
+`/dely:setup` in its TUI autocomplete; `plugin list` alone gives no paths.
+Record prior installs and restore them after the probe.
+
+Install OMP from the snapshot for its Control or pin rows. OMP has no trust step.
 
 ```bash
 omp plugin install "$snap"
@@ -116,9 +132,9 @@ wrong `pi.skills` path), not the snapshot. A hash mismatch on
 `SKILL.md`, `dely.js`, or `extensions/dely-pin.ts` is a fail: the linked tree is
 not the snapshot, or the extension was altered. Comparing only a symlink
 to `$snap` with `$snap` itself is not this check. Remove the OMP install
-in Step 18.
+in cleanup.
 
-Install Pi from the snapshot:
+Install Pi from the snapshot for its Control or pin rows:
 
 ```bash
 pi install "$snap"
@@ -139,13 +155,14 @@ project `.agents/skills`. A scratch home under the real home directory makes
 the real `~/.agents/skills` such an ancestor: `--approve` (or keeping any scratch
 home outside the home directory) ensures startup does not hang on that dialog.
 
-Remove the Pi install in Step 18 with `pi remove "$snap"`.
+Remove the Pi install in cleanup with `pi remove "$snap"`.
 
 Then verify by hash, at every location that can serve the skill:
 
 ```bash
 shasum -a 256 "$snap/skills/delivery/SKILL.md"
 find ~/.claude/plugins ~/.claude/skills ~/.agents/skills ~/.codex ~/.cursor \
+     ~/.copilot ~/.gemini/config/plugins ~/.grok/installed-plugins ~/.omp ~/.pi \
   -name SKILL.md -path '*delivery*' -exec shasum -a 256 {} +
 ```
 
@@ -165,82 +182,179 @@ install: report the path and the hash and ask.
 **A harness reporting a successful install is not evidence.** Cursor once ran
 an old branch for ten merges while reporting success every time.
 
-## Step 2 — build the probe repositories
+## Parameterized worker row
+
+Vary exactly: `id`, `name`, `binary`, `permissionDefault`, `discovery`, Model
+and Effort from the candidate's entry; the probe path `worker-<id>`; and phase
+(`implement`, then `review`). Use `default` where no pin is supported; for
+`modelPin` entries use a discovered selector and level, with the extension
+loaded. Record the actual default model and effort when no pin is requested.
+Use the candidate helper from the verified Control install. Run preflight and
+dispatch with no tool timeout, or one of at least 300 s.
 
 ```bash
-probe/mkrepo.sh r1 "Claude Code" claude-opus-5 medium "Codex CLI" <slug> <effort>
-probe/mkrepo.sh r2 "Codex CLI" <slug> <effort> "Cursor Agent CLI" <slug> default
-probe/mkrepo.sh r3 "Cursor Agent CLI" <slug> default "Claude Code" claude-opus-5 medium
+probe/mkrepo.sh worker-<id> "<name>" <model> <effort> "<name>" <model> <effort>
 ```
 
-The paths are fixed at `~/dely-probe/r1`, `r2` and `r3` so that a harness trust
-entry, which is keyed on the path, survives a rebuild. The first run needs a
-human to trust each harness at each path once; later runs need none. Take the
-model slugs from the harness's own discovery command, not from this file.
+From a Control terminal in this repository, create and bind a probe Run using
+Orca's orchestration commands. Answer the tested harness's trust dialog at
+this path before dispatch (by hand except for Claude's `probe/trust.sh`).
+Install Dely only in Control; OMP and Pi workers additionally need the pin
+extension loaded. Create two spec files under the probe path:
 
-## Step 3 — rows 1 to 3, the rotated deliveries
-
-For each repository, launch a Control and give it the delivery:
+- Implement: fix the `REQUEST.md` defect, add a regression test, run
+  `node --test test/`, and commit. Report through the dispatched lifecycle
+  commands, using its own task, dispatch and terminal identities.
+- Review: read the implement commit against `REQUEST.md`, run the gates,
+  and report `ACCEPT` or concrete findings through its lifecycle commands.
+  Do not modify the repository.
 
 ```bash
-orca terminal create --worktree path:~/dely-probe/rN \
-  --command "<binary> <permission default>"
+dely preflight --repo <absolute probe path> --run <run>
+dely dispatch --repo <absolute probe path> --run <run> --phase implement --spec-file <implement spec>
+# After processing implement settlement, acknowledging it and releasing:
+dely dispatch --repo <absolute probe path> --run <run> --phase review --spec-file <review spec>
 ```
 
-Wait for the harness to be idle, then send the Control prompt: use
-`dely:delivery` for the change described in `REQUEST.md`; the design contract
-is pre-approved as Bounded within `REQUEST.md`; stop only where the skill
-requires a human.
+Use the Control wait below for each dispatch. **Pass:** preflight passes both
+pins; both dispatches print `DISPATCHED` after a valid acknowledgement, both
+settle on accepted `worker_done`, the regression passes and the review reports
+`ACCEPT`. Record prompt retries and trust intervention separately; a launch
+that loses its prompt is a failed attempt, even if its retry passes. Read the
+worker screen with `orca terminal read --screen` on failure. Record pin
+projection where available; for Pi inspect the session transcript instead.
+A successful helper print alone does not prove the worker ran the task.
 
-Follow it with `orca orchestration run-list` filtered by `coordinator_handle`,
-`orca orchestration worker-list`, and `orca terminal read --screen`, until the
-Control screen stops changing and no worker is `dispatched`.
+## Parameterized Control row
 
-Use `--screen`. Without it a read returns accumulated output, which comes back
-as stacked fragments for any TUI and as an empty tail once a previous read has
-consumed the cursor. `worker-list` may also report an empty `taskTitle`, so
-identify a dispatch by its id and the order it appeared, not by its title.
+Vary exactly: Control `id`, `binary`, `permissionDefault`, its discovered
+model and effort launch arguments (only flags the entry supports), its
+`controlWake`, the invocation spelling from README, and path `control-<id>`.
+Keep both worker pins Claude Code with the same discovered model and effort
+for all Control variants. Record Control's actual model and effort.
 
-Collect: the SHA on the remote, the disposition in the handoff, how many times
-a human had to act and why, wall time, and per-phase time. Also record, as
-tracking data and not as a pass condition, the Control harness and model; how
-many model requests Control made during each worker wait and when they fell
-relative to the dispatch — from `token_usage_record` lines in a Codex rollout
-under `~/.codex/sessions`, from assistant messages with `usage` in a Claude
-session under `~/.claude/projects`, and by counting assistant records in a
-Cursor agent transcript (Cursor stores no token counts locally); and whether
-Control read `scripts/dely.js`.
+```bash
+probe/mkrepo.sh control-<id> "Claude Code" <model> <effort> "Claude Code" <model> <effort>
+orca terminal create --worktree path:~/dely-probe/control-<id> \
+  --command "<binary> <permissionDefault> <supported model/effort arguments>"
+```
 
-**Pass:** the branch is on the remote, the review disposition is `ACCEPT`, and
-no human acted. For the row whose Control wakes by `waker`, every `wait_bg`
-event in that Run's log is followed by a `settled`, `attention` or `stalled`
-event before its `notify`, and the Run's log has no `error` event. A
-`wait_bg` event with `which: ALREADY_WAITING` starts no waiter and has no
-`notify` of its own, so it is not paired. A retried `FAILED` dispatch writes
-an `error` event, so a Run that needed that recovery does not pass row 3
-and is reported as such rather than as a waker failure. Presence
-of `wait_bg` and `notify` is not enough: on `e874990` a Codex Control launched
-`dely wait-bg` inside a new Orca terminal, the waiter watched the wrong
-terminal and failed after 1 s with "no longer bound", and the log still
-carried `wait_bg` and `notify`, so the old wording passed it. Without the
-events at all the row passed without exercising the path it exists to test:
-on `82aa354` a Codex Control reached `ACCEPT` with a blocking `dely wait`,
-and branch, disposition and human count could not tell.
+Install the candidate in this Control harness and verify the loaded paths and
+hashes. Pre-trust Claude workers with `probe/trust.sh` at this path; answer
+Control's own dialog by hand. Wait for the composer before sending a prompt.
+Tell Control: use the delivery skill for `REQUEST.md`, treat the design as
+pre-approved Bounded, dispatch implement and review, push to the bare remote,
+and stop only where the skill requires a human. Control creates or binds its
+own Run. Do not bind it from the observer terminal.
 
-All three rows run for a release. Rows 2 and 3 rotate which harness is Control,
-implementer and reviewer, and a rotation is the only thing that exercises a
-harness in a role it does not hold in row 1. The release floor is ten rows
-(1–9 and 12), not row 1: rows 10 and 11 run when
-`start()` in `dely.js` or `extensions/dely-pin.ts` changes. The Pi rows run
-when `start()`, the extension or the `pi` entry changes, and after a Pi upgrade;
-the release floor stays ten rows. A release that ran fewer says so in its decision
-record and names which rows it skipped. The 0.19.0 release did exactly that
-— it ran rows 1, 4, 5 and 7 only — and recorded the exception rather than
-moving the floor.
+For `background`, Control runs `dely wait --run <run> --control <id>` as a
+background tool command and ends its turn. For `waker`, Control runs
+`dely wait-bg --run <run> --control <id>` as its last command and ends its
+turn. Run neither helper under a short tool timeout. Process each settled
+batch, then pass its delivery id as `--ack <delivery>` to the next wait;
+when no wait follows, run `orca orchestration check --ack <delivery>`.
+After the active waiter settles, for each waker harness separately run `dely wait --run <run> --control <id>`
+from a shell: it must print `REFUSED`.
+
+Observe with `worker-list`, `worker-show`, and `terminal read --screen`.
+**Pass:** the pushed SHA matches the reviewed head, review reports `ACCEPT`,
+no human acts after initial trust, and Control wakes and processes the correct
+batch. For waker Controls, every `wait_bg` log event is followed by `settled`,
+`attention` or `stalled` before `notify`, and there is no `error` event.
+`ALREADY_WAITING` starts no waiter and has no notify of its own. Confirm the
+next Control turn acts on the wake. Merely seeing `wait_bg` and `notify` does
+not prove the waiter watched the right terminal or exercised this path.
+
+Record Control requests during each wait, their timing, and whether it read
+`scripts/dely.js`. Use Codex rollout `token_usage_record`, Claude assistant
+`usage`, or Cursor assistant transcript records (no local token counts).
+For other harnesses, record the available source or say unobservable.
+
+## Stub row — Orca-rejected messages
+
+Run this from the observer shell with `snap` set to the candidate snapshot.
+It uses a fake Orca executable and isolated home, creates no real Run or
+worker, and checks a deliberately wrong copy before the candidate.
+
+```bash
+stub=$(mktemp -d "$HOME/dely-probe/rejected.XXXXXX")
+cat > "$stub/check.cjs" <<'JS'
+const fs = require('fs'), path = require('path'), assert = require('assert');
+const {spawnSync} = require('child_process');
+const [snap, root] = process.argv.slice(2);
+const helper = path.join(snap, 'skills/delivery/scripts/dely.js');
+fs.mkdirSync(path.join(root, 'home/.dely'), {recursive: true});
+fs.mkdirSync(path.join(root, 'repo'));
+fs.writeFileSync(path.join(root, 'repo/AGENTS.md'),
+  '| implement | Claude Code | default | default |\n' +
+  '| review | Claude Code | default | default |\n');
+fs.writeFileSync(path.join(root, 'repo/spec.md'), 'Fixture only.');
+fs.cpSync(snap, path.join(root, 'wrong'), {recursive: true});
+const wrong = path.join(root, 'wrong/skills/delivery/scripts/dely.js');
+const source = fs.readFileSync(wrong, 'utf8');
+const needle = 'return payloadOf(m)._orcaLifecycleRejection != null;';
+assert(source.includes(needle), 'update the wrong-copy mutation for this candidate');
+fs.writeFileSync(wrong, source.replace(needle, 'return false;'));
+fs.writeFileSync(path.join(root, 'orca.js'), `
+const fs = require('fs');
+const a = process.argv.slice(2), cmd = a[1], root = process.env.FIXTURE_ROOT;
+fs.appendFileSync(root+'/calls.jsonl', JSON.stringify(a)+'\\n');
+let result = {};
+if (cmd === 'worker-start') result = {dispatchId:'fixture-dispatch'};
+if (cmd === 'check' && !a.includes('--ack')) {
+  let n = 0; try {n = +fs.readFileSync(root+'/count','utf8')} catch {}
+  fs.writeFileSync(root+'/count', String(n+1));
+  const rejected = process.env.FIXTURE_MODE === 'reject' ||
+    (process.env.FIXTURE_MODE === 'sequence' && n === 0);
+  const payload = {dispatchId:'fixture-dispatch'};
+  if (rejected) payload._orcaLifecycleRejection = {code:'dispatch_capability_invalid'};
+  const messages = a.includes('--peek') ? [{type:'heartbeat',subject:'ack',payload}] :
+    [{type:'worker_done',subject:'Rejected genuine subject',payload}];
+  result = {deliveryId: rejected ? 'rejected-batch' : 'accepted-batch', messages};
+}
+console.log(JSON.stringify({ok:true,result}));
+`);
+function run(file, verb, mode) {
+  fs.rmSync(path.join(root, 'count'), {force:true});
+  fs.writeFileSync(path.join(root, 'calls.jsonl'), '');
+  const args = [file, verb, '--run', 'fixture-run'];
+  if (verb === 'wait') args.push('--control', 'claude', '--timeout-min', '0.05');
+  else args.push('--repo', path.join(root, 'repo'));
+  if (verb === 'dispatch') args.push('--phase', 'implement', '--spec-file', 'spec.md');
+  const r = spawnSync(process.execPath, args, {encoding:'utf8', timeout:10000,
+    env:{...process.env, HOME:path.join(root,'home'),
+      ORCA_TERMINAL_HANDLE:'fixture-terminal', ORCA_CLI_COMMAND:path.join(root,'orca.js'),
+      FIXTURE_ROOT:root, FIXTURE_MODE:mode, DELY_ACK_S:'0.2',
+      DELY_PREFLIGHT_S:'0.2', DELY_POLL_S:'0.02'}});
+  assert(!r.error, String(r.error));
+  return r.stdout;
+}
+for (const file of [wrong, helper]) {
+  const red = file === wrong;
+  assert.equal(run(file,'dispatch','reject').includes('DISPATCHED'), red);
+  assert.equal(run(file,'preflight','reject').includes(' PASS '), red);
+  const settled = JSON.parse(run(file,'wait','sequence'));
+  assert.equal(settled.SETTLED, red ? 'rejected-batch' : 'accepted-batch');
+  if (!red) assert(fs.readFileSync(path.join(root,'calls.jsonl'),'utf8')
+    .includes('"--ack","rejected-batch"'));
+  assert(run(file,'dispatch','accept').includes('DISPATCHED'));
+  assert(run(file,'preflight','accept').includes(' PASS '));
+  console.log(red ? 'RED: wrong copy advances on rejected messages' :
+    'GREEN: candidate ignores rejections and accepts genuine messages');
+}
+JS
+node "$stub/check.cjs" "$snap" "$stub"
+```
+
+**Pass:** both RED and GREEN print, all assertions pass, and the candidate's
+wait log in `$stub/home/.dely/log.jsonl` records the rejected batch before
+settling the accepted batch. Keep the fixture directory and output with the
+probe report; remove it after recording the result. The accepted message's
+subject intentionally begins `Rejected `; only the payload marker rejects it.
 
 ## Step 4 — row 4, a worker that dies after it acknowledges
 
-Inside one of the rows above, after the implement worker has acknowledged
+Inside the parameterized Control row, after the implement worker has acknowledged
 **and** Control's own wait for that Run is running
 (`pgrep -f "dely.js wait --run <run>"` for a background Control, the
 `wait-bg` waiter for a waker one), kill the worker's agent process from outside
@@ -296,7 +410,7 @@ neither is a substitute.
 ## Step 5 — row 5, a pin that has not answered its dialog
 
 Use a path that no harness has trusted — a new directory each time, never
-`r1` to `r3` — with a Claude Code pin, and run `dely preflight` inside a Run.
+the parameterized worker or Control paths — with a Claude Code pin, and run `dely preflight` inside a Run.
 
 **Pass:** `PREFLIGHT … FAIL` in under 60 s, the printed `last output` contains
 at least one line of the dialog, and `orca terminal list` shows nothing left
@@ -360,8 +474,8 @@ Steps and their pass conditions:
    `projects[<path>].hasTrustDialogAccepted` in `~/.claude.json`, and closes
    the terminal. **Pass:** it prints `TRUSTED`. On `NOT_TRUSTED`, stop and
    call the human — do not loop.
-3. Send Control one line: `Đã trust Claude Code trong repo này. Chạy lại
-   preflight và tiếp tục.` followed by Enter. If Orca answers
+3. Send Control one line: `Claude Code is trusted in this repository. Run
+   preflight again and continue.` followed by Enter. If Orca answers
    `agent_prompt_blocked`, Control is holding a menu: send `\r` first, then the
    text.
 4. **Pass:** the same Run gets a second preflight, it passes both pins, the
@@ -437,15 +551,6 @@ model.
 **Pass:** the session's model is unchanged from before that prompt. If the
 model switched, the extension applied the pin on a start after the first.
 
-## Step 12 — row 12, OMP as Control
-
-Launch OMP as Control. It dispatches a worker and runs `dely wait-bg` as its
-last command. Separately, `dely wait --control omp` from a shell.
-
-**Pass:** `dely wait-bg` reaches `SETTLED`, and `dely wait --control omp`
-prints `REFUSED`. If Control ran `dely wait` as a background job, that job
-is killed at 3600 s, which is `dely wait`'s default deadline.
-
 ## Step 13 — row 13, Pi worker with a valid pin
 
 Run this row when `start()` in `dely.js`, the extension or the `pi` entry
@@ -504,22 +609,10 @@ exists yet; otherwise record "not run"). Sample `worker-show` at 1 s or less.
 again exactly once. Killing the Pi worker process turns
 `attention.requiresAction` true within 3 s.
 
-## Step 17 — row 17, Pi as Control
+## Cleanup
 
-Run this row when `start()` in `dely.js`, the extension or the `pi` entry
-changes, and after a Pi upgrade.
-Launch Pi as Control. It dispatches a worker and runs `dely wait-bg` as its
-last command. Separately, run `dely wait --control pi` from a shell.
-
-**Pass:** the `dely wait-bg --control pi` cycle completes to `SETTLED`, meeting
-row 3's event-order criterion (every `wait_bg` event in that Run's log is
-followed by a `settled`, `attention` or `stalled` event before its `notify`,
-and the Run's log has no `error` event), Pi's next turn acted on the wake, and
-`dely wait --control pi` prints `REFUSED`.
-
-## Step 18 — clean up
-
-- uninstall the candidate from Claude Code, Codex CLI and Cursor Agent CLI;
+- uninstall candidate copies from every tested Control harness using README
+  commands, restoring any prior installs; Grok can also import Claude copies;
 - remove the OMP install (`omp plugin uninstall dely`; needs `bun` on PATH;
   when `bun` is absent, `omp plugin disable dely` stops OMP loading Dely's
   skills and extension and leaves `dely` listed, then delete
@@ -528,7 +621,7 @@ and the Run's log has no `error` event), Pi's next turn acted on the wake, and
   `~/.omp/plugins/omp-plugins.lock.json` with `jq 'del(.plugins.dely)'`);
 - remove the Pi install (`pi remove "$snap"`);
 - delete the snapshot;
-- keep `r1` to `r3` so their trust entries survive;
+- keep parameterized worker and Control paths so their trust entries survive;
 - remove the row 5, row 7, OMP-row and Pi-row paths, and the trust entries of the
   first two.
 
@@ -536,7 +629,7 @@ and the Run's log has no `error` event), Pi's next turn acted on the wake, and
 
 The deferred harnesses. Installing OMP from a git URL, or uninstalling it
 with `bun` present. Windows. A race between an acknowledgement and a
-replayed batch. A quota exhausted mid-run. A Control that skips a gate because
+replayed batch in a live session (the stub covers only its fixtures). A quota exhausted mid-run. A Control that skips a gate because
 the model was having a bad day. A shape change between two Orca releases, until
 the rows are run again. A Model `default` dispatch whose spec itself carries
 a pin line. A stuck live Pi worker before `DEADLINE`. Pi versions other than
@@ -546,4 +639,4 @@ load the extension, which runs its own default unseen.
 ## Results
 
 Put the table in the pull request body: one line per row, with the verdict, the
-number, and what was left behind.
+harness and role (or row number), and what was left behind.
