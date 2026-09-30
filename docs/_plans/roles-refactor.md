@@ -157,9 +157,14 @@ discovery command.
   - installing Orca;
   - a table of supported harnesses with Control wake and their `limits`, in
     one line each;
-  - per-harness install, verify, update and remove commands, **only as
-    measured** in `/Users/hieuphung/dely-probe/install-probe/report.md` for
-    Copilot, Antigravity and Grok, and as already documented for the others;
+  - install guidance that says plainly: **install Dely only in the harness
+    you use as the Control session**. Workers read no Dely skill, so a harness
+    used only as implementer or reviewer needs Orca and its own login, not a
+    Dely install. Then per-harness install, verify, update and remove
+    commands for the harnesses that can be Control, **only as measured** in
+    `/Users/hieuphung/dely-probe/install-probe/report.md` for Copilot,
+    Antigravity and Grok, and as already documented for the others. (Added
+    at the owner's request, 2026-09-30.)
   - one line for Kiro: measured, not supported;
   - pinning a model;
   - troubleshooting: shell startup prompts such as an oh-my-zsh update
