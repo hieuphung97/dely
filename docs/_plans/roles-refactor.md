@@ -90,11 +90,13 @@ request #61. No merge, force-push, stash, reset or clean.
     0.157.1; and Codex 0.159.2 never passes Orca 1.4.215's readiness check as
     a worker (`agent_readiness` timeout, with and without `-c`, measured
     2026-09-30), so it is not usable as a worker on that pair. Cause, measured
-    2026-09-30 in `~/dely-probe/roles-taskA/codex-readiness/`: Orca 1.4.215
-    recognises a ready Codex by the screen text `OpenAI Codex` followed by
-    `model:` and `directory:`, and the 0.159.2 start screen shows
-    `OpenAI Codex (v0.159.2)` and the path with neither label. `worker-start`
-    sends no prompt until that check passes, and nothing skips it;
+    2026-09-30 in `~/dely-probe/roles-taskA/codex-readiness/`: Orca 1.4.215's
+    screen check for Codex looks for `OpenAI Codex` followed by `model:` and
+    `directory:`, and the 0.159.2 start screen shows
+    `OpenAI Codex (v0.159.2)` and the path with neither label. No other
+    readiness signal (title, agent status) arrived within 60 s either.
+    `worker-start` sends no prompt until readiness passes, and has no flag to
+    skip it;
   - `pi`: as Control, run the helper with no tool timeout; the pin is
     unchecked;
   - `omp`: a dead worker surfaces only at `STALLED`;
@@ -187,6 +189,10 @@ discovery command.
   - the OMP and Pi pin rows kept;
   - a stub instrument row for Orca-rejected messages;
   - the release floor restated for the parameterized rows.
+- **`harnesses.json` `copilot` `notes`:** restore the two sentences the Spike
+  did not disprove, verbatim from `git show ec353bc:harnesses.json`: the
+  unavailable `--model` value falling back to `auto`, and the effort values
+  from `copilot --help`. (Task A re-review, Minor 2; `notes` only.)
 
 **Focused verification.** A human-equivalent read against the decision record
 and the install probe report; `git diff --check`; the disclosure greps.
