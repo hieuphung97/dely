@@ -85,7 +85,9 @@ request #61. No merge, force-push, stash, reset or clean.
   worker never becomes ready.
 - **`limits` on existing entries:**
   - `codex`: its Control's shell may lack `ORCA_TERMINAL_HANDLE`, measured on
-    0.157.1;
+    0.157.1; and Codex 0.159.2 never passes Orca 1.4.215's readiness check as
+    a worker (`agent_readiness` timeout, with and without `-c`, measured
+    2026-09-30), so it is not usable as a worker on that pair;
   - `pi`: as Control, run the helper with no tool timeout; the pin is
     unchecked;
   - `omp`: a dead worker surfaces only at `STALLED`;
