@@ -241,6 +241,15 @@ here, so the task copies it.
   byte-identical to `40ee718` for an absolute `--repo`.
 - Use a scratch `HOME` for every stub run.
 
+**Carried from the Task F re-review (`f89de2f`), in this task:**
+
+- **The role-table gate's row count** uses `(✓|⚠|✗)` rather than `[✓⚠✗]`,
+  so it counts the same in the C locale. A count mismatch prints a message.
+- **README's Orca sentence** says that Orca runs each session and launches
+  the workers.
+
+Files added for this: `AGENTS.md` (the gate) and `README.md` (that sentence).
+
 ### H. Tiered checklist
 
 **Behaviour.**
