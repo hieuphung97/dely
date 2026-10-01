@@ -28,8 +28,8 @@ Run the live worker row for each entry that changed and for each harness
 upgrade that a deployment uses. Each worker row covers implementer and
 reviewer in separate sessions. A **deployment** is this repository's
 `AGENTS.md` pins plus the harness the owner uses as Control. A **harness
-upgrade** is a version different from the one recorded in the last
-release's live report.
+upgrade** is a version different from the newest live report that ran that
+harness. If none did, treat the harness as upgraded.
 
 When the argv stub reports a difference it does not list as intended,
 whether or not the change meant it, record it and run the live worker row
@@ -37,13 +37,13 @@ for every entry it names.
 
 Run the Control row once per wake mode (`background`, `waker`) whenever
 `wait`, `wait-bg`, `notify`, the acknowledgement or settle logic, or the
-Control section of `SKILL.md` changes; this is in addition to any
-per-harness Control rows. Those per-wake-mode rows use Claude Code for
-`background` and Codex CLI for `waker`, unless a deployment's Control uses
-another harness of that mode. Skip Control when `controlWake` is
-`unsupported`, and record that reason. Run the Control row per harness when
-its entry changed, or when that harness upgraded and a deployment uses it
-as Control.
+`SKILL.md` sections "The control session" and "Orca and the helper" change;
+this is in addition to any per-harness Control rows. Those per-wake-mode
+rows use Claude Code for `background` and Codex CLI for `waker`, unless a
+deployment's Control uses another harness of that mode. Skip Control when
+`controlWake` is `unsupported`, and record that reason. Run the Control row
+per harness when its entry changed, or when that harness upgraded and a
+deployment uses it as Control.
 
 The release floor is the argv stub row, the rejected-message stub row, the
 live worker rows the rules above require, the Control rows those rules
@@ -227,11 +227,19 @@ an old branch for ten merges while reporting success every time.
 Run this from the observer shell with `snap` set to the candidate snapshot and
 `release_snap` to the last release snapshot. Set `DELY_NAMED_INTENDED` to the
 differences the candidate's decision record names for this release, one per
-line (empty if it names none). It uses a fake Orca executable and isolated
-home, creates no real Run or worker, and checks a deliberately wrong copy (a
-mutant that drops `--effort`) before the candidate. It stands in for the live
-worker row of every supported entry whose `harnesses.json` entry did not
-change. The argv stub does not test Orca.
+line (empty if it names none). The row prints only these line forms:
+`<name> --model`, `<name> --effort`, `<name> is new`, `<name> missing from
+candidate`, `<name> deferred in candidate`, and the preflight-labelled flag
+forms `<name> preflight --model` and `<name> preflight --effort`. Only
+differences of those kinds go in `DELY_NAMED_INTENDED`. "This release" means
+the `docs/decisions.md` sections dated after the commit date of the newest
+`v*` tag. Write the list from the record before the row runs; never edit it
+from the row's output. A mismatch is a finding against the record or the
+data. It uses a fake Orca executable and isolated home, creates no real Run
+or worker, and checks a deliberately wrong copy (a mutant that drops
+`--effort`) before the candidate. It stands in for the live worker row of
+every supported entry whose `harnesses.json` entry did not change. The argv
+stub does not test Orca.
 
 ```bash
 stub=$(mktemp -d "$HOME/dely-probe/argv.XXXXXX")
@@ -273,6 +281,7 @@ function pinOf(h, other, mode) {
   const modelCap = !!(h.modelFlag || h.modelPin || o.modelFlag || o.modelPin);
   const effortCap = !!(h.effortFlag || h.modelPin || o.effortFlag || o.modelPin);
   if (mode === 'default') return {model:'default', effort:'default'};
+  if (mode === 'effort') return {model:'default', effort:'high'};
   return {
     model: modelCap ? 'pin-model' : 'default',
     effort: effortCap ? 'high' : 'default',
@@ -323,20 +332,27 @@ function launch(file, h, other, mode, verb) {
     : out.includes('DISPATCHED') && starts.length > 0;
   return {out, startArgv: starts[0] || null, starts, ok, status: r.status};
 }
-function diffLaunch(label, cand, rel, h, other, intended, unexpected) {
+function diffLaunch(label, cand, rel, h, other, intended, unexpected, mode) {
   const tag = label === 'dispatch' ? h.name : h.name + ' ' + label;
   const okNeedle = label === 'preflight' ? 'preflight' : 'dispatch';
-  if (!cand.ok) add(unexpected, tag + ' candidate did not ' + okNeedle + ': ' + cand.out);
-  if (!rel.ok) add(unexpected, tag + ' last release did not ' + okNeedle + ': ' + rel.out);
-  if (cand.ok && rel.ok && cand.out !== rel.out) add(unexpected, tag + ' stdout');
-  if (JSON.stringify(cand.starts.map(stripped)) !== JSON.stringify(rel.starts.map(stripped)))
-    add(unexpected, tag + ' argv');
+  const ftag = label === 'preflight' ? h.name + ' preflight' : h.name;
+  if (mode === 'effort') {
+    if (cand.out !== rel.out) add(unexpected, tag + ' stdout');
+    if (JSON.stringify(cand.starts.map(stripped)) !== JSON.stringify(rel.starts.map(stripped)))
+      add(unexpected, tag + ' argv');
+  } else {
+    if (!cand.ok) add(unexpected, tag + ' candidate did not ' + okNeedle + ': ' + cand.out);
+    if (!rel.ok) add(unexpected, tag + ' last release did not ' + okNeedle + ': ' + rel.out);
+    if (cand.ok && rel.ok && cand.out !== rel.out) add(unexpected, tag + ' stdout');
+    if (JSON.stringify(cand.starts.map(stripped)) !== JSON.stringify(rel.starts.map(stripped)))
+      add(unexpected, tag + ' argv');
+  }
   const cf = flagsOf(cand.startArgv), rf = flagsOf(rel.startArgv);
   for (const flag of ['--model', '--effort']) {
     if (cf[flag] === rf[flag]) continue;
     const field = flag === '--model' ? 'modelFlag' : 'effortFlag';
-    if (h[field] !== other[field]) add(intended, h.name + ' ' + flag);
-    else add(unexpected, h.name + ' ' + flag);
+    if (h[field] !== other[field]) add(intended, ftag + ' ' + flag);
+    else add(unexpected, ftag + ' ' + flag);
   }
 }
 function compare(candTree, relTree) {
@@ -358,15 +374,17 @@ function compare(candTree, relTree) {
       add(intended, h.name + ' is new');
       continue;
     }
-    for (const mode of ['pinned', 'default']) {
+    for (const mode of ['pinned', 'default'].concat(
+      (h.effortFlag || h.modelPin || other.effortFlag || other.modelPin) ? ['effort'] : []
+    )) {
       diffLaunch('dispatch',
         launch(helper(candTree), h, other, mode, 'dispatch'),
         launch(helper(relTree), h, other, mode, 'dispatch'),
-        h, other, intended, unexpected);
+        h, other, intended, unexpected, mode);
       diffLaunch('preflight',
         launch(helper(candTree), h, other, mode, 'preflight'),
         launch(helper(relTree), h, other, mode, 'preflight'),
-        h, other, intended, unexpected);
+        h, other, intended, unexpected, mode);
     }
   }
   for (const h of relHs.filter((x) => x.status === 'supported')) {
@@ -394,14 +412,16 @@ node "$stub/check.cjs" "$snap" "$release_snap" "$stub"
 ```
 
 **Pass:** RED prints (the `--effort`-dropping mutant fails the comparison), GREEN
-prints, every supported entry was compared pinned and with `default`, preflight
-output and launches matched, every release-supported entry missing or
-`deferred` in the candidate is reported, and the printed INTENDED lines equal
-the differences the candidate's decision record names for this release. A
-difference the record does not name fails the row. If the `--effort` mutation
-assert fires, update the needle; it is not a candidate failure. Keep the
-fixture directory and output with the probe report; remove it after recording
-the result.
+prints, every supported entry was compared pinned and with `default`, entries
+with `effortFlag` or `modelPin` were also compared with Effort pinned and Model
+`default` (including the refusal), preflight output and launches matched, every
+release-supported entry missing or `deferred` in the candidate is reported, and
+the printed INTENDED lines equal `DELY_NAMED_INTENDED`. An argv or stdout
+difference always fails the row; the live worker rows it routes to replace the
+row for those entries, and the floor is met when they pass. If the `--effort`
+mutation assert fires, update the needle; it is not a candidate failure. Keep
+the fixture directory and output with the probe report; remove it after
+recording the result.
 
 ## Parameterized worker row
 
@@ -461,11 +481,12 @@ A successful helper print alone does not prove the worker ran the task.
 ## Parameterized Control row
 
 Run once per wake mode (`background`, `waker`) whenever `wait`, `wait-bg`,
-`notify`, the acknowledgement or settle logic, or the Control section of
-`SKILL.md` changes; this is in addition to any per-harness rows. Use Claude
-Code for `background` and Codex CLI for `waker`, unless a deployment's
-Control uses another harness of that mode. Run per harness when its entry
-changed, or when that harness upgraded and a deployment uses it as Control.
+`notify`, the acknowledgement or settle logic, or the `SKILL.md` sections
+"The control session" and "Orca and the helper" change; this is in addition
+to any per-harness rows. Use Claude Code for `background` and Codex CLI for
+`waker`, unless a deployment's Control uses another harness of that mode.
+Run per harness when its entry changed, or when that harness upgraded and a
+deployment uses it as Control.
 Skip when `controlWake` is `unsupported`, and record that reason.
 
 Vary exactly: Control `id`, `binary`, `permissionDefault`, its discovered
@@ -902,7 +923,11 @@ the model was having a bad day. A shape change between two Orca releases, until
 the rows are run again. A Model `default` dispatch whose spec itself carries
 a pin line. A stuck live Pi worker before `DEADLINE`. Pi versions other than
 0.87.1 and 0.99.1. Pi's trust layout on other machines. A pinned Pi worker that did not
-load the extension, which runs its own default unseen.
+load the extension, which runs its own default unseen. A preflight that leaks
+its worker. A heartbeat-only acknowledgement, because the argv stub's fixture
+returns one batch. An Orca upgrade, which reruns live workers only for
+deployment harnesses, so the other supported harnesses are not re-verified
+against the new Orca.
 
 ## Results
 
