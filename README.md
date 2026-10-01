@@ -42,7 +42,7 @@ Dely here.
 **Implementer** is a session Control starts to make the change.
 
 **Reviewer** is a session Control starts to check the change independently
-before the pull request.
+before the pull request. The implementer and the reviewer are the workers.
 
 A Spike investigates only — no delivery run.
 
@@ -50,7 +50,8 @@ A Spike investigates only — no delivery run.
 
 Before the first delivery in a project, open each harness you chose there once
 and answer its trust question. Setup opens them for you. OMP has no trust
-question; Pi asks only when the project has `.pi/` or `.agents/skills`.
+question; Pi asks only when the project or a parent folder has `.pi/` or
+`.agents/skills`.
 
 ✓ works · ⚠ works, read the note · ✗ not supported
 
@@ -70,6 +71,8 @@ Other agents Orca can launch may work too;
 [`harnesses.json`](harnesses.json) records what was measured.
 
 ## Install Orca
+
+Orca launches and supervises each session.
 
 1. Install the [desktop app](https://www.onorca.dev/docs/install).
 2. Register the CLI: Settings → General → Orca CLI. See the
@@ -125,7 +128,7 @@ If add keeps a stale marketplace, remove the marketplace and plugin, then add
 again. Pin a tag or full commit SHA with
 `codex plugin marketplace add --ref <ref> https://github.com/hieuphung97/dely.git`.
 Do not use `codex plugin install`.
-Invoke `$delivery (dely:delivery)` or `$setup`.
+Invoke `$delivery (dely:delivery)` or `$setup (dely:setup)`.
 
 ### Cursor Agent CLI
 
@@ -216,7 +219,8 @@ pi remove /path/to/dely                    # remove local install
 Find `<version>` in [releases](https://github.com/hieuphung97/dely/releases).
 Update by installing the new tag. At startup, check that Skills names
 `delivery` and `setup`, and Extensions names `dely-pin.ts`.
-Invoke `/skill:delivery` or `/skill:setup`.
+Invoke `/skill:delivery` or `/skill:setup`. Check a pinned worker's model in
+`~/.pi/agent/sessions/`.
 
 Checked versions (observations, not minimums): Orca 1.4.217; Claude Code
 2.1.285; Codex CLI 0.159.2; Cursor Agent CLI 2026.09.28-64d2043; Copilot CLI
