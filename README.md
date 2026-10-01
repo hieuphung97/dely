@@ -72,7 +72,7 @@ Other agents Orca can launch may work too;
 
 ## Install Orca
 
-Orca launches and supervises each session.
+Orca runs each session and launches the workers.
 
 1. Install the [desktop app](https://www.onorca.dev/docs/install).
 2. Register the CLI: Settings → General → Orca CLI. See the

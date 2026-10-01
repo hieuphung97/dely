@@ -290,7 +290,10 @@ function orcaHint(msg, run) {
 
 function requireHandle(extra) {
   if (process.env.ORCA_TERMINAL_HANDLE) return;
-  fail("not inside an Orca terminal", extra);
+  fail(
+    "not inside an Orca terminal. Pass your own terminal's handle as ORCA_TERMINAL_HANDLE, never another pane's",
+    extra
+  );
 }
 
 function clip(s) {
@@ -339,8 +342,8 @@ function lastText(id) {
 }
 
 function preflight(f) {
-  requireHandle({ run: f.run, repo: f.repo });
   f.repo = path.resolve(f.repo);
+  requireHandle({ run: f.run, repo: f.repo });
   const pins = ["implement", "review"].map((ph) => pin(f.repo, ph));
   const uniq = pins.filter(
     (p, i) => pins.findIndex((q) => q.agent === p.agent && q.model === p.model && q.effort === p.effort) === i
@@ -463,8 +466,8 @@ function dropWorker(id) {
 }
 
 function dispatch(f) {
-  requireHandle({ run: f.run, repo: f.repo });
   f.repo = path.resolve(f.repo);
+  requireHandle({ run: f.run, repo: f.repo });
   const p = pin(f.repo, f.phase);
   const spec =
     fs.readFileSync(path.resolve(f.repo, f["spec-file"]), "utf8") +
@@ -568,29 +571,33 @@ function wait(f) {
     }
   }
   const as = f.as ? ["--terminal", f.as] : [];
-  if (typeof f.ack === "string") {
-    const r = orca(["orchestration", "check", ...as, "--run", f.run, "--ack", f.ack]);
-    if (r.ok === false) fail((r.error && r.error.message) || "check --ack failed", { run: f.run });
-  }
   const control = (f.as ? selfHarness(f.as) : self) || f.control || null;
-  logEvent("wait", { run: f.run, control });
   const deadline = Date.now() + Number(f["timeout-min"] || 60) * 60000;
   const stallMin = Number(f["stall-min"] || 10);
   const skip = String(f.skip || "").split(",").filter(Boolean);
   const track = {};
   let lastProgressCheck = 0;
+  let pendingAck = typeof f.ack === "string" ? f.ack : null;
+  let waiting = false;
   while (Date.now() < deadline) {
+    const ack = pendingAck;
+    pendingAck = null;
     const r = orca([
       "orchestration",
       "check",
       ...as,
+      ...(ack ? ["--ack", ack] : []),
       "--wait",
       "--run",
       f.run,
       "--timeout-ms",
       String(Math.max(1, Math.floor(POLL_S * 1000))),
     ]);
-    if (r.ok === false) fail((r.error && r.error.message) || "check failed", { run: f.run });
+    if (r.ok === false) fail((r.error && r.error.message) || (ack ? "check --ack failed" : "check failed"), { run: f.run });
+    if (!waiting) {
+      logEvent("wait", { run: f.run, control });
+      waiting = true;
+    }
     const res = r.result || {};
     if (res.deliveryId) {
       const msgs = res.messages || [];
@@ -693,8 +700,8 @@ function wait(f) {
 
 function waitBg(f) {
   validateAck(f);
+  requireHandle({ run: f.run });
   const me = process.env.ORCA_TERMINAL_HANDLE;
-  if (!me) fail("not inside an Orca terminal", { run: f.run });
   const file = path.resolve(f.out || path.join(os.tmpdir(), "dely-wait-" + f.run + ".out"));
   const lock = file + ".lock";
   const recorded = () => {

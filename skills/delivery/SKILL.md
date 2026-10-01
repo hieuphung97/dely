@@ -144,8 +144,9 @@ them, and omits a flag whose value is `default`. A harness whose entry
 names `modelPin: spec` or `modelPin: spec-unchecked` receives its pin as a
 spec line instead of flags, and the helper verifies the reported model
 only for `spec`; a pin such a harness cannot resolve stops the worker
-before its first request and surfaces as `NO_ACK`. On a harness that takes
-neither flags nor a spec pin, a Model written there is silently not applied:
+before its first request and surfaces as `NO_ACK`. A spec line must not start
+`dely-pin:`. On a harness that takes neither flags nor a spec pin, a Model
+written there is silently not applied:
 write `default` and set the model in Orca's agent default arguments. A worker
 left on a harness default is an unpinned environment: it lives in the harness's
 own config, it changes without announcing itself, and the dispatch that relies
@@ -165,7 +166,9 @@ one, so `REFUSED … (called with --control …)` means use `wait-bg`.
 **Result handling.** `SETTLED`: process the batch, do the guide's completion
 accounting, and pass the settled `deliveryId` as `--ack` to the next
 `dely wait` or `wait-bg`, or run `orca orchestration check --ack` when no
-wait follows. `ATTENTION` has two routes, and the difference
+wait follows. When `wait` prints `ERROR` for `--ack`, run
+`orca orchestration check --ack <settled id>` and wait again without
+`--ack`. `ATTENTION` has two routes, and the difference
 is whether the plane can still see the worker. With `nextAction.kind` other
 than `none`, run the argv Orca printed and skip that id next time. With
 `nextAction: none` and `attention.requiresAction`, the plane has lost sight
