@@ -31,7 +31,7 @@ for launch settings and measured versions; the list can grow.
 | Antigravity CLI | waker | First launch on a new path can lose the prompt; no effort pin. |
 | Cursor Agent CLI | background | No effort pin. |
 | GitHub Copilot CLI | background | Orca misses its trust dialog and first-launch app promo (`NO_ACK`); no model pin; prompts can remain unsent. |
-| OMP | waker | A dead worker surfaces only at `STALLED`; OMP 18.4.4 workers do not start on Orca 1.4.217 ([orca#24068](https://github.com/stablyai/orca/issues/24068)). |
+| OMP | waker | A dead worker surfaces only at `STALLED`; OMP 18.4.4 workers did not start on Orca 1.4.217 ([orca#24068](https://github.com/stablyai/orca/issues/24068)). |
 | Pi | waker | As Control, run the helper with no tool timeout; the pin is unchecked. |
 
 ## Install Dely
@@ -168,8 +168,8 @@ Kiro CLI was measured but is not supported: workers never became ready.
 
 Checked versions (observations, not minimums): Orca 1.4.217; Claude Code
 2.1.285; Codex CLI 0.159.2; Cursor Agent CLI 2026.09.28-64d2043; Copilot CLI
-1.0.89; Antigravity CLI 1.2.14; Grok Build 1.0.44; OMP 18.3.4 (install);
-Pi 0.99.1.
+1.0.89; Antigravity CLI 1.2.13 (install), 1.2.14 (worker, Control); Grok
+Build 1.0.44; OMP 18.3.4 (install); Pi 0.99.1.
 
 ## Pin a model
 

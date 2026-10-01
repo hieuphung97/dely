@@ -91,8 +91,8 @@ limits too:
   ends, and its 0.157.1 shell lacked the terminal handle.
 - Pi: its Control must run the helper without a tool timeout, and its pin is
   unchecked.
-- OMP: a dead worker surfaces only at `STALLED`, and OMP 18.4.4 workers do not
-  start on Orca 1.4.217.
+- OMP: a dead worker surfaces only at `STALLED`, and OMP 18.4.4 workers did
+  not start on Orca 1.4.217.
 - Cursor: no effort pin.
 
 The helper:
@@ -172,14 +172,30 @@ chose, narrower than the checklist's release floor. Report:
 - **Blocked outside Dely:**
   - Grok as Control stopped on Grok's free usage limit twice, so its waker
     path was not re-measured on this candidate.
-  - OMP self-updated to 18.4.4. Orca 1.4.217 never sees an OMP 18.4.4 worker
-    as ready (stablyai/orca#24068), so OMP pin rows 8 to 10 could not run. That
-    is now OMP's limit.
-- **Not run, by the owner's choice:** Control rows for Cursor, OMP and Kiro.
+  - OMP self-updated to 18.4.4. Orca 1.4.217 did not see an OMP 18.4.4 worker
+    as ready in four attempts (stablyai/orca#24068 gives the cause), so OMP pin
+    rows 8 to 10 and the OMP parameterized worker row could not run. That is
+    now OMP's limit.
+- **Not run, by the owner's choice:** Control rows for Cursor, OMP and Kiro,
+  and the parameterized worker row for Pi. Pi as implementer ran in rows 13
+  and 16; Pi as reviewer was not exercised on this candidate.
   Cursor's launch argv is byte-identical to 0.22.0 in stub comparisons, this
   delivery's helper commits leave OMP's argv unchanged, and each wake mode was
   exercised by another harness.
 - **Observed but not changed:** a Pi Control never ran `worker-release`.
+- **Accepted as not met:** the hint for Orca's "active actionable waiter"
+  error states that a `dely wait` for the Run is still running, rather than
+  naming a command; the design review proposed the same condition.
+- **Open, recorded here:**
+  - the `rejected` log event lists every message of the batch without marking
+    the rejected ones;
+  - `agy models` still offers `gemini-3-flash-preview`, which failed to
+    acknowledge in the Spike;
+  - Codex 0.159.1's "Update available" screen matches Orca's
+    blocking-dialog pattern;
+  - `setup` has no route for a preflight `ERROR`;
+  - a missing-handle `error` log line records `--repo` unresolved, because the
+    handle check runs before the path is resolved.
 
 #### Deferred
 
