@@ -3,11 +3,115 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-30.
+Last updated 2026-10-01.
 
 ---
 
 ## Settled
+
+### 2026-10-01 — README shows a role table derived from `harnesses.json`; `limits` are user caveats; the checklist runs rows by what changed
+
+#### Context
+
+An independent architecture review of PR #61 at `65a54b0`
+(`~/dely-probe/arch-review/roles-architecture-review.md`) found no Blocking
+issue and no regression. It found that the README rewrite of 2026-09-30:
+
+- lost the logo, the usage video, the table of contents, "How Dely works",
+  the Log section, and the invocation for Claude Code and Codex;
+- showed protocol words ("Control wake") that a user cannot act on;
+- paraphrased `limits` by hand, which had already drifted.
+
+It also found three maintenance problems:
+
+- `notes` repeat the decision record and hold two false Pi statements;
+- the version rule ignores `harnesses.json`, `extensions/` and `package.json`,
+  although the helper builds every launch from `harnesses.json`;
+- the checklist floor (16 parameterized rows on any shared change) cannot be
+  met in practice.
+
+The owner said that a new user needs to know, per harness, which roles it can
+take and what to watch out for. The owner chose to fix all of this before
+merging PR #61.
+
+#### Decision
+
+- **`limits` is the one user-facing caveat per harness.** It is written in
+  user words, and a sentence about one role starts "As Control," or "As a
+  worker,". `setup` prints it. README copies it verbatim.
+- **README's role table is derived, not hand-written.** For each harness the
+  row is `| name | Control | Implementer | Reviewer | limits |`:
+  - Control is ✗ when `status` is `deferred` or `controlWake` is
+    `unsupported`; ⚠ when `limits` has a sentence starting "As Control,";
+    otherwise ✓;
+  - Implementer and Reviewer are ✗ when `deferred`; ⚠ when `limits` has a
+    sentence starting "As a worker,"; otherwise ✓.
+
+  A closure gate builds every row from `harnesses.json` and requires README to
+  contain it exactly.
+- **README follows the review's outline:**
+  1. logo, video and contents;
+  2. Quickstart;
+  3. How Dely works, with what Control, implementer and reviewer are;
+  4. the role table;
+  5. Orca and Dely installs, with every harness's invocation;
+  6. choosing models;
+  7. Log;
+  8. troubleshooting.
+- **`notes` keep only why a field has its value,** with the date of the
+  decision section that measured it. History moves to, or stays in, this
+  record. A sentence is removed only when this record already holds it.
+- **The version rule also covers `harnesses.json`, `extensions/` and
+  `package.json`.**
+- **The helper:**
+  - passes `--ack` on its first `check --wait` (Orca's one-call form);
+  - resolves `--repo` before the handle check;
+  - adds Orca's own guidance to the missing-handle error.
+
+  `SKILL.md` says that a spec line must not start `dely-pin:`, and what to do
+  when `--ack` returns `ERROR`.
+- **The checklist runs rows by what changed:**
+  - an argv stub row compares launches with the last release and stands in
+    for the live worker rows of unchanged entries;
+  - Control rows run once per wake mode when only wait logic changes, and per
+    harness when its entry changes or it upgrades;
+  - OMP rows 8 and 9 are a standing named skip while stablyai/orca#24068 is
+    open;
+  - Pi rows join the Orca-upgrade rerun list.
+
+#### Alternatives considered
+
+**A `roles` object in `harnesses.json`.** Rejected again: `status`,
+`controlWake` and role-prefixed `limits` carry every mark the table needs.
+
+**A README generator.** Rejected: the repository has no build step. A gate in
+the existing lexical style catches the same drift.
+
+**Keeping the 16-row floor.** Rejected: the 40ee718 run took 3 h 40 min in a
+narrowed scope and still had blocked rows. A floor no release meets is
+skipped by name every time.
+
+#### Consequences
+
+A user picks harnesses per role from one table whose marks cannot drift from
+the data. Adding a harness touches one entry and its README install block;
+the row follows from the entry. `limits` sentences are now part of the
+public README, so they must stay short and actionable. The gate proves that
+README matches the data, not that the data is true.
+
+#### Non-goals
+
+- Changing how a rejected-only batch is surfaced.
+- `start()` for a Pi entry with `modelFlag: true`.
+- Filtering Antigravity's discovery.
+- Re-measuring Grok as Control, which needs a paid account.
+
+#### Deferred
+
+Grok as Control on the 0.23.0 helper. Trigger: a Grok account without the
+free-tier limit.
+
+---
 
 ### 2026-09-30 — Each harness states what it can do per role, with limits; Copilot, Antigravity and Grok are supported
 
