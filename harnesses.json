@@ -7,6 +7,7 @@
       "binary": "claude",
       "status": "supported",
       "controlWake": "background",
+      "limits": "Put @AGENTS.md in CLAUDE.md.",
       "trust": "dialog",
       "discovery": {
         "models": "claude -p \"/model\" --output-format json",
@@ -25,7 +26,7 @@
         "needsImport": true,
         "importLine": "@AGENTS.md"
       },
-      "notes": "worker-start --model pin honoured. The two discovery probes are answered locally (num_turns 0, total_cost_usd 0, no model turn); do not treat them as a dispatch. Trust is a dialog. A fresh repository shows the trust dialog even with --dangerously-skip-permissions, with No, exit preselected, reproduced 2026-09-11 on Claude Code 2.1.268; a worktree of an already-trusted repository inherits trust and shows none, which is what the withdrawn 2026-09-04 probe actually measured — do not re-propose that 2026-09-04 reading. Claude Code 2.1.273 and 2.1.274 word the dialog 'Quick safety check: Is this a project you created or one you trust?' with 'No, exit' preselected, so Enter refuses and exits the harness. Orca's prompt delivery sends Enter into that dialog, which is why a NO_ACK or PREFLIGHT FAIL quote on an untrusted path ends at a shell prompt and may hold only the tail 'Security guide' within the helper's 400-character quote (measured 2026-09-16 and 2026-09-17)."
+      "notes": "worker-start --model pin honoured. The two discovery probes are answered locally (num_turns 0, total_cost_usd 0, no model turn); do not treat them as a dispatch. Claude Code 2.1.273 and 2.1.274 word the trust dialog 'Quick safety check: Is this a project you created or one you trust?' with 'No, exit' preselected, so Enter refuses and exits the harness. Orca's prompt delivery sends Enter into that dialog, which is why a NO_ACK or PREFLIGHT FAIL quote on an untrusted path ends at a shell prompt and may hold only the tail 'Security guide' within the helper's 400-character quote (measured 2026-09-16 and 2026-09-17)."
     },
     {
       "name": "Codex CLI",
@@ -33,7 +34,7 @@
       "binary": "codex",
       "status": "supported",
       "controlWake": "waker",
-      "limits": "As Control, it can start the next helper command before the last one ends (30 s tool yield), and 0.157.1's shell lacked ORCA_TERMINAL_HANDLE.",
+      "limits": "Use Codex CLI 0.159.2 or newer with Orca 1.4.217 or newer. As Control, it can start the next Dely step before the last one finishes.",
       "trust": "dialog",
       "discovery": {
         "models": "codex debug models",
@@ -55,7 +56,7 @@
           "CLAUDE.md"
         ]
       },
-      "notes": "Codex CLI 0.154.0 shows its own trust dialog on a fresh directory ('Do you trust the contents of this directory?'), measured 2026-09-16 during the 0.19.0 checklist; trust is dialog, not orca-preflight. Control wakes by waker. Discovery: slugs with visibility hide are not offered; effort levels are supported_reasoning_levels on each slug, not one vocabulary per harness. Native AGENTS.md reader; CLAUDE.md is inert (not imported). '› 1. Yes, continue' is preselected, so Enter grants trust (measured 2026-09-16 on 0.154.0). 2026-09-11, Orca 1.4.199: a gpt-5.6-terra medium Control slept, 3 turns for a two-worker cycle. 2026-09-16, 0.20.0 candidate: a gpt-5.6-sol high Control ended its turn after each wait-bg, one request per wait, and notify started a new turn. 2026-09-17, 0.20.0: a gpt-5.6-terra medium Control kept its turn open in 2 of 2 runs, looping orca terminal wait about every 35 s (6 requests in a 118 s wait); in one of them it launched dely wait-bg inside a new Orca terminal, so the waiter watched the wrong terminal and failed. A gpt-5.6-sol medium Control slept (requests only in the first 18 s of each wait, 3 turns). Whether a Codex Control sleeps is not a stable property of the model; record the Control model with each probe row. Codex's default model is now gpt-6-astra high, not measured as Control. 2026-09-29, Codex CLI 0.157.1 as Control: the wake worked, but its tool shell had no ORCA_TERMINAL_HANDLE, so the helper failed until the model found its own handle. 2026-09-30, Codex CLI 0.159.2 failed Orca 1.4.215's worker readiness check: worker-start fails at agent_readiness after its 60 s timeout, with and without -c on its argv; Orca 1.4.215 recognises a ready Codex by the screen text OpenAI Codex followed by model: and directory:, and the 0.159.2 start screen shows neither label. On 2026-09-30, Codex CLI 0.159.2 passed dely preflight as a worker on Orca 1.4.217. A real Codex preflight also passed on Orca 1.4.215 on 2026-09-27, with the Codex version unrecorded; the measured failure is specific to Codex CLI 0.159.2 on Orca 1.4.215. 2026-09-30 live checklist of 40ee718 under Orca 1.4.217 (~/dely-probe/checklist-roles-40ee718.md): Codex CLI 0.159.2 gpt-5.6-terra medium passed as implementer and reviewer, and as a waker Control in two deliveries with no terminal-handle error. In one Control it ran dely dispatch while dely preflight was still running, because its tool call yielded after 30 s."
+      "notes": "Discovery: slugs with visibility hide are not offered; effort levels are supported_reasoning_levels on each slug, not one vocabulary per harness. Native AGENTS.md reader; CLAUDE.md is inert (not imported). 2026-09-11, Orca 1.4.199: a gpt-5.6-terra medium Control slept, 3 turns for a two-worker cycle. 2026-09-16, 0.20.0 candidate: a gpt-5.6-sol high Control ended its turn after each wait-bg, one request per wait, and notify started a new turn. 2026-09-17, 0.20.0: a gpt-5.6-terra medium Control kept its turn open in 2 of 2 runs, looping orca terminal wait about every 35 s (6 requests in a 118 s wait); in one of them it launched dely wait-bg inside a new Orca terminal, so the waiter watched the wrong terminal and failed. A gpt-5.6-sol medium Control slept (requests only in the first 18 s of each wait, 3 turns). Codex's default model is now gpt-6-astra high, not measured as Control. Codex CLI 0.159.2 failed Orca 1.4.215's worker readiness check: worker-start fails at agent_readiness after its 60 s timeout, with and without -c on its argv; Orca 1.4.215 recognises a ready Codex by the screen text OpenAI Codex followed by model: and directory:, and the 0.159.2 start screen shows neither label. A Codex preflight passed on Orca 1.4.215 on 2026-09-27 with the Codex version unrecorded, so the measured failure is specific to 0.159.2 on 1.4.215. 2026-09-16."
     },
     {
       "name": "Grok Build",
@@ -63,7 +64,7 @@
       "binary": "grok",
       "status": "supported",
       "controlWake": "waker",
-      "limits": "Every repository with AGENTS.md needs a per-path trust answer, and there is no model pin.",
+      "limits": "Answer the trust question once in every project. As a worker, you cannot choose the model. As Control, a free account ran out of usage mid-delivery.",
       "trust": "dialog",
       "discovery": null,
       "modelFlag": false,
@@ -77,7 +78,7 @@
         "readsAgentsMd": true,
         "needsImport": false
       },
-      "notes": "Grok Build 1.0.44 under Orca 1.4.215, measured 2026-09-29 (self-updated from 1.0.40 during the Spike). Control wakes by waker. On 1.0.44 every repository with AGENTS.md (every Dely repository) shows a per-path trust dialog ('Do you trust the contents of this directory?' keyed y/n); Orca detects it within about 2 s (agent-trust-workspace). A README-only fresh repo showed no dialog. Once trusted, implementer and reviewer both worked. Orca refuses --model. Grok validates root plugin.json (name and description only). PATH agent collides with this binary, so Cursor must not be documented as agent. Native AGENTS.md. A killed worker reaches attention.requiresAction within 1.5 s. Discovery is null: there is no launch-time pin. 2026-09-30 live checklist of 40ee718 under Orca 1.4.217 (~/dely-probe/checklist-roles-40ee718.md): Grok Build 1.0.44 passed as implementer and reviewer. As Control (grok-4.7 low), both attempts stopped on Grok's free usage limit before wait-bg, so the waker path was not re-measured."
+      "notes": "On 1.0.44 a README-only fresh repo showed no trust dialog; every repository with AGENTS.md shows one. Native AGENTS.md. Discovery is null: there is no launch-time pin. 2026-09-29."
     },
     {
       "name": "Antigravity CLI",
@@ -85,7 +86,7 @@
       "binary": "agy",
       "status": "supported",
       "controlWake": "waker",
-      "limits": "The first launch on a new path can lose the prompt, and there is no effort pin.",
+      "limits": "Sign in before the first delivery. Choose the effort through the model name. Avoid gemini-3-flash-preview. As a worker, the first launch in a new folder can lose the task.",
       "trust": "dialog",
       "discovery": {
         "models": "agy models",
@@ -107,7 +108,7 @@
           "GEMINI.md"
         ]
       },
-      "notes": "Antigravity CLI 1.2.13 under Orca 1.4.215, measured 2026-09-29 (self-updated from 1.2.12 during the Spike). worker-start --agent agy returns agent_unconfigured; the id that resolves is antigravity. Control wakes by waker. As implementer and reviewer it worked, but the first launch on a new path lost the prompt 3 of 4 times (0 of 6 once trusted). Orca accepts --model; --effort is rejected or silently drops the pin. Discovery: agy models (TSV, offer the slug column) — some slugs already end in -high/-medium/-low; do not strip those suffixes. Native AGENTS.md; do not offer GEMINI.md. Root plugin.json is the agy package (name and description only; additionalProperties false). Install is agy plugin install of the git URL or a local path; the CLI has no plugin update. Do not write ~/.gemini. A killed worker reaches attention.requiresAction within 1.5 s. 2026-09-30 live checklist of 40ee718 under Orca 1.4.217 (~/dely-probe/checklist-roles-40ee718.md): Antigravity CLI self-updated to 1.2.14; two worker preflights on a new path failed with turn_start_unobserved (screen: not signed in) before the third passed. As a waker Control (gemini-3.8-flash-medium) it passed."
+      "notes": "A worker preflight on a new path showed 'not signed in' (2026-09-30). 2026-09-29."
     },
     {
       "name": "Kiro CLI",
@@ -115,6 +116,7 @@
       "binary": "kiro-cli",
       "status": "deferred",
       "controlWake": "waker",
+      "limits": "Workers never start in Orca.",
       "trust": "dialog",
       "discovery": null,
       "modelFlag": false,
@@ -128,7 +130,7 @@
         "readsAgentsMd": true,
         "needsImport": false
       },
-      "notes": "Kiro CLI 2.21.0 under Orca 1.4.215, measured 2026-09-29. A worker never becomes ready: worker-start fails at agent_readiness after its 60 s timeout (3 of 3), with and without the trust-all confirmation answered, so the prompt is never delivered. worker-start --agent kiro-cli returns agent_unconfigured; the id that resolves is kiro. Control wakes by waker via wait-bg, measured once, but only with a global confirmation setting (chat.disableTrustAllConfirmation) whose default exits. permissionDefault is none; --trust-all-tools is forbidden on the launch argv because it opens a confirmation whose default is No, exit, and Orca's Enter kills the session (measured on Orca 1.4.199). Once the TUI is idle, /tools trust-all was observed to trust tools for the session with no confirmation dialog. Headless kiro-cli chat --no-interactive is not a Dely worker. Native AGENTS.md. Discovery while supported was kiro-cli chat --list-models --format json (offer each model_id) and effort from kiro-cli chat --help; live 2.16.2 may offer only auto. Orca refuses --model. Install is npx skills targeting the kiro-cli agent at global scope. Do not write ~/.kiro or create custom agents."
+      "notes": "Orca refuses --model. 2026-09-29."
     },
     {
       "name": "Cursor Agent CLI",
@@ -136,7 +138,7 @@
       "binary": "cursor-agent",
       "status": "supported",
       "controlWake": "background",
-      "limits": "There is no effort pin.",
+      "limits": "Choose the effort through the model name, for example cursor-grok-4.6-high.",
       "trust": "dialog",
       "discovery": {
         "models": "cursor-agent models",
@@ -158,7 +160,7 @@
           "CLAUDE.md"
         ]
       },
-      "notes": "worker-start --model pin honoured; omit --effort (there is no effort flag; write the literal default). worker-start --agent cursor-agent returns agent_unconfigured; the id that resolves is cursor. Offer the model slug before ' - '. Do not invent an effort vocabulary, strip effort suffixes from slugs, or synthesize parameterized [effort=…] forms. Native AGENTS.md reader; the CLI also applies CLAUDE.md as a rule, so that file is not inert, but the import write offer stays on entries with needsImport. Never PATH agent (collides with Grok). Never -w/--worktree. Do not put --trust or an unpinned --sandbox on the launch argv. Trust dialog on a fresh directory, measured 2026-09-16 and 2026-09-17 on Cursor Agent 2026.09.10-fd3934a and 2026.09.15-d2fe57e: '⚠ Workspace Trust Required … Do you trust the contents of this directory?' with '▶ [a] Trust this workspace' preselected over '[q] Quit', so `a` or Enter grants trust, and the screen shows '⏳ Trusting workspace...' before the composer. Text sent in that state was dropped while `orca terminal send` returned ok; wait for the composer before sending a prompt."
+      "notes": "worker-start --model pin honoured; omit --effort (there is no effort flag; write the literal default). Trust dialog on a fresh directory, measured 2026-09-16 and 2026-09-17 on Cursor Agent 2026.09.10-fd3934a and 2026.09.15-d2fe57e: '⚠ Workspace Trust Required … Do you trust the contents of this directory?' with '▶ [a] Trust this workspace' preselected over '[q] Quit', so `a` or Enter grants trust, and the screen shows '⏳ Trusting workspace...' before the composer. Text sent in that state was dropped while `orca terminal send` returned ok; wait for the composer before sending a prompt. 2026-09-16."
     },
     {
       "name": "GitHub Copilot CLI",
@@ -166,7 +168,7 @@
       "binary": "copilot",
       "status": "supported",
       "controlWake": "background",
-      "limits": "Orca detects neither its trust dialog nor its first-launch app promo (answer No, thanks once); both show only as NO_ACK. There is no model pin, and prompts are occasionally left unsent.",
+      "limits": "At the first launch, answer No, thanks to the app prompt. As a worker, you cannot choose the model. As a worker, a missed prompt shows as NO_ACK.",
       "trust": "dialog",
       "discovery": null,
       "modelFlag": false,
@@ -184,7 +186,7 @@
           "CLAUDE.md"
         ]
       },
-      "notes": "GitHub Copilot CLI 1.0.89 under Orca 1.4.215, measured 2026-09-29 (self-updated from 1.0.83 during the Spike). Control wakes by background. The per-path trust dialog ('Confirm folder trust … Do you trust the files in this folder?' with 1. Yes preselected; option 2 remembers the folder) is not detected by Orca: worker-start returns input_accepted, and the helper sees only NO_ACK after 60 s. Restore interrupted sessions then lists sessions from other folders; Esc starts fresh, Enter is a wrong-session hazard. Once trusted, implementer and reviewer both worked; 2 of 7 launches left the prompt unsent. Orca refuses --model. An unavailable --model value prints Using \"auto\" instead and continues. Effort while supported was from copilot --help: none|minimal|low|medium|high|xhigh|max. --allow-all is the documented equivalent of --allow-all-tools --allow-all-paths --allow-all-urls, with --yolo as its alias (Orca's default). No non-interactive model listing: copilot models fails with Invalid command format; copilot -p \"/model\" dispatched a real turn. Native AGENTS.md and CLAUDE.md reader (--no-custom-instructions disables both). A killed worker reaches attention.requiresAction within 1.5 s. Direct installs copy existing manifests into ~/.copilot/installed-plugins/_direct/<source>/ (directory named after the local source directory or sanitized git URL); no sidecar. 2026-09-30 live checklist of 40ee718 under Orca 1.4.217 (~/dely-probe/checklist-roles-40ee718.md): Copilot CLI 1.0.89 showed an app promo at each launch ('Now generally available! … Install it now?' with Yes, install preselected) until a human answered No, thanks once; Orca does not detect it, it cleared itself after about 30 s, and the pasted worker prompt was left unsent (2 NO_ACK). After that the worker passed both roles, and a background Control (auto, which ran gpt-6-luna) passed with one NO_ACK retry of its Claude worker."
+      "notes": "Direct installs copy existing manifests into ~/.copilot/installed-plugins/_direct/<source>/ (directory named after the local source directory or sanitized git URL); no sidecar. Copilot 1.0.89 app promo ('Now generally available! … Install it now?' with Yes, install preselected) cleared itself after about 30 s. 2026-09-30."
     },
     {
       "name": "OMP",
@@ -192,7 +194,7 @@
       "binary": "omp",
       "status": "supported",
       "controlWake": "waker",
-      "limits": "A dead worker surfaces only at STALLED, and OMP 18.4.4 workers did not pass Orca 1.4.217's readiness check (stablyai/orca#24068).",
+      "limits": "As a worker, OMP 18.4 does not start under Orca 1.4.217 (stablyai/orca#24068), and a crash is noticed late. It never asks for trust, so use it only in repositories you trust. To pin a model, install Dely in OMP.",
       "trust": "none",
       "discovery": {
         "models": "omp models --json",
@@ -215,7 +217,7 @@
         "readsAgentsMd": true,
         "needsImport": false
       },
-      "notes": "OMP 18.3.3 under Orca 1.4.212, measured 2026-09-27. worker-start --agent omp --model is refused: 'Agent omp does not support launch-time model selection'; the pin travels as a spec line `dely-pin: <selector>` or `dely-pin: <selector> <effort>` that extensions/dely-pin.ts applies on the first before_agent_start. Trust is none: OMP has no workspace-trust gate, so a repository's `.omp/extensions`, `.omp/skills` and `.omp/config.yml` take effect without a prompt; a worker showed no trust dialog and wrote a file without an approval prompt. Approvals follow the user's `tools.approvalMode` (defaults to yolo). Control wakes by waker; bash runs as an async job (timeout default 300 s, max 3600 s, equal to dely wait's default 60 min); a full 0.20.1 wait-bg cycle with a Claude Code worker settled end to end. A killed OMP worker keeps liveness.verdict live (source agent_status), nextAction none and attention.requiresAction false for at least six minutes, so dely wait reaches STALLED after --stall-min, not ATTENTION. Install is omp plugin install of a local checkout (package.json pi.extensions and pi.skills); the dely marketplace does not load the extension. An unresolvable pin must process.exit: throw is swallowed and the turn runs on the default model; ctx.shutdown() lets the turn finish, worker_done included. The level check sets the level and reads it back with getThinkingLevel() rather than reading registry shapes. Discovery: omp models --json, offer selector, effort from thinking. 2026-09-30 live checklist of 40ee718 under Orca 1.4.217 (~/dely-probe/checklist-roles-40ee718.md): OMP self-updated to 18.4.4, and worker-start failed at agent_readiness for every OMP worker in four attempts; per stablyai/orca#24068, OMP 18.4 titles an idle pane 'π > <dir>', which Orca does not read as idle. A second-turn dely-pin line in an interactive OMP 18.4.4 session was ignored (row 11)."
+      "notes": "OMP 18.4 titles an idle pane 'π > <dir>', which Orca does not read as idle (stablyai/orca#24068). A second-turn dely-pin line in an interactive OMP 18.4.4 session was ignored (row 11). 2026-09-30."
     },
     {
       "name": "Pi",
@@ -223,7 +225,7 @@
       "binary": "pi",
       "status": "supported",
       "controlWake": "waker",
-      "limits": "As Control, run the helper with no tool timeout; the pin is unchecked.",
+      "limits": "As Control, run Dely's commands with no time limit, and release leftover workers. To pin a model, install Dely in Pi, then check the model in Pi's session log.",
       "trust": "dialog",
       "discovery": {
         "models": "pi --list-models | awk 'NR>1 && $1!=\"\" {print $1\"/\"$2}'",
@@ -247,7 +249,7 @@
           "CLAUDE.md"
         ]
       },
-      "notes": "Pi 0.87.1 under Orca 1.4.215, measured 2026-09-28. worker-start --agent pi --model is refused: 'Agent pi does not support launch-time model selection'; the pin travels as a spec line `dely-pin: <selector>` or `dely-pin: <selector> <effort>` that extensions/dely-pin.ts applies on the first before_agent_start. Orca reports neither the model (projection.provider has model: null) nor a transcript (worker-read returns provider_unsupported and falls back to terminal). modelPin is spec-unchecked so dispatch skips the projection check. Trust is a dialog ('Trust project folder?' with Trust preselected), shown only when the directory or an ancestor holds .pi/ (settings.json, extensions, skills, prompts, themes, SYSTEM.md) or .agents/skills; a clean repository shows no dialog. Orca passes the prompt on the command line, so a worker held by the trust dialog never acknowledges. A worker has no approval step and wrote files without a prompt. Killing its process sets attention.requiresAction true within 3 s, so dely wait reaches ATTENTION. Control wakes by waker; a full dely wait-bg cycle settled. Pi's bash tool runs commands under a model-chosen timeout (10 s, 20 s and 30 s were seen), which killed `dely preflight` and `dely dispatch` mid-command in 2 of 6 Pi Control sessions; a Pi Control must not run the helper under a timeout shorter than `ACK_S` (60 s) plus the pin check for `dispatch`, or `PREFLIGHT_S` (150 s) for `preflight`. Install is pi install git:github.com/hieuphung97/dely@v<version> or pi install of a local path (Pi also loads a package's extensions/ and skills/ directories by convention, whatever the key; the package.json pi key is what OMP reads). The extension sets the level and reads it back via getThinkingLevel(), failing on mismatch. A Model or Effort cell containing whitespace fails open on Pi. Discovery: models via pi --list-models, effort levels via pi --help. 2026-09-30 live checklist of 40ee718 under Orca 1.4.217 (~/dely-probe/checklist-roles-40ee718.md): Pi 0.99.1 as a waker Control (google-vertex/gemini-3.8-flash medium) completed a delivery with no tool timeout, but never ran worker-release, so two worker terminals stayed live. Pin rows passed on 0.99.1."
+      "notes": "A Model or Effort cell containing whitespace fails closed. Pi loads the extension only through the package.json pi key. 2026-09-28, corrected 2026-10-01."
     }
   ]
 }
