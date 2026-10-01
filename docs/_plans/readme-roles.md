@@ -112,7 +112,7 @@ request #61. No merge, force-push, stash, reset or clean.
   - Remove a sentence only if `docs/decisions.md` already holds that fact. If
     it does not, keep the sentence.
   - Correct the two false Pi sentences: a whitespace pin cell now fails
-    closed; Pi loads the extension only through the `pi` key.
+    closed; with a `pi` key, Pi loads only the extensions that key lists.
 - **`AGENTS.md`.** The version rule names `skills/`, `harnesses.json`,
   `extensions/` and `package.json`.
 
@@ -123,6 +123,41 @@ request #61. No merge, force-push, stash, reset or clean.
 - A table of every `limits` sentence, each with its source: a `harnesses.json`
   field, a report line, or an issue.
 - `jq` showing that no field other than `limits` and `notes` changed.
+- Every closure gate.
+
+### E2. `limits` and `notes` corrections (replan of Task E)
+
+The scoped re-review of the Task E remediation (`3684fa9`) did not accept:
+`~/dely-probe/readme-tasks/rereviewE-3684fa9.md`. Control fixes the wording
+here, so the task copies it.
+
+**Behaviour.** Files: `harnesses.json` (`limits` and `notes` only).
+
+- **`copilot.limits`, exactly:** "At the first launch, answer No, thanks to
+  the app prompt; until then a launch can leave the task unsent. Answer the
+  folder trust question once in every project and choose to remember the
+  folder; Orca does not see it, so a missed one shows as NO_ACK. As a worker,
+  you cannot choose the model."
+- **`antigravity.limits`:** the worker sentence is exactly "As a worker, the
+  first launch in a new folder can lose the task and show 'not signed in'
+  while signed in; Dely retries once, then asks you to open agy there." The
+  other sentences stay.
+- **`notes` dates:**
+  - every `notes` value ends with "Decision sections: " and the dates of every
+    `docs/decisions.md` section it draws on, oldest first, as they appear in
+    the headings;
+  - a sentence keeps its own measurement date where it has one;
+  - remove the trailing bare dates that this list replaces.
+- **`pi.notes`:** the whitespace sentence is "A Model or Effort cell
+  containing whitespace fails closed, except a Model cell '<selector>
+  <level>' with Effort default, which applies that level."
+
+**Focused verification.**
+
+- `jq` showing that only those fields changed.
+- For each entry, the list of section dates checked against
+  `grep -n '^### ' docs/decisions.md`.
+- The derived marks per entry.
 - Every closure gate.
 
 ### F. README and the role-table gate
