@@ -1,9 +1,9 @@
 {
   "name": "dely",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "private": true,
-  "omp": {
-    "extensions": ["./omp/dely-pin.ts"],
+  "pi": {
+    "extensions": ["./extensions/dely-pin.ts"],
     "skills": ["./skills"]
   }
 }

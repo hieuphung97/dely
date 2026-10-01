@@ -15,22 +15,71 @@ https://github.com/user-attachments/assets/83ec539a-6551-4807-8517-0c73e5d171d7
 ## Contents
 
 - [Quickstart](#quickstart)
-- [Project setup](#project-setup)
-- [Install](#install)
 - [How Dely works](#how-dely-works)
+- [Choose a harness for each role](#choose-a-harness-for-each-role)
+- [Install Orca](#install-orca)
+- [Install Dely](#install-dely)
+- [Choose models](#choose-models)
 - [Log](#log)
 - [Troubleshooting](#troubleshooting)
 
 ## Quickstart
 
-Install Orca, then Dely.
+1. [Install Orca](#install-orca).
+2. [Install Dely](#install-dely) in the harness you will talk to.
+3. Open that harness in your project and optionally invoke `dely:setup`.
+4. Ask for a change.
+
+## How Dely works
+
+You ask. Control designs. You approve. The implementer builds. The reviewer
+checks. Control opens the pull request. You merge.
+
+**Control** is the session you talk to. It writes the design, waits for your
+approval, starts the other two sessions, and opens the pull request. Install
+Dely here.
+
+**Implementer** is a session Control starts to make the change.
+
+**Reviewer** is a session Control starts to check the change independently
+before the pull request. The implementer and the reviewer are the workers.
+
+A Spike investigates only — no delivery run.
+
+## Choose a harness for each role
+
+Before the first delivery in a project, open each harness you chose there once
+and answer its trust question. Setup opens them for you. OMP has no trust
+question; Pi asks only when the project or a parent folder has `.pi/` or
+`.agents/skills`.
+
+✓ works · ⚠ works, read the note · ✗ not supported
+
+| Harness | Control | Implementer | Reviewer | Watch out for |
+| --- | --- | --- | --- | --- |
+| Claude Code | ✓ | ✓ | ✓ | Put @AGENTS.md in CLAUDE.md. |
+| Codex CLI | ⚠ | ✓ | ✓ | Use Codex CLI 0.159.2 or newer with Orca 1.4.217 or newer. As Control, it can start the next Dely step before the last one finishes. |
+| Grok Build | ⚠ | ⚠ | ⚠ | Answer the trust question once in every project. As a worker, you cannot choose the model. As Control, a free account ran out of usage mid-delivery. |
+| Antigravity CLI | ✓ | ⚠ | ⚠ | Choose the effort through the model name. Avoid gemini-3-flash-preview. As a worker, the first launch in a new folder can lose the task and show 'not signed in' while signed in; Dely retries once, then asks you to open agy there. |
+| Kiro CLI | ✗ | ✗ | ✗ | Workers never start in Orca. |
+| Cursor Agent CLI | ✓ | ✓ | ✓ | Choose the effort through the model name, for example cursor-grok-4.6-high. |
+| GitHub Copilot CLI | ✓ | ⚠ | ⚠ | At the first launch, answer No, thanks to the app prompt; until then a launch can leave the task unsent. Answer the folder trust question once in every project and choose to remember the folder; Orca does not see it, so a missed one shows as NO_ACK. As a worker, you cannot choose the model. |
+| OMP | ✓ | ⚠ | ⚠ | As a worker, OMP 18.4 does not start under Orca 1.4.217 or later (stablyai/orca#24068) until that issue closes, and a crash is noticed after about 10 minutes. It never asks for trust, so use it only in repositories you trust. As a worker, to pin a model, install Dely in OMP. |
+| Pi | ⚠ | ⚠ | ⚠ | As Control, run Dely's commands with no time limit, and release leftover workers. As a worker, to pin a model, install Dely in Pi, then check the model in Pi's session log. |
+
+Other agents Orca can launch may work too;
+[`harnesses.json`](harnesses.json) records what was measured.
+
+## Install Orca
+
+Orca runs each session and launches the workers.
 
 1. Install the [desktop app](https://www.onorca.dev/docs/install).
-2. Register the CLI (it ships with the app): Settings → General → Orca CLI.
-   See the [CLI overview](https://www.onorca.dev/docs/cli/overview).
+2. Register the CLI: Settings → General → Orca CLI. See the
+   [CLI overview](https://www.onorca.dev/docs/cli/overview).
 3. Enable orchestration: Settings → Experimental. See
    [orchestration](https://www.onorca.dev/docs/cli/orchestration).
-4. Preflight:
+4. Check it:
 
 ```bash
 orca open
@@ -38,189 +87,151 @@ orca status --json
 orca orchestration run-list --json
 ```
 
-`dely:delivery` stops if this preflight fails. On Linux the binary is
-`orca-ide` (see the [install docs](https://www.onorca.dev/docs/install)).
+On Linux, the binary is `orca-ide`.
 
-Optional agent skills `orca-cli` and `orchestration`:
-https://www.onorca.dev/docs/cli/skills
+## Install Dely
 
-Then:
+**Install Dely only in the harness you use as the Control session.** A harness
+used only as implementer or reviewer needs Orca and its own login. Workers
+read no Dely skill. **A pinned OMP or Pi worker also needs that harness's
+Dely install below**, which loads `dely-pin.ts`.
 
-1. Install `dely` in the harness ([Install](#install)).
-2. Open a session in the project.
-3. Invoke `dely:setup` (optional).
-4. Ask for a change.
-
-## Project setup
-
-In the project, invoke `dely:setup`.
-
-It asks Quick (this harness for both phases) or Customize (pick harness,
-model, and effort for `implement` and `review`), then writes one managed
-block into `AGENTS.md`. Skip it and `dely:delivery` uses the current
-harness and that harness's defaults.
-
-## Install
-
-The plugin is `dely`, from the `dely` marketplace at
-`https://github.com/hieuphung97/dely.git`. The skill name is `delivery`;
-invoke it as `dely:delivery`. The runtime needs Node 18 or newer on PATH.
-
-Four harnesses are supported today: Claude Code, Codex CLI, Cursor
-Agent CLI, and OMP. That list is not closed. `harnesses.json` at the
-repository root carries four more as `deferred`: GitHub Copilot CLI,
-Antigravity CLI, Grok Build, and Kiro CLI.
+Have Node 18 or newer on PATH. Open Control in your project, invoke `dely:setup`
+(optional) to choose implementer and reviewer harnesses, models and efforts,
+then ask for a change using `dely:delivery`. Without setup, Dely uses Control's
+harness and defaults. Use the invocation spelling listed below for your harness.
 
 ### Claude Code
 
 ```bash
 claude plugin marketplace add https://github.com/hieuphung97/dely.git
 claude plugin install dely@dely
-
-claude plugin list                 # verify it is installed
-claude plugin update dely          # update (restart required to apply)
-claude plugin uninstall dely       # uninstall
+claude plugin list                 # verify
+claude plugin update dely          # update; restart to apply
+claude plugin uninstall dely       # remove
 ```
 
-A Claude Code Control was observed running `scripts/dely` straight out of
-the marketplace source directory it was added from, not from
-`~/.claude/plugins/cache`. A hash check that covers only the cache proves
-nothing; it must cover every location that can serve the skill.
+Put `@AGENTS.md` in `CLAUDE.md` so Claude reads the project pins.
+Invoke `/dely:delivery` or `/dely:setup`.
 
 ### Codex CLI
 
 ```bash
 codex plugin marketplace add https://github.com/hieuphung97/dely.git
 codex plugin add dely@dely
-
-codex plugin list                  # verify it is installed
-codex plugin marketplace upgrade   # update: see below
-codex plugin remove dely@dely      # uninstall
+codex plugin list                  # verify
+codex plugin marketplace upgrade   # update; open a new session
+codex plugin remove dely@dely       # remove
 ```
 
-`codex plugin marketplace add --ref <ref>` pins the marketplace to a tag
-such as `v0.17.0` or an exact full commit SHA. There is no
-`codex plugin update`: use `codex plugin marketplace upgrade`. Do not use
-`codex plugin install`.
-
-`codex plugin marketplace add` was observed keeping a stale marketplace of
-the same name, installing the previous version, and reporting success. A
-harness reporting a successful install is not evidence. To refresh, remove
-the marketplace and the plugin, then add and install again.
+If add keeps a stale marketplace, remove the marketplace and plugin, then add
+again. Pin a tag or full commit SHA with
+`codex plugin marketplace add --ref <ref> https://github.com/hieuphung97/dely.git`.
+Do not use `codex plugin install`.
+Invoke `$delivery (dely:delivery)` or `$setup (dely:setup)`.
 
 ### Cursor Agent CLI
 
 ```bash
 cursor-agent plugin marketplace add https://github.com/hieuphung97/dely.git
-
-# verify it is installed
-cursor-agent plugin marketplace list
-
-# re-index, no fetch
-cursor-agent plugin marketplace update dely
-
-# refresh: remove and re-add (remove drops the marketplace, not the plugin)
-cursor-agent plugin marketplace remove dely
-cursor-agent plugin marketplace add https://github.com/hieuphung97/dely.git
+cursor-agent plugin marketplace list          # verify marketplace
+cursor-agent plugin marketplace update dely   # re-index only; does not fetch
+cursor-agent plugin marketplace remove dely   # remove marketplace only
 ```
 
-Cursor Agent CLI cannot install from a local snapshot:
-`cursor-agent plugin marketplace add` takes a git URL only, and installing
-what it indexes needs the interactive `/plugin` panel. It reads the Claude
-plugin cache; a Cursor copy with a different hash wins over that cache.
+In a session, open `/plugin` → Marketplace → dely → Install for you.
+To update, remove and re-add the marketplace, then uninstall and reinstall
+Dely in `/plugin`. To remove Dely, use `/plugin` → Installed → dely → Uninstall.
+Type `/dely` to find `/delivery` and `/setup`. Local snapshot installs are
+unavailable; Cursor can read the Claude plugin cache.
 
-The snapshot is addressed by commit, so `marketplace update` only re-indexes
-and does not fetch. Remove and re-add the marketplace to pick up new commits,
-then choose `Uninstall` from the `Installed` tab and install again from the
-`Marketplace` tab of the `/plugin` panel.
+### GitHub Copilot CLI
 
-Add the marketplace first with `cursor-agent plugin marketplace add`, then in
-a Cursor Agent session type `/plugin` and press Enter. Open the `Marketplace`
-tab, type `dely` in the search box, press Enter on `dely (dely)`, and choose
-`Install for you (user scope)` (or `Install for all collaborators on this
-repository (project scope)`).
+```bash
+copilot plugin install https://github.com/hieuphung97/dely.git
+copilot plugin install /path/to/dely       # local alternative
+copilot skill list                        # verify delivery and setup
+copilot plugin update dely                # update git or local install
+copilot plugin uninstall dely             # remove
+```
 
-To uninstall, open the `Installed` tab, select `dely`, and choose
-`Uninstall`. `cursor-agent plugin marketplace remove` removes the marketplace
-entry and leaves the plugin installed.
+Invoke `/dely:delivery` or `/dely:setup`. Direct installs print a deprecation
+warning. A same-named project or personal skill can hide the plugin skill.
 
-Type `/dely` to filter the palette to Dely's `/delivery` and `/setup`.
+### Antigravity CLI
+
+```bash
+agy plugin install https://github.com/hieuphung97/dely.git
+agy plugin install /path/to/dely           # local alternative
+agy plugin list                           # verify dely with skills
+agy plugin install https://github.com/hieuphung97/dely.git   # update git install
+agy plugin uninstall dely                 # remove
+```
+
+There is no plugin update subcommand. Re-run install with the same target to
+update. Invoke `/dely:delivery` or `/dely:setup`.
+
+### Grok Build
+
+```bash
+grok plugin install https://github.com/hieuphung97/dely.git --trust
+grok plugin install /path/to/dely --trust  # local alternative
+grok plugin details dely                  # verify
+grok inspect                              # verify loaded delivery and setup
+grok plugin update dely                   # update git install
+grok plugin uninstall dely                # remove
+```
+
+For a local install, uninstall then install again; update does not re-copy.
+Invoke `/delivery` or `/setup`. Grok also loads Claude Code plugins; its own
+copy wins. To stop loading Dely completely, remove both copies if present.
 
 ### OMP
 
-Install from a dedicated clone, or unpack a git-archive snapshot. Never
-point `omp plugin install` at a working checkout of this repository: that
-command links the path rather than copying it, so OMP runs whatever the
-checkout holds.
+Use a dedicated clone or an unpacked snapshot; install links the source path.
 
 ```bash
 git clone https://github.com/hieuphung97/dely.git
-# or unpack a git archive snapshot
 omp plugin install /path/to/dely
-
-omp plugin list --json             # verify it is installed
-omp skill list --json              # verify the skills loaded
-
-# update: git pull in that dedicated clone, then a new OMP session
-omp plugin uninstall dely          # uninstall; needs bun on PATH
-omp plugin disable dely            # stop OMP loading Dely's skills and extension
+omp plugin list --json                    # verify dely-pin.ts
+omp skill list --json                     # verify loaded skills
+omp plugin uninstall dely                 # remove; needs bun on PATH
+omp plugin disable dely                   # disable skills and extension
 ```
 
-When `bun` is absent, `omp plugin uninstall dely` is unavailable.
-`omp plugin disable dely` stops OMP loading Dely's skills and extension; it
-leaves `dely` in `omp plugin list`. Then delete
-`~/.omp/plugins/node_modules/dely`, `rmdir` the then-empty
-`~/.omp/plugins/node_modules` directory, and rewrite
-`~/.omp/plugins/omp-plugins.lock.json` with `jq 'del(.plugins.dely)'`.
+Update by pulling the dedicated clone, then opening a new OMP session.
+Without bun, disable Dely; delete `~/.omp/plugins/node_modules/dely`, remove
+the empty `node_modules` directory, and delete `.plugins.dely` from
+`~/.omp/plugins/omp-plugins.lock.json`. Invoke `delivery` or `setup` without
+namespacing. OMP has no workspace-trust gate; only use trusted repositories.
 
-The `dely` marketplace does not install OMP's extension. Installing from a
-git URL was not checked.
+### Pi
 
-Dely's `setup` and `delivery` are not namespaced in OMP and take precedence
-over a project's own skills of those names. OMP has no workspace-trust gate:
-a repository's `.omp/extensions`, `.omp/skills` and `.omp/config.yml` take
-effect without a prompt, and approvals follow the user's
-`tools.approvalMode`.
+```bash
+pi install git:github.com/hieuphung97/dely@v<version>
+pi install /path/to/dely                   # local alternative
+pi list                                   # verify
+pi --verbose                              # verify loaded paths at startup
+pi remove git:github.com/hieuphung97/dely@v<version>
+pi remove /path/to/dely                    # remove local install
+```
 
-To pin OMP, set Model to a `selector` from `omp models --json` and Effort
-to one of that model's `thinking` levels. The helper appends
-`dely-pin: <selector>` or `dely-pin: <selector> <effort>` to the spec.
-No `.omp/config.yml` is needed.
+Find `<version>` in [releases](https://github.com/hieuphung97/dely/releases).
+Update by installing the new tag. At startup, check that Skills names
+`delivery` and `setup`, and Extensions names `dely-pin.ts`.
+Invoke `/skill:delivery` or `/skill:setup`. Check a pinned worker's model in
+`~/.pi/agent/sessions/`.
 
-### Checked versions
+Checked versions (observations, not minimums): Orca 1.4.218; Claude Code
+2.1.286; Codex CLI 0.159.3; Cursor Agent CLI 2026.09.28-64d2043; Copilot CLI
+1.0.89; Antigravity CLI 1.2.13 (install), 1.2.14 (worker, Control); Grok
+Build 1.0.44; OMP 18.4.8 (Control); Pi 0.99.1.
 
-These are the versions this README's commands were last locally checked
-against — observations, not a promised minimum:
+## Choose models
 
-| Tool | Checked version |
-| --- | --- |
-| Claude Code | 2.1.274 |
-| Codex CLI | 0.154.0 |
-| Cursor Agent CLI | 2026.09.15-d2fe57e |
-| OMP | 18.3.4 |
-| Orca | 1.4.212 |
-
-## How Dely works
-
-Ask for a change. Approve the design when asked. Dely implements, a
-different session reviews, then opens a PR. You merge. A Spike investigates
-only — no delivery run.
-
-Control loads `orca skills get orchestration` and follows that supervised
-loop. `dely preflight` runs in setup, and again after `NO_ACK`. After
-`DISPATCHED`, Control waits by the harness Control wake: `background`
-runs `dely wait`; `waker` runs `dely wait-bg` as its last command and
-ends the turn. It never acts on an Orca nudge. `SETTLED` hands over the
-batch; `ATTENTION` with a `nextAction` other than `none` runs the argv Orca
-printed, and `ATTENTION` with `nextAction: none` and `requiresAction` means
-the plane lost sight of the worker — check it, stop, abandon and release it,
-then dispatch the same prompt file once more; `STALLED` is read then waited
-or recovered; `NO_ACK` and `FAILED` retry once; `DEADLINE` is a checkpoint
-(`worker-list` and last output; wait again if progressing; a second
-`DEADLINE` with no progress goes to the human); `ERROR` goes to the
-human.
-
-The workflow contract is [`skills/delivery/SKILL.md`](skills/delivery/SKILL.md).
+Invoke setup to list the models and efforts each installed harness offers, then
+write your choice. The role table's notes say which harnesses cannot take a
+model.
 
 ## Log
 
@@ -235,34 +246,29 @@ harness printed.
 
 ## Troubleshooting
 
-- **`dely:delivery` stops immediately.** Orca is not running or a required
-  capability is absent, including orchestration. Run the Quickstart
-  preflight, then retry.
-- **A stale skills copy shadows a newer plugin.** Codex also loads
-  `~/.agents/skills`, and a copy left there — or a symlink to it from
-  `~/.claude/skills` — wins over the plugin. Claude Code was observed
-  running `scripts/dely` from the marketplace source directory, not from
-  `~/.claude/plugins/cache`. Cursor Agent CLI reads the Claude plugin
-  cache, and a Cursor copy with a different hash wins over it. Compare
-  `skills/delivery/SKILL.md` by hash at every location that can serve the
-  skill, including marketplace source directories, then update or remove
-  the shadowing install. A harness reporting a successful install is not
-  evidence of which copy ran; the hash is.
-- **Codex still behaves the same after `codex plugin marketplace upgrade`.**
-  Confirm the remote has new commits. A delivery already running keeps the
-  plugin version from its start; open a new session after the upgrade.
-- **`AGENTS.md` pins don't seem to apply in Claude Code.** Put
-  `@AGENTS.md` in `CLAUDE.md`; Claude Code does not read `AGENTS.md`
-  directly.
+- **Worker stays at startup:** read its screen. Answer shell startup prompts
+  such as an oh-my-zsh update, then retry.
+- **Orca disconnects:** reopen Orca, check the commands under Install Orca,
+  and inspect workers with `orca orchestration worker-list --run <run>`
+  before retrying.
+- **First launch stops at trust:** open that harness in the same path and
+  answer its dialog, then retry. Copilot can report only `NO_ACK`, and its
+  first launch also shows an app promo: answer No, thanks once;
+  Antigravity can lose the prompt on a new path; retry once. Pi asks when
+  the path or an ancestor has `.pi/` resources or `.agents/skills`.
+- **Codex helper says "not inside an Orca terminal":** ask Control to look up
+  its handle with `orca terminal list --worktree active --json` only when
+  that worktree has one agent terminal, then prefix helper and `orca` commands
+  with `ORCA_TERMINAL_HANDLE=<handle>`. Otherwise, use another Control harness.
+  Never use another pane's handle.
+- **Old behavior after update:** open a new Control session. Ask Control to run
+  its `scripts/dely` with no arguments to identify the running copy. Compare
+  `skills/delivery/SKILL.md` by SHA-256 at every skill location, including
+  `~/.agents/skills`, project and personal skills, plugin caches and
+  marketplace sources; update or remove mismatched copies.
+  Codex personal skills can shadow plugins; Cursor copies can override the
+  Claude cache; Copilot project and personal skills can hide its plugin.
 
-## Contributing, security, and license
-
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — issue-first workflow, fork/branch/pull
-  request flow, and review expectations. External contributors do not need
-  Dely or Orca.
-- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — Contributor Covenant 2.1.
-- [`SECURITY.md`](SECURITY.md) — how to report a vulnerability privately.
-- [`docs/decisions.md`](docs/decisions.md) — settled, open, and rejected
-  design decisions, with rationale.
-
-[MIT](LICENSE)
+[Workflow contract](skills/delivery/SKILL.md) ·
+[Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) ·
+[Security](SECURITY.md) · [Decisions](docs/decisions.md) · [MIT](LICENSE)

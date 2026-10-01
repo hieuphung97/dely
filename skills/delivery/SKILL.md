@@ -110,7 +110,8 @@ to this skill. Control learns the helper's interface by running
 and does not read `scripts/dely.js`. Control's wake mode is that harness's
 `controlWake` in `../../harnesses.json`. The preflight step runs in setup
 and again after a `NO_ACK`; a delivery does not preflight before its first
-dispatch.
+dispatch. Run `dely preflight` and `dely dispatch` with no tool timeout, or
+one of at least 300 s.
 
 Write the prompt to an untracked file **inside the worktree**. Never inline
 it in a shell argument: prompts carry backticks, quotes and newlines, and a
@@ -140,14 +141,16 @@ did not pin.
 **Name the model and effort on every dispatch.** The helper passes
 `--model`/`--effort` when `../../harnesses.json` says that harness takes
 them, and omits a flag whose value is `default`. A harness whose entry
-names `modelPin: spec` receives its pin as a spec line instead of flags; a
-pin such a harness cannot resolve stops the worker before its first request
-and surfaces as `NO_ACK`. On a harness that takes neither flags nor a spec
-pin, a Model written there is silently not applied: write `default` and set
-the model in Orca's agent default arguments. A worker left on a harness
-default is an unpinned environment: it lives in the harness's own config,
-it changes without announcing itself, and the dispatch that relies on it
-looks identical to one that pinned the same value deliberately.
+names `modelPin: spec` or `modelPin: spec-unchecked` receives its pin as a
+spec line instead of flags, and the helper verifies the reported model
+only for `spec`; a pin such a harness cannot resolve stops the worker
+before its first request and surfaces as `NO_ACK`. A spec line must not start
+`dely-pin:`. On a harness that takes neither flags nor a spec pin, a Model
+written there is silently not applied:
+write `default` and set the model in Orca's agent default arguments. A worker
+left on a harness default is an unpinned environment: it lives in the harness's
+own config, it changes without announcing itself, and the dispatch that relies
+on it looks identical to one that pinned the same value deliberately.
 
 **Never act on an Orca nudge.** After `DISPATCHED`, wait by the wake mode
 of **this Control's own harness** — not the harness of the worker being
@@ -161,23 +164,27 @@ terminal it runs in and refuses a waker even when `--control` names another
 one, so `REFUSED … (called with --control …)` means use `wait-bg`.
 
 **Result handling.** `SETTLED`: process the batch, do the guide's completion
-accounting, and acknowledge. `ATTENTION` has two routes, and the difference
-is whether the plane can still see the worker. With `nextAction.kind` other
-than `none`, run the argv Orca printed and skip that id next time. With
-`nextAction: none` and `attention.requiresAction`, the plane has lost sight
-of the worker rather than asked for something: read it with `worker-read`
-and `worker-show`, and if the process is gone, `worker-stop`, then
-`worker-abandon` when the stop reports `stop_unknown`, then
-`worker-release`, then one fresh `dely dispatch` with the same prompt file.
-A second time on the same input goes to the human. An absent `nextAction` is
-absent, not `none` with attention — that row is not `ATTENTION` and the wait
-continues. `STALLED`: read the output, then wait again or recover.
-`NO_ACK`: run setup's `dely preflight` in the same Run. If every pin passes,
-one fresh `dely dispatch` with the same prompt file; never retry into the same
+accounting, and pass the settled `deliveryId` as `--ack` to the next
+`dely wait` or `wait-bg`, or run `orca orchestration check --ack` when no
+wait follows. When `wait` (or the `wait-bg` output) prints `ERROR` for
+`--ack`, run `orca orchestration check --ack <settled id>` and wait again
+without `--ack`; a waker Control waits again with `wait-bg`. `ATTENTION` has
+two routes, and the difference is whether the plane can still see the
+worker. With `nextAction.kind` other than `none`, run the argv Orca printed
+and skip that id next time. With `nextAction: none` and
+`attention.requiresAction`, the plane has lost sight of the worker rather
+than asked for something: read it with `worker-read` and `worker-show`, and
+if the process is gone, `worker-stop`, then `worker-abandon` when the stop
+reports `stop_unknown`, then `worker-release`, then one fresh
+`dely dispatch` with the same prompt file. A second time on the same input
+goes to the human. An absent `nextAction` is absent, not `none` with
+attention — that row is not `ATTENTION` and the wait continues. `STALLED`:
+read the output, then wait again or recover. `NO_ACK`: run setup's
+`dely preflight` in the same Run. If every pin passes, one fresh
+`dely dispatch` with the same prompt file; never retry into the same
 terminal, and never reuse a settled terminal; a second failure on the same
-input goes to the human. Any `PREFLIGHT … FAIL`: do not dispatch to any
-pin — a failed pin's cause is already known and another dispatch only
-repeats it.
+input goes to the human. Any `PREFLIGHT … FAIL`: do not dispatch to any pin
+— a failed pin's cause is already known and another dispatch only repeats it.
 Stop and relay the printed reason: the harness, the path, and that the human
 opens that harness there once to answer its own dialog; Dely never answers
 it. The failed worker is already stopped and released. When the human says

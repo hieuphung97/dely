@@ -3,11 +3,601 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-09-27.
+Last updated 2026-10-01.
 
 ---
 
 ## Settled
+
+### 2026-10-01 — README shows a role table derived from `harnesses.json`; `limits` are user caveats; the checklist runs rows by what changed
+
+#### Context
+
+An independent architecture review of PR #61 at `65a54b0`
+(`~/dely-probe/arch-review/roles-architecture-review.md`) found no Blocking
+issue and no regression. It found that the README rewrite of 2026-09-30:
+
+- lost the logo, the usage video, the table of contents, "How Dely works",
+  the Log section, and the invocation for Claude Code and Codex;
+- showed protocol words ("Control wake") that a user cannot act on;
+- paraphrased `limits` by hand, which had already drifted.
+
+It also found three maintenance problems:
+
+- `notes` repeat the decision record and hold two false Pi statements (both
+  corrected in the 2026-09-28 section): a whitespace pin cell now fails closed,
+  and with a `pi` key Pi loads only the extensions the key lists;
+- the version rule ignores `harnesses.json`, `extensions/` and `package.json`,
+  although the helper builds every launch from `harnesses.json`;
+- the checklist floor (16 parameterized rows on any shared change) cannot be
+  met in practice.
+
+The owner said that a new user needs to know, per harness, which roles it can
+take and what to watch out for. The owner chose to fix all of this before
+merging PR #61.
+
+#### Decision
+
+- **`limits` is the one user-facing caveat per harness.** It is written in
+  user words, and a sentence about one role starts "As Control," or "As a
+  worker,". `setup` prints it. README copies it verbatim.
+- **README's role table is derived, not hand-written.** For each harness the
+  row is `| name | Control | Implementer | Reviewer | limits |`:
+  - Control is ✗ when `status` is `deferred` or `controlWake` is
+    `unsupported`; ⚠ when `limits` has a sentence starting "As Control,";
+    otherwise ✓;
+  - Implementer and Reviewer are ✗ when `deferred`; ⚠ when `limits` has a
+    sentence starting "As a worker,"; otherwise ✓.
+
+  A closure gate builds every row from `harnesses.json` and requires README to
+  contain it exactly.
+- **README follows the review's outline:**
+  1. logo, video and contents;
+  2. Quickstart;
+  3. How Dely works, with what Control, implementer and reviewer are;
+  4. the role table;
+  5. Orca and Dely installs, with every harness's invocation;
+  6. choosing models;
+  7. Log;
+  8. troubleshooting.
+- **`notes` keep only why a field has its value,** with the date of the
+  decision section that measured it. History moves to, or stays in, this
+  record. A sentence is removed only when this record already holds it. This
+  supersedes earlier sections that say a measurement goes into an entry's
+  `notes`.
+- **The version rule also covers `harnesses.json`, `extensions/` and
+  `package.json`.**
+- **The helper:**
+  - passes `--ack` on its first `check --wait` (Orca's one-call form);
+  - resolves `--repo` before the handle check;
+  - adds Orca's own guidance to the missing-handle error.
+
+  `SKILL.md` says that a spec line must not start `dely-pin:`, and what to do
+  when `--ack` returns `ERROR`.
+- **The checklist runs rows by what changed:**
+  - an argv stub row compares `dispatch` and `preflight` launches with the
+    newest release tag, with the pin built from both snapshots' capabilities,
+    pinned, `default`, and Effort-only for entries that take an effort. It
+    stands in for the live worker rows of entries
+    whose launch fields did not change. Its list of intended differences is
+    written from this record before it runs, never from its output;
+  - an entry changes when a launch field changes; `limits` and `notes` do
+    not count;
+  - Control rows run once per wake mode (Claude Code for `background`, Codex
+    CLI for `waker`) whenever wait, settle, acknowledgement or `notify` logic
+    or the `SKILL.md` Control text changes. They also run per harness when
+    its entry changes, or when it upgrades and a deployment uses it as
+    Control;
+  - an Orca upgrade reruns the live worker row for each harness a deployment
+    uses, the Control row per wake mode, rows 4 and 5, and Pi rows 13 to 16;
+  - OMP rows 8 to 10 and the OMP worker row are a standing named skip while
+    stablyai/orca#24068 is open.
+
+#### Alternatives considered
+
+**A `roles` object in `harnesses.json`.** Rejected again: `status`,
+`controlWake` and role-prefixed `limits` carry every mark the table needs.
+
+**A README generator.** Rejected: the repository has no build step. A gate in
+the existing lexical style catches the same drift.
+
+**Keeping the 16-row floor.** Rejected: the 40ee718 run took 3 h 40 min in a
+narrowed scope and still had blocked rows. A floor no release meets is
+skipped by name every time.
+
+#### Consequences
+
+A user picks harnesses per role from one table whose marks cannot drift from
+the data. Adding a harness touches one entry and its README install block;
+the row follows from the entry. `limits` sentences are now part of the
+public README, so they must stay short and actionable. The gate proves that
+README matches the data, not that the data is true.
+
+#### Non-goals
+
+- Changing how a rejected-only batch is surfaced.
+- `start()` for a Pi entry with `modelFlag: true`.
+- Filtering Antigravity's discovery.
+- Re-measuring Grok as Control, which needs a paid account.
+
+#### Verification, 2026-10-01
+
+The live checklist ran on `20490dc` under Orca 1.4.218, in the scope the
+tiering rules give this candidate: Orca was upgraded, wait logic changed, and
+Cursor and OMP had not been checked as Control on a 0.23.0 helper. Report:
+`~/dely-probe/checklist-readme-20490dc.md`.
+
+- **Passed:**
+  - installs and hashes for Claude Code, Codex, OMP and Pi;
+  - the Orca-rejected message stub row;
+  - the argv stub row against `v0.22.0`, whose intended differences equal
+    the list written from this record (Antigravity `--model`, Pi new);
+  - the argv stub row against `40ee718`, with no difference, so worker
+    launches did not change since the previous live run;
+  - implementer and reviewer for Cursor and Claude Code;
+  - Control for Claude Code and Cursor (background) and for Codex and OMP
+    18.4.8 (waker), with the `REFUSED` checks;
+  - row 4 under a waker Control, row 5, and Pi rows 13, 14 and 15.
+- **Passed after a failed attempt:**
+  - row 4 under a background Control: on the first attempt, Control read
+    the killed worker's screen as alive and did not redispatch; the second
+    attempt passed;
+  - the OMP Control and Pi row 13, blocked first by Google Vertex errors
+    (429, then 403 billing).
+- **Partial: Pi row 16.** The helper reported `ATTENTION` 15 s after the
+  kill. A redispatched Pi worker did not acknowledge within 60 s while Vertex
+  was slow, so the end-to-end row was not observed.
+- **Observed, not changed:**
+  - Claude, Codex and Cursor Controls acknowledged a settled batch with a
+    separate `orca orchestration check --ack` before dispatching the
+    review, instead of passing it to the next wait. Both forms are accepted,
+    and no batch replayed. The one-call `--ack` form worked from the observer
+    and from the OMP Control;
+  - Claude and OMP Controls did not release settled workers, as a Pi
+    Control did on 2026-09-30;
+  - Orca 1.4.218 reports an unanswered Claude trust dialog as
+    `agent_readiness` in 20 s, where 1.4.217 took 58 s.
+- **Not run, with reasons:**
+  - **Live worker rows for Copilot, Antigravity, Grok and Pi.** Their entries
+    changed against `v0.22.0`. They passed live on `40ee718` (Pi as
+    implementer in rows 13 and 16, not as reviewer). The argv stub against
+    `40ee718` shows no launch difference since then. The Orca 1.4.218
+    upgrade reruns the deployment harnesses and Pi rows 13 to 16, so
+    Copilot, Antigravity and Grok are not re-verified against Orca 1.4.218,
+    and Pi only as implementer; the checklist names that gap.
+  - **Control rows for Copilot, Antigravity and Pi.** Their entries changed,
+    and they passed as Control on `40ee718`. The wait change since then is
+    covered by the per-wake-mode Control rows on `20490dc`: Claude and Cursor
+    for `background`, Codex and OMP for `waker`. Owner's scope. Grok's
+    Control row is under Deferred.
+  - **OMP rows 8 to 10 and the OMP worker row:** standing skip while
+    stablyai/orca#24068 is open.
+  - **Kiro:** `deferred`.
+  - **Rows 6, 7 and 11:** by the owner's scope. Row 6 last ran live on
+    `40ee718`, before this delivery changed the `wait` loop's acknowledgement.
+    The `STALLED` path itself did not change.
+- **Open, recorded here:**
+  - Controls of several harnesses (Pi, Claude, OMP) leave settled workers
+    unreleased. This is probably `SKILL.md`'s completion accounting, not a
+    harness limit, though only Pi's `limits` says so;
+  - the role-table gate does not enforce row order;
+  - there is no OMP row for a level the model does not offer (row 15 is
+    Pi-only);
+  - the argv stub's unexpected-difference lines carry no mode, and the
+    routed live worker row runs only the pinned mode, so the recorded line is
+    the only signal for a `default` or Effort-only difference. An intended
+    `effortFlag` change cannot pass the row, which fails safe;
+  - a `waitInterrupted` result after a combined `--ack` ends in the same
+    `ERROR` as before, one call later.
+
+#### Deferred
+
+Grok as Control on the 0.23.0 helper. Trigger: a Grok account without the
+free-tier limit.
+
+Workers left unreleased by Controls. Trigger: the next delivery that touches
+`SKILL.md`'s completion accounting.
+
+---
+
+### 2026-09-30 — Each harness states what it can do per role, with limits; Copilot, Antigravity and Grok are supported
+
+#### Context
+
+The question "which harness can be Control, implementer or reviewer" had no
+honest answer in the package. `status` said `supported` for Pi, whose Control
+kills its own helper under a model-chosen timeout, and `deferred` for three
+harnesses whose last measurement was a month and several releases old.
+
+**Measurement, 2026-09-29, Orca 1.4.215.** Two probe sessions measured every
+harness in every role. The reports are
+`~/dely-probe/role-spike/A-report.md` (Copilot, Antigravity, Grok, Kiro) and
+`~/dely-probe/role-spike/B-report.md` (OMP and Pi as reviewer, Claude Code's
+Bash timeout, Codex and Cursor as Control). Per role, n = 1:
+
+- Copilot CLI 1.0.89 (it self-updated from 1.0.83 during the run): Control by
+  background wake worked. As implementer and reviewer it worked once the
+  path was trusted. Its trust dialog is not detected by Orca, which accepts the
+  input, so the helper sees only `NO_ACK` after 60 s; 2 of 7 launches left the
+  prompt unsent. Orca refuses `--model`.
+- Antigravity CLI 1.2.13: Control by waker worked. As implementer and reviewer
+  it worked, but the first launch on a new path lost the prompt 3 of 4 times
+  (0 of 6 once trusted). Orca now accepts `--model` for it; `--effort` is
+  rejected or silently drops the pin.
+- Grok Build 1.0.44: Control by waker worked with no model request during the
+  wait. As implementer and reviewer it worked after one trust answer per path;
+  1.0.44 asks in every repository that has an `AGENTS.md`, and Orca detects the
+  dialog within about 2 s. Orca refuses `--model`.
+- Kiro CLI 2.21.0: a worker never became ready in Orca (3 of 3); Control by
+  `wait-bg` worked once, but only with a global confirmation setting whose
+  default exits.
+- Codex CLI 0.157.1 as Control: the wake worked (1 request per wait), but its
+  tool shell had no `ORCA_TERMINAL_HANDLE`, so the helper failed until the
+  model found its own handle. Not re-measured on 0.159.1.
+- Claude Code as Control: a long command moved to the background instead of
+  being killed, and `dely preflight` completed.
+- OMP and Pi as reviewer: both found a planted defect.
+
+Killed Copilot, Antigravity and Grok workers reached `attention.requiresAction`
+within 1.5 s. The same probes found two helper defects that apply to every
+harness: an Orca-rejected heartbeat counted as the acknowledgement, and an
+Orca-rejected `worker_done` settled a wait (a Cursor Control released a live
+worker on it).
+
+**Real use, `~/.dely/log.jsonl`**, counting only Runs in the owner's
+repositories and dropping stub lines (a design review corrected Control's
+first counts):
+
+- 37 Runs.
+- Implementer: Cursor about 211. Reviewers: Cursor about 133, Codex about 92,
+  Claude 12. OMP implemented 7 times, all in this repository. Pi: none.
+- Every real Control waited in the background.
+- Six batches settled twice because they were never acknowledged.
+- Real `preflight` failures: a wait already active on the Run (4), the Run
+  bound to another terminal (4), a relative `--repo` (2), and a shell startup
+  prompt (oh-my-zsh) holding a Cursor worker (2).
+
+**A design review** (`~/dely-probe/arch-review/refactor-design-review.md`)
+rejected the first proposal, a `roles` object with per-role statuses, as a
+re-encoding of fields that already exist.
+
+#### Decision
+
+The schema keeps `status` (whether a harness is offered as a worker) and
+`controlWake` (how it can be Control, or `unsupported`). An entry may carry
+`limits`, one short sentence of what a user must know, which `setup` prints
+next to the harness it offers. The values are:
+
+- **Copilot CLI:** supported, `controlWake: background`.
+- **Antigravity CLI:** supported, `controlWake: waker`, `modelFlag: true`,
+  `effortFlag: false`, discovery `agy models`.
+- **Grok Build:** supported, `controlWake: waker`.
+- **Kiro CLI:** stays `deferred`, because a worker never becomes ready;
+  `controlWake` becomes `waker`, as measured.
+
+Each of the first three carries its launch limits. Existing entries gain
+limits too:
+
+- Codex: as Control it can start the next helper command before the last one
+  ends, and its 0.157.1 shell lacked the terminal handle.
+- Pi: its Control must run the helper without a tool timeout, and its pin is
+  unchecked.
+- OMP: a dead worker surfaces only at `STALLED`, and OMP 18.4.4 workers did
+  not start on Orca 1.4.217.
+- Cursor: no effort pin.
+
+The helper:
+
+- ignores messages Orca rejected when it looks for an acknowledgement or a
+  settling message;
+- takes `--ack <deliveryId>` on `wait` and `wait-bg`, to acknowledge the
+  previous batch the way Orca does, instead of acknowledging by itself;
+- checks for `ORCA_TERMINAL_HANDLE` before it dispatches;
+- adds a one-line hint to Orca's "bound to another terminal" and "active
+  waiter" errors;
+- records the `dispatchId` of a settling message and the Control harness of a
+  wait.
+
+The pin extension stops the worker when it cannot apply a pin, including a
+`setModel` that throws and a `dely-pin:` line it cannot parse. `SKILL.md`
+tells Control to run the helper with no tool timeout and to pass the settled
+id to its next wait. A gate checks the enumerated values in `harnesses.json`.
+
+#### Alternatives considered
+
+**A `roles` object with `supported`/`limited`/`unsupported` per role.**
+Rejected: `status` and `controlWake` already hold both axes; no consumer
+would branch on `limited`; implementer and reviewer never differed in any
+measurement or code path.
+
+**Refusing a dispatch or a wait for an unsupported role in the helper.**
+Rejected: Orca's own readiness gate already fails a worker that cannot start,
+and a hand-kept refusal would outlive the harness's fix and block
+re-measuring.
+
+**`wait` acknowledging by itself.** Rejected: it reverses Orca's documented
+process-then-acknowledge order; `--ack` on the next wait is Orca's own idiom.
+
+**A fixed log schema with an outcome enum.** Rejected: Orca's own dispatch
+record holds agent, model and outcome; only the `dispatchId` and the Control
+harness were missing.
+
+**Leaving Copilot, Antigravity and Grok deferred.** Rejected by the owner:
+each worked in every role it was measured in, and its limits can be stated.
+
+#### Consequences
+
+A user reading `setup` or README sees what each harness can do and what it
+costs. Three more harnesses are supported on one measurement per role, and
+all three self-update often; their `notes` name the measured versions, and
+their live rows run when their entry or the shared launch code changes.
+
+Kiro stays out, and its Control result is recorded, not offered.
+
+#### Verification, 2026-09-30
+
+The live checklist ran on `40ee718` under Orca 1.4.217, in a scope the owner
+chose, narrower than the checklist's release floor. Report:
+`~/dely-probe/checklist-roles-40ee718.md`.
+
+- **Passed:**
+  - installs and hashes for Claude Code, Codex, Copilot, Antigravity, Grok,
+    OMP and Pi, and the README install, verify, update and remove commands for
+    Copilot, Antigravity and Grok;
+  - the Orca-rejected message stub row;
+  - implementer and reviewer for Claude Code, Codex 0.159.2, Cursor, Copilot,
+    Antigravity and Grok;
+  - Control for Claude Code, Copilot (background), Codex, Antigravity and Pi
+    0.99.1 (waker), each with the `REFUSED` check where it applies;
+  - row 4 under a background and a waker Control, rows 5 and 6, rows 11 and
+    13 to 16.
+- **Passed after failed attempts:**
+  - Copilot's worker passed on its third attempt. Copilot 1.0.89 shows an app
+    promo at launch that Orca does not detect, and the pasted prompt was left
+    unsent twice; after a human answered "No, thanks" once, it did not return.
+  - Antigravity passed on its third preflight on a new path, which is its
+    stated limit.
+- **Partial:** row 7. The trust loop completed, but a Codex Control ran
+  `dely dispatch` while `dely preflight` was still running (its tool call
+  yields after 30 s). That is now Codex's Control limit.
+- **Blocked outside Dely:**
+  - Grok as Control stopped on Grok's free usage limit twice, so its waker
+    path was not re-measured on this candidate.
+  - OMP self-updated to 18.4.4. Orca 1.4.217 did not see an OMP 18.4.4 worker
+    as ready in four attempts (stablyai/orca#24068 gives the cause), so OMP pin
+    rows 8 to 10 and the OMP parameterized worker row could not run. That is
+    now OMP's limit.
+- **Not run, by the owner's choice:** Control rows for Cursor, OMP and Kiro,
+  and the parameterized worker row for Pi. Pi as implementer ran in rows 13
+  and 16; Pi as reviewer was not exercised on this candidate.
+  Cursor's launch argv is byte-identical to 0.22.0 in stub comparisons, this
+  delivery's helper commits leave OMP's argv unchanged, and each wake mode was
+  exercised by another harness.
+- **Observed but not changed:** a Pi Control never ran `worker-release`.
+- **Accepted as not met:** the hint for Orca's "active actionable waiter"
+  error states that a `dely wait` for the Run is still running, rather than
+  naming a command; the design review proposed the same condition.
+- **Open, recorded here:**
+  - the `rejected` log event lists every message of the batch without marking
+    the rejected ones;
+  - `agy models` still offers `gemini-3-flash-preview`, which failed to
+    acknowledge in the Spike;
+  - Codex 0.159.1's "Update available" screen matches Orca's
+    blocking-dialog pattern;
+  - `setup` has no route for a preflight `ERROR`;
+  - a missing-handle `error` log line records `--repo` unresolved, because the
+    handle check runs before the path is resolved.
+
+#### Deferred
+
+A Kiro worker. Trigger: an Orca release in which `worker-start --agent kiro`
+becomes ready.
+
+A pinned Copilot or Grok worker. Trigger: an Orca release whose
+`worker-start` accepts `--model` for them.
+
+OMP 18.4 workers and OMP pin rows 8 to 10. Trigger: an Orca release that
+closes stablyai/orca#24068.
+
+Grok as Control on this candidate's helper. Trigger: a Grok account without
+the free-tier limit.
+
+### 2026-09-28 — Pi is a supported harness and shares OMP's package and pin extension
+
+#### Context
+
+Pi (`pi-coding-agent`) 0.87.1 was measured under Orca 1.4.215 on 2026-09-28,
+in fresh git roots under `~/dely-probe/`, as a worker and as Control, with
+Dely 0.22.0 installed. OMP is a fork of Pi, and Orca's own status extension
+for both says they "expose the same extension API".
+
+**Orca launches Pi but cannot pin or observe its model.**
+`worker-start --agent pi --model …` is refused ("Agent pi does not support
+launch-time model selection"): Orca's model-capability map has no `pi` entry
+at all. For a Pi worker, `worker-show` reports `projection.provider` as
+`{"id":"pi","model":null}`, because Orca's status extension adds the model to
+its posts only for OMP. `worker-read` has no transcript for Pi
+(`provider_unsupported`); it falls back to the terminal.
+
+**Worker.** Orca launches bare `pi`. A worker acknowledged 12 s after start,
+wrote a file without an approval prompt (Pi has no approval step), and sent
+`worker_done`. Killing its process turned `attention.requiresAction` true
+within 3 s, so `dely wait` reaches `ATTENTION` for Pi, which it does not for
+OMP.
+
+**Trust.** Pi asks "Trust project folder?", with Trust preselected, only when
+the working directory or an ancestor holds `.pi/settings.json`,
+`.pi/extensions`, `.pi/skills`, `.pi/prompts`, `.pi/themes`, `.pi/SYSTEM.md`
+or a project `.agents/skills`. A fresh repository with none of these started
+without a dialog. Orca delivers Pi's prompt on the command line, so a worker
+held by the dialog never acknowledges.
+
+**Package.** A root `package.json` with a `pi` key declaring `extensions`
+and `skills` is loaded by Pi (`pi install <path>` or
+`pi install git:github.com/<owner>/<repo>@<ref>`, which clones that ref under
+`~/.pi/agent/git/`) and, measured the same day, by OMP, which reads
+`omp ?? pi`. With only the `omp` key that 0.22.0 ships, Pi loads the skills
+from `skills/` by convention but not the extension. Pi also loads a package's
+`extensions/` directory by convention, whatever the manifest key says (found
+by the task review). Pi therefore loads the extension from the `pi` key and
+also, whatever the key, from `extensions/`; the 0.22.0 layout (`omp` key,
+`omp/dely-pin.ts`) gives Pi neither. OMP needs the key: without an `omp` or
+`pi` key it treats the package as no plugin at all.
+Corrected 2026-10-01: with a `pi` key, Pi loads only the extensions that key
+lists ("a manifest, when present, is used exclusively"); it falls back to
+`extensions/` by convention only when there is no key. The Pi architecture
+review's resolver run showed this.
+
+**The pin extension fails every Pi pin that names an effort.** Inside Pi a
+registry model describes its levels as `thinkingLevelMap`
+(`{off: null, minimal: "minimal", …, max: null}`), a third shape after OMP's
+`thinking.efforts` and the array `omp models --json` prints. The 0.22.0
+extension checks only the other two, and printed `DELY-PIN-FAIL` for the valid
+pin `google-vertex/gemini-3.5-flash low`. On both Pi and OMP, calling
+`setThinkingLevel(level)` and reading `getThinkingLevel()` back returned the
+requested level when the model offers it and something else when it does not:
+`max` came back as `high` on both, and an unknown level as `minimal` on Pi and
+as nothing on OMP.
+
+**Control.** Pi has no background job that ends a turn and wakes it; asked to
+run one, the model used `nohup … &`, and nothing woke it when the job ended. A
+full `dely wait-bg --control pi` cycle with an OMP worker settled, and Pi
+processed the wake. Pi's bash tool runs a command under a timeout the model
+chooses: Pi Controls in the live checklist chose 10 s, 20 s and 30 s, and in 2
+of 6 Control sessions that timeout killed the helper mid-command (found by
+the integration review). It killed `dely preflight` twice and a review
+`dely dispatch` once in one session, leaving unreleased preflight workers
+whose stale `worker_done` then settled the next `wait-bg` at once; in the
+other it killed an implement `dely dispatch` during its 60 s acknowledgement
+wait, so that dispatch wrote no `dispatch`, `NO_ACK` or stop event.
+
+**Discovery.** `pi --list-models` prints a table (`provider`, `model`, …),
+not JSON. `pi --help` lists the `--thinking` levels.
+
+#### Decision
+
+Pi is `supported` in `harnesses.json` under id `pi`, as worker and as Control:
+`controlWake: waker`, `trust: dialog`, `modelFlag: false`,
+`effortFlag: false`, `modelPin: spec-unchecked`, `permissionDefault: none`,
+and discovery by two commands whose output is already the catalogue:
+`pi --list-models` reduced to `<provider>/<model>` lines, and the `--thinking`
+levels read from `pi --help`.
+
+`modelPin: spec-unchecked` carries the pin exactly as `spec` does, a
+`dely-pin:` line in the spec applied by the shipped extension, but
+`dely dispatch` skips the post-acknowledgement check of
+`projection.provider.model`, because Orca does not report Pi's model. OMP
+keeps `spec` and the check. No other harness names `modelPin`.
+
+One package serves both. The root `package.json` declares the extension and
+the skills under `pi`, which OMP also reads, and the extension moves from
+`omp/dely-pin.ts` to `extensions/dely-pin.ts`. The extension no longer reads a
+harness's registry shape for levels: it sets the level, reads it back, and
+fails the same way on a mismatch as on an unknown selector.
+
+Pi installs from a tag with `pi install git:github.com/hieuphung97/dely@v<version>`.
+
+`dely` resolves `--repo` to an absolute path before any use. Live row 17 on
+the first candidate failed because a Pi Control passed `--repo .` and the
+helper handed Orca the selector `path:.`, which Orca cannot match; the defect
+predated Pi and applied to every Control. The path is normalized lexically
+with `path.resolve`, without resolving symlinks: a canonical absolute path,
+such as `$(pwd)` prints, reaches Orca unchanged, while a trailing slash or a
+`.` or `..` segment is collapsed, and `--repo .` yields the working
+directory's physical path.
+
+This amends the 2026-09-27 OMP record's package key, extension path and level
+check; its reasoning stands.
+
+#### Alternatives considered
+
+**Treat a present provider with a null model as unverifiable for every
+`modelPin` harness.** Rejected: it would weaken the check that was reviewed
+and measured for OMP, where Orca does report the model.
+
+**Leave Pi unpinned until Orca supports it.** Rejected: pinning works now and
+fails closed on a bad pin; only the missing-extension case is unseen.
+
+**Add a third registry shape to the extension.** Rejected: the read-back is
+shape-agnostic and removes code; a fourth shape would need another branch.
+
+**A discovery field that joins table columns.** Rejected: `discovery.models`
+is already a command, so a pipeline yields selectors with no schema change.
+
+**A second `package.json` key, or a Pi-only package.** Rejected: OMP reads the
+`pi` key, so one manifest is enough.
+
+#### Consequences
+
+A project can pin Pi's model and effort per phase. A bad selector or level
+stops the worker before its first request and surfaces as `NO_ACK`.
+
+**If Pi does not load the extension, a pinned Pi worker runs its own default
+and nothing reports it.** OMP catches this case through Orca's projection; Pi
+cannot until Orca reports its model.
+
+A repository with `.pi/` resources or `.agents/skills` holds a Pi worker at
+Pi's trust dialog until a human opens Pi there once.
+
+A dead Pi worker is seen by `ATTENTION`. A stuck but live one is seen only by
+`DEADLINE`, because Orca has no Pi transcript for `STALLED` to read.
+
+**A Pi Control can kill its own helper.** When the model gives `dely dispatch`
+or `dely preflight` a bash timeout shorter than the helper needs (`ACK_S`,
+60 s, plus the pin check for `dispatch`; `PREFLIGHT_S`, 150 s, for
+`preflight`), the helper dies without recording or cleaning up. A dispatch of
+an OMP worker killed that way also skips OMP's post-acknowledgement pin check.
+This decision does not guard against it; the Control must not run the helper
+under such a timeout.
+
+A Model or Effort cell that contains whitespace yields a pin line the
+extension does not recognize, so no pin applies. OMP's projection check
+catches this; on Pi the worker runs its default unseen. `setup` writes
+discovered tokens, which contain no whitespace, so only a hand edit reaches
+it. Corrected 2026-10-01: the extension now stops on any `dely-pin:` line it
+cannot parse, so such a cell fails closed on Pi too.
+
+Pi rows join the live checklist. They run when `start()`, the extension or the
+`pi` entry changes, and after a Pi upgrade; the release floor stays ten rows.
+
+**Live verification, on Pi 0.87.1, OMP 18.3.4 and Orca 1.4.215.** On a
+snapshot of `c436785`: the OMP and Pi install checks passed; OMP rows 8 to 11
+passed (row 8's projection held the pin 6.2 s before the acknowledgement, and
+with the extension disabled the dispatch printed `FAILED … pin not applied`);
+Pi rows 13 to 16 passed (every request of row 13 ran the pinned
+`google-vertex/gemini-3.5-flash` `low`, rows 14 and 15 stopped at `NO_ACK`
+quoting `DELY-PIN-FAIL` with no request, and a killed Pi worker reached
+`ATTENTION` 0.2 s after the kill); row 17 failed on the relative `--repo`
+described above. After the helper fix, row 17 ran again on a snapshot of
+`5fecbc1` and passed in both Runs, with no `error` event and every `dispatch`
+recording an absolute `repo` (see below). Rows 1 to 7 and 12 were not run: Claude Code,
+Codex CLI and Cursor Agent CLI launch byte-identical to 0.22.0 for an absolute
+`--repo`, which task reviews reproduced against a 0.22.0 snapshot, and row 12
+(OMP as Control) runs `dispatch`, `preflight` and `log`, whose only change is
+that an absolute `--repo` passes unchanged and a relative one now works, while
+`start()` and the pin check are unchanged for `spec` harnesses. In row 17's
+first Run on `5fecbc1`, the Pi Control's 30 s bash timeout killed the
+implement `dely dispatch`, so that dispatch recorded nothing; the review
+dispatch and both of the second Run's dispatches recorded an absolute `repo`.
+
+Under Orca 1.4.215, `dely wait` reported `ATTENTION` with `missing_status`
+three times for OMP workers that were alive and working (Run
+`run_e7119838e66e`: 13:45:29Z, 15:34:02Z and 00:05:28Z), and once `STALLED`
+(15:21:35Z), whose printed reason was `transcript_parse_failed` while the log
+line records only `idleMinutes: 10`. Control confirmed the process and its output each
+time and waited again with `--skip`. This decision does not change that.
+
+#### Non-goals
+
+Verifying a Pi worker's model without Orca's help. A background-wake Pi
+Control. Detecting a stuck Pi worker before `DEADLINE`.
+
+#### Deferred
+
+`modelPin: spec` for Pi, then `modelFlag: true`. Trigger: an Orca release
+that reports Pi's model in `projection.provider.model`, then one whose
+`worker-start --agent pi` accepts `--model`. Requested on
+[stablyai/orca#23388](https://github.com/stablyai/orca/issues/23388#issuecomment-5871097741).
 
 ### 2026-09-27 — OMP is a supported harness, and its model pin travels in the spec
 
@@ -100,6 +690,11 @@ agent start of a session, and only on a line that begins with `dely-pin:`. A
 selector OMP does not offer, or a model it cannot switch to, prints a line
 beginning `DELY-PIN-FAIL` and exits the process, so the dispatch surfaces as
 `NO_ACK` quoting that line.
+
+Amended 2026-09-28 (see the Pi record above): the extension is now
+`extensions/dely-pin.ts`, declared under the `pi` key that OMP also reads, and
+it checks a level by setting it and reading it back rather than by reading
+OMP's registry shape.
 
 OMP is installed from a local checkout with `omp plugin install <path>`, not
 from the `dely` marketplace.
@@ -264,9 +859,9 @@ spec line carries only an effort, and the post-acknowledgement check keeps
 running. The request is filed as
 [stablyai/orca#23388](https://github.com/stablyai/orca/issues/23388).
 
-Deleting `omp/dely-pin.ts`, `modelPin`, the root `package.json` and OMP's
-separate install path. Trigger: an Orca release that also accepts `--effort`
-for `omp`; `effortFlag` becomes `true`, and OMP installs from the `dely`
+Deleting OMP's use of `extensions/dely-pin.ts` and `modelPin`, and its
+separate install path; the package stays while Pi needs it. Trigger: an Orca
+release that also accepts `--effort` for `omp`; `effortFlag` becomes `true`, and OMP installs from the `dely`
 marketplace, which already loads its skills.
 
 `controlWake: background` for OMP. Trigger: a measured OMP job timeout above

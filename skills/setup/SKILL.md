@@ -36,9 +36,9 @@ that harness's defaults for model and effort, written as the literal
 harnesses, models and effort levels and write what the human chooses. Where a
 harness exposes no way to pin a model or an effort, write the literal `default`
 for that cell and point to Orca's agent default arguments. An entry with
-`modelPin: spec` can be pinned — offer its discovered models and effort
-levels as for a flag harness, and write Effort `default` for a model whose
-effort field is `null`.
+`modelPin: spec` or `modelPin: spec-unchecked` can be pinned — offer its
+discovered models and effort levels as for a flag harness, and write
+Effort `default` for a model whose effort field is `null`.
 
 Ask which path. Do not start writing until that is answered.
 
@@ -66,7 +66,8 @@ not, append the block. Touch nothing else.
 ## Discovery
 
 Offer only entries whose `status` is `supported`. A `deferred` entry is
-omitted, not an error.
+omitted, not an error. When an offered entry has `limits`, print it next
+to that harness.
 
 For each supported entry whose `binary` is installed, run that entry's
 `discovery`. `discovery` is `null` when the harness has no listing command;

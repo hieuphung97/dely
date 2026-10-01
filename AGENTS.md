@@ -40,9 +40,10 @@ Repository artifacts are written in English.
   Candidate changes in this checkout take effect for the next delivery, not
   the one shipping them. Plugin caches and any live worker hook wiring are
   refreshed only between plans.
-- A delivery that changes anything under `skills/` advances the version in
-  both plugin manifests, `package.json`, and the version gate below, within
-  that same delivery.
+- A delivery that changes anything under `skills/`, `harnesses.json`,
+  `extensions/` or `package.json` advances the version in both plugin
+  manifests, `package.json`, and the version gate below, within that same
+  delivery.
 
 ## Phase dispatch
 
@@ -57,7 +58,7 @@ delivery run.
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
 | `implement` | Cursor Agent CLI | cursor-grok-4.6-high | default |
-| `review` | Codex CLI | gpt-5.6-sol | high |
+| `review` | Claude Code | claude-opus-5-5 | high |
 <!-- dely:end -->
 
 The table is this repository's deployment selection, not the portable
@@ -82,14 +83,18 @@ jq -e . harnesses.json plugin.json .claude-plugin/plugin.json .claude-plugin/mar
 ```
 
 ```bash
+jq -e '.harnesses | all((.status == "supported" or .status == "deferred") and (.controlWake == "background" or .controlWake == "waker" or .controlWake == "unsupported") and ((has("modelPin") | not) or .modelPin == "spec" or .modelPin == "spec-unchecked"))' harnesses.json >/dev/null
+```
+
+```bash
 node --check skills/delivery/scripts/dely.js
 git ls-files -z '*.sh' 'skills/delivery/scripts/dely' | xargs -0 -n1 bash -n
 ```
 
 ```bash
-test "$(jq -r .version .claude-plugin/plugin.json)" = 0.22.0
-test "$(jq -r .version .codex-plugin/plugin.json)" = 0.22.0
-test "$(jq -r .version package.json)" = 0.22.0
+test "$(jq -r .version .claude-plugin/plugin.json)" = 0.23.0
+test "$(jq -r .version .codex-plugin/plugin.json)" = 0.23.0
+test "$(jq -r .version package.json)" = 0.23.0
 ```
 
 ```bash
@@ -108,6 +113,13 @@ git grep -nE 'adoptCommand|adoptedPermission|adoptPath|readAdopts|writeAdopts|re
 git grep -Ei 'pace.?id' -- . ':!docs/_plans' && exit 1 || true
 git grep -E '(^|[^A-Za-z0-9])[A-Z][0-9]+[a-z]?([^A-Za-z0-9]|$)' -- . ':!docs/_plans' && exit 1 || true
 ```
+
+```bash
+rows=$(jq -r '.harnesses[] | . as $h | (if $h.status == "deferred" or $h.controlWake == "unsupported" then "✗" elif ($h.limits // "") | test("(^|[.] )As Control,") then "⚠" else "✓" end) as $c | (if $h.status == "deferred" then "✗" elif ($h.limits // "") | test("(^|[.] )As a worker,") then "⚠" else "✓" end) as $w | "| \($h.name) | \($c) | \($w) | \($w) | \(if ($h.limits // "") == "" then "—" else $h.limits end) |"' harnesses.json) || exit 1
+printf '%s\n' "$rows" | while IFS= read -r row; do grep -qxF -- "$row" README.md || { echo "README lacks: $row"; exit 1; }; done && { test "$(grep -cE '^\| [^|]+ \| (✓|⚠|✗) \| (✓|⚠|✗) \| (✓|⚠|✗) \|' README.md)" = "$(jq '.harnesses | length' harnesses.json)" || { echo "README role rows ≠ harnesses.json entries"; exit 1; }; }
+```
+
+Control is ✗ when `status` is `deferred` or `controlWake` is `unsupported`, ⚠ when `limits` has a sentence starting "As Control,", otherwise ✓; Implementer and Reviewer are ✗ when `deferred`, ⚠ when `limits` has a sentence starting "As a worker,", otherwise ✓. A role sentence starts the `limits` value or follows ". ".
 
 The first three gates prove repository shape and syntax only. A Bounded or
 Architectural change to runtime behaviour must also name a focused instrument
