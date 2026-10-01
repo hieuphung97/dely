@@ -9,35 +9,56 @@ can stand in for the human only for Claude Code.
 ## Input and release floor
 
 - candidate SHA and checkout path;
-- last-release SHA (newest `v*` tag; today `v0.22.0` = `3155c22`) and its snapshot path;
+- last-release SHA (the newest `v*` tag) and its snapshot path;
 - Orca running with orchestration enabled (live rows only);
 - each harness being tested installed and signed in (live rows only);
 - Node and `~/dely-probe/` writable.
 
 Run rows by what changed, against **every supported entry** in the candidate's
 `harnesses.json`. The argv stub row compares stdout and `worker-start` argv
-for every supported entry to the last release snapshot; it stands in for the
-live worker row of every entry whose `harnesses.json` entry did not change.
+for every supported entry to the last release snapshot, and also runs
+`dely preflight` for each entry and compares its output and launches; it
+stands in for the live worker row of every entry whose `harnesses.json`
+entry did not change. An **entry changed** when one of these fields differs
+from the last release: `id`, `name`, `binary`, `status`, `controlWake`,
+`modelFlag`, `effortFlag`, `modelPin`, `permissionDefault`, `discovery`,
+`trust`. A change to `limits` or `notes` does not count.
+
 Run the live worker row for each entry that changed and for each harness
 upgrade that a deployment uses. Each worker row covers implementer and
-reviewer in separate sessions.
+reviewer in separate sessions. A **deployment** is this repository's
+`AGENTS.md` pins plus the harness the owner uses as Control. A **harness
+upgrade** is a version different from the one recorded in the last
+release's live report.
 
-Run the Control row once per wake mode (`background`, `waker`) when only wait
-or settle logic changed; skip Control when `controlWake` is `unsupported`, and
-record that reason. Run the Control row per harness when its entry changed, or
-when that harness upgraded and a deployment uses it as Control.
+When the argv stub reports a difference it does not list as intended,
+whether or not the change meant it, record it and run the live worker row
+for every entry it names.
+
+Run the Control row once per wake mode (`background`, `waker`) whenever
+`wait`, `wait-bg`, `notify`, the acknowledgement or settle logic, or the
+Control section of `SKILL.md` changes; this is in addition to any
+per-harness Control rows. Those per-wake-mode rows use Claude Code for
+`background` and Codex CLI for `waker`, unless a deployment's Control uses
+another harness of that mode. Skip Control when `controlWake` is
+`unsupported`, and record that reason. Run the Control row per harness when
+its entry changed, or when that harness upgraded and a deployment uses it
+as Control.
 
 The release floor is the argv stub row, the rejected-message stub row, the
 live worker rows the rules above require, the Control rows those rules
-require, and rows 4–7. OMP rows 8 and 9 are a standing named skip while
-stablyai/orca#24068 is open. Rows 10–11 run when `start()` or the pin
-extension changes. Rows 13–16 run when `start()`, the extension or the Pi
-entry changes, after a Pi upgrade, and after an Orca upgrade. Rerun the argv
-stub, the live worker rows the rules require, the Control rows those rules
-require, and rows 4–5 after an Orca upgrade; rerun OMP pin rows and its
-Control row after an OMP upgrade; rerun Pi pin rows and its Control row after
-a Pi upgrade. A release that skips required rows names them and the reason in
-its decision record; structural gates cannot substitute for them.
+require, and rows 4–7. OMP rows 8, 9 and 10 and the OMP parameterized
+worker row are a standing named skip until stablyai/orca#24068 is closed.
+Rows 10–11 run when `start()` or the pin extension changes, except row 10
+stays under that OMP skip while the issue is open. Rows 13–16 run when
+`start()`, the extension or the Pi entry changes, after a Pi upgrade, and
+after an Orca upgrade. After an Orca upgrade, run the live worker row for
+each harness a deployment uses, the Control row once per wake mode, rows 4
+and 5, and Pi rows 13 to 16. The argv stub does not test Orca and is not on
+this list. Rerun OMP pin rows and its Control row after an OMP upgrade;
+rerun Pi pin rows and its Control row after a Pi upgrade. A release that
+skips required rows names them and the reason in its decision record;
+structural gates cannot substitute for them.
 
 ## Step 1 — install the candidate from a snapshot
 
@@ -51,7 +72,7 @@ rm -rf "$snap" && mkdir -p "$snap"
 git -C <checkout> archive "$sha" | tar -x -C "$snap"
 ```
 
-The last release is the newest `v*` tag (`v0.22.0` = `3155c22` today). Snapshot
+The last release is the newest `v*` tag. Snapshot
 it the same way; the argv stub row needs both trees and does not install either:
 
 ```bash
@@ -204,11 +225,13 @@ an old branch for ten merges while reporting success every time.
 ## Stub row — launch argv against the last release
 
 Run this from the observer shell with `snap` set to the candidate snapshot and
-`release_snap` to the last release snapshot. It uses a fake Orca executable and
-isolated home, creates no real Run or worker, and checks a deliberately wrong
-copy (a mutant that drops `--effort`) before the candidate. It stands in for
-the live worker row of every supported entry whose `harnesses.json` entry did
-not change.
+`release_snap` to the last release snapshot. Set `DELY_NAMED_INTENDED` to the
+differences the candidate's decision record names for this release, one per
+line (empty if it names none). It uses a fake Orca executable and isolated
+home, creates no real Run or worker, and checks a deliberately wrong copy (a
+mutant that drops `--effort`) before the candidate. It stands in for the live
+worker row of every supported entry whose `harnesses.json` entry did not
+change. The argv stub does not test Orca.
 
 ```bash
 stub=$(mktemp -d "$HOME/dely-probe/argv.XXXXXX")
@@ -235,7 +258,9 @@ const a = process.argv.slice(2), cmd = a[1], root = process.env.FIXTURE_ROOT;
 fs.appendFileSync(root+'/calls.jsonl', JSON.stringify(a)+'\\n');
 let result = {};
 if (cmd === 'worker-start') result = {dispatchId:'d-1'};
-if (cmd === 'check') result = {messages:[{type:'heartbeat',subject:'ack',payload:{dispatchId:'d-1'}}]};
+if (cmd === 'check') result = {deliveryId:'batch-1',messages:[
+  {type:'heartbeat',subject:'ack',payload:{dispatchId:'d-1'}},
+  {type:'worker_done',subject:'preflight ok',payload:{dispatchId:'d-1'}}]};
 if (cmd === 'worker-list') result = {workers:[]};
 if (cmd === 'worker-show') result = {projection:{provider:{model:'pin-model'}}};
 if (cmd === 'worker-read') result = {terminal:{tail:[]}};
@@ -243,10 +268,14 @@ if (cmd === 'worker-stop' || cmd === 'worker-release') result = {};
 if (cmd === 'status') result = {runtime:{appVersion:'stub'}};
 console.log(JSON.stringify({ok:true,result}));
 `);
-function pinOf(h) {
+function pinOf(h, other, mode) {
+  const o = other || {};
+  const modelCap = !!(h.modelFlag || h.modelPin || o.modelFlag || o.modelPin);
+  const effortCap = !!(h.effortFlag || h.modelPin || o.effortFlag || o.modelPin);
+  if (mode === 'default') return {model:'default', effort:'default'};
   return {
-    model: (h.modelFlag || h.modelPin) ? 'pin-model' : 'default',
-    effort: (h.effortFlag || h.modelPin) ? 'high' : 'default',
+    model: modelCap ? 'pin-model' : 'default',
+    effort: effortCap ? 'high' : 'default',
   };
 }
 function flagsOf(argv) {
@@ -266,73 +295,111 @@ function stripped(argv) {
   }
   return out;
 }
-function dispatch(file, h) {
-  const pin = pinOf(h);
+function add(arr, line) {
+  if (!arr.includes(line)) arr.push(line);
+}
+function launch(file, h, other, mode, verb) {
+  const pin = pinOf(h, other, mode);
   fs.writeFileSync(path.join(root, 'repo/AGENTS.md'),
     '| Phase | Harness | Model | Effort |\n| --- | --- | --- | --- |\n' +
     '| `implement` | ' + h.name + ' | ' + pin.model + ' | ' + pin.effort + ' |\n' +
     '| `review` | ' + h.name + ' | ' + pin.model + ' | ' + pin.effort + ' |\n');
   fs.writeFileSync(path.join(root, 'calls.jsonl'), '');
-  const r = spawnSync(process.execPath, [file, 'dispatch', '--run', 'fixture-run',
-    '--repo', path.join(root, 'repo'), '--phase', 'implement', '--spec-file', 'spec.md'],
+  const args = [file, verb, '--run', 'fixture-run', '--repo', path.join(root, 'repo')];
+  if (verb === 'dispatch') args.push('--phase', 'implement', '--spec-file', 'spec.md');
+  const r = spawnSync(process.execPath, args,
     {encoding:'utf8', timeout:10000, env:{...process.env,
       HOME:path.join(root, 'home'), ORCA_TERMINAL_HANDLE:'fixture-terminal',
       ORCA_CLI_COMMAND:path.join(root, 'orca.js'), FIXTURE_ROOT:root,
-      DELY_ACK_S:'0.2', DELY_POLL_S:'0.02', DELY_PIN_CHECK_S:'0'}});
-  let startArgv = null;
+      DELY_ACK_S:'0.2', DELY_POLL_S:'0.02', DELY_PIN_CHECK_S:'0', DELY_PREFLIGHT_S:'0.2'}});
+  const starts = [];
   for (const line of fs.readFileSync(path.join(root, 'calls.jsonl'), 'utf8').split('\n').filter(Boolean)) {
     const a = JSON.parse(line);
-    if (a[1] === 'worker-start') startArgv = a;
+    if (a[1] === 'worker-start') starts.push(a);
   }
-  return {out: (r.stdout || '').trim(), startArgv, status: r.status};
+  let out = (r.stdout || '').trim();
+  if (verb === 'preflight') out = out.replace(/PASS \d+s/g, 'PASS');
+  const ok = verb === 'preflight' ? / PASS/.test(out) && starts.length > 0
+    : out.includes('DISPATCHED') && starts.length > 0;
+  return {out, startArgv: starts[0] || null, starts, ok, status: r.status};
+}
+function diffLaunch(label, cand, rel, h, other, intended, unexpected) {
+  const tag = label === 'dispatch' ? h.name : h.name + ' ' + label;
+  const okNeedle = label === 'preflight' ? 'preflight' : 'dispatch';
+  if (!cand.ok) add(unexpected, tag + ' candidate did not ' + okNeedle + ': ' + cand.out);
+  if (!rel.ok) add(unexpected, tag + ' last release did not ' + okNeedle + ': ' + rel.out);
+  if (cand.ok && rel.ok && cand.out !== rel.out) add(unexpected, tag + ' stdout');
+  if (JSON.stringify(cand.starts.map(stripped)) !== JSON.stringify(rel.starts.map(stripped)))
+    add(unexpected, tag + ' argv');
+  const cf = flagsOf(cand.startArgv), rf = flagsOf(rel.startArgv);
+  for (const flag of ['--model', '--effort']) {
+    if (cf[flag] === rf[flag]) continue;
+    const field = flag === '--model' ? 'modelFlag' : 'effortFlag';
+    if (h[field] !== other[field]) add(intended, h.name + ' ' + flag);
+    else add(unexpected, h.name + ' ' + flag);
+  }
 }
 function compare(candTree, relTree) {
   const intended = [], unexpected = [];
-  const supported = load(candTree).filter((h) => h.status === 'supported');
+  const candHs = load(candTree), relHs = load(relTree);
+  const supported = candHs.filter((h) => h.status === 'supported');
   assert(supported.length, 'candidate has no supported entries');
   for (const h of supported) {
-    const other = load(relTree).find((x) => x.name === h.name);
-    const cand = dispatch(helper(candTree), h);
-    const rel = dispatch(helper(relTree), h);
+    const other = relHs.find((x) => x.name === h.name);
     if (!other) {
-      if (!cand.out.includes('DISPATCHED') || !cand.startArgv)
-        unexpected.push(h.name + ' is new but candidate did not dispatch');
-      else if (rel.startArgv) unexpected.push(h.name + ' is new but last release dispatched');
-      else intended.push(h.name + ' is new');
+      for (const mode of ['pinned', 'default']) {
+        const candD = launch(helper(candTree), h, other, mode, 'dispatch');
+        const candP = launch(helper(candTree), h, other, mode, 'preflight');
+        const relD = launch(helper(relTree), h, other, mode, 'dispatch');
+        if (!candD.ok) add(unexpected, h.name + ' is new but candidate did not dispatch');
+        else if (relD.startArgv) add(unexpected, h.name + ' is new but last release dispatched');
+        if (!candP.ok) add(unexpected, h.name + ' is new but candidate preflight failed: ' + candP.out);
+      }
+      add(intended, h.name + ' is new');
       continue;
     }
-    if (!cand.out.includes('DISPATCHED') || !cand.startArgv)
-      unexpected.push(h.name + ' candidate did not dispatch: ' + cand.out);
-    if (!rel.out.includes('DISPATCHED') || !rel.startArgv)
-      unexpected.push(h.name + ' last release did not dispatch: ' + rel.out);
-    if (cand.out !== rel.out) unexpected.push(h.name + ' stdout');
-    if (JSON.stringify(stripped(cand.startArgv)) !== JSON.stringify(stripped(rel.startArgv)))
-      unexpected.push(h.name + ' argv');
-    const cf = flagsOf(cand.startArgv), rf = flagsOf(rel.startArgv);
-    for (const flag of ['--model', '--effort']) {
-      if (cf[flag] === rf[flag]) continue;
-      const field = flag === '--model' ? 'modelFlag' : 'effortFlag';
-      if (h[field] !== other[field]) intended.push(h.name + ' ' + flag);
-      else unexpected.push(h.name + ' ' + flag);
+    for (const mode of ['pinned', 'default']) {
+      diffLaunch('dispatch',
+        launch(helper(candTree), h, other, mode, 'dispatch'),
+        launch(helper(relTree), h, other, mode, 'dispatch'),
+        h, other, intended, unexpected);
+      diffLaunch('preflight',
+        launch(helper(candTree), h, other, mode, 'preflight'),
+        launch(helper(relTree), h, other, mode, 'preflight'),
+        h, other, intended, unexpected);
     }
+  }
+  for (const h of relHs.filter((x) => x.status === 'supported')) {
+    const cand = candHs.find((x) => x.name === h.name);
+    if (!cand) add(intended, h.name + ' missing from candidate');
+    else if (cand.status === 'deferred') add(intended, h.name + ' deferred in candidate');
   }
   return {intended, unexpected};
 }
+assert(process.env.DELY_NAMED_INTENDED != null,
+  'set DELY_NAMED_INTENDED to the decision-record names, one per line');
+const named = process.env.DELY_NAMED_INTENDED.split('\n').map((s) => s.trim()).filter(Boolean);
 const red = compare(path.join(root, 'wrong'), release);
 assert(red.unexpected.length, 'mutant dropping --effort must fail');
 console.log('RED: mutant dropping --effort: ' + red.unexpected.join('; '));
 const green = compare(snap, release);
 assert.equal(green.unexpected.length, 0, green.unexpected.join('; ') || 'unexpected');
 for (const line of green.intended) console.log('INTENDED: ' + line);
+assert.deepEqual([...green.intended].sort(), [...named].sort(),
+  'INTENDED ' + JSON.stringify(green.intended) + ' != named ' + JSON.stringify(named));
 console.log('GREEN: candidate matches last release except named intended differences');
 JS
+test -n "${DELY_NAMED_INTENDED+x}" || { echo 'set DELY_NAMED_INTENDED to the decision-record names, one per line (empty if none)'; exit 1; }
 node "$stub/check.cjs" "$snap" "$release_snap" "$stub"
 ```
 
 **Pass:** RED prints (the `--effort`-dropping mutant fails the comparison), GREEN
-prints, every supported entry was compared, and every difference is named as
-intended (`--model` or `--effort` when that flag's field changed between the
-snapshots, or "is new" when the last release has no such entry). Keep the
+prints, every supported entry was compared pinned and with `default`, preflight
+output and launches matched, every release-supported entry missing or
+`deferred` in the candidate is reported, and the printed INTENDED lines equal
+the differences the candidate's decision record names for this release. A
+difference the record does not name fails the row. If the `--effort` mutation
+assert fires, update the needle; it is not a candidate failure. Keep the
 fixture directory and output with the probe report; remove it after recording
 the result.
 
@@ -340,7 +407,8 @@ the result.
 
 Run for each supported entry that changed and for each harness upgrade a
 deployment uses. Unchanged entries are covered by the argv stub row.
-Skip a deferred entry.
+Skip a deferred entry. The OMP parameterized worker row is a standing named
+skip until stablyai/orca#24068 is closed.
 
 Vary exactly: `id`, `name`, `discovery`, Model
 and Effort from the candidate's entry; the probe path `worker-<id>`; and phase
@@ -392,10 +460,13 @@ A successful helper print alone does not prove the worker ran the task.
 
 ## Parameterized Control row
 
-Run once per wake mode (`background`, `waker`) when only wait or settle logic
-changed. Run per harness when its entry changed, or when that harness upgraded
-and a deployment uses it as Control. Skip when `controlWake` is `unsupported`,
-and record that reason.
+Run once per wake mode (`background`, `waker`) whenever `wait`, `wait-bg`,
+`notify`, the acknowledgement or settle logic, or the Control section of
+`SKILL.md` changes; this is in addition to any per-harness rows. Use Claude
+Code for `background` and Codex CLI for `waker`, unless a deployment's
+Control uses another harness of that mode. Run per harness when its entry
+changed, or when that harness upgraded and a deployment uses it as Control.
+Skip when `controlWake` is `unsupported`, and record that reason.
 
 Vary exactly: Control `id`, `binary`, `permissionDefault`, its discovered
 model and effort launch arguments (from that Control CLI's `--help`, not
@@ -683,9 +754,7 @@ second.
 
 ## Step 8 — row 8, OMP worker with a valid pin
 
-Standing named skip while stablyai/orca#24068 is open. Run when that issue
-closes, or when an OMP upgrade is claimed to start workers again.
-
+Standing named skip until stablyai/orca#24068 is closed.
 
 Build a probe repository under `~/dely-probe/` whose `implement` pin is OMP
 with a Model `selector` from `omp models --json` and an Effort that is one of
@@ -718,9 +787,7 @@ was not running the pin.
 
 ## Step 9 — row 9, OMP worker with an invalid pin
 
-Standing named skip while stablyai/orca#24068 is open. Run when that issue
-closes, or when an OMP upgrade is claimed to start workers again.
-
+Standing named skip until stablyai/orca#24068 is closed.
 
 Same probe-repository setup as row 8's first dispatch (plugin enabled), with
 a selector `omp models --json` does not offer.
@@ -732,7 +799,8 @@ called `ctx.shutdown()` instead of exiting the process.
 
 ## Step 10 — row 10, OMP worker with Model `default`
 
-Run this row when `start()` in `dely.js` or `extensions/dely-pin.ts` changes.
+Standing named skip until stablyai/orca#24068 is closed. After that, run this
+row when `start()` in `dely.js` or `extensions/dely-pin.ts` changes.
 Same probe-repository setup as row 8's first dispatch, with Model `default`
 and Effort `default`.
 
