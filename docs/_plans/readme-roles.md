@@ -287,6 +287,58 @@ Files added for this: `AGENTS.md` (the gate) and `README.md` (that sentence).
 - Run it with the `--effort`-dropping mutant. It must fail.
 - `git diff --check` and the disclosure greps.
 
+### H2. Checklist corrections (replan of Task H)
+
+The scoped re-review of the Task H remediation (`844641e`) did not accept:
+`~/dely-probe/readme-tasks/rereviewH-844641e.md`.
+
+**Behaviour.** Files: `probe/checklist.md`, and `skills/delivery/SKILL.md`
+(reflow only; no word changes).
+
+- **Named-difference list (Important A).** The argv stub row's text:
+  - lists the five line forms the row prints: `<name> --model`,
+    `<name> --effort`, `<name> is new`, `<name> missing from candidate`,
+    `<name> deferred in candidate`, plus the preflight-labelled forms below;
+  - says that only differences of those kinds go in
+    `DELY_NAMED_INTENDED`;
+  - says that "this release" means the `docs/decisions.md` sections dated
+    after the commit date of the newest `v*` tag;
+  - says that the list is written from the record before the row runs and
+    is never edited from the row's output, and that a mismatch is a finding
+    against the record or the data.
+- **Upgrade reference (Minor 1).** "A harness upgrade" is a version different
+  from the newest live report that ran that harness. If none did, treat the
+  harness as upgraded.
+- **`SKILL.md` headings (Minor 2).** The per-wake-mode trigger names both
+  sections: "The control session" and "Orca and the helper".
+- **Stub limits (Minor 3).**
+  - Add a third mode for entries with `effortFlag` or `modelPin`: Effort
+    pinned, Model `default`. Compare its output, including the refusal.
+  - Label flag tags that come from `preflight` (for example
+    `<name> preflight --effort`).
+  - Under "What this cannot see", name what the stub cannot see:
+    - a preflight that leaks its worker;
+    - a heartbeat-only acknowledgement, because the fixture returns one
+      batch;
+    - a change to the top-level `effortRequiresModel`.
+- **Orca upgrade coverage (Minor 4).** Under "What this cannot see", say that
+  an Orca upgrade reruns workers only for deployment harnesses, so the other
+  supported harnesses are not re-verified against the new Orca.
+- **Pass wording (Minor 5).** "An argv or stdout difference always fails the
+  row; the live worker rows it routes to replace the row for those entries,
+  and the floor is met when they pass."
+- **`SKILL.md` reflow (Minor 6).** Reflow the whole paragraph that holds the
+  two rewrapped lines to its normal width, with no word changes.
+
+**Focused verification.**
+
+- Rerun the stub row with `DELY_NAMED_INTENDED` written from the record for
+  `40ee718` against `3155c22`: it passes.
+- It fails on the earlier mutants and on a third-mode mutant that disables
+  the effort-without-model refusal.
+- `git diff --word-diff` of `SKILL.md` shows no word change.
+- Every closure gate.
+
 ## Acceptance
 
 | Requirement | Instrument | Counterexample | Observed red |

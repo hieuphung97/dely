@@ -75,13 +75,22 @@ merging PR #61.
   `SKILL.md` says that a spec line must not start `dely-pin:`, and what to do
   when `--ack` returns `ERROR`.
 - **The checklist runs rows by what changed:**
-  - an argv stub row compares launches with the last release and stands in
-    for the live worker rows of unchanged entries;
-  - Control rows run once per wake mode when only wait logic changes, and per
-    harness when its entry changes or it upgrades;
-  - OMP rows 8 and 9 are a standing named skip while stablyai/orca#24068 is
-    open;
-  - Pi rows join the Orca-upgrade rerun list.
+  - an argv stub row compares `dispatch` and `preflight` launches with the
+    newest release tag, with the pin built from both snapshots' capabilities,
+    pinned and `default`. It stands in for the live worker rows of entries
+    whose launch fields did not change. Its list of intended differences is
+    written from this record before it runs, never from its output;
+  - an entry changes when a launch field changes; `limits` and `notes` do
+    not count;
+  - Control rows run once per wake mode (Claude Code for `background`, Codex
+    CLI for `waker`) whenever wait, settle, acknowledgement or `notify` logic
+    or the `SKILL.md` Control text changes. They also run per harness when
+    its entry changes, or when it upgrades and a deployment uses it as
+    Control;
+  - an Orca upgrade reruns the live worker row for each harness a deployment
+    uses, the Control row per wake mode, rows 4 and 5, and Pi rows 13 to 16;
+  - OMP rows 8 to 10 and the OMP worker row are a standing named skip while
+    stablyai/orca#24068 is open.
 
 #### Alternatives considered
 
