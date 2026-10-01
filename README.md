@@ -1,13 +1,81 @@
 # dely
 
-Dely takes a coding change through design approval, implementation, independent
-review, and a pull request. You approve the design and merge the result.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo.svg">
+  <img src="assets/logo-light.svg" alt="dely" width="72" height="72">
+</picture>
+
+Ask for a change; Dely takes it through design approval, implementation,
+independent review, and a pull request you merge.
+
+https://github.com/user-attachments/assets/83ec539a-6551-4807-8517-0c73e5d171d7
+
+[YouTube](https://www.youtube.com/watch?v=6pRWkhlQSAc)
+
+## Contents
+
+- [Quickstart](#quickstart)
+- [How Dely works](#how-dely-works)
+- [Choose a harness for each role](#choose-a-harness-for-each-role)
+- [Install Orca](#install-orca)
+- [Install Dely](#install-dely)
+- [Choose models](#choose-models)
+- [Log](#log)
+- [Troubleshooting](#troubleshooting)
+
+## Quickstart
+
+1. [Install Orca](#install-orca).
+2. [Install Dely](#install-dely) in the harness you will talk to.
+3. Open that harness in your project and optionally invoke `dely:setup`.
+4. Ask for a change.
+
+## How Dely works
+
+You ask. Control designs. You approve. The implementer builds. The reviewer
+checks. Control opens the pull request. You merge.
+
+**Control** is the session you talk to. It writes the design, waits for your
+approval, starts the other two sessions, and opens the pull request. Install
+Dely here.
+
+**Implementer** is a session Control starts to make the change.
+
+**Reviewer** is a session Control starts to check the change independently
+before the pull request.
+
+A Spike investigates only — no delivery run.
+
+## Choose a harness for each role
+
+Before the first delivery in a project, open each harness you chose there once
+and answer its trust question. Setup opens them for you. OMP has no trust
+question; Pi asks only when the project has `.pi/` or `.agents/skills`.
+
+✓ works · ⚠ works, read the note · ✗ not supported
+
+| Harness | Control | Implementer | Reviewer | Watch out for |
+| --- | --- | --- | --- | --- |
+| Claude Code | ✓ | ✓ | ✓ | Put @AGENTS.md in CLAUDE.md. |
+| Codex CLI | ⚠ | ✓ | ✓ | Use Codex CLI 0.159.2 or newer with Orca 1.4.217 or newer. As Control, it can start the next Dely step before the last one finishes. |
+| Grok Build | ⚠ | ⚠ | ⚠ | Answer the trust question once in every project. As a worker, you cannot choose the model. As Control, a free account ran out of usage mid-delivery. |
+| Antigravity CLI | ✓ | ⚠ | ⚠ | Choose the effort through the model name. Avoid gemini-3-flash-preview. As a worker, the first launch in a new folder can lose the task and show 'not signed in' while signed in; Dely retries once, then asks you to open agy there. |
+| Kiro CLI | ✗ | ✗ | ✗ | Workers never start in Orca. |
+| Cursor Agent CLI | ✓ | ✓ | ✓ | Choose the effort through the model name, for example cursor-grok-4.6-high. |
+| GitHub Copilot CLI | ✓ | ⚠ | ⚠ | At the first launch, answer No, thanks to the app prompt; until then a launch can leave the task unsent. Answer the folder trust question once in every project and choose to remember the folder; Orca does not see it, so a missed one shows as NO_ACK. As a worker, you cannot choose the model. |
+| OMP | ✓ | ⚠ | ⚠ | As a worker, OMP 18.4 does not start under Orca 1.4.217 (stablyai/orca#24068) until that issue closes, and a crash is noticed after about 10 minutes. It never asks for trust, so use it only in repositories you trust. As a worker, to pin a model, install Dely in OMP. |
+| Pi | ⚠ | ⚠ | ⚠ | As Control, run Dely's commands with no time limit, and release leftover workers. As a worker, to pin a model, install Dely in Pi, then check the model in Pi's session log. |
+
+Other agents Orca can launch may work too;
+[`harnesses.json`](harnesses.json) records what was measured.
 
 ## Install Orca
 
 1. Install the [desktop app](https://www.onorca.dev/docs/install).
-2. Register the CLI: Settings → General → Orca CLI.
-3. Enable orchestration: Settings → Experimental.
+2. Register the CLI: Settings → General → Orca CLI. See the
+   [CLI overview](https://www.onorca.dev/docs/cli/overview).
+3. Enable orchestration: Settings → Experimental. See
+   [orchestration](https://www.onorca.dev/docs/cli/orchestration).
 4. Check it:
 
 ```bash
@@ -17,22 +85,6 @@ orca orchestration run-list --json
 ```
 
 On Linux, the binary is `orca-ide`.
-
-## Choose harnesses
-
-Supported choices include the following. See [harnesses.json](harnesses.json)
-for launch settings and measured versions; the list can grow.
-
-| Harness | Control wake | Limits |
-| --- | --- | --- |
-| Claude Code | background | — |
-| Codex CLI | waker | As Control, it can start the next helper command before the last one ends; 0.157.1's shell lacked `ORCA_TERMINAL_HANDLE`. |
-| Grok Build | waker | Every repository with `AGENTS.md` needs a per-path trust answer; no model pin. |
-| Antigravity CLI | waker | First launch on a new path can lose the prompt; no effort pin. |
-| Cursor Agent CLI | background | No effort pin. |
-| GitHub Copilot CLI | background | Orca misses its trust dialog and first-launch app promo (`NO_ACK`); no model pin; prompts can remain unsent. |
-| OMP | waker | A dead worker surfaces only at `STALLED`; OMP 18.4.4 workers did not start on Orca 1.4.217 ([orca#24068](https://github.com/stablyai/orca/issues/24068)). |
-| Pi | waker | As Control, run the helper with no tool timeout; the pin is unchecked. |
 
 ## Install Dely
 
@@ -57,6 +109,7 @@ claude plugin uninstall dely       # remove
 ```
 
 Put `@AGENTS.md` in `CLAUDE.md` so Claude reads the project pins.
+Invoke `/dely:delivery` or `/dely:setup`.
 
 ### Codex CLI
 
@@ -72,6 +125,7 @@ If add keeps a stale marketplace, remove the marketplace and plugin, then add
 again. Pin a tag or full commit SHA with
 `codex plugin marketplace add --ref <ref> https://github.com/hieuphung97/dely.git`.
 Do not use `codex plugin install`.
+Invoke `$delivery (dely:delivery)` or `$setup`.
 
 ### Cursor Agent CLI
 
@@ -164,24 +218,27 @@ Update by installing the new tag. At startup, check that Skills names
 `delivery` and `setup`, and Extensions names `dely-pin.ts`.
 Invoke `/skill:delivery` or `/skill:setup`.
 
-Kiro CLI was measured but is not supported: workers never became ready.
-
 Checked versions (observations, not minimums): Orca 1.4.217; Claude Code
 2.1.285; Codex CLI 0.159.2; Cursor Agent CLI 2026.09.28-64d2043; Copilot CLI
 1.0.89; Antigravity CLI 1.2.13 (install), 1.2.14 (worker, Control); Grok
 Build 1.0.44; OMP 18.3.4 (install); Pi 0.99.1.
 
-## Pin a model
+## Choose models
 
-Invoke setup to select live model and effort values for each phase. Copilot
-and Grok have neither model nor effort pins; Cursor and Antigravity have no
-effort pin.
+Invoke setup to list the models and efforts each installed harness offers, then
+write your choice. The role table's notes say which harnesses cannot take a
+model.
 
-OMP uses a selector from `omp models --json` and that model's `thinking`
-levels. Pi uses `<provider>/<model>` from `pi --list-models` and
-levels from `pi --help`. Pi's pin is unchecked by Orca; verify it in the
-session transcript under `~/.pi/agent/sessions/`. For Pi, instruct Control
-to run the helper with no tool timeout.
+## Log
+
+`~/.dely/log.jsonl` is machine-local JSON Lines, one object per line. It
+is off unless `~/.dely/` exists; `mkdir ~/.dely` turns it on, and Dely
+never creates that directory. A missing directory means nothing is
+written and nothing is created.
+
+The file may contain sensitive content. It quotes worker screen output
+in full, so it can hold repository contents, error text, and whatever a
+harness printed.
 
 ## Troubleshooting
 

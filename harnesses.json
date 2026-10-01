@@ -160,7 +160,7 @@
           "CLAUDE.md"
         ]
       },
-      "notes": "worker-start --model pin honoured; omit --effort (there is no effort flag; write the literal default). worker-start --agent cursor-agent returns agent_unconfigured; the id that resolves is cursor. Offer the model slug before ' - '. Trust dialog on a fresh directory, measured 2026-09-16 and 2026-09-17 on Cursor Agent 2026.09.10-fd3934a and 2026.09.15-d2fe57e: '⚠ Workspace Trust Required … Do you trust the contents of this directory?' with '▶ [a] Trust this workspace' preselected over '[q] Quit', so `a` or Enter grants trust, and the screen shows '⏳ Trusting workspace...' before the composer. Text sent in that state was dropped while `orca terminal send` returned ok; wait for the composer before sending a prompt. Decision sections: 2026-08-27, 2026-09-04, 2026-09-16, 2026-09-17."
+      "notes": "worker-start --model pin honoured; omit --effort (there is no effort flag; write the literal default). worker-start --agent cursor-agent returns agent_unconfigured; the id that resolves is cursor. Offer the model slug before ' - '. Trust dialog on a fresh directory, measured 2026-09-16 and 2026-09-17 on Cursor Agent 2026.09.10-fd3934a and 2026.09.15-d2fe57e: '⚠ Workspace Trust Required … Do you trust the contents of this directory?' with '▶ [a] Trust this workspace' preselected over '[q] Quit', so `a` or Enter grants trust, and the screen shows '⏳ Trusting workspace...' before the composer. Text sent in that state was dropped while `orca terminal send` returned ok; wait for the composer before sending a prompt. Decision sections: 2026-08-27, 2026-09-04, 2026-09-14, 2026-09-16, 2026-09-17."
     },
     {
       "name": "GitHub Copilot CLI",

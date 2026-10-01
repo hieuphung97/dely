@@ -114,6 +114,12 @@ git grep -Ei 'pace.?id' -- . ':!docs/_plans' && exit 1 || true
 git grep -E '(^|[^A-Za-z0-9])[A-Z][0-9]+[a-z]?([^A-Za-z0-9]|$)' -- . ':!docs/_plans' && exit 1 || true
 ```
 
+```bash
+jq -r '.harnesses[] | . as $h | (if $h.status == "deferred" or $h.controlWake == "unsupported" then "✗" elif ($h.limits // "") | test("(^|[.] )As Control,") then "⚠" else "✓" end) as $c | (if $h.status == "deferred" then "✗" elif ($h.limits // "") | test("(^|[.] )As a worker,") then "⚠" else "✓" end) as $w | "| \($h.name) | \($c) | \($w) | \($w) | \(if ($h.limits // "") == "" then "—" else $h.limits end) |"' harnesses.json | while IFS= read -r row; do grep -qxF -- "$row" README.md || { echo "README lacks: $row"; exit 1; }; done
+```
+
+Control is ✗ when `status` is `deferred` or `controlWake` is `unsupported`, ⚠ when `limits` has a sentence starting "As Control,", otherwise ✓; Implementer and Reviewer are ✗ when `deferred`, ⚠ when `limits` has a sentence starting "As a worker,", otherwise ✓.
+
 The first three gates prove repository shape and syntax only. A Bounded or
 Architectural change to runtime behaviour must also name a focused instrument
 that distinguishes the changed behaviour from its failure mode, and a change
