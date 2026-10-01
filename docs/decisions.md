@@ -157,17 +157,38 @@ Cursor and OMP had not been checked as Control on a 0.23.0 helper. Report:
     Control did on 2026-09-30;
   - Orca 1.4.218 reports an unanswered Claude trust dialog as
     `agent_readiness` in 20 s, where 1.4.217 took 58 s.
-- **Not run:**
-  - live worker rows for entries whose launch fields did not change (the
-    argv stubs stand in);
-  - OMP rows 8 to 10 and the OMP worker row (stablyai/orca#24068);
-  - Copilot, Antigravity, Grok and Kiro rows;
-  - rows 6, 7 and 11.
+- **Not run, with reasons:**
+  - **Live worker rows for Copilot, Antigravity, Grok and Pi.** Their entries
+    changed against `v0.22.0`. They passed live on `40ee718` (Pi as
+    implementer in rows 13 and 16, not as reviewer). The argv stub against
+    `40ee718` shows no launch difference since then. The Orca 1.4.218
+    upgrade reruns only deployment harnesses, so these four are not
+    re-verified against Orca 1.4.218; the checklist names that gap.
+  - **OMP rows 8 to 10 and the OMP worker row:** standing skip while
+    stablyai/orca#24068 is open.
+  - **Kiro:** `deferred`.
+  - **Rows 6, 7 and 11:** by the owner's scope. Row 6 last ran live on
+    `40ee718`, before this delivery changed the `wait` loop's acknowledgement.
+    The `STALLED` path itself did not change.
+- **Open, recorded here:**
+  - Controls of several harnesses (Pi, Claude, OMP) leave settled workers
+    unreleased. This is probably `SKILL.md`'s completion accounting, not a
+    harness limit, though only Pi's `limits` says so;
+  - the role-table gate does not enforce row order;
+  - there is no OMP row for a level the model does not offer (row 15 is
+    Pi-only);
+  - the argv stub's unexpected-difference lines carry no mode, and an
+    intended `effortFlag` change cannot pass the row. Both fail safe;
+  - a `waitInterrupted` result after a combined `--ack` ends in the same
+    `ERROR` as before, one call later.
 
 #### Deferred
 
 Grok as Control on the 0.23.0 helper. Trigger: a Grok account without the
 free-tier limit.
+
+Workers left unreleased by Controls. Trigger: the next delivery that touches
+`SKILL.md`'s completion accounting.
 
 ---
 

@@ -194,7 +194,7 @@
       "binary": "omp",
       "status": "supported",
       "controlWake": "waker",
-      "limits": "As a worker, OMP 18.4 does not start under Orca 1.4.217 (stablyai/orca#24068) until that issue closes, and a crash is noticed after about 10 minutes. It never asks for trust, so use it only in repositories you trust. As a worker, to pin a model, install Dely in OMP.",
+      "limits": "As a worker, OMP 18.4 does not start under Orca 1.4.217 or later (stablyai/orca#24068) until that issue closes, and a crash is noticed after about 10 minutes. It never asks for trust, so use it only in repositories you trust. As a worker, to pin a model, install Dely in OMP.",
       "trust": "none",
       "discovery": {
         "models": "omp models --json",

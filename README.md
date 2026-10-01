@@ -64,7 +64,7 @@ question; Pi asks only when the project or a parent folder has `.pi/` or
 | Kiro CLI | ✗ | ✗ | ✗ | Workers never start in Orca. |
 | Cursor Agent CLI | ✓ | ✓ | ✓ | Choose the effort through the model name, for example cursor-grok-4.6-high. |
 | GitHub Copilot CLI | ✓ | ⚠ | ⚠ | At the first launch, answer No, thanks to the app prompt; until then a launch can leave the task unsent. Answer the folder trust question once in every project and choose to remember the folder; Orca does not see it, so a missed one shows as NO_ACK. As a worker, you cannot choose the model. |
-| OMP | ✓ | ⚠ | ⚠ | As a worker, OMP 18.4 does not start under Orca 1.4.217 (stablyai/orca#24068) until that issue closes, and a crash is noticed after about 10 minutes. It never asks for trust, so use it only in repositories you trust. As a worker, to pin a model, install Dely in OMP. |
+| OMP | ✓ | ⚠ | ⚠ | As a worker, OMP 18.4 does not start under Orca 1.4.217 or later (stablyai/orca#24068) until that issue closes, and a crash is noticed after about 10 minutes. It never asks for trust, so use it only in repositories you trust. As a worker, to pin a model, install Dely in OMP. |
 | Pi | ⚠ | ⚠ | ⚠ | As Control, run Dely's commands with no time limit, and release leftover workers. As a worker, to pin a model, install Dely in Pi, then check the model in Pi's session log. |
 
 Other agents Orca can launch may work too;
