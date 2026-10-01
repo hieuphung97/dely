@@ -26,7 +26,7 @@
         "needsImport": true,
         "importLine": "@AGENTS.md"
       },
-      "notes": "worker-start --model pin honoured. The two discovery probes are answered locally (num_turns 0, total_cost_usd 0, no model turn); do not treat them as a dispatch. Claude Code 2.1.273 and 2.1.274 word the trust dialog 'Quick safety check: Is this a project you created or one you trust?' with 'No, exit' preselected, so Enter refuses and exits the harness. Orca's prompt delivery sends Enter into that dialog, which is why a NO_ACK or PREFLIGHT FAIL quote on an untrusted path ends at a shell prompt and may hold only the tail 'Security guide' within the helper's 400-character quote (measured 2026-09-16 and 2026-09-17)."
+      "notes": "worker-start --model pin honoured. The two discovery probes are answered locally (num_turns 0, total_cost_usd 0, no model turn); do not treat them as a dispatch. Claude Code 2.1.273 and 2.1.274 word the trust dialog 'Quick safety check: Is this a project you created or one you trust?' with 'No, exit' preselected, so Enter refuses and exits the harness. Orca's prompt delivery sends Enter into that dialog, which is why a NO_ACK or PREFLIGHT FAIL quote on an untrusted path ends at a shell prompt and may hold only the tail 'Security guide' within the helper's 400-character quote (measured 2026-09-16 and 2026-09-17). Decision sections: 2026-09-14, 2026-09-16, 2026-09-17."
     },
     {
       "name": "Codex CLI",
@@ -56,7 +56,7 @@
           "CLAUDE.md"
         ]
       },
-      "notes": "Discovery: slugs with visibility hide are not offered; effort levels are supported_reasoning_levels on each slug, not one vocabulary per harness. Native AGENTS.md reader; CLAUDE.md is inert (not imported). 2026-09-11, Orca 1.4.199: a gpt-5.6-terra medium Control slept, 3 turns for a two-worker cycle. 2026-09-16, 0.20.0 candidate: a gpt-5.6-sol high Control ended its turn after each wait-bg, one request per wait, and notify started a new turn. 2026-09-17, 0.20.0: a gpt-5.6-terra medium Control kept its turn open in 2 of 2 runs, looping orca terminal wait about every 35 s (6 requests in a 118 s wait); in one of them it launched dely wait-bg inside a new Orca terminal, so the waiter watched the wrong terminal and failed. A gpt-5.6-sol medium Control slept (requests only in the first 18 s of each wait, 3 turns). Codex's default model is now gpt-6-astra high, not measured as Control. 2026-09-30, Codex CLI 0.159.2 failed Orca 1.4.215's worker readiness check: worker-start fails at agent_readiness after its 60 s timeout, with and without -c on its argv; Orca 1.4.215 recognises a ready Codex by the screen text OpenAI Codex followed by model: and directory:, and the 0.159.2 start screen shows neither label. A Codex preflight passed on Orca 1.4.215 on 2026-09-27 with the Codex version unrecorded, so the measured failure is specific to 0.159.2 on 1.4.215."
+      "notes": "Discovery: slugs with visibility hide are not offered; effort levels are supported_reasoning_levels on each slug, not one vocabulary per harness. Native AGENTS.md reader; CLAUDE.md is inert (not imported). 2026-09-11, Orca 1.4.199: a gpt-5.6-terra medium Control slept, 3 turns for a two-worker cycle. 2026-09-16, 0.20.0 candidate: a gpt-5.6-sol high Control ended its turn after each wait-bg, one request per wait, and notify started a new turn. 2026-09-17, 0.20.0: a gpt-5.6-terra medium Control kept its turn open in 2 of 2 runs, looping orca terminal wait about every 35 s (6 requests in a 118 s wait); in one of them it launched dely wait-bg inside a new Orca terminal, so the waiter watched the wrong terminal and failed. A gpt-5.6-sol medium Control slept (requests only in the first 18 s of each wait, 3 turns). Codex's default model is now gpt-6-astra high, not measured as Control. 2026-09-30, Codex CLI 0.159.2 failed Orca 1.4.215's worker readiness check: worker-start fails at agent_readiness after its 60 s timeout, with and without -c on its argv; Orca 1.4.215 recognises a ready Codex by the screen text OpenAI Codex followed by model: and directory:, and the 0.159.2 start screen shows neither label. A Codex preflight passed on Orca 1.4.215 on 2026-09-27 with the Codex version unrecorded, so the measured failure is specific to 0.159.2 on 1.4.215. Decision sections: 2026-09-11, 2026-09-16, 2026-09-17, 2026-09-30."
     },
     {
       "name": "Grok Build",
@@ -78,7 +78,7 @@
         "readsAgentsMd": true,
         "needsImport": false
       },
-      "notes": "On 1.0.44 a README-only fresh repo showed no trust dialog; every repository with AGENTS.md shows one. Native AGENTS.md. Discovery is null: there is no launch-time pin. 2026-09-30."
+      "notes": "On 1.0.44 a README-only fresh repo showed no trust dialog; every repository with AGENTS.md shows one. Native AGENTS.md. Discovery is null: there is no launch-time pin. Decision sections: 2026-09-30."
     },
     {
       "name": "Antigravity CLI",
@@ -86,7 +86,7 @@
       "binary": "agy",
       "status": "supported",
       "controlWake": "waker",
-      "limits": "Choose the effort through the model name. Avoid gemini-3-flash-preview. As a worker, the first launch in a new folder can lose the task and show 'not signed in' while signed in; Dely retries.",
+      "limits": "Choose the effort through the model name. Avoid gemini-3-flash-preview. As a worker, the first launch in a new folder can lose the task and show 'not signed in' while signed in; Dely retries once, then asks you to open agy there.",
       "trust": "dialog",
       "discovery": {
         "models": "agy models",
@@ -108,7 +108,7 @@
           "GEMINI.md"
         ]
       },
-      "notes": "Orca accepts --model; --effort is rejected or dropped. A worker preflight on a new path showed 'not signed in' while signed in, on a lost first launch. 2026-09-30."
+      "notes": "Orca accepts --model; --effort is rejected or dropped. A worker preflight on a new path showed 'not signed in' while signed in, on a lost first launch. Decision sections: 2026-09-30."
     },
     {
       "name": "Kiro CLI",
@@ -130,7 +130,7 @@
         "readsAgentsMd": true,
         "needsImport": false
       },
-      "notes": "Workers never pass Orca's readiness check. 2026-09-30."
+      "notes": "Workers never pass Orca's readiness check. Decision sections: 2026-09-30."
     },
     {
       "name": "Cursor Agent CLI",
@@ -160,7 +160,7 @@
           "CLAUDE.md"
         ]
       },
-      "notes": "worker-start --model pin honoured; omit --effort (there is no effort flag; write the literal default). worker-start --agent cursor-agent returns agent_unconfigured; the id that resolves is cursor. Offer the model slug before ' - '. Trust dialog on a fresh directory, measured 2026-09-16 and 2026-09-17 on Cursor Agent 2026.09.10-fd3934a and 2026.09.15-d2fe57e: '⚠ Workspace Trust Required … Do you trust the contents of this directory?' with '▶ [a] Trust this workspace' preselected over '[q] Quit', so `a` or Enter grants trust, and the screen shows '⏳ Trusting workspace...' before the composer. Text sent in that state was dropped while `orca terminal send` returned ok; wait for the composer before sending a prompt. 2026-09-16."
+      "notes": "worker-start --model pin honoured; omit --effort (there is no effort flag; write the literal default). worker-start --agent cursor-agent returns agent_unconfigured; the id that resolves is cursor. Offer the model slug before ' - '. Trust dialog on a fresh directory, measured 2026-09-16 and 2026-09-17 on Cursor Agent 2026.09.10-fd3934a and 2026.09.15-d2fe57e: '⚠ Workspace Trust Required … Do you trust the contents of this directory?' with '▶ [a] Trust this workspace' preselected over '[q] Quit', so `a` or Enter grants trust, and the screen shows '⏳ Trusting workspace...' before the composer. Text sent in that state was dropped while `orca terminal send` returned ok; wait for the composer before sending a prompt. Decision sections: 2026-08-27, 2026-09-04, 2026-09-16, 2026-09-17."
     },
     {
       "name": "GitHub Copilot CLI",
@@ -168,7 +168,7 @@
       "binary": "copilot",
       "status": "supported",
       "controlWake": "background",
-      "limits": "At the first launch, answer No, thanks to the app prompt. As a worker, you cannot choose the model. As a worker, an untrusted path or about 1 launch in 4 leaves the task unsent and shows as NO_ACK; Dely retries.",
+      "limits": "At the first launch, answer No, thanks to the app prompt; until then a launch can leave the task unsent. Answer the folder trust question once in every project and choose to remember the folder; Orca does not see it, so a missed one shows as NO_ACK. As a worker, you cannot choose the model.",
       "trust": "dialog",
       "discovery": null,
       "modelFlag": false,
@@ -186,7 +186,7 @@
           "CLAUDE.md"
         ]
       },
-      "notes": "Direct installs copy existing manifests into ~/.copilot/installed-plugins/_direct/<source>/ (directory named after the local source directory or sanitized git URL); no sidecar. Copilot 1.0.89 app promo ('Now generally available! … Install it now?' with Yes, install preselected) cleared itself after about 30 s. 2026-09-30."
+      "notes": "Direct installs copy existing manifests into ~/.copilot/installed-plugins/_direct/<source>/ (directory named after the local source directory or sanitized git URL); no sidecar. Copilot 1.0.89 app promo ('Now generally available! … Install it now?' with Yes, install preselected) cleared itself after about 30 s. Decision sections: 2026-08-31, 2026-09-30."
     },
     {
       "name": "OMP",
@@ -217,7 +217,7 @@
         "readsAgentsMd": true,
         "needsImport": false
       },
-      "notes": "Trust is none: no workspace-trust gate. The pin travels as a spec line. OMP 18.4 titles an idle pane 'π > <dir>', which Orca does not read as idle (stablyai/orca#24068). A second-turn dely-pin line in an interactive OMP 18.4.4 session was ignored (row 11). 2026-09-30."
+      "notes": "Trust is none: no workspace-trust gate. The pin travels as a spec line. OMP 18.4 titles an idle pane 'π > <dir>', which Orca does not read as idle (stablyai/orca#24068). A second-turn dely-pin line in an interactive OMP 18.4.4 session was ignored (row 11). Decision sections: 2026-09-27, 2026-09-30."
     },
     {
       "name": "Pi",
@@ -249,7 +249,7 @@
           "CLAUDE.md"
         ]
       },
-      "notes": "A Model or Effort cell containing whitespace fails closed. With a pi key, Pi loads only the extensions it lists, so the key must list ./extensions/dely-pin.ts. Orca reports model null, so dispatch skips the check. 2026-09-28, corrected 2026-10-01."
+      "notes": "A Model or Effort cell containing whitespace fails closed, except a Model cell '<selector> <level>' with Effort default, which applies that level. With a pi key, Pi loads only the extensions it lists, so the key must list ./extensions/dely-pin.ts. Orca reports model null, so dispatch skips the check. Decision sections: 2026-09-28, 2026-10-01."
     }
   ]
 }
