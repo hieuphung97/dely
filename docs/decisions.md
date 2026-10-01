@@ -77,7 +77,8 @@ merging PR #61.
 - **The checklist runs rows by what changed:**
   - an argv stub row compares `dispatch` and `preflight` launches with the
     newest release tag, with the pin built from both snapshots' capabilities,
-    pinned and `default`. It stands in for the live worker rows of entries
+    pinned, `default`, and Effort-only for entries that take an effort. It
+    stands in for the live worker rows of entries
     whose launch fields did not change. Its list of intended differences is
     written from this record before it runs, never from its output;
   - an entry changes when a launch field changes; `limits` and `notes` do
@@ -118,6 +119,50 @@ README matches the data, not that the data is true.
 - `start()` for a Pi entry with `modelFlag: true`.
 - Filtering Antigravity's discovery.
 - Re-measuring Grok as Control, which needs a paid account.
+
+#### Verification, 2026-10-01
+
+The live checklist ran on `20490dc` under Orca 1.4.218, in the scope the
+tiering rules give this candidate: Orca was upgraded, wait logic changed, and
+Cursor and OMP had not been checked as Control on a 0.23.0 helper. Report:
+`~/dely-probe/checklist-readme-20490dc.md`.
+
+- **Passed:**
+  - installs and hashes for Claude Code, Codex, OMP and Pi;
+  - the Orca-rejected message stub row;
+  - the argv stub row against `v0.22.0`, whose intended differences equal
+    the list written from this record (Antigravity `--model`, Pi new);
+  - the argv stub row against `40ee718`, with no difference, so worker
+    launches did not change since the previous live run;
+  - implementer and reviewer for Cursor and Claude Code;
+  - Control for Claude Code and Cursor (background) and for Codex and OMP
+    18.4.8 (waker), with the `REFUSED` checks;
+  - row 4 under a waker Control, row 5, and Pi rows 13, 14 and 15.
+- **Passed after a failed attempt:**
+  - row 4 under a background Control: on the first attempt, Control read
+    the killed worker's screen as alive and did not redispatch; the second
+    attempt passed;
+  - the OMP Control and Pi row 13, blocked first by Google Vertex errors
+    (429, then 403 billing).
+- **Partial: Pi row 16.** The helper reported `ATTENTION` 15 s after the
+  kill. A redispatched Pi worker did not acknowledge within 60 s while Vertex
+  was slow, so the end-to-end row was not observed.
+- **Observed, not changed:**
+  - Claude, Codex and Cursor Controls acknowledged a settled batch with a
+    separate `orca orchestration check --ack` before dispatching the
+    review, instead of passing it to the next wait. Both forms are accepted,
+    and no batch replayed. The one-call `--ack` form worked from the observer
+    and from the OMP Control;
+  - Claude and OMP Controls did not release settled workers, as a Pi
+    Control did on 2026-09-30;
+  - Orca 1.4.218 reports an unanswered Claude trust dialog as
+    `agent_readiness` in 20 s, where 1.4.217 took 58 s.
+- **Not run:**
+  - live worker rows for entries whose launch fields did not change (the
+    argv stubs stand in);
+  - OMP rows 8 to 10 and the OMP worker row (stablyai/orca#24068);
+  - Copilot, Antigravity, Grok and Kiro rows;
+  - rows 6, 7 and 11.
 
 #### Deferred
 
