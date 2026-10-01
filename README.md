@@ -26,12 +26,12 @@ for launch settings and measured versions; the list can grow.
 | Harness | Control wake | Limits |
 | --- | --- | --- |
 | Claude Code | background | — |
-| Codex CLI | waker | As Control, its shell may lack `ORCA_TERMINAL_HANDLE` (0.157.1). |
+| Codex CLI | waker | As Control, it can start the next helper command before the last one ends; 0.157.1's shell lacked `ORCA_TERMINAL_HANDLE`. |
 | Grok Build | waker | Every repository with `AGENTS.md` needs a per-path trust answer; no model pin. |
 | Antigravity CLI | waker | First launch on a new path can lose the prompt; no effort pin. |
 | Cursor Agent CLI | background | No effort pin. |
-| GitHub Copilot CLI | background | Orca misses its trust dialog (`NO_ACK`, once per path); no model pin; prompts can remain unsent. |
-| OMP | waker | A dead worker surfaces only at `STALLED`. |
+| GitHub Copilot CLI | background | Orca misses its trust dialog and first-launch app promo (`NO_ACK`); no model pin; prompts can remain unsent. |
+| OMP | waker | A dead worker surfaces only at `STALLED`; OMP 18.4.4 workers do not start on Orca 1.4.217 ([orca#24068](https://github.com/stablyai/orca/issues/24068)). |
 | Pi | waker | As Control, run the helper with no tool timeout; the pin is unchecked. |
 
 ## Install Dely
@@ -166,11 +166,10 @@ Invoke `/skill:delivery` or `/skill:setup`.
 
 Kiro CLI was measured but is not supported: workers never became ready.
 
-Checked versions (observations, not minimums): Orca 1.4.215 (Codex CLI 0.159.2
-as a worker needs 1.4.217); Claude Code 2.1.274; Codex CLI 0.154.0 (install),
-0.157.1 (Control), 0.159.2 (worker); Cursor Agent CLI 2026.09.15-d2fe57e;
-Copilot CLI 1.0.89; Antigravity CLI 1.2.13; Grok Build 1.0.44;
-OMP 18.3.4 (install), 18.3.3 (worker); Pi 0.87.1.
+Checked versions (observations, not minimums): Orca 1.4.217; Claude Code
+2.1.285; Codex CLI 0.159.2; Cursor Agent CLI 2026.09.28-64d2043; Copilot CLI
+1.0.89; Antigravity CLI 1.2.14; Grok Build 1.0.44; OMP 18.3.4 (install);
+Pi 0.99.1.
 
 ## Pin a model
 
@@ -192,7 +191,8 @@ to run the helper with no tool timeout.
   and inspect workers with `orca orchestration worker-list --run <run>`
   before retrying.
 - **First launch stops at trust:** open that harness in the same path and
-  answer its dialog, then retry. Copilot can report only `NO_ACK`;
+  answer its dialog, then retry. Copilot can report only `NO_ACK`, and its
+  first launch also shows an app promo: answer No, thanks once;
   Antigravity can lose the prompt on a new path; retry once. Pi asks when
   the path or an ancestor has `.pi/` resources or `.agents/skills`.
 - **Codex helper says "not inside an Orca terminal":** ask Control to look up

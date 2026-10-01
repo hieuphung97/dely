@@ -87,10 +87,12 @@ next to the harness it offers. The values are:
 Each of the first three carries its launch limits. Existing entries gain
 limits too:
 
-- Codex: its Control's shell may lack the terminal handle.
+- Codex: as Control it can start the next helper command before the last one
+  ends, and its 0.157.1 shell lacked the terminal handle.
 - Pi: its Control must run the helper without a tool timeout, and its pin is
   unchecked.
-- OMP: a dead worker surfaces only at `STALLED`.
+- OMP: a dead worker surfaces only at `STALLED`, and OMP 18.4.4 workers do not
+  start on Orca 1.4.217.
 - Cursor: no effort pin.
 
 The helper:
@@ -141,6 +143,44 @@ their live rows run when their entry or the shared launch code changes.
 
 Kiro stays out, and its Control result is recorded, not offered.
 
+#### Verification, 2026-09-30
+
+The live checklist ran on `40ee718` under Orca 1.4.217, in a scope the owner
+chose, narrower than the checklist's release floor. Report:
+`~/dely-probe/checklist-roles-40ee718.md`.
+
+- **Passed:**
+  - installs and hashes for Claude Code, Codex, Copilot, Antigravity, Grok,
+    OMP and Pi, and the README install, verify, update and remove commands for
+    Copilot, Antigravity and Grok;
+  - the Orca-rejected message stub row;
+  - implementer and reviewer for Claude Code, Codex 0.159.2, Cursor, Copilot,
+    Antigravity and Grok;
+  - Control for Claude Code, Copilot (background), Codex, Antigravity and Pi
+    0.99.1 (waker), each with the `REFUSED` check where it applies;
+  - row 4 under a background and a waker Control, rows 5 and 6, rows 11 and
+    13 to 16.
+- **Passed after failed attempts:**
+  - Copilot's worker passed on its third attempt. Copilot 1.0.89 shows an app
+    promo at launch that Orca does not detect, and the pasted prompt was left
+    unsent twice; after a human answered "No, thanks" once, it did not return.
+  - Antigravity passed on its third preflight on a new path, which is its
+    stated limit.
+- **Partial:** row 7. The trust loop completed, but a Codex Control ran
+  `dely dispatch` while `dely preflight` was still running (its tool call
+  yields after 30 s). That is now Codex's Control limit.
+- **Blocked outside Dely:**
+  - Grok as Control stopped on Grok's free usage limit twice, so its waker
+    path was not re-measured on this candidate.
+  - OMP self-updated to 18.4.4. Orca 1.4.217 never sees an OMP 18.4.4 worker
+    as ready (stablyai/orca#24068), so OMP pin rows 8 to 10 could not run. That
+    is now OMP's limit.
+- **Not run, by the owner's choice:** Control rows for Cursor, OMP and Kiro.
+  Cursor's launch argv is byte-identical to 0.22.0 in stub comparisons, this
+  delivery's helper commits leave OMP's argv unchanged, and each wake mode was
+  exercised by another harness.
+- **Observed but not changed:** a Pi Control never ran `worker-release`.
+
 #### Deferred
 
 A Kiro worker. Trigger: an Orca release in which `worker-start --agent kiro`
@@ -148,6 +188,12 @@ becomes ready.
 
 A pinned Copilot or Grok worker. Trigger: an Orca release whose
 `worker-start` accepts `--model` for them.
+
+OMP 18.4 workers and OMP pin rows 8 to 10. Trigger: an Orca release that
+closes stablyai/orca#24068.
+
+Grok as Control on this candidate's helper. Trigger: a Grok account without
+the free-tier limit.
 
 ### 2026-09-28 — Pi is a supported harness and shares OMP's package and pin extension
 
