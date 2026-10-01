@@ -24,7 +24,9 @@ issue and no regression. It found that the README rewrite of 2026-09-30:
 
 It also found three maintenance problems:
 
-- `notes` repeat the decision record and hold two false Pi statements;
+- `notes` repeat the decision record and hold two false Pi statements (both
+  corrected in the 2026-09-28 section): a whitespace pin cell now fails closed,
+  and with a `pi` key Pi loads only the extensions the key lists;
 - the version rule ignores `harnesses.json`, `extensions/` and `package.json`,
   although the helper builds every launch from `harnesses.json`;
 - the checklist floor (16 parameterized rows on any shared change) cannot be
@@ -60,7 +62,9 @@ merging PR #61.
   8. troubleshooting.
 - **`notes` keep only why a field has its value,** with the date of the
   decision section that measured it. History moves to, or stays in, this
-  record. A sentence is removed only when this record already holds it.
+  record. A sentence is removed only when this record already holds it. This
+  supersedes earlier sections that say a measurement goes into an entry's
+  `notes`.
 - **The version rule also covers `harnesses.json`, `extensions/` and
   `package.json`.**
 - **The helper:**
@@ -356,6 +360,10 @@ by the task review). Pi therefore loads the extension from the `pi` key and
 also, whatever the key, from `extensions/`; the 0.22.0 layout (`omp` key,
 `omp/dely-pin.ts`) gives Pi neither. OMP needs the key: without an `omp` or
 `pi` key it treats the package as no plugin at all.
+Corrected 2026-10-01: with a `pi` key, Pi loads only the extensions that key
+lists ("a manifest, when present, is used exclusively"); it falls back to
+`extensions/` by convention only when there is no key. The Pi architecture
+review's resolver run showed this.
 
 **The pin extension fails every Pi pin that names an effort.** Inside Pi a
 registry model describes its levels as `thinkingLevelMap`
@@ -463,7 +471,8 @@ A Model or Effort cell that contains whitespace yields a pin line the
 extension does not recognize, so no pin applies. OMP's projection check
 catches this; on Pi the worker runs its default unseen. `setup` writes
 discovered tokens, which contain no whitespace, so only a hand edit reaches
-it.
+it. Corrected 2026-10-01: the extension now stops on any `dely-pin:` line it
+cannot parse, so such a cell fails closed on Pi too.
 
 Pi rows join the live checklist. They run when `start()`, the extension or the
 `pi` entry changes, and after a Pi upgrade; the release floor stays ten rows.

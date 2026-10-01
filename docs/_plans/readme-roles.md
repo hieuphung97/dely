@@ -77,8 +77,10 @@ request #61. No merge, force-push, stash, reset or clean.
     newer with Orca 1.4.217 or newer.
   - **Cursor and Antigravity:** "choose the effort through the model name"
     replaces "no effort pin".
-  - **Antigravity:** sign in before the first delivery; avoid
-    `gemini-3-flash-preview`.
+  - **Antigravity:** avoid `gemini-3-flash-preview`. As a worker, the first
+    launch in a new folder can lose the task and show "not signed in" while
+    signed in; Dely retries. (Amended after the Task E review: no source
+    supports a separate sign-in caveat.)
   - **Copilot:** answer "No, thanks" to the app prompt at the first launch.
   - **Grok:** the per-project trust answer. As Control, a free account ran
     out of usage mid-delivery.
@@ -91,7 +93,19 @@ request #61. No merge, force-push, stash, reset or clean.
   - **Claude:** put `@AGENTS.md` in `CLAUDE.md`.
   - **Kiro:** "Workers never start in Orca."
 
-  No `limits` contains `|`.
+  No `limits` contains `|`. A sentence about pinning a model is about
+  workers, because Dely pins only the implement and review phases, so it
+  starts "As a worker," (amended after the Task E review).
+- **Section dates.** A `notes` date names a decision section that exists
+  (`2026-09-30` for facts measured on 2026-09-29), and a kept sentence keeps
+  its own measurement date.
+- **Field justifications.** Each entry keeps one short sentence for every
+  non-obvious field, for example:
+  - Pi: `modelPin: spec-unchecked`, because Orca reports model null;
+  - Antigravity: `modelFlag`/`effortFlag`;
+  - OMP: `trust: none` and `modelPin: spec`;
+  - Kiro: why it is `deferred`;
+  - Cursor: the resolving id and the slug rule behind `modelSlugBefore`.
 - **`notes`.**
   - Keep only what justifies a field's value, and end with the date of the
     decision section that measured it.
