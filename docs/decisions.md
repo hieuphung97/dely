@@ -162,8 +162,14 @@ Cursor and OMP had not been checked as Control on a 0.23.0 helper. Report:
     changed against `v0.22.0`. They passed live on `40ee718` (Pi as
     implementer in rows 13 and 16, not as reviewer). The argv stub against
     `40ee718` shows no launch difference since then. The Orca 1.4.218
-    upgrade reruns only deployment harnesses, so these four are not
-    re-verified against Orca 1.4.218; the checklist names that gap.
+    upgrade reruns the deployment harnesses and Pi rows 13 to 16, so
+    Copilot, Antigravity and Grok are not re-verified against Orca 1.4.218,
+    and Pi only as implementer; the checklist names that gap.
+  - **Control rows for Copilot, Antigravity and Pi.** Their entries changed,
+    and they passed as Control on `40ee718`. The wait change since then is
+    covered by the per-wake-mode Control rows on `20490dc`: Claude and Cursor
+    for `background`, Codex and OMP for `waker`. Owner's scope. Grok's
+    Control row is under Deferred.
   - **OMP rows 8 to 10 and the OMP worker row:** standing skip while
     stablyai/orca#24068 is open.
   - **Kiro:** `deferred`.
@@ -177,8 +183,10 @@ Cursor and OMP had not been checked as Control on a 0.23.0 helper. Report:
   - the role-table gate does not enforce row order;
   - there is no OMP row for a level the model does not offer (row 15 is
     Pi-only);
-  - the argv stub's unexpected-difference lines carry no mode, and an
-    intended `effortFlag` change cannot pass the row. Both fail safe;
+  - the argv stub's unexpected-difference lines carry no mode, and the
+    routed live worker row runs only the pinned mode, so the recorded line is
+    the only signal for a `default` or Effort-only difference. An intended
+    `effortFlag` change cannot pass the row, which fails safe;
   - a `waitInterrupted` result after a combined `--ack` ends in the same
     `ERROR` as before, one call later.
 

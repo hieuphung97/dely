@@ -238,8 +238,9 @@ from the row's output. A mismatch is a finding against the record or the
 data. A flag change gives both its dispatch line and its `preflight` line;
 `<name> is new` means the entry is absent from the release's
 `harnesses.json`, not that it became supported. It uses a fake Orca
-executable and isolated home, creates no real Run or worker, and checks a deliberately wrong copy (a mutant that drops
-`--effort`) before the candidate. It stands in for the live worker row of
+executable and isolated home, creates no real Run or worker, and checks a
+deliberately wrong copy (a mutant that drops `--effort`) before the
+candidate. It stands in for the live worker row of
 every supported entry whose `harnesses.json` entry did not change. The argv
 stub does not test Orca.
 
