@@ -9,27 +9,35 @@ can stand in for the human only for Claude Code.
 ## Input and release floor
 
 - candidate SHA and checkout path;
-- Orca running with orchestration enabled;
-- each harness being tested installed and signed in;
+- last-release SHA (newest `v*` tag; today `v0.22.0` = `3155c22`) and its snapshot path;
+- Orca running with orchestration enabled (live rows only);
+- each harness being tested installed and signed in (live rows only);
 - Node and `~/dely-probe/` writable.
 
-Run the parameterized worker and Control rows for every supported harness
-whose entry changed. If shared worker-launch code changed, run both rows for
-**every supported harness** in the candidate's `harnesses.json`; skip Control
-only when `controlWake` is `unsupported`, and record that reason. Each worker
-row covers implementer and reviewer in separate sessions. For this candidate,
-the shared launch changes require Claude, Codex, Cursor, Copilot, Antigravity,
-Grok, OMP and Pi. Kiro stays deferred.
+Run rows by what changed, against **every supported entry** in the candidate's
+`harnesses.json`. The argv stub row compares stdout and `worker-start` argv
+for every supported entry to the last release snapshot; it stands in for the
+live worker row of every entry whose `harnesses.json` entry did not change.
+Run the live worker row for each entry that changed and for each harness
+upgrade that a deployment uses. Each worker row covers implementer and
+reviewer in separate sessions.
 
-The release floor is those parameterized rows plus rows 4–9 and the rejected
-message stub row. Rows 10–11 run when `start()` or the pin extension changes.
-Rows 13–16 run when `start()`, the extension or the Pi entry changes, or Pi
-upgrades. The parameterized Control row replaces the former OMP and Pi
-Control rows. Rerun the parameterized rows and rows 4–5 after an Orca upgrade;
-rerun OMP pin rows and its parameterized Control row after an OMP upgrade;
-rerun Pi pin rows and its parameterized Control row after a Pi upgrade.
-A release that skips required rows names them and the reason in its decision
-record; structural gates cannot substitute for them.
+Run the Control row once per wake mode (`background`, `waker`) when only wait
+or settle logic changed; skip Control when `controlWake` is `unsupported`, and
+record that reason. Run the Control row per harness when its entry changed, or
+when that harness upgraded and a deployment uses it as Control.
+
+The release floor is the argv stub row, the rejected-message stub row, the
+live worker rows the rules above require, the Control rows those rules
+require, and rows 4–7. OMP rows 8 and 9 are a standing named skip while
+stablyai/orca#24068 is open. Rows 10–11 run when `start()` or the pin
+extension changes. Rows 13–16 run when `start()`, the extension or the Pi
+entry changes, after a Pi upgrade, and after an Orca upgrade. Rerun the argv
+stub, the live worker rows the rules require, the Control rows those rules
+require, and rows 4–5 after an Orca upgrade; rerun OMP pin rows and its
+Control row after an OMP upgrade; rerun Pi pin rows and its Control row after
+a Pi upgrade. A release that skips required rows names them and the reason in
+its decision record; structural gates cannot substitute for them.
 
 ## Step 1 — install the candidate from a snapshot
 
@@ -41,6 +49,16 @@ sha=<candidate SHA>
 snap=~/dely-probe/.snap-$sha
 rm -rf "$snap" && mkdir -p "$snap"
 git -C <checkout> archive "$sha" | tar -x -C "$snap"
+```
+
+The last release is the newest `v*` tag (`v0.22.0` = `3155c22` today). Snapshot
+it the same way; the argv stub row needs both trees and does not install either:
+
+```bash
+release_sha=<last release SHA>
+release_snap=~/dely-probe/.snap-$release_sha
+rm -rf "$release_snap" && mkdir -p "$release_snap"
+git -C <checkout> archive "$release_sha" | tar -x -C "$release_snap"
 ```
 
 Install Claude Code and Codex CLI with their marketplace commands using
@@ -183,7 +201,146 @@ install: report the path and the hash and ask.
 **A harness reporting a successful install is not evidence.** Cursor once ran
 an old branch for ten merges while reporting success every time.
 
+## Stub row — launch argv against the last release
+
+Run this from the observer shell with `snap` set to the candidate snapshot and
+`release_snap` to the last release snapshot. It uses a fake Orca executable and
+isolated home, creates no real Run or worker, and checks a deliberately wrong
+copy (a mutant that drops `--effort`) before the candidate. It stands in for
+the live worker row of every supported entry whose `harnesses.json` entry did
+not change.
+
+```bash
+stub=$(mktemp -d "$HOME/dely-probe/argv.XXXXXX")
+cat > "$stub/check.cjs" <<'JS'
+const fs = require('fs'), path = require('path'), assert = require('assert');
+const {spawnSync} = require('child_process');
+const [snap, release, root] = process.argv.slice(2);
+assert(snap && release && root, 'usage: check.cjs <candidate-snap> <release-snap> <fixture-root>');
+const helper = (tree) => path.join(tree, 'skills/delivery/scripts/dely.js');
+const load = (tree) => JSON.parse(fs.readFileSync(path.join(tree, 'harnesses.json'), 'utf8')).harnesses;
+const candH = load(snap), relH = load(release);
+fs.mkdirSync(path.join(root, 'home/.dely'), {recursive: true});
+fs.mkdirSync(path.join(root, 'repo'));
+fs.writeFileSync(path.join(root, 'repo/spec.md'), 'Fixture only.');
+fs.cpSync(snap, path.join(root, 'wrong'), {recursive: true});
+const wrong = helper(path.join(root, 'wrong'));
+const source = fs.readFileSync(wrong, 'utf8');
+const needle = '  if (wantsEffort) args.push("--effort", p.effort);\n';
+assert(source.includes(needle), 'update the --effort mutation for this candidate');
+fs.writeFileSync(wrong, source.replace(needle, ''));
+fs.writeFileSync(path.join(root, 'orca.js'), `
+const fs = require('fs');
+const a = process.argv.slice(2), cmd = a[1], root = process.env.FIXTURE_ROOT;
+fs.appendFileSync(root+'/calls.jsonl', JSON.stringify(a)+'\\n');
+let result = {};
+if (cmd === 'worker-start') result = {dispatchId:'d-1'};
+if (cmd === 'check') result = {messages:[{type:'heartbeat',subject:'ack',payload:{dispatchId:'d-1'}}]};
+if (cmd === 'worker-list') result = {workers:[]};
+if (cmd === 'worker-show') result = {projection:{provider:{model:'pin-model'}}};
+if (cmd === 'worker-read') result = {terminal:{tail:[]}};
+if (cmd === 'worker-stop' || cmd === 'worker-release') result = {};
+if (cmd === 'status') result = {runtime:{appVersion:'stub'}};
+console.log(JSON.stringify({ok:true,result}));
+`);
+function pinOf(h) {
+  return {
+    model: (h.modelFlag || h.modelPin) ? 'pin-model' : 'default',
+    effort: (h.effortFlag || h.modelPin) ? 'high' : 'default',
+  };
+}
+function flagsOf(argv) {
+  const f = {};
+  if (!argv) return f;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--model' || argv[i] === '--effort') f[argv[i]] = argv[++i];
+  }
+  return f;
+}
+function stripped(argv) {
+  const out = [];
+  if (!argv) return out;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--model' || argv[i] === '--effort') { i++; continue; }
+    out.push(argv[i]);
+  }
+  return out;
+}
+function dispatch(file, h) {
+  const pin = pinOf(h);
+  fs.writeFileSync(path.join(root, 'repo/AGENTS.md'),
+    '| Phase | Harness | Model | Effort |\n| --- | --- | --- | --- |\n' +
+    '| `implement` | ' + h.name + ' | ' + pin.model + ' | ' + pin.effort + ' |\n' +
+    '| `review` | ' + h.name + ' | ' + pin.model + ' | ' + pin.effort + ' |\n');
+  fs.writeFileSync(path.join(root, 'calls.jsonl'), '');
+  const r = spawnSync(process.execPath, [file, 'dispatch', '--run', 'fixture-run',
+    '--repo', path.join(root, 'repo'), '--phase', 'implement', '--spec-file', 'spec.md'],
+    {encoding:'utf8', timeout:10000, env:{...process.env,
+      HOME:path.join(root, 'home'), ORCA_TERMINAL_HANDLE:'fixture-terminal',
+      ORCA_CLI_COMMAND:path.join(root, 'orca.js'), FIXTURE_ROOT:root,
+      DELY_ACK_S:'0.2', DELY_POLL_S:'0.02', DELY_PIN_CHECK_S:'0'}});
+  let startArgv = null;
+  for (const line of fs.readFileSync(path.join(root, 'calls.jsonl'), 'utf8').split('\n').filter(Boolean)) {
+    const a = JSON.parse(line);
+    if (a[1] === 'worker-start') startArgv = a;
+  }
+  return {out: (r.stdout || '').trim(), startArgv, status: r.status};
+}
+function compare(candTree, relTree) {
+  const intended = [], unexpected = [];
+  const supported = load(candTree).filter((h) => h.status === 'supported');
+  assert(supported.length, 'candidate has no supported entries');
+  for (const h of supported) {
+    const other = load(relTree).find((x) => x.name === h.name);
+    const cand = dispatch(helper(candTree), h);
+    const rel = dispatch(helper(relTree), h);
+    if (!other) {
+      if (!cand.out.includes('DISPATCHED') || !cand.startArgv)
+        unexpected.push(h.name + ' is new but candidate did not dispatch');
+      else if (rel.startArgv) unexpected.push(h.name + ' is new but last release dispatched');
+      else intended.push(h.name + ' is new');
+      continue;
+    }
+    if (!cand.out.includes('DISPATCHED') || !cand.startArgv)
+      unexpected.push(h.name + ' candidate did not dispatch: ' + cand.out);
+    if (!rel.out.includes('DISPATCHED') || !rel.startArgv)
+      unexpected.push(h.name + ' last release did not dispatch: ' + rel.out);
+    if (cand.out !== rel.out) unexpected.push(h.name + ' stdout');
+    if (JSON.stringify(stripped(cand.startArgv)) !== JSON.stringify(stripped(rel.startArgv)))
+      unexpected.push(h.name + ' argv');
+    const cf = flagsOf(cand.startArgv), rf = flagsOf(rel.startArgv);
+    for (const flag of ['--model', '--effort']) {
+      if (cf[flag] === rf[flag]) continue;
+      const field = flag === '--model' ? 'modelFlag' : 'effortFlag';
+      if (h[field] !== other[field]) intended.push(h.name + ' ' + flag);
+      else unexpected.push(h.name + ' ' + flag);
+    }
+  }
+  return {intended, unexpected};
+}
+const red = compare(path.join(root, 'wrong'), release);
+assert(red.unexpected.length, 'mutant dropping --effort must fail');
+console.log('RED: mutant dropping --effort: ' + red.unexpected.join('; '));
+const green = compare(snap, release);
+assert.equal(green.unexpected.length, 0, green.unexpected.join('; ') || 'unexpected');
+for (const line of green.intended) console.log('INTENDED: ' + line);
+console.log('GREEN: candidate matches last release except named intended differences');
+JS
+node "$stub/check.cjs" "$snap" "$release_snap" "$stub"
+```
+
+**Pass:** RED prints (the `--effort`-dropping mutant fails the comparison), GREEN
+prints, every supported entry was compared, and every difference is named as
+intended (`--model` or `--effort` when that flag's field changed between the
+snapshots, or "is new" when the last release has no such entry). Keep the
+fixture directory and output with the probe report; remove it after recording
+the result.
+
 ## Parameterized worker row
+
+Run for each supported entry that changed and for each harness upgrade a
+deployment uses. Unchanged entries are covered by the argv stub row.
+Skip a deferred entry.
 
 Vary exactly: `id`, `name`, `discovery`, Model
 and Effort from the candidate's entry; the probe path `worker-<id>`; and phase
@@ -234,6 +391,11 @@ projection where available; for Pi inspect the session transcript instead.
 A successful helper print alone does not prove the worker ran the task.
 
 ## Parameterized Control row
+
+Run once per wake mode (`background`, `waker`) when only wait or settle logic
+changed. Run per harness when its entry changed, or when that harness upgraded
+and a deployment uses it as Control. Skip when `controlWake` is `unsupported`,
+and record that reason.
 
 Vary exactly: Control `id`, `binary`, `permissionDefault`, its discovered
 model and effort launch arguments (from that Control CLI's `--help`, not
@@ -521,6 +683,10 @@ second.
 
 ## Step 8 — row 8, OMP worker with a valid pin
 
+Standing named skip while stablyai/orca#24068 is open. Run when that issue
+closes, or when an OMP upgrade is claimed to start workers again.
+
+
 Build a probe repository under `~/dely-probe/` whose `implement` pin is OMP
 with a Model `selector` from `omp models --json` and an Effort that is one of
 that model's `thinking` levels, and with the pinned model different from
@@ -552,6 +718,10 @@ was not running the pin.
 
 ## Step 9 — row 9, OMP worker with an invalid pin
 
+Standing named skip while stablyai/orca#24068 is open. Run when that issue
+closes, or when an OMP upgrade is claimed to start workers again.
+
+
 Same probe-repository setup as row 8's first dispatch (plugin enabled), with
 a selector `omp models --json` does not offer.
 
@@ -582,7 +752,7 @@ model switched, the extension applied the pin on a start after the first.
 ## Step 13 — row 13, Pi worker with a valid pin
 
 Run this row when `start()` in `dely.js`, the extension or the `pi` entry
-changes, and after a Pi upgrade.
+changes, after a Pi upgrade, and after an Orca upgrade.
 Build a probe repository under `~/dely-probe/` whose `implement` pin is Pi
 with a Model `<provider>/<model>` from `pi --list-models` and an Effort
 that is one of the `--thinking` levels (from `pi --help`, which lists the
@@ -606,7 +776,7 @@ default, the pin was not applied before the first request.
 ## Step 14 — row 14, Pi worker with an unknown selector
 
 Run this row when `start()` in `dely.js`, the extension or the `pi` entry
-changes, and after a Pi upgrade.
+changes, after a Pi upgrade, and after an Orca upgrade.
 Same probe-repository setup as row 13's dispatch, with a selector
 `pi --list-models` does not offer.
 
@@ -616,7 +786,7 @@ Same probe-repository setup as row 13's dispatch, with a selector
 ## Step 15 — row 15, Pi worker with a level the model does not offer
 
 Run this row when `start()` in `dely.js`, the extension or the `pi` entry
-changes, and after a Pi upgrade.
+changes, after a Pi upgrade, and after an Orca upgrade.
 Same probe-repository setup as row 13's dispatch, with a valid model selector
 and an effort level that the model does not offer (for example `max` on
 `google-vertex/gemini-3.5-flash`).
@@ -627,7 +797,7 @@ and an effort level that the model does not offer (for example `max` on
 ## Step 16 — row 16, a Pi worker that dies after it acknowledges
 
 Run this row when `start()` in `dely.js`, the extension or the `pi` entry
-changes, and after a Pi upgrade.
+changes, after a Pi upgrade, and after an Orca upgrade.
 Follow row 4's procedure inside a dispatch with a Pi worker: kill the Pi worker
 process from outside Orca under row 4's kill guard (kill only while Control's
 wait is running, the implementer process is still alive, and no `settled` event
@@ -648,8 +818,9 @@ again exactly once. Killing the Pi worker process turns
   `~/.omp/plugins/node_modules` directory, and rewrite
   `~/.omp/plugins/omp-plugins.lock.json` with `jq 'del(.plugins.dely)'`);
 - remove the Pi install (`pi remove "$snap"`);
-- delete the snapshot;
+- delete the candidate and last-release snapshots;
 - keep parameterized worker and Control paths so their trust entries survive;
+- remove the argv and rejected-message fixture directories after recording them;
 - remove the row 5, row 7, OMP-row and Pi-row paths, and the trust entries of the
   first two.
 

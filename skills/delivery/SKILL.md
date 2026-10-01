@@ -166,9 +166,9 @@ one, so `REFUSED … (called with --control …)` means use `wait-bg`.
 **Result handling.** `SETTLED`: process the batch, do the guide's completion
 accounting, and pass the settled `deliveryId` as `--ack` to the next
 `dely wait` or `wait-bg`, or run `orca orchestration check --ack` when no
-wait follows. When `wait` prints `ERROR` for `--ack`, run
+wait follows. When `wait` (or the `wait-bg` output) prints `ERROR` for `--ack`, run
 `orca orchestration check --ack <settled id>` and wait again without
-`--ack`. `ATTENTION` has two routes, and the difference
+`--ack`; a waker Control waits again with `wait-bg`. `ATTENTION` has two routes, and the difference
 is whether the plane can still see the worker. With `nextAction.kind` other
 than `none`, run the argv Orca printed and skip that id next time. With
 `nextAction: none` and `attention.requiresAction`, the plane has lost sight

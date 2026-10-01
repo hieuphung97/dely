@@ -116,7 +116,7 @@ git grep -E '(^|[^A-Za-z0-9])[A-Z][0-9]+[a-z]?([^A-Za-z0-9]|$)' -- . ':!docs/_pl
 
 ```bash
 rows=$(jq -r '.harnesses[] | . as $h | (if $h.status == "deferred" or $h.controlWake == "unsupported" then "✗" elif ($h.limits // "") | test("(^|[.] )As Control,") then "⚠" else "✓" end) as $c | (if $h.status == "deferred" then "✗" elif ($h.limits // "") | test("(^|[.] )As a worker,") then "⚠" else "✓" end) as $w | "| \($h.name) | \($c) | \($w) | \($w) | \(if ($h.limits // "") == "" then "—" else $h.limits end) |"' harnesses.json) || exit 1
-printf '%s\n' "$rows" | while IFS= read -r row; do grep -qxF -- "$row" README.md || { echo "README lacks: $row"; exit 1; }; done && test "$(grep -cE '^\| [^|]+ \| (✓|⚠|✗) \| (✓|⚠|✗) \| (✓|⚠|✗) \|' README.md)" = "$(jq '.harnesses | length' harnesses.json)" || { echo "README role rows ≠ harnesses.json entries"; exit 1; }
+printf '%s\n' "$rows" | while IFS= read -r row; do grep -qxF -- "$row" README.md || { echo "README lacks: $row"; exit 1; }; done && { test "$(grep -cE '^\| [^|]+ \| (✓|⚠|✗) \| (✓|⚠|✗) \| (✓|⚠|✗) \|' README.md)" = "$(jq '.harnesses | length' harnesses.json)" || { echo "README role rows ≠ harnesses.json entries"; exit 1; }; }
 ```
 
 Control is ✗ when `status` is `deferred` or `controlWake` is `unsupported`, ⚠ when `limits` has a sentence starting "As Control,", otherwise ✓; Implementer and Reviewer are ✗ when `deferred`, ⚠ when `limits` has a sentence starting "As a worker,", otherwise ✓. A role sentence starts the `limits` value or follows ". ".
