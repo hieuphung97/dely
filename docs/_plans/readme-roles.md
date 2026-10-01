@@ -271,6 +271,14 @@ Files added for this: `AGENTS.md` (the gate) and `README.md` (that sentence).
 - **Pi rows 13 to 16** join the Orca-upgrade rerun list.
 - **The per-candidate harness list** is replaced by "every supported entry".
 - **The release floor** is restated in these terms.
+- **Carried from the Task G review (`e92e9bd`):**
+  - the role-table gate prints its count message only when the counts
+    differ (`AGENTS.md`);
+  - the `SKILL.md` sentence on `ERROR` for `--ack` also covers the `wait-bg`
+    output, and a waker Control waits again with `wait-bg`.
+
+  Files added for this: `AGENTS.md` (the gate) and `skills/delivery/SKILL.md`
+  (that sentence).
 
 **Focused verification.**
 
