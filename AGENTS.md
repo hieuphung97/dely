@@ -49,19 +49,12 @@ Repository artifacts are written in English.
 
 Name the model and reasoning effort on every dispatch.
 
-<!-- dely:begin -->
 ## Dely
 
 Bounded or Architectural work invokes `dely:delivery`; Spike starts no
 delivery run.
 
-| Phase | Harness | Model | Effort |
-| --- | --- | --- | --- |
-| `implement` | Claude Code | claude-sonnet-5-5 | medium |
-| `review` | Codex CLI | gpt-6.1-sol | high |
-<!-- dely:end -->
-
-The table is this repository's deployment selection, not the portable
+`.dely/pins.json` is this repository's deployment selection, not the portable
 protocol. Per-harness facts — status, Control wake, trust, discovery,
 model and effort flag support, permission defaults, forbidden headless
 forms, the instructions-file rule, and measured notes including for

@@ -168,6 +168,8 @@ dispatch against a fake Orca.
 
 Moving this repository's own pins to `.dely/pins.json` and replacing its
 block with the routing line. Trigger: 0.24.0 installed as the running plugin.
+Done 2026-10-05: pins are in `.dely/pins.json` and `AGENTS.md` carries the
+routing line.
 
 A way for a team to forbid personal overrides of a phase. Trigger: a team asks
 for it.
