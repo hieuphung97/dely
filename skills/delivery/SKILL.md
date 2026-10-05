@@ -11,8 +11,8 @@ review, and pull-request preparation. It is a thin control protocol, not an
 orchestrator, SDLC framework, or second source of Git state.
 
 Read `AGENTS.md` in the repository for this project's gate commands, artifact
-paths, default branch, and per-phase harness/model/effort pins. This skill
-never names them.
+paths, and default branch. Per-phase harness/model/effort pins come from
+`.dely/`, which `dely pins` resolves. This skill never names them.
 
 ## Two human gates
 
@@ -88,7 +88,8 @@ branch when starting on the default branch. The envelope freezes owned
 scope and paths; protected pre-existing dirty paths; acceptance criteria,
 counterexample, and focused instruments; branch, base, remote, and
 pull-request target; resolved harness, model, and effort for dispatched
-roles; and authority to branch, commit owned paths, run gates, push, and
+roles, from `dely pins --repo <path>` with each phase's source (`local`,
+`team` or `control`); and authority to branch, commit owned paths, run gates, push, and
 open or update a pull request. It never authorises merge, force-push,
 stash, reset, cleanup, or an edit outside owned scope. Dely stages and
 commits only contract-owned paths. It never stashes, resets, cleans, or
@@ -129,8 +130,8 @@ those belong to this skill, and a prompt that restates them narrows or
 contradicts them. Where the design contract states an acceptance row, the
 prompt carries that row as written. Every dispatch goes through
 `dely dispatch`. Control does not compose a worker launch or call
-`worker-start` by hand. The helper reads the pins from `AGENTS.md` and
-appends the acknowledgement instruction and a sentence that the Orca
+`worker-start` by hand. The helper resolves the pins from `.dely/` as
+`dely:setup` describes and appends the acknowledgement instruction and a sentence that the Orca
 preamble and the spec file are everything the worker needs and that it
 should read no other skill. The `worker-start` receipt records
 `launch.requested` and `launch.effective`; it does not establish that the
@@ -269,7 +270,7 @@ and say so.
 Review independence is role independence: a fresh session that did not
 implement and does not edit the candidate. It gets the decision record (or
 Bounded design), the baseline, and the diff. The phase adds no sandbox by
-default; `AGENTS.md` may pin one for a concrete risk. Review depth is
+default; a project may pin one for a concrete risk in `AGENTS.md`. Review depth is
 adaptive: Bounded work gets one independent whole-change review. Each
 Architectural task gets an independent task review. After all tasks are
 accepted, a different fresh reviewer performs one integration review of

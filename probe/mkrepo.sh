@@ -1,14 +1,14 @@
 #!/bin/bash
 # Create a probe repository for probe/checklist.md.
 #
-# Usage: probe/mkrepo.sh <name> <implement harness> <model> <effort> \
-#                               <review harness> <model> <effort>
+# Usage: probe/mkrepo.sh <name> <implement harness id> <model> <effort> \
+#                               <review harness id> <model> <effort>
 #
-# Example: probe/mkrepo.sh r1 "Claude Code" claude-opus-5 medium \
-#                                "Codex CLI" gpt-5.1-codex high
+# Example: probe/mkrepo.sh r1 claude claude-opus-5 medium \
+#                                codex gpt-5.1-codex high
 #
-# Writes ~/dely-probe/<name> with a bare remote, a delivery-sized task, and a
-# Dely managed block carrying the two pins. Re-running it destroys and rebuilds
+# Writes ~/dely-probe/<name> with a bare remote, a delivery-sized task, the
+# team pins in .dely/pins.json, and the one-line routing sentence in AGENTS.md. Re-running it destroys and rebuilds
 # the repository, which is the point: the harness trust entry is keyed on the
 # path and survives, so only the first run needs a human.
 set -eu
@@ -16,7 +16,7 @@ set -eu
 ROOT="$HOME/dely-probe"
 name=${1-}
 if [ $# -ne 7 ] || [ -z "$name" ]; then
-  echo "usage: probe/mkrepo.sh <name> <implH> <implM> <implE> <revH> <revM> <revE>" >&2
+  echo "usage: probe/mkrepo.sh <name> <implH id> <implM> <implE> <revH id> <revM> <revE>" >&2
   exit 2
 fi
 
@@ -90,17 +90,16 @@ git diff --check
 node --test test/
 \`\`\`
 
-<!-- dely:begin -->
-## Dely
-
 Bounded or Architectural work invokes \`dely:delivery\`; Spike starts no
 delivery run.
+SRC
 
-| Phase | Harness | Model | Effort |
-| --- | --- | --- | --- |
-| \`implement\` | ${2} | ${3} | ${4} |
-| \`review\` | ${5} | ${6} | ${7} |
-<!-- dely:end -->
+mkdir -p "$repo/.dely"
+cat > "$repo/.dely/pins.json" <<SRC
+{
+  "implement": { "harness": "${2}", "model": "${3}", "effort": "${4}" },
+  "review": { "harness": "${5}", "model": "${6}", "effort": "${7}" }
+}
 SRC
 
 printf '@AGENTS.md\n' > "$repo/CLAUDE.md"

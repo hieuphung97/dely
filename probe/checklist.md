@@ -27,7 +27,7 @@ from the last release: `id`, `name`, `binary`, `status`, `controlWake`,
 Run the live worker row for each entry that changed and for each harness
 upgrade that a deployment uses. Each worker row covers implementer and
 reviewer in separate sessions. A **deployment** is this repository's
-`AGENTS.md` pins plus the harness the owner uses as Control. A **harness
+pins plus the harness the owner uses as Control. A **harness
 upgrade** is a version different from the newest live report that ran that
 harness. If none did, treat the harness as upgraded.
 
@@ -45,7 +45,8 @@ deployment's Control uses another harness of that mode. Skip Control when
 per harness when its entry changed, or when that harness upgraded and a
 deployment uses it as Control.
 
-The release floor is the argv stub row, the rejected-message stub row, the
+The release floor is the argv stub row, the pin-resolution stub row when its
+trigger fired, the rejected-message stub row, the
 live worker rows the rules above require, the Control rows those rules
 require, and rows 4–7. Rows 10–11 run when `start()` or the pin extension
 changes. Rows 13–16 run when
@@ -240,7 +241,9 @@ executable and isolated home, creates no real Run or worker, and checks a
 deliberately wrong copy (a mutant that drops `--effort`) before the
 candidate. It stands in for the live worker row of
 every supported entry whose `harnesses.json` entry did not change. The argv
-stub does not test Orca.
+stub does not test Orca. It writes each helper's pins where that helper reads
+them: the table in `AGENTS.md` for the release snapshot, `.dely/pins.json` for
+the candidate.
 
 ```bash
 stub=$(mktemp -d "$HOME/dely-probe/argv.XXXXXX")
@@ -310,10 +313,17 @@ function add(arr, line) {
 }
 function launch(file, h, other, mode, verb) {
   const pin = pinOf(h, other, mode);
+  // Each helper reads its own form: the 0.23.1 release reads this table in
+  // AGENTS.md, the candidate reads .dely/pins.json. The table carries no
+  // dely:begin marker, which the candidate would refuse.
   fs.writeFileSync(path.join(root, 'repo/AGENTS.md'),
     '| Phase | Harness | Model | Effort |\n| --- | --- | --- | --- |\n' +
     '| `implement` | ' + h.name + ' | ' + pin.model + ' | ' + pin.effort + ' |\n' +
     '| `review` | ' + h.name + ' | ' + pin.model + ' | ' + pin.effort + ' |\n');
+  const one = {harness: h.id, model: pin.model, effort: pin.effort};
+  fs.mkdirSync(path.join(root, 'repo/.dely'), {recursive: true});
+  fs.writeFileSync(path.join(root, 'repo/.dely/pins.json'),
+    JSON.stringify({implement: one, review: one}));
   fs.writeFileSync(path.join(root, 'calls.jsonl'), '');
   const args = [file, verb, '--run', 'fixture-run', '--repo', path.join(root, 'repo')];
   if (verb === 'dispatch') args.push('--phase', 'implement', '--spec-file', 'spec.md');
@@ -439,7 +449,7 @@ Use `"$snap/skills/delivery/scripts/dely"` as `dely` below, including waits.
 Run preflight and dispatch with no tool timeout, or one of at least 300 s.
 
 ```bash
-probe/mkrepo.sh worker-<id> "<name>" <model> <effort> "<name>" <model> <effort>
+probe/mkrepo.sh worker-<id> <id> <model> <effort> <id> <model> <effort>
 ```
 
 Run `probe/mkrepo.sh` from the candidate Dely checkout. In an observer agent
@@ -498,7 +508,7 @@ not the word `none`. Record Control's actual model and effort. Run the script
 from the candidate Dely checkout; the new terminal runs in the probe repository.
 
 ```bash
-probe/mkrepo.sh control-<id> "Claude Code" <model> <effort> "Claude Code" <model> <effort>
+probe/mkrepo.sh control-<id> claude <model> <effort> claude <model> <effort>
 orca terminal create --worktree path:~/dely-probe/control-<id> \
   --command "<binary> <permissionDefault> <supported model/effort arguments>"
 ```
@@ -536,6 +546,226 @@ Record Control requests during each wait, their timing, and whether it read
 `usage`, or Cursor assistant transcript records (no local token counts).
 For other harnesses, record the available source or say unobservable.
 
+## Stub row — pin resolution
+
+Run this when the pin resolver in `dely.js`, the `.dely/` file format, or the
+text of `dely pins` changes. It runs from the observer shell with `snap` set to
+the candidate snapshot, against a fake Orca executable and an isolated home;
+it creates no real Run or worker. It checks six requirements, each against a
+deliberately wrong copy of the candidate before the candidate itself:
+
+| Row | Requirement | Mutant that must turn it RED |
+| --- | --- | --- |
+| 1 | the personal file overrides per phase | `first-file-only`: the first file found answers both phases, so `implement` falls to Control |
+| 2 | worktree, then main checkout | `worktree-only`: reads only `<repo>/.dely/local`; `main-wins`: the main checkout's file beats the worktree's own |
+| 3 | Control fallback | `control-throws`: no Control harness is an error as in 0.23.1; `control-claude`: hard-codes `claude` |
+| 4 | an old `dely:begin` block stops the helper | `block-ignored`: the block is skipped and Control answers |
+| 5 | strict format | `typo-ignored`: an unknown key such as `reveiw` is skipped and the team pin is used |
+| 6 | `dispatch` and `preflight` use the resolver | `dispatch-agents-md`, `preflight-agents-md`: each still parses the `AGENTS.md` table |
+
+```bash
+stub=$(mktemp -d "$HOME/dely-probe/pins.XXXXXX")
+cat > "$stub/check.cjs" <<'JS'
+const fs = require('fs'), path = require('path'), assert = require('assert');
+const {spawnSync, execFileSync} = require('child_process');
+const [snap, rootArg] = process.argv.slice(2);
+assert(snap && rootArg, 'usage: check.cjs <candidate-snap> <fixture-root>');
+const root = fs.realpathSync(rootArg);
+const sh = (cwd, ...a) => execFileSync(a[0], a.slice(1), {cwd, stdio: 'pipe'});
+fs.mkdirSync(path.join(root, 'home'), {recursive: true});
+fs.writeFileSync(path.join(root, 'orca.js'), `
+const fs = require('fs');
+const a = process.argv.slice(2), cmd = a[0] === 'terminal' ? 'terminal ' + a[1] : a[1], root = process.env.FIXTURE_ROOT;
+fs.appendFileSync(root+'/calls.jsonl', JSON.stringify(a)+'\\n');
+let result = {};
+if (cmd === 'terminal list') result = {terminals:[Object.assign({handle:'fixture-terminal'},
+  process.env.FIXTURE_IDENTITY ? {agentIdentity: process.env.FIXTURE_IDENTITY} : {})]};
+if (cmd === 'worker-start') result = {dispatchId:'d-1'};
+if (cmd === 'check') result = {deliveryId:'batch-1',messages:[
+  {type:'heartbeat',subject:'ack',payload:{dispatchId:'d-1'}},
+  {type:'worker_done',subject:'preflight ok',payload:{dispatchId:'d-1'}}]};
+if (cmd === 'worker-list') result = {workers:[]};
+if (cmd === 'worker-show') result = {projection:{provider:{model:'pin-model'}}};
+if (cmd === 'worker-read') result = {terminal:{tail:[]}};
+if (cmd === 'status') result = {runtime:{appVersion:'stub'}};
+console.log(JSON.stringify({ok:true,result}));
+`);
+let n = 0;
+function repo(files, agents) {
+  const dir = path.join(root, 'r' + (++n));
+  fs.mkdirSync(dir);
+  sh(dir, 'git', 'init', '-q', '-b', 'main');
+  for (const [f, v] of Object.entries(files || {})) {
+    fs.mkdirSync(path.dirname(path.join(dir, f)), {recursive: true});
+    fs.writeFileSync(path.join(dir, f), typeof v === 'string' ? v : JSON.stringify(v));
+  }
+  if (agents) fs.writeFileSync(path.join(dir, 'AGENTS.md'), agents);
+  fs.writeFileSync(path.join(dir, 'spec.md'), 'Fixture only.');
+  return dir;
+}
+function commit(dir, ...paths) {
+  sh(dir, 'git', 'add', ...paths);
+  sh(dir, 'git', '-c', 'user.name=probe', '-c', 'user.email=p@example.invalid', 'commit', '-qm', 'x');
+}
+function helper(tree, args, ident) {
+  const r = spawnSync(process.execPath, [path.join(tree, 'skills/delivery/scripts/dely.js'), ...args],
+    {encoding: 'utf8', timeout: 10000, env: {...process.env, HOME: path.join(root, 'home'),
+      ORCA_TERMINAL_HANDLE: 'fixture-terminal', ORCA_CLI_COMMAND: path.join(root, 'orca.js'),
+      FIXTURE_ROOT: root, FIXTURE_IDENTITY: ident || '', DELY_ACK_S: '0.2', DELY_POLL_S: '0.02',
+      DELY_PIN_CHECK_S: '0', DELY_PREFLIGHT_S: '0.2'}});
+  return {status: r.status, out: (r.stdout || '').trim()};
+}
+function pins(tree, dir, ident) {
+  const r = helper(tree, ['pins', '--repo', dir], ident);
+  let json = null;
+  try { json = JSON.parse(r.out); } catch (_) { /* error text */ }
+  return {...r, json};
+}
+const P = (harness, model = 'm', effort = 'default') => ({harness, model, effort});
+const same = (got, want) => JSON.stringify(got) === JSON.stringify(want);
+function starts() {
+  return fs.readFileSync(path.join(root, 'calls.jsonl'), 'utf8').split('\n').filter(Boolean)
+    .map((l) => JSON.parse(l)).filter((a) => a[1] === 'worker-start');
+}
+function argvOf(a, name) { const i = a.indexOf(name); return i < 0 ? null : a[i + 1]; }
+
+// Each row returns null on pass or a string on failure.
+const rows = {
+  1(tree) {
+    const dir = repo({'.dely/pins.json': {implement: P('claude', 'a'), review: P('codex', 'b')},
+                      '.dely/local/pins.json': {review: P('cursor', 'c')}});
+    const r = pins(tree, dir);
+    const t = path.join(dir, '.dely/pins.json'), l = path.join(dir, '.dely/local/pins.json');
+    const want = {implement: {harness: 'claude', model: 'a', effort: 'default', source: 'team', file: t},
+                  review: {harness: 'cursor', model: 'c', effort: 'default', source: 'local', file: l}};
+    return r.status === 0 && same(r.json, want) ? null : 'status ' + r.status + ' ' + r.out;
+  },
+  2(tree) {
+    const main = repo({'.dely/pins.json': {implement: P('claude', 'a'), review: P('codex', 'b')}});
+    commit(main, '.dely/pins.json');
+    fs.mkdirSync(path.join(main, '.dely/local'), {recursive: true});
+    fs.writeFileSync(path.join(main, '.dely/local/pins.json'), JSON.stringify({review: P('cursor', 'c')}));
+    const wt = path.join(root, 'wt' + (++n));
+    sh(main, 'git', 'worktree', 'add', '-q', '-b', 'w' + n, wt);
+    const a = pins(tree, wt);
+    if (a.status !== 0 || !a.json || a.json.review.source !== 'local' ||
+        a.json.review.file !== path.join(main, '.dely/local/pins.json') || a.json.implement.source !== 'team')
+      return 'worktree without its own file should read the main checkout: ' + a.out;
+    fs.mkdirSync(path.join(wt, '.dely/local'), {recursive: true});
+    fs.writeFileSync(path.join(wt, '.dely/local/pins.json'), JSON.stringify({review: P('antigravity', 'd')}));
+    const b = pins(tree, wt);
+    if (b.status !== 0 || !b.json || b.json.review.harness !== 'antigravity' ||
+        b.json.review.file !== path.join(wt, '.dely/local/pins.json'))
+      return 'worktree with its own file should win: ' + b.out;
+    return null;
+  },
+  3(tree) {
+    const dir = repo({});
+    const r = pins(tree, dir, 'codex');
+    const side = {harness: 'codex', model: 'default', effort: 'default', source: 'control', file: null};
+    return r.status === 0 && same(r.json, {implement: side, review: side}) ? null : 'status ' + r.status + ' ' + r.out;
+  },
+  4(tree) {
+    const dir = repo({}, '# x\n<!-- dely:begin -->\n| `implement` | Claude Code | m | e |\n<!-- dely:end -->\n');
+    const r = pins(tree, dir, 'codex');
+    return r.status !== 0 && r.out.includes('.dely/pins.json') && !r.json ? null : 'status ' + r.status + ' ' + r.out;
+  },
+  5(tree) {
+    const ok = {implement: P('claude', 'a'), review: P('codex', 'b')};
+    const cases = {
+      'typo key': {...ok, reveiw: P('cursor')},
+      'unknown harness': {...ok, review: P('nope')},
+      'missing effort': {...ok, review: {harness: 'codex', model: 'b'}},
+      'invalid JSON': '{"implement": ',
+    };
+    for (const [name, body] of Object.entries(cases)) {
+      const dir = repo({'.dely/pins.json': body});
+      const r = pins(tree, dir, 'codex');
+      if (r.status === 0 || r.json || !r.out.includes(path.join(dir, '.dely/pins.json')))
+        return name + ' should fail naming the file: status ' + r.status + ' ' + r.out;
+    }
+    return null;
+  },
+  6(tree) {
+    const table = '| Phase | Harness | Model | Effort |\n| --- | --- | --- | --- |\n' +
+      '| `implement` | Claude Code | old-model | low |\n| `review` | Claude Code | old-model | low |\n';
+    const dir = repo({'.dely/pins.json': {implement: P('claude', 'a'), review: P('claude', 'b')},
+                      '.dely/local/pins.json': {implement: P('codex', 'pin-model', 'high')}}, table);
+    fs.writeFileSync(path.join(root, 'calls.jsonl'), '');
+    const d = helper(tree, ['dispatch', '--repo', dir, '--run', 'fixture-run', '--phase', 'implement', '--spec-file', 'spec.md']);
+    const s = starts();
+    if (!d.out.includes('DISPATCHED') || !s.length || argvOf(s[0], '--agent') !== 'codex' ||
+        argvOf(s[0], '--model') !== 'pin-model' || argvOf(s[0], '--effort') !== 'high')
+      return 'dispatch should launch the personal pin: ' + d.out + ' ' + JSON.stringify(s[0]);
+    fs.writeFileSync(path.join(root, 'calls.jsonl'), '');
+    helper(tree, ['preflight', '--repo', dir, '--run', 'fixture-run']);
+    const byTitle = Object.fromEntries(starts().map((a) => [argvOf(a, '--task-title'), a]));
+    const pi = byTitle['preflight-implement'], pr = byTitle['preflight-review'];
+    if (!pi || argvOf(pi, '--agent') !== 'codex' || argvOf(pi, '--model') !== 'pin-model')
+      return 'preflight should launch the personal implement pin: ' + JSON.stringify(pi);
+    if (!pr || argvOf(pr, '--agent') !== 'claude' || argvOf(pr, '--model') !== 'b')
+      return 'preflight should launch the team review pin: ' + JSON.stringify(pr);
+    return null;
+  },
+};
+
+function mutant(name, edits) {
+  const dir = path.join(root, 'mutant-' + name);
+  fs.cpSync(snap, dir, {recursive: true});
+  const file = path.join(dir, 'skills/delivery/scripts/dely.js');
+  let src = fs.readFileSync(file, 'utf8');
+  for (const [needle, repl] of edits) {
+    assert(src.includes(needle), 'update the ' + name + ' mutation for this candidate: ' + needle);
+    src = src.replace(needle, () => repl);
+  }
+  fs.writeFileSync(file, src);
+  return dir;
+}
+const agentsTable = (phaseExpr) => `{ const md = fs.readFileSync(path.join(f.repo, "AGENTS.md"), "utf8");
+    const row = md.split("\\n").find((l) => new RegExp("^\\\\|\\\\s*\`?" + ${phaseExpr} + "\`?\\\\s*\\\\|").test(l));
+    const [, hn, mo, ef] = row.split("|").slice(1).map((c) => c.trim().replace(/\`/g, ""));
+    const hh = loadHarnesses().find((x) => x.name === hn);
+    return { phase: ${phaseExpr}, agent: hh.id, model: mo, effort: ef, modelFlag: hh.modelFlag, effortFlag: hh.effortFlag, modelPin: hh.modelPin }; }`;
+const mutants = [
+  ['first-file-only', 1, [['const hit = sources.find((s) => phase in s[2]);',
+    'const hit = sources.length && phase in sources[0][2] ? sources[0] : undefined;']]],
+  ['worktree-only', 2, [['const main = mainCheckout(repo);\n  if (!main) return null;', 'const main = null;\n  if (!main) return null;']]],
+  ['main-wins', 2, [['if (fs.existsSync(own)) return own;', 'if (fs.existsSync(own) && !mainCheckout(repo)) return own;']]],
+  ['control-throws', 3, [['const id = selfHarness();', 'const id = null;']]],
+  ['control-claude', 3, [['const id = selfHarness();', 'const id = "claude";']]],
+  ['block-ignored', 4, [['if (agents.includes(OLD_BLOCK)) {', 'if (false) {']]],
+  ['typo-ignored', 5, [['if (!PHASES.includes(k)) fail(', 'if (false) fail(']]],
+  ['dispatch-agents-md', 6, [['const p = pin(f.repo, f.phase);',
+    'const p = (() => ' + agentsTable('f.phase') + ')();']]],
+  ['preflight-agents-md', 6, [['const pins = PHASES.map((ph) => resolved[ph]);',
+    'const pins = PHASES.map((ph) => (() => ' + agentsTable('ph') + ')());']]],
+];
+const redRows = new Set();
+for (const [name, row, edits] of mutants) {
+  const tree = mutant(name, edits);
+  const why = rows[row](tree);
+  assert(why, 'mutant ' + name + ' must fail row ' + row);
+  redRows.add(row);
+  console.log('RED: mutant ' + name + ' fails row ' + row + ': ' + String(why).split('\n')[0].slice(0, 150));
+}
+for (const r of [1, 2, 3, 4, 5, 6]) assert(redRows.has(r), 'no mutant turned row ' + r + ' RED');
+for (const r of [1, 2, 3, 4, 5, 6]) {
+  const why = rows[r](snap);
+  assert.equal(why, null, 'candidate fails row ' + r + ': ' + why);
+  console.log('GREEN: row ' + r);
+}
+console.log('GREEN: candidate resolves pins as specified');
+JS
+node "$stub/check.cjs" "$snap" "$stub"
+```
+
+**Pass:** every mutant prints RED for the row it is named for, and the candidate
+prints GREEN for rows 1 to 6. If a mutation assert fires, update that needle;
+it is not a candidate failure. A GREEN candidate with a row that no mutant
+turned RED proves nothing, and the script refuses it. Keep the fixture
+directory and output with the probe report; remove it after recording the
+result.
+
 ## Stub row — Orca-rejected messages
 
 Run this from the observer shell with `snap` set to the candidate snapshot.
@@ -552,9 +782,10 @@ const helper = path.join(snap, 'skills/delivery/scripts/dely.js');
 for (const home of ['red-home', 'green-home'])
   fs.mkdirSync(path.join(root, home, '.dely'), {recursive: true});
 fs.mkdirSync(path.join(root, 'repo'));
-fs.writeFileSync(path.join(root, 'repo/AGENTS.md'),
-  '| implement | Claude Code | default | default |\n' +
-  '| review | Claude Code | default | default |\n');
+fs.mkdirSync(path.join(root, 'repo/.dely'));
+fs.writeFileSync(path.join(root, 'repo/.dely/pins.json'), JSON.stringify({
+  implement: {harness: 'claude', model: 'default', effort: 'default'},
+  review: {harness: 'claude', model: 'default', effort: 'default'}}));
 fs.writeFileSync(path.join(root, 'repo/spec.md'), 'Fixture only.');
 fs.cpSync(snap, path.join(root, 'wrong'), {recursive: true});
 const wrong = path.join(root, 'wrong/skills/delivery/scripts/dely.js');
@@ -779,7 +1010,7 @@ Build a probe repository under `~/dely-probe/` whose `implement` pin is OMP
 with a Model `selector` from `omp models --json` and an Effort that is one of
 that model's `thinking` levels. The pinned model and level must differ from
 OMP's configured default.
-`probe/mkrepo.sh` writes whatever harness names it is given; OMP needs no
+`probe/mkrepo.sh` writes whatever harness ids it is given; OMP needs no
 trust step. From that repository run `dely dispatch` for `implement`.
 
 **Pass:** `dely dispatch` prints `DISPATCHED <id>` without a model check,

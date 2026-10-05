@@ -1,30 +1,37 @@
 ---
 name: setup
-description: Configure a project's AGENTS.md with one managed Dely block — per-phase harness, model and effort for implement and review, discovered from the live harness surface. Use at the start of a Control Session, when the project has no managed block, or when those pins need rewriting from the installed harnesses. Not for installing plugins, trusting hooks, or delivering a change; that is delivery.
+description: Configure a project's Dely pins — per-phase harness, model and effort for implement and review, written to .dely/pins.json (team) or .dely/local/pins.json (only this person), discovered from the live harness surface. Use at the start of a Control Session, when the project has no pins, or when pins need rewriting from the installed harnesses. Not for installing plugins, trusting hooks, or delivering a change; that is delivery.
 ---
 
 # Setup
 
-Write exactly one managed block into the project's `AGENTS.md`. Discover
-models and effort from the installed harnesses. Do not store a catalogue. Do
-not install, trust, or enumerate anything.
-
-Read `AGENTS.md` first. Replace only the region between this skill's own
-markers. Prose outside the block is not read, merged, moved, or deleted.
+Write the project's Dely pins into one JSON file, and one routing sentence
+into `AGENTS.md`. Discover models and effort from the installed harnesses. Do
+not store a catalogue. Do not install, trust, or enumerate anything.
 
 Harness facts live in `../../harnesses.json` relative to this skill
 (repository root `harnesses.json`). Read that file. Do not copy a list from
 this package, from memory, or from `docs/`.
 
-## Two rows only
+## Two files
 
-The managed block configures deployment preferences for `implement` and
-`review` — nothing else. There is no coordinator or orchestrator field,
-because Orca is the constant, required execution plane. There is no control
+```
+.dely/pins.json            team pins, tracked
+.dely/local/pins.json      personal pins, never tracked
+.dely/local/.gitignore     contains *, so nothing under .dely/local is tracked
+```
+
+Each file is an object whose only keys are `implement` and `review`. Each
+value has exactly the string keys `harness` (an `id` from `harnesses.json`),
+`model` and `effort`. A file may name one phase or both. Per phase, the
+personal file wins over the team file, and the team file over Control's own
+harness with `default` for Model and Effort. `dely pins --repo <path>` prints
+what resolves and from where.
+
+Pins configure `implement` and `review` — nothing else. There is no control
 row, because the current interactive session already exists and is never
-dispatched. There is no release row, because release has no LLM worker. There
-is no Plan Mode field and no design-skill field: the active design method is
-a property of the harness and session, not a Dely setting.
+dispatched; there is no release row, because release has no LLM worker; there
+is no Plan Mode or design-skill field.
 
 ## Two paths
 
@@ -40,28 +47,38 @@ for that cell and point to Orca's agent default arguments. An entry with
 discovered models and effort levels as for a flag harness, and write
 Effort `default` for a model whose effort field is `null`.
 
-Ask which path. Do not start writing until that is answered.
+Ask which path, and whether the choice is for the team or only for this
+person. Do not start writing until both are answered.
 
 ## What to write
 
-Exactly one block, and nothing else:
+For a team choice, write `.dely/pins.json`. For a personal choice, write
+`.dely/local/pins.json`, and write `.dely/local/.gitignore` containing the
+single line `*` first, so the personal file never shows in `git status`. Never
+edit the repository's root `.gitignore`. Create the directories as needed.
 
-```markdown
-<!-- dely:begin -->
-## Dely
-
-Bounded or Architectural work invokes `dely:delivery`; Spike starts no
-delivery run.
-
-| Phase | Harness | Model | Effort |
-| --- | --- | --- | --- |
-| `implement` | … | … | … |
-| `review` | … | … | … |
-<!-- dely:end -->
+```json
+{
+  "implement": { "harness": "claude", "model": "default", "effort": "default" },
+  "review": { "harness": "codex", "model": "default", "effort": "default" }
+}
 ```
 
-If the markers already exist, replace the region between them. If they do
-not, append the block. Touch nothing else.
+Use the harness `id`, not its display name. If the target file exists, show
+what it holds and write only on a yes. A personal file shadows the team file
+per phase; say so when writing one.
+
+Then make sure `AGENTS.md` carries the routing line. If it has no
+`dely:delivery`, append:
+
+> Bounded or Architectural work invokes `dely:delivery`; Spike starts no
+> delivery run.
+
+If `AGENTS.md` contains an old `<!-- dely:begin -->` block, the helper stops
+until it is gone. Offer to replace the block, from its begin marker through its
+end marker, with the routing line, and carry its table over to
+`.dely/pins.json` as the proposed team pins. Change `AGENTS.md` only on a yes.
+Prose outside the block is never touched.
 
 ## Discovery
 
@@ -99,25 +116,22 @@ A harness that is not installed is omitted from the offer, not an error.
 
 ## Pinning
 
-Where a managed block exists, pin its Harness, Model and Effort for
-`implement` and `review` on every dispatch. The literal `default` in Model or
-Effort means the harness default is wanted: omit that flag. That is not the
-same as an unset cell — defaults are a deployment preference, not a
-reproducible pin, and the execution envelope records the configured value and,
-where the harness exposes it, the actual observed model and effort.
+The literal `default` in Model or Effort means the harness default is wanted:
+omit that flag. That is not the same as an unset phase: defaults are a
+deployment preference, not a reproducible pin, and the execution envelope
+records the configured value and, where the harness exposes it, the actual
+observed model and effort.
 
-Where `AGENTS.md` carries no managed block, `delivery` runs `implement` and
-`review` on the current harness with harness defaults and omits the model and
-effort flags. Setup is a convenience over that fallback, not a precondition
-for it.
+Where no file names a phase, `delivery` runs it on Control's own harness with
+`default` for Model and Effort. Setup is a convenience over that fallback, not
+a precondition for it. The run stops only when Control's harness is unknown.
 
 ## When a choice cannot be offered
 
 Where a choice cannot be offered, do not make it. Take the conservative
 action — which may be writing a conservative value, and may be doing
 nothing — and report the choice that was not offered, naming what was
-available and how to set it; do not write that report into the managed
-block.
+available and how to set it; do not write that report into a pins file.
 
 For the instructions-file import: if the current harness's
 `instructionsFile.needsImport` is true, the import is absent, and setup
@@ -125,15 +139,8 @@ cannot ask, write nothing and report the offer that was not made.
 
 ## Refusals
 
-Stop and report to the human, unchanged, when:
-
-- the markers are broken (a `begin` without a matching `end`, or an `end`
-  before its `begin`)
-- more than one `<!-- dely:begin -->` is present
-- a legacy phase table outside the block contradicts the block
-
-Do not merge two tables, delete a legacy table, or guess which is
-authoritative.
+Stop and report to the human, unchanged, when an existing pins file is not
+valid JSON in the format above. Do not repair it or guess what it meant.
 
 ## Instructions file
 
@@ -147,8 +154,7 @@ one-line file at `instructionsFile.file` containing
 `instructionsFile.importLine`. The human accepts or declines. Never write it
 unasked.
 
-This is not a second managed block: no markers, no configuration, a pointer
-at the block rather than a copy of it.
+This carries no configuration: it points at `AGENTS.md`, it does not copy it.
 
 The offer follows `needsImport`. Files listed in `inert` are not imported.
 Files listed in `alsoApplies` are applied as rules by that harness; that
@@ -156,7 +162,7 @@ does not by itself trigger the write offer.
 
 ## Trust
 
-After the managed block is written, for each pinned harness whose `trust` is
+After the pins are written, for each pinned harness whose `trust` is
 `dialog`, open it once for the human with
 `orca terminal create --worktree path:<repo> --command "<binary> <permissionDefault>"`,
 taking `binary` and `permissionDefault` from that entry in `harnesses.json`.

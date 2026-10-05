@@ -9,6 +9,169 @@ Last updated 2026-10-05.
 
 ## Settled
 
+### 2026-10-05 — Pins live in `.dely/`, with a personal file that overrides the team's per phase
+
+#### Context
+
+Issue #62 asked for pins a person can set without committing them: a team uses
+different harnesses and models, and the only place a pin could live was the
+managed block in `AGENTS.md`, which every clone shares. That block was already
+described as a deployment selection, not protocol, yet `setup`'s quick path
+rewrote it with whichever harness ran setup, so two people on two harnesses
+would rewrite the shared file back and forth.
+
+Two further facts, read from 0.23.1:
+
+- `skills/setup/SKILL.md` and the README promise that without pins Dely runs
+  both roles on Control's harness with defaults. `pin()` in `dely.js` instead
+  throws `no implement pin in AGENTS.md`, or fails reading a missing
+  `AGENTS.md`, so the promised fallback never ran.
+- The block is loaded into every session and every worker, because harnesses
+  auto-load `AGENTS.md` (2026-09-06 record).
+
+#### Decision
+
+Pins are read from two optional JSON files in the repository:
+
+```
+.dely/pins.json            team pins, tracked
+.dely/local/pins.json      personal pins, never tracked
+.dely/local/.gitignore     contains *, so nothing under .dely/local is tracked
+```
+
+Each file is an object whose only keys are `implement` and `review`; each
+value has exactly `harness` (an `id` from `harnesses.json`), `model` and
+`effort`, all strings. Any other key, a missing field, an unknown harness, or
+invalid JSON stops the helper with the file's path. A file may name one phase
+or both.
+
+Per phase, the first source that names it wins:
+
+1. the personal file — `.dely/local/pins.json` in the worktree passed as
+   `--repo`, or, when that worktree has none, in the main checkout. The main
+   checkout is the parent of `git rev-parse --git-common-dir`, used only when
+   that directory is named `.git`. One personal file is read, never both;
+2. `.dely/pins.json` in that worktree;
+3. Control's own harness, read from Orca's `agentIdentity` for the calling
+   terminal, with Model and Effort `default`.
+
+`dely pins --repo <path>` prints the resolved pin for each phase and its
+source (`local`, `team` or `control`). Control runs it when it builds the
+execution envelope and records the sources; `preflight` and `dispatch` use the
+same resolver.
+
+If `AGENTS.md` still contains `<!-- dely:begin -->`, the helper stops and says
+the pins moved to `.dely/pins.json` and to run `dely:setup`. It does not read
+the block. `AGENTS.md` keeps one routing line, which `setup` appends when it is
+absent:
+
+> Bounded or Architectural work invokes `dely:delivery`; Spike starts no
+> delivery run.
+
+`setup` asks whether a choice is for the team or only for this person and
+writes the matching file. The managed block, its markers and its refusal cases
+are gone. When `setup` finds an old block it offers to replace it with the
+routing line and does so only on a yes.
+
+This supersedes the 2026-09-16 Deferred item "A `~/.dely/config.json` for
+anything the directory marker cannot express": per-person configuration lives
+in the repository, not in the home directory.
+
+#### Alternatives considered
+
+**Keep the table in `AGENTS.md` and add a personal file beside it.** Rejected:
+`setup` keeps editing a file people own, with markers and refusal cases, and
+the table keeps riding into every worker's context.
+
+**Read the old block as a fallback during a transition.** Rejected by the
+owner. A loud stop replaces it, so an upgrade cannot silently move a project's
+workers to Control's harness.
+
+**Personal pins inside `.git/`.** Rejected: few tools keep user-edited
+settings there, editors hide it, and Codex's workspace-write sandbox makes
+`.git` read-only, so `setup` could not write the file from a sandboxed Codex
+Control.
+
+**One personal file in the home directory, keyed by project.** Rejected by the
+owner, who wants every setting managed in its repository. It would also have
+collided with `~/.dely/`, whose existence turns logging on.
+
+**`AGENTS.local.md` or another `AGENTS.*` name.** Rejected: Codex reads
+`AGENTS.override.md` instead of `AGENTS.md`, and a file in that family risks a
+harness giving it a meaning of its own.
+
+**Committed per-person files such as `.dely/pins/<email>.json`.** Rejected: it
+commits preferences and email addresses, churns history, and fails for
+outside contributors.
+
+**Hooks to make sure Dely is invoked.** Rejected: a hook cannot decide whether
+work is Spike, Bounded or Architectural; it can only inject the same sentence
+`AGENTS.md` already carries, or block tools, which would also block Spikes,
+Control's own plan and record writes, and the workers. Hook formats differ per
+harness, some harnesses have none, and project hooks need trust that `setup`
+never grants.
+
+**Keep the markdown table format.** Rejected: a table parsed by regex accepts a
+mistyped phase silently; JSON with fixed keys fails on it.
+
+#### Consequences
+
+- Breaking: a project with the old block stops at its first `dely` call until
+  `setup` runs again or the block is replaced by hand.
+- `git clean -fdx` deletes `.dely/local/`, as it deletes any ignored file.
+- A personal file created by hand without `.dely/local/.gitignore` is not
+  ignored; the README tells people to use `setup`.
+- This repository keeps its own block until a follow-up delivery: the
+  installed 0.23.1 helper that runs this delivery reads `AGENTS.md` for every
+  dispatch, including the reviews.
+- Not improved: a team that treats its review pin as policy cannot stop a
+  person overriding it; the override is visible only in that person's
+  envelope.
+
+#### Non-goals
+
+A home-directory configuration file. Per-worktree team pins. Merging two
+personal files. Partial phase entries (a model without a harness). Hooks.
+
+#### Verification, 2026-10-05
+
+A separate Claude Code session (`claude-sonnet-5-5`, medium) ran
+`probe/checklist.md` on a snapshot of `de8c6bd` with Orca 1.4.220, Claude Code
+2.1.289 and Codex CLI 0.160.0, in the scope the owner chose. Report:
+`~/dely-probe/checklist-pins-de8c6bd.md`; evidence
+`~/dely-probe/live-pins-de8c6bd/`.
+
+- Argv stub against `v0.23.1`, `DELY_NAMED_INTENDED` empty: the mutant
+  dropping `--effort` failed, the candidate passed with no intended
+  difference.
+- Rejected-message stub and the new pin-resolution stub: every wrong copy
+  failed on its row (nine for pin resolution), the candidate passed.
+- Control row, `background`, Claude Code: Control ran `dely pins` first and
+  recorded both phases from the team file; implement and review settled, the
+  review accepted, and the pushed SHA equalled the reviewed head.
+- Control row, `waker`, Codex CLI (`gpt-5.6-terra`, medium): the owner
+  answered Codex's folder-trust dialog; every `wait_bg` was followed by
+  `settled` before `notify`; the pushed SHA equalled the reviewed head; a
+  blocking `wait` from the Codex Control's own terminal printed `REFUSED`.
+- Setup, Quick path, "only for me", in a repository with no team pins:
+  `.dely/local/pins.json` and `.dely/local/.gitignore` (`*`) were written,
+  `git status --porcelain` was empty, no root `.gitignore` appeared, and
+  `dely pins` reported both phases from `local`.
+
+Not run, because the owner scoped the probe to stubs, Control rows and the
+setup row: the live worker rows for Claude Code 2.1.289 and Codex CLI 0.160.0,
+rows 4 to 7, and every OMP and Pi row. A personal pin was exercised live only
+through `dely pins`, not through a dispatch; the pin-resolution stub covers
+dispatch against a fake Orca.
+
+#### Deferred
+
+Moving this repository's own pins to `.dely/pins.json` and replacing its
+block with the routing line. Trigger: 0.24.0 installed as the running plugin.
+
+A way for a team to forbid personal overrides of a phase. Trigger: a team asks
+for it.
+
 ### 2026-10-05 — OMP's pin is unchecked while Orca reports no OMP status
 
 #### Context
@@ -1735,6 +1898,8 @@ least one checklist row with that harness in a role.
 
 A `~/.dely/config.json` for anything the directory marker cannot express.
 Trigger: a second setting that needs to be configured at all.
+Superseded 2026-10-05: configuration lives in the repository under `.dely/`
+(see that day's record on pins).
 
 ### 2026-09-16 — Dely drops its structural suite, its CI job, and the code for harnesses it cannot support
 

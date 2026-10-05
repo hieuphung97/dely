@@ -19,7 +19,7 @@ https://github.com/user-attachments/assets/83ec539a-6551-4807-8517-0c73e5d171d7
 - [Choose a harness for each role](#choose-a-harness-for-each-role)
 - [Install Orca](#install-orca)
 - [Install Dely](#install-dely)
-- [Choose models](#choose-models)
+- [Configure a project](#configure-a-project)
 - [Log](#log)
 - [Troubleshooting](#troubleshooting)
 
@@ -27,7 +27,9 @@ https://github.com/user-attachments/assets/83ec539a-6551-4807-8517-0c73e5d171d7
 
 1. [Install Orca](#install-orca).
 2. [Install Dely](#install-dely) in the harness you will talk to.
-3. Open that harness in your project and optionally invoke `dely:setup`.
+3. Open that harness in your project. Run `dely:setup` to choose which harness
+   and model run each role, or use the project's existing pins. If no pin names
+   a phase, it runs on Control's harness.
 4. Ask for a change.
 
 ## How Dely works
@@ -96,10 +98,11 @@ used only as implementer or reviewer needs Orca and its own login. Workers
 read no Dely skill. **A pinned OMP or Pi worker also needs that harness's
 Dely install below**, which loads `dely-pin.ts`.
 
-Have Node 18 or newer on PATH. Open Control in your project, invoke `dely:setup`
-(optional) to choose implementer and reviewer harnesses, models and efforts,
-then ask for a change using `dely:delivery`. Without setup, Dely uses Control's
-harness and defaults. Use the invocation spelling listed below for your harness.
+Have Node 18 or newer on PATH. Open Control in your project and ask for a
+change using `dely:delivery`. To choose the implementer and reviewer, run
+`dely:setup` first; see [Configure a project](#configure-a-project). If no pin
+names a phase, it runs on Control's harness with its default model and effort.
+Use the invocation spelling listed below for your harness.
 
 ### Claude Code
 
@@ -111,7 +114,7 @@ claude plugin update dely          # update; restart to apply
 claude plugin uninstall dely       # remove
 ```
 
-Put `@AGENTS.md` in `CLAUDE.md` so Claude reads the project pins.
+Put `@AGENTS.md` in `CLAUDE.md` so Claude reads the routing line setup adds.
 Invoke `/dely:delivery` or `/dely:setup`.
 
 ### Codex CLI
@@ -227,11 +230,47 @@ Checked versions (observations, not minimums): Orca 1.4.218, 1.4.220 (OMP worker
 1.0.89; Antigravity CLI 1.2.13 (install), 1.2.14 (worker, Control); Grok
 Build 1.0.44; OMP 18.4.8 (Control), 18.6.1 (worker); Pi 0.99.1.
 
-## Choose models
+## Configure a project
 
-Invoke setup to list the models and efforts each installed harness offers, then
-write your choice. The role table's notes say which harnesses cannot take a
-model.
+Pins say which harness, model and effort run the implementer and the reviewer.
+Run `dely:setup` in Control. It asks whether the choice is for the team or only
+for you, then writes one of two files:
+
+- `.dely/pins.json` holds team pins. Commit it.
+- `.dely/local/pins.json` holds your own pins. It is never committed.
+
+Both files look like this:
+
+```json
+{
+  "implement": { "harness": "claude", "model": "default", "effort": "default" },
+  "review": { "harness": "codex", "model": "default", "effort": "default" }
+}
+```
+
+`harness` is an id from [`harnesses.json`](harnesses.json), such as `claude` or
+`codex`, not the display name. Use `default` to leave the model or effort to
+the harness. A file can name just one phase.
+
+Dely picks a pin for each phase on its own. Your file wins, then the team file,
+then Control's own harness with its defaults. If your file pins only
+`review`, Dely uses the team's `implement` pin when there is one. Otherwise it
+uses Control's harness and defaults.
+
+In another worktree of the same clone, Dely looks for your file in that
+worktree first, then in the main checkout.
+
+`.dely/local/` has its own `.gitignore`, so nothing in it shows in `git status`.
+`git clean -fdx` deletes it, personal pins included.
+
+To see what is in use, ask Control to run `dely pins --repo <path>`. It prints
+each phase's harness, model, effort and source (`local`, `team` or `control`).
+
+### Upgrading from 0.23
+
+Version 0.23 kept the pins in a `<!-- dely:begin -->` block in `AGENTS.md`.
+Dely now stops while that block is there. Run `dely:setup`. It offers to move
+the table to `.dely/pins.json` and leave one routing line in `AGENTS.md`.
 
 ## Log
 
