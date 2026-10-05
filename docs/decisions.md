@@ -60,7 +60,43 @@ harness-private file format in the helper.
 
 #### Verification, 2026-10-05
 
-Pending: recorded by Control after the live checklist.
+A separate Claude Code session ran `probe/checklist.md` on a snapshot of
+`c7e96e4` (Orca 1.4.220, OMP 18.6.1), in the scope the owner chose: OMP rows
+plus stubs. Report: `~/dely-probe/checklist-omp-c7e96e4.md`; raw evidence
+`~/dely-probe/live-0231/`.
+
+- The OMP install from the snapshot resolved to the linked package and passed
+  the hash chain.
+- The rejected-message stub passed (RED, LOG PASS, GREEN). The argv stub
+  against `v0.23.0` passed with `DELY_NAMED_INTENDED` empty: `spec` and
+  `spec-unchecked` launch the same argv.
+- OMP parameterized worker row, pin `google-vertex/gemini-3.5-flash`
+  `medium`: preflight PASS in 9 s; implement and review both `DISPATCHED`
+  and settled with `worker_done`; the review returned `ACCEPT`. In both
+  session logs the pinned model and level precede the first user message,
+  and every assistant message ran the pinned model.
+- Row 8, pin `google-vertex/gemini-3.5-flash` `low` (model and level both
+  differ from the default): `DISPATCHED` without a model check; 19 of 19
+  assistant messages ran the pin.
+- Row 9, an unknown selector: `NO_ACK` quoting `DELY-PIN-FAIL`; OMP wrote no
+  session for it.
+- Row 10, Model `default`: no `dely-pin:` line in the first user message;
+  the worker ran OMP's default.
+
+Finding: `dely wait` returned `ATTENTION` 15 s after it started for a healthy
+OMP worker (liveness `unverifiable` / `missing_status`, `nextAction` `none`,
+`requiresAction` `true`), which settled about 20 s later. That is the
+projection a killed worker shows (row 4 table), and the behaviour the
+2026-09-28 record saw under Orca 1.4.215. The `limits` sentence "a crash is
+noticed after about 10 minutes" was therefore replaced in `4d7d581` by "Dely
+reports a working OMP worker as needing attention". `limits` and `notes` do
+not change a launch, so no row reran.
+
+Not run, because the owner scoped this delivery to OMP rows plus stubs: the
+Claude Code and Codex CLI worker rows (upgraded to 2.1.289 and 0.160.0), the
+Control rows per wake mode and for OMP and Pi, rows 4 to 7, and Pi rows 13 to
+16 (Pi upgraded to 1.0.2). Row 11 did not run because neither `start()` nor
+the extension changed. OMP crash timing on Orca 1.4.220 was not measured.
 
 #### Deferred
 
@@ -72,6 +108,10 @@ gate. Pi keeps the extension.
 
 Returning OMP to `spec`: only if a later decision keeps the spec pin and Orca
 reports OMP's model again (stablyai/orca#24196).
+
+Telling a live OMP worker from a dead one in `dely wait`. Trigger: an Orca
+release containing stablyai/orca#24196, or a decision to read a signal other
+than the projection; until then the projection cannot tell them apart.
 
 ### 2026-10-01 — README shows a role table derived from `harnesses.json`; `limits` are user caveats; the checklist runs rows by what changed
 
