@@ -25,8 +25,10 @@ Each file is an object whose only keys are `implement` and `review`. Each
 value has exactly the string keys `harness` (an `id` from `harnesses.json`),
 `model` and `effort`. A file may name one phase or both. Per phase, the
 personal file wins over the team file, and the team file over Control's own
-harness with `default` for Model and Effort. `dely pins --repo <path>` prints
-what resolves and from where.
+harness with `default` for Model and Effort. In a linked worktree, the
+personal file is looked for in that worktree first and then in the main
+checkout; only one personal file is read, never both. `dely pins --repo <path>`
+prints what resolves and from where.
 
 Pins configure `implement` and `review` — nothing else. There is no control
 row, because the current interactive session already exists and is never
