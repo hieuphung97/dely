@@ -3,11 +3,75 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-10-01.
+Last updated 2026-10-05.
 
 ---
 
 ## Settled
+
+### 2026-10-05 — OMP's pin is unchecked while Orca reports no OMP status
+
+#### Context
+
+Measured on 2026-10-05 (evidence `~/dely-probe/omp-ready-1420/NOTES.md`):
+
+- Orca 1.4.220 with OMP 18.6.1: `worker-start --agent omp` passed agent
+  readiness in about 8 s, four of four. stablyai/orca#24068 is closed
+  (PR #24295).
+- Every OMP worker's `worker-show` projection had `liveness`
+  `{verdict: unverifiable, reason: missing_status}` and no `provider`, pinned
+  or not (stablyai/orca#24436; fix PR stablyai/orca#24196 is open).
+- Dely 0.23.0 `dely dispatch` with an OMP pin `google-vertex/gemini-3.8-flash`
+  `medium` printed `FAILED <id> pin not applied: expected
+  google-vertex/gemini-3.8-flash, saw none`, although the OMP session log
+  shows the extension applied the pin (`thinking_level_change` from `high` to
+  `medium` before the first user message).
+- `worker-start --agent omp --model …` is refused on 1.4.220 ("does not
+  support launch-time model selection"); stablyai/orca#24796 (merged
+  2026-10-03) is not in that release.
+- `omp --model google-vertex/gemini-3.8-flash:low` started with thinking
+  `low` (session log), so an effort can travel in the model name.
+
+#### Decision
+
+OMP's `modelPin` is `spec-unchecked`: the pin still travels as a spec line,
+and dispatch skips the post-acknowledgement model check. The extension still
+applies the pin and fails closed on a bad one. The README role row and the
+checklist follow; the user checks the model in OMP's session log.
+
+This amends the 2026-09-27 record's post-acknowledgement check and its
+rejected alternative in the 2026-09-28 record, whose premise "Orca does
+report the model" no longer holds. It supersedes the two OMP items in the
+2026-09-27 Deferred list.
+
+#### Alternatives considered
+
+**Keep `spec` and wait for stablyai/orca#24196.** Rejected: every pinned OMP
+dispatch fails today.
+
+**Read OMP's session log from the helper.** Rejected: it puts a
+harness-private file format in the helper.
+
+#### Consequences
+
+- No harness uses `spec` now; its check in `dely.js` stays dormant.
+- An OMP worker that did not load the extension runs OMP's default unseen, as
+  for Pi.
+
+#### Verification, 2026-10-05
+
+Pending: recorded by Control after the live checklist.
+
+#### Deferred
+
+Pinning OMP by flag. Trigger: an Orca release containing
+stablyai/orca#24796. `modelFlag: true`, no `modelPin`, effort as
+`<selector>:<level>` in the Model cell; then delete the `spec` mode and its
+check from `dely.js`, `SKILL.md`, `skills/setup/SKILL.md` and the `modelPin`
+gate. Pi keeps the extension.
+
+Returning OMP to `spec`: only if a later decision keeps the spec pin and Orca
+reports OMP's model again (stablyai/orca#24196).
 
 ### 2026-10-01 — README shows a role table derived from `harnesses.json`; `limits` are user caveats; the checklist runs rows by what changed
 

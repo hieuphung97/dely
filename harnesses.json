@@ -194,7 +194,7 @@
       "binary": "omp",
       "status": "supported",
       "controlWake": "waker",
-      "limits": "As a worker, OMP 18.4 does not start under Orca 1.4.217 or later (stablyai/orca#24068) until that issue closes, and a crash is noticed after about 10 minutes. It never asks for trust, so use it only in repositories you trust. As a worker, to pin a model, install Dely in OMP.",
+      "limits": "It never asks for trust, so use it only in repositories you trust. As a worker, use Orca 1.4.220 or newer, which does not show OMP's status (stablyai/orca#24436), so a crash is noticed after about 10 minutes. As a worker, to pin a model, install Dely in OMP, then check the model in OMP's session log.",
       "trust": "none",
       "discovery": {
         "models": "omp models --json",
@@ -204,7 +204,7 @@
       },
       "modelFlag": false,
       "effortFlag": false,
-      "modelPin": "spec",
+      "modelPin": "spec-unchecked",
       "permissionDefault": "none",
       "forbiddenHeadless": [
         "omp -p",
@@ -217,7 +217,7 @@
         "readsAgentsMd": true,
         "needsImport": false
       },
-      "notes": "Trust is none: no workspace-trust gate. The pin travels as a spec line. OMP 18.4 titles an idle pane 'π > <dir>', which Orca does not read as idle (stablyai/orca#24068). A second-turn dely-pin line in an interactive OMP 18.4.4 session was ignored (row 11). Decision sections: 2026-09-27, 2026-09-30."
+      "notes": "Trust is none: no workspace-trust gate. The pin travels as a spec line. Orca 1.4.220 reports no OMP status or model (stablyai/orca#24436), so dispatch skips the model check; the extension still applies the pin and fails closed on a bad one. A second-turn dely-pin line in an interactive OMP 18.4.4 session was ignored (row 11). Decision sections: 2026-09-27, 2026-09-30, 2026-10-05."
     },
     {
       "name": "Pi",

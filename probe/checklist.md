@@ -47,10 +47,8 @@ deployment uses it as Control.
 
 The release floor is the argv stub row, the rejected-message stub row, the
 live worker rows the rules above require, the Control rows those rules
-require, and rows 4–7. OMP rows 8, 9 and 10 and the OMP parameterized
-worker row are a standing named skip until stablyai/orca#24068 is closed.
-Rows 10–11 run when `start()` or the pin extension changes, except row 10
-stays under that OMP skip while the issue is open. Rows 13–16 run when
+require, and rows 4–7. Rows 10–11 run when `start()` or the pin extension
+changes. Rows 13–16 run when
 `start()`, the extension or the Pi entry changes, after a Pi upgrade, and
 after an Orca upgrade. After an Orca upgrade, run the live worker row for
 each harness a deployment uses, the Control row once per wake mode, rows 4
@@ -430,8 +428,7 @@ recording the result.
 
 Run for each supported entry that changed and for each harness upgrade a
 deployment uses. Unchanged entries are covered by the argv stub row.
-Skip a deferred entry. The OMP parameterized worker row is a standing named
-skip until stablyai/orca#24068 is closed.
+Skip a deferred entry.
 
 Vary exactly: `id`, `name`, `discovery`, Model
 and Effort from the candidate's entry; the probe path `worker-<id>`; and phase
@@ -778,40 +775,22 @@ second.
 
 ## Step 8 — row 8, OMP worker with a valid pin
 
-Standing named skip until stablyai/orca#24068 is closed.
-
 Build a probe repository under `~/dely-probe/` whose `implement` pin is OMP
 with a Model `selector` from `omp models --json` and an Effort that is one of
-that model's `thinking` levels, and with the pinned model different from
+that model's `thinking` levels. The pinned model and level must differ from
 OMP's configured default.
 `probe/mkrepo.sh` writes whatever harness names it is given; OMP needs no
 trust step. From that repository run `dely dispatch` for `implement`.
 
-**Pass:** `dely dispatch` prints `DISPATCHED <id>` — the post-acknowledgement
-check passed. Record `worker-show` `result.projection.provider.model` at
-the acknowledgement; if that value is not already the pinned selector,
-record how long after the acknowledgement it became the pin. The last
-`model_change` (and `thinking_level_change`, when an Effort is pinned)
-before the first user message is the pinned model and level; every
-assistant message, the first included, is the pinned model; and
-`worker-show` `projection.provider.model` before release shows it.
-If the helper prints `DISPATCHED` but the first request ran OMP's
-configured default, the check compared a different field or format.
-
-Then keep the same pin and stop this dispatch from loading `extensions/dely-pin.ts`
-without touching any user configuration beyond this plugin:
-`omp plugin disable dely`. Dispatch `implement` again. Re-enable with
-`omp plugin enable dely` before later rows.
-
-**Pass:** `dely dispatch` prints
-`FAILED <id> pin not applied: expected <selector>, saw <value or none>`
-and does not print `DISPATCHED`. A print of `DISPATCHED`, or a warning
-that still dispatches, is a fail: the helper did not stop a worker that
-was not running the pin.
+**Pass:** `dely dispatch` prints `DISPATCHED <id>` without a model check,
+because Orca does not report OMP's model (stablyai/orca#24436). In the OMP
+session JSONL under `~/.omp/agent/sessions/`: the last `model_change` before
+the first user message and every assistant message is the pinned model, and
+the last `thinking_level_change` before the first user message is the pinned
+level. If the first request ran OMP's configured default, the extension did
+not apply the pin.
 
 ## Step 9 — row 9, OMP worker with an invalid pin
-
-Standing named skip until stablyai/orca#24068 is closed.
 
 Same probe-repository setup as row 8's first dispatch (plugin enabled), with
 a selector `omp models --json` does not offer.
@@ -823,8 +802,7 @@ called `ctx.shutdown()` instead of exiting the process.
 
 ## Step 10 — row 10, OMP worker with Model `default`
 
-Standing named skip until stablyai/orca#24068 is closed. After that, run this
-row when `start()` in `dely.js` or `extensions/dely-pin.ts` changes.
+Run this row when `start()` in `dely.js` or `extensions/dely-pin.ts` changes.
 Same probe-repository setup as row 8's first dispatch, with Model `default`
 and Effort `default`.
 
@@ -925,8 +903,8 @@ replayed batch in a live session (the stub covers only its fixtures). A quota ex
 the model was having a bad day. A shape change between two Orca releases, until
 the rows are run again. A Model `default` dispatch whose spec itself carries
 a pin line. A stuck live Pi worker before `DEADLINE`. Pi versions other than
-0.87.1 and 0.99.1. Pi's trust layout on other machines. A pinned Pi worker that did not
-load the extension, which runs its own default unseen. A preflight that leaks
+0.87.1 and 0.99.1. Pi's trust layout on other machines. A pinned Pi or OMP worker that did
+not load the extension, which runs its own default unseen. A preflight that leaks
 its worker. A heartbeat-only acknowledgement, because the argv stub's fixture
 returns one batch. An Orca upgrade, which reruns live workers only for
 deployment harnesses, so the other supported harnesses are not re-verified
