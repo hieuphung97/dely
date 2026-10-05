@@ -47,7 +47,8 @@ Branch, base, remote, and pull-request target: the feature branch this plan
 commits to, the branch and remote it targets, and where its pull request goes.
 
 Resolved phase pins: the harness, model, and effort each dispatched role runs
-under, taken from `AGENTS.md` — not a default left implicit.
+under, from `dely pins`, each with its source (`local`, `team` or `control`) —
+not a default left implicit.
 
 Authority: this plan may branch, commit only its own owned paths, run gates,
 push the named branch, and open or update the named pull request. It may not

@@ -102,14 +102,131 @@ function harnessById(id) {
   return loadHarnesses().find((h) => h.id === id);
 }
 
+const PHASES = ["implement", "review"];
+const PIN_FIELDS = ["harness", "model", "effort"];
+const OLD_BLOCK = "<!-- dely:begin -->";
+
+function readPinsFile(file) {
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (e) {
+    fail(file + ": " + (e.message || e));
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) fail(file + ": must be an object");
+  for (const k of Object.keys(data)) {
+    if (!PHASES.includes(k)) fail(file + ": unknown key " + JSON.stringify(k) + "; allowed: " + PHASES.join(", "));
+  }
+  for (const ph of PHASES) {
+    if (!(ph in data)) continue;
+    const v = data[ph];
+    if (!v || typeof v !== "object" || Array.isArray(v)) fail(file + ": " + ph + " must be an object");
+    for (const k of Object.keys(v)) {
+      if (!PIN_FIELDS.includes(k)) fail(file + ": " + ph + " has unknown field " + JSON.stringify(k));
+    }
+    for (const k of PIN_FIELDS) {
+      if (typeof v[k] !== "string" || !v[k]) fail(file + ": " + ph + "." + k + " must be a non-empty string");
+    }
+    if (!harnessById(v.harness)) fail(file + ": " + ph + " names unknown harness " + JSON.stringify(v.harness));
+  }
+  return data;
+}
+
+// The main checkout is the parent of the git common dir, used only when that
+// directory is named .git and is not the worktree itself.
+function mainCheckout(repo) {
+  try {
+    const common = String(
+      execFileSync("git", ["-C", repo, "rev-parse", "--git-common-dir"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+    ).trim();
+    const abs = path.resolve(repo, common);
+    const main = path.dirname(abs);
+    return path.basename(abs) === ".git" && main !== repo ? main : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function personalPinsFile(repo) {
+  const own = path.join(repo, ".dely", "local", "pins.json");
+  if (fs.existsSync(own)) return own;
+  const main = mainCheckout(repo);
+  if (!main) return null;
+  const theirs = path.join(main, ".dely", "local", "pins.json");
+  return fs.existsSync(theirs) ? theirs : null;
+}
+
+// Per phase: personal file, team file, Control's own harness with defaults.
+function resolvePins(repo) {
+  repo = path.resolve(repo);
+  let agents = "";
+  try {
+    agents = fs.readFileSync(path.join(repo, "AGENTS.md"), "utf8");
+  } catch (_) {
+    /* no instructions file */
+  }
+  if (agents.includes(OLD_BLOCK)) {
+    fail(
+      path.join(repo, "AGENTS.md") +
+        " still has a dely:begin block; pins moved to .dely/pins.json. Run dely:setup to write them and replace the block"
+    );
+  }
+  const team = path.join(repo, ".dely", "pins.json");
+  const sources = [];
+  const personal = personalPinsFile(repo);
+  if (personal) sources.push(["local", personal, readPinsFile(personal)]);
+  if (fs.existsSync(team)) sources.push(["team", team, readPinsFile(team)]);
+  const resolved = {};
+  for (const phase of PHASES) {
+    const hit = sources.find((s) => phase in s[2]);
+    let source = "control";
+    let file = null;
+    let v;
+    if (hit) {
+      [source, file] = hit;
+      v = hit[2][phase];
+    } else {
+      const id = selfHarness();
+      if (!id || !harnessById(id)) {
+        fail(
+          "no pin names " + phase + " and Control's harness is unknown" +
+            (id ? " (" + id + " is not in harnesses.json)" : "") +
+            "; add " + team + " or run dely:setup"
+        );
+      }
+      v = { harness: id, model: "default", effort: "default" };
+    }
+    const h = harnessById(v.harness);
+    resolved[phase] = {
+      phase,
+      agent: h.id,
+      model: v.model,
+      effort: v.effort,
+      modelFlag: h.modelFlag,
+      effortFlag: h.effortFlag,
+      modelPin: h.modelPin,
+      source,
+      file,
+    };
+  }
+  return resolved;
+}
+
 function pin(repo, phase) {
-  const md = fs.readFileSync(path.join(repo, "AGENTS.md"), "utf8");
-  const row = md.split("\n").find((l) => new RegExp("^\\|\\s*`?" + phase + "`?\\s*\\|").test(l));
-  if (!row) throw new Error("no " + phase + " pin in AGENTS.md");
-  const [, harness, model, effort] = row.split("|").slice(1).map((c) => c.trim().replace(/`/g, ""));
-  const h = loadHarnesses().find((x) => x.name === harness);
-  if (!h) throw new Error("unknown harness " + harness);
-  return { phase, agent: h.id, model, effort, modelFlag: h.modelFlag, effortFlag: h.effortFlag, modelPin: h.modelPin };
+  return resolvePins(repo)[phase];
+}
+
+function pinsCmd(f) {
+  const r = resolvePins(path.resolve(f.repo));
+  const view = {};
+  for (const ph of PHASES) {
+    const p = r[ph];
+    view[ph] = { harness: p.agent, model: p.model, effort: p.effort, source: p.source, file: p.file };
+  }
+  out(view, 0);
 }
 
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -344,7 +461,8 @@ function lastText(id) {
 function preflight(f) {
   f.repo = path.resolve(f.repo);
   requireHandle({ run: f.run, repo: f.repo });
-  const pins = ["implement", "review"].map((ph) => pin(f.repo, ph));
+  const resolved = resolvePins(f.repo);
+  const pins = PHASES.map((ph) => resolved[ph]);
   const uniq = pins.filter(
     (p, i) => pins.findIndex((q) => q.agent === p.agent && q.model === p.model && q.effort === p.effort) === i
   );
@@ -827,6 +945,7 @@ function logCmd(f) {
 }
 
 const COMMANDS = {
+  pins: { required: [["repo", "PATH"]], optional: [] },
   preflight: { required: [["repo", "PATH"], ["run", "RUN"]], optional: [] },
   dispatch: {
     required: [
@@ -881,7 +1000,7 @@ function printUsage() {
 }
 
 const [cmd, ...rest] = process.argv.slice(2);
-const table = { preflight, dispatch, wait, "wait-bg": waitBg, notify, log: logCmd };
+const table = { pins: pinsCmd, preflight, dispatch, wait, "wait-bg": waitBg, notify, log: logCmd };
 if (!cmd) {
   printIdentity();
   printUsage();
