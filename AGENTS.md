@@ -57,8 +57,8 @@ delivery run.
 
 | Phase | Harness | Model | Effort |
 | --- | --- | --- | --- |
-| `implement` | Cursor Agent CLI | cursor-grok-4.6-high | default |
-| `review` | Claude Code | claude-opus-5-5 | high |
+| `implement` | Claude Code | claude-sonnet-5-5 | medium |
+| `review` | Codex CLI | gpt-6.1-sol | high |
 <!-- dely:end -->
 
 The table is this repository's deployment selection, not the portable
