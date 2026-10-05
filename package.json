@@ -1,6 +1,6 @@
 {
   "name": "dely",
-  "version": "0.23.0",
+  "version": "0.23.1",
   "private": true,
   "pi": {
     "extensions": ["./extensions/dely-pin.ts"],

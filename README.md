@@ -64,7 +64,7 @@ question; Pi asks only when the project or a parent folder has `.pi/` or
 | Kiro CLI | ✗ | ✗ | ✗ | Workers never start in Orca. |
 | Cursor Agent CLI | ✓ | ✓ | ✓ | Choose the effort through the model name, for example cursor-grok-4.6-high. |
 | GitHub Copilot CLI | ✓ | ⚠ | ⚠ | At the first launch, answer No, thanks to the app prompt; until then a launch can leave the task unsent. Answer the folder trust question once in every project and choose to remember the folder; Orca does not see it, so a missed one shows as NO_ACK. As a worker, you cannot choose the model. |
-| OMP | ✓ | ⚠ | ⚠ | As a worker, OMP 18.4 does not start under Orca 1.4.217 or later (stablyai/orca#24068) until that issue closes, and a crash is noticed after about 10 minutes. It never asks for trust, so use it only in repositories you trust. As a worker, to pin a model, install Dely in OMP. |
+| OMP | ✓ | ⚠ | ⚠ | It never asks for trust, so use it only in repositories you trust. As a worker, use Orca 1.4.220 or newer, which does not show OMP's status (stablyai/orca#24436), so Dely reports a working OMP worker as needing attention. As a worker, to pin a model, install Dely in OMP, then check the model in OMP's session log. |
 | Pi | ⚠ | ⚠ | ⚠ | As Control, run Dely's commands with no time limit, and release leftover workers. As a worker, to pin a model, install Dely in Pi, then check the model in Pi's session log. |
 
 Other agents Orca can launch may work too;
@@ -222,10 +222,10 @@ Update by installing the new tag. At startup, check that Skills names
 Invoke `/skill:delivery` or `/skill:setup`. Check a pinned worker's model in
 `~/.pi/agent/sessions/`.
 
-Checked versions (observations, not minimums): Orca 1.4.218; Claude Code
+Checked versions (observations, not minimums): Orca 1.4.218, 1.4.220 (OMP worker); Claude Code
 2.1.286; Codex CLI 0.159.3; Cursor Agent CLI 2026.09.28-64d2043; Copilot CLI
 1.0.89; Antigravity CLI 1.2.13 (install), 1.2.14 (worker, Control); Grok
-Build 1.0.44; OMP 18.4.8 (Control); Pi 0.99.1.
+Build 1.0.44; OMP 18.4.8 (Control), 18.6.1 (worker); Pi 0.99.1.
 
 ## Choose models
 
