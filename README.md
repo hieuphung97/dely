@@ -27,8 +27,9 @@ https://github.com/user-attachments/assets/83ec539a-6551-4807-8517-0c73e5d171d7
 
 1. [Install Orca](#install-orca).
 2. [Install Dely](#install-dely) in the harness you will talk to.
-3. Open that harness in your project and invoke `dely:setup` to choose which
-   harness and model run each role, or skip it and use Control's own harness.
+3. Open that harness in your project. Run `dely:setup` to choose which harness
+   and model run each role, or use the project's existing pins. If no pin names
+   a phase, it runs on Control's harness.
 4. Ask for a change.
 
 ## How Dely works
@@ -99,9 +100,9 @@ Dely install below**, which loads `dely-pin.ts`.
 
 Have Node 18 or newer on PATH. Open Control in your project and ask for a
 change using `dely:delivery`. To choose the implementer and reviewer, run
-`dely:setup` first; see [Configure a project](#configure-a-project). Without
-it, both run on Control's harness with its default model and effort. Use the
-invocation spelling listed below for your harness.
+`dely:setup` first; see [Configure a project](#configure-a-project). If no pin
+names a phase, it runs on Control's harness with its default model and effort.
+Use the invocation spelling listed below for your harness.
 
 ### Claude Code
 
@@ -252,8 +253,9 @@ Both files look like this:
 the harness. A file can name just one phase.
 
 Dely picks a pin for each phase on its own. Your file wins, then the team file,
-then Control's own harness with its defaults. If you pin only `review`, the
-implementer still comes from the team file.
+then Control's own harness with its defaults. If your file pins only
+`review`, Dely uses the team's `implement` pin when there is one. Otherwise it
+uses Control's harness and defaults.
 
 In another worktree of the same clone, Dely looks for your file in that
 worktree first, then in the main checkout.
