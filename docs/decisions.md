@@ -133,6 +133,37 @@ mistyped phase silently; JSON with fixed keys fails on it.
 A home-directory configuration file. Per-worktree team pins. Merging two
 personal files. Partial phase entries (a model without a harness). Hooks.
 
+#### Verification, 2026-10-05
+
+A separate Claude Code session (`claude-sonnet-5-5`, medium) ran
+`probe/checklist.md` on a snapshot of `de8c6bd` with Orca 1.4.220, Claude Code
+2.1.289 and Codex CLI 0.160.0, in the scope the owner chose. Report:
+`~/dely-probe/checklist-pins-de8c6bd.md`; evidence
+`~/dely-probe/live-pins-de8c6bd/`.
+
+- Argv stub against `v0.23.1`, `DELY_NAMED_INTENDED` empty: the mutant
+  dropping `--effort` failed, the candidate passed with no intended
+  difference.
+- Rejected-message stub and the new pin-resolution stub: every wrong copy
+  failed on its row (nine for pin resolution), the candidate passed.
+- Control row, `background`, Claude Code: Control ran `dely pins` first and
+  recorded both phases from the team file; implement and review settled, the
+  review accepted, and the pushed SHA equalled the reviewed head.
+- Control row, `waker`, Codex CLI (`gpt-5.6-terra`, medium): the owner
+  answered Codex's folder-trust dialog; every `wait_bg` was followed by
+  `settled` before `notify`; the pushed SHA equalled the reviewed head; a
+  blocking `wait` from the Codex Control's own terminal printed `REFUSED`.
+- Setup, Quick path, "only for me", in a repository with no team pins:
+  `.dely/local/pins.json` and `.dely/local/.gitignore` (`*`) were written,
+  `git status --porcelain` was empty, no root `.gitignore` appeared, and
+  `dely pins` reported both phases from `local`.
+
+Not run, because the owner scoped the probe to stubs, Control rows and the
+setup row: the live worker rows for Claude Code 2.1.289 and Codex CLI 0.160.0,
+rows 4 to 7, and every OMP and Pi row. A personal pin was exercised live only
+through `dely pins`, not through a dispatch; the pin-resolution stub covers
+dispatch against a fake Orca.
+
 #### Deferred
 
 Moving this repository's own pins to `.dely/pins.json` and replacing its
