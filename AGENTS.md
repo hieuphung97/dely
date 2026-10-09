@@ -1,8 +1,9 @@
 # dely — Agent Instructions
 
 This repository contains the `dely` package: the `delivery` skill and its
-automation-first control protocol for coding agents, supported today on
-Claude Code, Codex CLI, and Cursor Agent CLI.
+automation-first control protocol for coding agents, on Claude Code, Codex
+CLI, Cursor Agent CLI and the other harnesses `harnesses.json` marks
+`supported`.
 
 ## Source of truth
 
@@ -34,7 +35,7 @@ Repository artifacts are written in English.
   (JSON Lines, one object per line); no project-owned log file is tracked.
   Dely never creates `~/.dely/`: a missing directory means nothing is
   written and nothing is created. The log records failed and abandoned
-  deliveries too, which the previous format did not.
+  deliveries too.
 - A self-update runs its release phase through the frozen installed plugin
   version, because Control is already using it when the plan starts.
   Candidate changes in this checkout take effect for the next delivery, not
@@ -120,15 +121,15 @@ that distinguishes the changed behaviour from its failure mode, and a change
 to what a worker launch does is verified by running `probe/checklist.md`, not
 by these gates.
 
-The version gate is a literal pin. It is what keeps the two manifests from
-splitting now that no workflow compares them: a `skills/` change that forgets
-one manifest ships different protocol text under the same version string.
+The version gate is a literal pin and the only check that keeps the two
+manifests from splitting: a `skills/` change that forgets one manifest ships
+different protocol text under the same version string.
 
 The absence command distinguishes a deleted rail from documentation that
-merely says it is deleted. This delivery deleted
-`skills/delivery/references/harnesses.md`; the command fails if that file
-returns. The identifier grep is the same instrument applied to code: it
-fails on a deletion that removes a definition and leaves a caller.
+merely says it is deleted: it fails if the retired
+`skills/delivery/references/harnesses.md` returns. The identifier grep is
+the same instrument applied to code: it fails on a deletion that removes a
+definition and leaves a caller.
 
 The disclosure grep is lexical. It catches named consumer identifiers; it does
 not catch a quoted consumer path, a branch name, or a session id. A green result
