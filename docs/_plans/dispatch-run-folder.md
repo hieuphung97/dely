@@ -72,7 +72,8 @@ force-push, stash, reset, clean, or edit outside owned scope.
 
 - `dely dispatch` resolves `--spec-file` against `--repo`. If the resolved
   path is not inside `<repo>/.dely/local/runs/<run>/` (compare resolved paths
-  with a separator, so `runs/<run>2/` and `runs/<run>/../x` are outside), it
+  with a separator, so `runs/<run>2/` and `runs/<run>/../x` are outside,
+  while an in-folder name such as `..notes.md` is inside), it
   prints a `REFUSED` line naming that folder and exits non-zero before any
   `worker-start`. Otherwise, when `<repo>/.dely/local/.gitignore` is absent,
   it writes that file with the single line `*`; an existing file is left
@@ -80,8 +81,11 @@ force-push, stash, reset, clean, or edit outside owned scope.
 - `dely log` adds `residue` to the record: the sorted repo-relative paths of
   every file (recursively) under `<repo>/.dely/local/runs/<run>/`, where repo
   is `--repo`, else the object's `repo`; `[]` when the folder is absent or
-  empty; `null` when no repo is known. It deletes nothing, and still writes
-  and creates nothing when `~/.dely/` is absent.
+  empty; `null` when no repo is known; `null` plus `residueError` (error
+  code and repo-relative path) when any directory under the folder, or the
+  folder itself, exists but cannot be read. Only a missing folder is `[]`
+  without reading it. It deletes nothing, and still writes and creates
+  nothing when `~/.dely/` is absent.
 - `SKILL.md`: the "Orca and the helper" paragraph on prompt files names the
   Run's folder for the prompt and the handoff, withdraws deleting the prompt
   after the worker returns, and says the folder is kept until close; the
@@ -105,7 +109,7 @@ force-push, stash, reset, clean, or edit outside owned scope.
 
 **Direction.** Keep `dely.js` in its current style: one guard near the top of
 `dispatch()` after `f.repo` is resolved, using `path.relative` and rejecting a
-result that is empty, starts with `..`, or is absolute; one small recursive
+result that is empty, is `..` or starts with `..` plus the path separator, or is absolute; one small recursive
 listing used by `logCmd`. Use the helper's existing `out()` for `REFUSED`
 with a distinct exit code not already used by `dispatch` (read the existing
 codes first). Do not add a subcommand. Do not change `usageLine` output
@@ -132,10 +136,10 @@ layout.
 
 | Requirement | Instrument | Counterexample | Observed red |
 | --- | --- | --- | --- |
-| A spec outside the Run's folder is refused with no `worker-start` | fake Orca; spec at `repo/spec.md`, `.dely/local/runs/<run>2/spec.md`, `.dely/local/runs/<run>/../x/spec.md`; read the fake's `calls.jsonl` | a guard using `startsWith` without a trailing separator, or on the unresolved string | |
-| A spec inside the Run's folder dispatches; `.dely/local/.gitignore` is created with `*` when absent and left byte-identical when present; `git status --porcelain` in the fixture repo is empty after dispatch | fake Orca in a `git init` fixture, once with no `.gitignore`, once with `.dely/local/.gitignore` holding `keep-me` | a helper that always writes `.gitignore` | |
+| A spec outside the Run's folder is refused with no `worker-start`; an in-folder name starting with `..` dispatches | fake Orca; spec at `repo/spec.md`, `.dely/local/runs/<run>2/spec.md`, `.dely/local/runs/<run>/../x/spec.md`, and `.dely/local/runs/<run>/..notes.md`; read the fake's `calls.jsonl` | a guard using `startsWith` without a trailing separator, or on the unresolved string; a guard refusing every relative path that starts with `..` | |
+| A spec inside the Run's folder dispatches; `.dely/local/.gitignore` is created with `*` when absent, after which `git status --porcelain` in the fixture repo is empty; an existing file is left byte-identical | fake Orca in a `git init` fixture, once with no `.gitignore` (assert the status), once with `.dely/local/.gitignore` holding `keep-me` (assert the bytes only: that file ignores nothing, so the status is not expected empty) | a helper that always writes `.gitignore` | |
 | `residue` lists every file under the Run's folder, nested included, repo-relative, sorted | `dely log --repo <fixture>` from another cwd with `a.md` and `sub/b.md`; read `~/.dely/log.jsonl` in the isolated home | a top-level-only listing, or a listing of cwd instead of `--repo` | |
-| Folder absent → `[]`; no `--repo` and no `repo` in the object → `null`; no `~/.dely` → no file or directory created, exit 0 | the same script | `residue: []` when the repo is unknown | |
+| Folder absent → `[]`; no `--repo` and no `repo` in the object → `null`; folder or a nested directory unreadable (mode 000) → `null` with `residueError`; no `~/.dely` → no file or directory created, exit 0 | the same script, restoring permissions afterwards | `residue: []` when the repo is unknown; a listing that treats every read error as an absent folder | |
 | `SKILL.md` keeps no rule deleting a prompt when its worker returns | `git grep -n 'After the worker returns' skills/` empty, and a human reads the diff | text keeping both "delete after return" and "keep until close" | |
 | The argv stub row passes against `v0.24.1` | `probe/checklist.md` stub row, `DELY_NAMED_INTENDED` empty | the fixture spec left at `repo/spec.md`, so the candidate refuses | |
 | Closure gates and version gate pass | the commands in `AGENTS.md` | — (shape and syntax only) | n/a |

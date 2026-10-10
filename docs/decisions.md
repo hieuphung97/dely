@@ -50,7 +50,8 @@ Read from 0.24.1:
    `--spec-file` whose resolved path is not inside that folder; the message
    names the folder. When `.dely/local/.gitignore` is absent the helper
    writes it with the single line `*`, the same file `dely:setup` writes; an
-   existing file is never rewritten.
+   existing file is never rewritten, so a hand-written one that does not
+   ignore the folder leaves the dispatch files visible to Git.
 3. Dispatch files are kept until the run closes; the rule that deleted the
    prompt after its worker returned is withdrawn. At close — after release,
    or when the run stops early — Control deletes the Run's folder, then runs
@@ -58,7 +59,10 @@ Read from 0.24.1:
 4. `dely log` adds `residue`: the sorted repo-relative paths of every file
    still under that Run's folder, `[]` when the folder is absent or empty,
    `null` when no repository is known (`--repo` absent and no `repo` in the
-   object). The log stays an observer: it deletes nothing, and without
+   object) or when any part of the folder cannot be read. An unreadable part
+   also adds `residueError`, the error code and the repo-relative path it
+   failed on, so an incomplete listing never reads as a clean close. The log
+   stays an observer: it deletes nothing, and without
    `~/.dely/` it writes and creates nothing.
 5. A Spike that dispatches workers follows the same rule: its own Run, every
    dispatch through `dely dispatch`, its files in that Run's folder. A report
