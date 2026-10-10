@@ -110,10 +110,49 @@ directory shared across runs cannot be deleted by one of them.
 The `wait-bg --out` default in the system temporary directory. Cleaning up
 consumer repositories. A retention policy for reports after close.
 
+#### Verification, 2026-10-10
+
+A separate Claude Code session (`claude-sonnet-5-5`, medium) ran
+`probe/checklist.md` on a snapshot of `4c63776` with Orca 1.4.224, Claude Code
+2.1.296 and Codex CLI 0.162.0, in the scope the owner chose. Report:
+`~/dely-probe/checklist-run-folder-4c63776.md`; evidence
+`~/dely-probe/live-run-folder-4c63776/`.
+
+- Argv stub against `v0.24.1`, `DELY_NAMED_INTENDED` empty: the mutant
+  dropping `--effort` failed, the candidate passed with no intended
+  difference. The rejected-message and pin-resolution stubs passed with
+  their fixtures' spec files in `.dely/local/runs/fixture-run/`.
+- Control row, `background`, Claude Code: both dispatches named a spec in
+  the Run's folder; both handoffs were written there; Control deleted the
+  folder at close and the `delivery` line carried `residue: []`; review
+  accepted and the pushed SHA equalled the reviewed head. Neither prompt
+  nor handoff was told about the folder; Control took it from `SKILL.md`.
+- Control row, `waker`, Codex CLI (`gpt-5.6-terra`, medium): both dispatches
+  named a spec in the Run's folder; review accepted, the pushed SHA equalled
+  the reviewed head, the waker events were clean and a blocking `wait`
+  printed `REFUSED`. Codex's exec policy refused `rm -rf`; Control deleted
+  the files with its patch tool and the folder with `rmdir`, and the
+  `delivery` line carried `residue: []`. Two observations, both already
+  named under Consequences: `git status` showed `?? .dely/local/` for 13 s
+  between Control writing the first prompt and its first dispatch, and
+  Control asked neither worker for a handoff file, so the verdicts travelled
+  only in `worker_done` subjects.
+
+Seen and outside this decision: the Claude Control released neither worker
+after settlement; `dely log` keeps its own `sha` field, so a `sha` in the
+object Control passes is dropped.
+
+Not run, because the owner scoped the probe to stubs and the Control rows:
+the live worker rows for the Orca, Claude Code and Codex CLI upgrades, rows
+4 to 7, and every OMP and Pi row.
+
 #### Deferred
 
 Checking that a handoff landed inside the Run's folder. Trigger: a live row
-or a consumer report shows a handoff written elsewhere under 0.25.0.
+or a consumer report shows a handoff written elsewhere under 0.25.0. A Codex
+Control that asks for no handoff file at all was seen once on 2026-10-10;
+a second observation is the trigger for making the helper name the handoff
+path in the spec.
 
 ### 2026-10-05 — Pins live in `.dely/`, with a personal file that overrides the team's per phase
 
