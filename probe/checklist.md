@@ -21,7 +21,7 @@ for every supported entry to the last release snapshot, and also runs
 stands in for the live worker row of every entry whose `harnesses.json`
 entry did not change. An **entry changed** when one of these fields differs
 from the last release: `id`, `name`, `binary`, `status`, `controlWake`,
-`modelFlag`, `effortFlag`, `modelPin`, `permissionDefault`, `discovery`,
+`modelFlag`, `effortFlag`, `effortInModel`, `modelPin`, `permissionDefault`, `discovery`,
 `trust`. A change to `limits` or `notes` does not count.
 
 Run the live worker row for each entry that changed and for each harness
@@ -48,8 +48,8 @@ deployment uses it as Control.
 The release floor is the argv stub row, the pin-resolution stub row when its
 trigger fired, the rejected-message stub row, the
 live worker rows the rules above require, the Control rows those rules
-require, and rows 4–7. Rows 10–11 run when `start()` or the pin extension
-changes. Rows 13–16 run when
+require, and rows 4–7. Rows 8–10 and 12 run when `start()` or the `omp` entry
+changes; row 11 runs when the pin extension changes. Rows 13–16 run when
 `start()`, the extension or the Pi entry changes, after a Pi upgrade, and
 after an Orca upgrade. After an Orca upgrade, run the live worker row for
 each harness a deployment uses, the Control row once per wake mode, rows 4
@@ -274,7 +274,6 @@ if (cmd === 'check') result = {deliveryId:'batch-1',messages:[
   {type:'heartbeat',subject:'ack',payload:{dispatchId:'d-1'}},
   {type:'worker_done',subject:'preflight ok',payload:{dispatchId:'d-1'}}]};
 if (cmd === 'worker-list') result = {workers:[]};
-if (cmd === 'worker-show') result = {projection:{provider:{model:'pin-model'}}};
 if (cmd === 'worker-read') result = {terminal:{tail:[]}};
 if (cmd === 'worker-stop' || cmd === 'worker-release') result = {};
 if (cmd === 'status') result = {runtime:{appVersion:'stub'}};
@@ -283,8 +282,10 @@ console.log(JSON.stringify({ok:true,result}));
 function pinOf(h, other, mode) {
   const o = other || {};
   const modelCap = !!(h.modelFlag || h.modelPin || o.modelFlag || o.modelPin);
-  const effortCap = !!(h.effortFlag || h.modelPin || o.effortFlag || o.modelPin);
+  // A modelFlag entry gets a pinned Effort too, so an argv that starts using it is seen.
+  const effortCap = !!(h.effortFlag || h.effortInModel || h.modelFlag || h.modelPin || o.effortFlag || o.effortInModel || o.modelFlag || o.modelPin);
   if (mode === 'default') return {model:'default', effort:'default'};
+  if (mode === 'effortdefault') return {model:'pin-model', effort:'default'};
   if (mode === 'effort') return {model:'default', effort:'high'};
   return {
     model: modelCap ? 'pin-model' : 'default',
@@ -304,6 +305,8 @@ function stripped(argv) {
   if (!argv) return out;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--model' || argv[i] === '--effort') { i++; continue; }
+    // A spec pin line is compared by the candidate-only assertions below.
+    if (argv[i] === '--spec') { out.push(argv[++i].replace(/\ndely-pin: .*/, '')); continue; }
     out.push(argv[i]);
   }
   return out;
@@ -331,7 +334,7 @@ function launch(file, h, other, mode, verb) {
     {encoding:'utf8', timeout:10000, env:{...process.env,
       HOME:path.join(root, 'home'), ORCA_TERMINAL_HANDLE:'fixture-terminal',
       ORCA_CLI_COMMAND:path.join(root, 'orca.js'), FIXTURE_ROOT:root,
-      DELY_ACK_S:'0.2', DELY_POLL_S:'0.02', DELY_PIN_CHECK_S:'0', DELY_PREFLIGHT_S:'0.2'}});
+      DELY_ACK_S:'0.2', DELY_POLL_S:'0.02', DELY_PREFLIGHT_S:'0.2'}});
   const starts = [];
   for (const line of fs.readFileSync(path.join(root, 'calls.jsonl'), 'utf8').split('\n').filter(Boolean)) {
     const a = JSON.parse(line);
@@ -341,7 +344,9 @@ function launch(file, h, other, mode, verb) {
   if (verb === 'preflight') out = out.replace(/PASS \d+s/g, 'PASS');
   const ok = verb === 'preflight' ? / PASS/.test(out) && starts.length > 0
     : out.includes('DISPATCHED') && starts.length > 0;
-  return {out, startArgv: starts[0] || null, starts, ok, status: r.status};
+  const startArgv = starts[0] || null;
+  const si = startArgv ? startArgv.indexOf('--spec') : -1;
+  return {out, startArgv, starts, ok, status: r.status, spec: si < 0 ? null : startArgv[si + 1]};
 }
 function diffLaunch(label, cand, rel, h, other, intended, unexpected, mode) {
   const tag = label === 'dispatch' ? h.name : h.name + ' ' + label;
@@ -366,11 +371,40 @@ function diffLaunch(label, cand, rel, h, other, intended, unexpected, mode) {
     else add(unexpected, ftag + ' ' + flag);
   }
 }
+// Candidate-only: what the candidate's own entries must launch. The release
+// comparison cannot see these, because the release launched them differently.
+function assertCandidate(candTree, unexpected) {
+  for (const h of load(candTree).filter((x) => x.status === 'supported')) {
+    for (const verb of ['dispatch', 'preflight']) {
+      const tag = verb === 'dispatch' ? h.name : h.name + ' preflight';
+      if (h.effortInModel && h.modelFlag) {
+        const hi = launch(helper(candTree), h, null, 'pinned', verb);
+        const f = flagsOf(hi.startArgv);
+        if (f['--model'] !== 'pin-model' + h.effortInModel + 'high') add(unexpected, tag + ' --model ' + f['--model']);
+        if ('--effort' in f) add(unexpected, tag + ' passes --effort');
+        if (hi.spec == null || /dely-pin:/.test(hi.spec)) add(unexpected, tag + ' spec carries a dely-pin line');
+        const lo = launch(helper(candTree), h, null, 'effortdefault', verb);
+        const g = flagsOf(lo.startArgv);
+        if (g['--model'] !== 'pin-model') add(unexpected, tag + ' Effort default --model ' + g['--model']);
+        if ('--effort' in g) add(unexpected, tag + ' Effort default passes --effort');
+        const rf = launch(helper(candTree), h, null, 'effort', verb);
+        if (rf.starts.length) add(unexpected, tag + ' launched with Model default and a pinned Effort');
+      }
+      if (h.modelPin) {
+        const m = launch(helper(candTree), h, null, 'pinned', verb);
+        const f = flagsOf(m.startArgv);
+        if (m.spec == null || !m.spec.includes('\ndely-pin: pin-model high')) add(unexpected, tag + ' spec lacks dely-pin: pin-model high');
+        if ('--model' in f || '--effort' in f) add(unexpected, tag + ' passes a flag beside the spec pin');
+      }
+    }
+  }
+}
 function compare(candTree, relTree) {
   const intended = [], unexpected = [];
   const candHs = load(candTree), relHs = load(relTree);
   const supported = candHs.filter((h) => h.status === 'supported');
   assert(supported.length, 'candidate has no supported entries');
+  assertCandidate(candTree, unexpected);
   for (const h of supported) {
     const other = relHs.find((x) => x.name === h.name);
     if (!other) {
@@ -386,7 +420,7 @@ function compare(candTree, relTree) {
       continue;
     }
     for (const mode of ['pinned', 'default'].concat(
-      (h.effortFlag || h.modelPin || other.effortFlag || other.modelPin) ? ['effort'] : []
+      (h.effortFlag || h.effortInModel || h.modelPin || other.effortFlag || other.effortInModel || other.modelPin) ? ['effort'] : []
     )) {
       diffLaunch('dispatch',
         launch(helper(candTree), h, other, mode, 'dispatch'),
@@ -424,8 +458,13 @@ node "$stub/check.cjs" "$snap" "$release_snap" "$stub"
 
 **Pass:** RED prints (the `--effort`-dropping mutant fails the comparison), GREEN
 prints, every supported entry was compared pinned and with `default`, entries
-with `effortFlag` or `modelPin` were also compared with Effort pinned and Model
-`default` (including the refusal), preflight output and launches matched, every
+with `effortFlag`, `effortInModel` or `modelPin` were also compared with Effort
+pinned and Model `default` (including the refusal), preflight output and
+launches matched (a spec pin line is stripped from the comparison and asserted
+for the candidate alone: an `effortInModel` entry launches `--model
+pin-model<sep>high`, or `--model pin-model` with Effort `default`, with no
+`--effort` and no `dely-pin:` line, and a `modelPin` entry's spec carries
+`dely-pin: pin-model high` with no flag), every
 release-supported entry missing or `deferred` in the candidate is reported, and
 the printed INTENDED lines equal `DELY_NAMED_INTENDED`. An argv or stdout
 difference always fails the row; the live worker rows it routes to replace the
@@ -587,7 +626,6 @@ if (cmd === 'check') result = {deliveryId:'batch-1',messages:[
   {type:'heartbeat',subject:'ack',payload:{dispatchId:'d-1'}},
   {type:'worker_done',subject:'preflight ok',payload:{dispatchId:'d-1'}}]};
 if (cmd === 'worker-list') result = {workers:[]};
-if (cmd === 'worker-show') result = {projection:{provider:{model:'pin-model'}}};
 if (cmd === 'worker-read') result = {terminal:{tail:[]}};
 if (cmd === 'status') result = {runtime:{appVersion:'stub'}};
 console.log(JSON.stringify({ok:true,result}));
@@ -615,7 +653,7 @@ function helper(tree, args, ident) {
     {encoding: 'utf8', timeout: 10000, env: {...process.env, HOME: path.join(root, 'home'),
       ORCA_TERMINAL_HANDLE: 'fixture-terminal', ORCA_CLI_COMMAND: path.join(root, 'orca.js'),
       FIXTURE_ROOT: root, FIXTURE_IDENTITY: ident || '', DELY_ACK_S: '0.2', DELY_POLL_S: '0.02',
-      DELY_PIN_CHECK_S: '0', DELY_PREFLIGHT_S: '0.2'}});
+      DELY_PREFLIGHT_S: '0.2'}});
   return {status: r.status, out: (r.stdout || '').trim()};
 }
 function pins(tree, dir, ident) {
@@ -1010,39 +1048,39 @@ second.
 
 ## Step 8 — row 8, OMP worker with a valid pin
 
-Build a probe repository under `~/dely-probe/` whose `implement` pin is OMP
-with a Model `selector` from `omp models --json` and an Effort that is one of
-that model's `thinking` levels. The pinned model and level must differ from
-OMP's configured default.
-`probe/mkrepo.sh` writes whatever harness ids it is given; OMP needs no
-trust step. From that repository run `dely dispatch` for `implement`.
+Run this row when `start()` in `dely.js` or the `omp` entry changes, and after
+an OMP or Orca upgrade. Build a probe repository under `~/dely-probe/` whose
+`implement` pin is OMP with a Model `selector` from `omp models --json` and an
+Effort that is one of that model's `thinking` levels. The pinned model and
+level must differ from OMP's configured default. `probe/mkrepo.sh` writes
+whatever harness ids it is given; OMP needs no trust step. From that
+repository run `dely dispatch` for `implement`.
 
 **Pass:** `dely dispatch` prints `DISPATCHED <id>` without a model check,
-because Orca does not report OMP's model (stablyai/orca#24436). In the OMP
-session JSONL under `~/.omp/agent/sessions/`: the last `model_change` before
-the first user message and every assistant message is the pinned model, and
-the last `thinking_level_change` before the first user message is the pinned
-level. If the first request ran OMP's configured default, the extension did
-not apply the pin.
+because Orca does not report OMP's model (stablyai/orca#24436). The receipt's
+`launch.effective.model` equals `selector:level`. In the OMP session JSONL
+under `~/.omp/agent/sessions/`: the last `model_change` before the first user
+message and every assistant message is the pinned model, and the last
+`thinking_level_change` before the first user message is the pinned level.
 
 ## Step 9 — row 9, OMP worker with an invalid pin
 
-Same probe-repository setup as row 8's first dispatch (plugin enabled), with
-a selector `omp models --json` does not offer.
+Run this row when `start()` in `dely.js` or the `omp` entry changes. Same
+probe-repository setup as row 8, with a selector `omp models --json` does not
+offer.
 
-**Pass:** `dely dispatch` prints `NO_ACK` whose quote contains
-`DELY-PIN-FAIL`, and that session has no assistant message. If the worker
-acknowledged and completed on OMP's default model, the extension threw or
-called `ctx.shutdown()` instead of exiting the process.
+**Pass:** `dely dispatch` prints `NO_ACK` and that session has no assistant
+message. If the worker acknowledged and completed on OMP's default model, OMP
+fell back instead of stopping.
 
 ## Step 10 — row 10, OMP worker with Model `default`
 
-Run this row when `start()` in `dely.js` or `extensions/dely-pin.ts` changes.
-Same probe-repository setup as row 8's first dispatch, with Model `default`
-and Effort `default`.
+Run this row when `start()` in `dely.js` or the `omp` entry changes. Same
+probe-repository setup as row 8, with Model `default` and Effort `default`.
 
-**Pass:** the worker transcript's first user message has no `dely-pin:`
-line. A first user message that contains a `dely-pin:` line is a fail.
+**Pass:** the `worker-start` argv has no `--model`, and the worker
+transcript's first user message has no `dely-pin:` line. Either present is a
+fail.
 
 ## Step 11 — row 11, a second `dely-pin:` line in an interactive OMP session
 
@@ -1053,6 +1091,15 @@ model.
 
 **Pass:** the session's model is unchanged from before that prompt. If the
 model switched, the extension applied the pin on a start after the first.
+
+## Step 12 — row 12, OMP worker with a level the model does not offer
+
+Run this row when `start()` in `dely.js` or the `omp` entry changes. Same
+probe-repository setup as row 8, with a valid Model `selector` and an Effort
+the model does not offer, so the launch carries `--model selector:bogus`.
+
+**Pass:** `dely dispatch` prints `NO_ACK` or `FAILED`, and no session has an
+assistant message.
 
 ## Step 13 — row 13, Pi worker with a valid pin
 
@@ -1138,12 +1185,13 @@ replayed batch in a live session (the stub covers only its fixtures). A quota ex
 the model was having a bad day. A shape change between two Orca releases, until
 the rows are run again. A Model `default` dispatch whose spec itself carries
 a pin line. A stuck live Pi worker before `DEADLINE`. Pi versions other than
-0.87.1 and 0.99.1. Pi's trust layout on other machines. A pinned Pi or OMP worker that did
+0.87.1, 0.99.1 and 1.0.2. Pi's trust layout on other machines. A pinned Pi worker that did
 not load the extension, which runs its own default unseen. A preflight that leaks
 its worker. A heartbeat-only acknowledgement, because the argv stub's fixture
-returns one batch. An Orca upgrade, which reruns live workers only for
-deployment harnesses, so the other supported harnesses are not re-verified
-against the new Orca.
+returns one batch. An OMP worker on Orca older than 1.4.224, which refuses `--model`. An Orca
+upgrade reruns the live worker row for each deployment harness, the Control row
+once per wake mode, rows 4 and 5, and Pi rows 13–16, so the other supported
+harnesses are not re-verified against the new Orca.
 
 ## Results
 

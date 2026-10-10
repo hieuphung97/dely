@@ -46,7 +46,7 @@ that harness's defaults for model and effort, written as the literal
 harnesses, models and effort levels and write what the human chooses. Where a
 harness exposes no way to pin a model or an effort, write the literal `default`
 for that cell and point to Orca's agent default arguments. An entry with
-`modelPin: spec` or `modelPin: spec-unchecked` can be pinned — offer its
+`effortInModel` or `modelPin: spec-unchecked` can be pinned — offer its
 discovered models and effort levels as for a flag harness, and write
 Effort `default` for a model whose effort field is `null`.
 
