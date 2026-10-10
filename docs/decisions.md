@@ -3,11 +3,117 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-10-05.
+Last updated 2026-10-10.
 
 ---
 
 ## Settled
+
+### 2026-10-10 — Every dispatch file lives in its Run's folder under `.dely/local/runs/`, kept until the run closes
+
+#### Context
+
+Issue #69: a consumer project found 16 untracked dispatch files in its
+repository root, written between 2026-09-09 and 2026-09-10 and left for a
+month. Six came from two delivery runs (four and two handoffs and reviews),
+ten from a chain of five read-only Spikes (five prompts, five handoffs). No
+delivery prompt survived; every report did.
+
+Read from 0.24.1:
+
+- `SKILL.md` tells Control to write the prompt to an untracked file inside the
+  worktree and delete it after the worker returns. The handoff "is a file in
+  the worktree; its path travels as `payload.reportPath`". Nothing names who
+  deletes a report, or when, and no Release step mentions dispatch files.
+- A report cannot be deleted when its worker returns: Control routes on it, a
+  review re-reads the implement handoff, and remediation goes back to the
+  original parties. The only point where nothing reads it any more is the
+  run's close, and no step exists there.
+- A Spike "starts no delivery run" and the skill's description excludes it,
+  so a Spike that dispatched Orca workers ran outside every rule here,
+  including prompt deletion. Its reports were inputs to later Spikes in the
+  same chain, so per-dispatch deletion would have been wrong too.
+- `dely dispatch --spec-file` accepts any path; nothing names a default
+  location, so Control chose the repository root, where the files show in
+  `git status` and carry no owner.
+- `dely log` writes the object Control passes; it has no field for files left
+  behind, so the residue was invisible in maintenance logging.
+
+#### Decision
+
+1. Every dispatch file of a Run — the prompt Control writes and the handoff
+   the prompt names — lives in `<repo>/.dely/local/runs/<run>/`, where `<run>`
+   is the Orca Run id. It is still inside the worktree, so the reason for the
+   2026-09-04 rule (no second permission surface, no prompt in a shell
+   argument) holds.
+2. `dely dispatch` refuses, with `REFUSED` and before any `worker-start`, a
+   `--spec-file` whose resolved path is not inside that folder; the message
+   names the folder. When `.dely/local/.gitignore` is absent the helper
+   writes it with the single line `*`, the same file `dely:setup` writes; an
+   existing file is never rewritten.
+3. Dispatch files are kept until the run closes; the rule that deleted the
+   prompt after its worker returned is withdrawn. At close — after release,
+   or when the run stops early — Control deletes the Run's folder, then runs
+   `dely log --run <run> --repo <path> --json '<object>'`.
+4. `dely log` adds `residue`: the sorted repo-relative paths of every file
+   still under that Run's folder, `[]` when the folder is absent or empty,
+   `null` when no repository is known (`--repo` absent and no `repo` in the
+   object). The log stays an observer: it deletes nothing, and without
+   `~/.dely/` it writes and creates nothing.
+5. A Spike that dispatches workers follows the same rule: its own Run, every
+   dispatch through `dely dispatch`, its files in that Run's folder. A report
+   a later dispatch of the same Spike reads stays there until the Spike
+   reports its recommendation; then Control deletes the folder and runs
+   `dely log`. A Spike still starts no delivery run. The skill's description
+   says so, so a Spike that dispatches loads it.
+
+This amends the 2026-09-04 record (decision four) and the portable launch
+rule in the 2026-08-26 Antigravity record in place.
+
+#### Alternatives considered
+
+**Keep the location free and add only a close step.** Rejected: a Spike does
+not load this skill, so a rule only in prose does not reach it; a refusal in
+the helper reaches every Control that dispatches through it, and its message
+teaches the path.
+
+**Delete the handoff with the prompt when the worker returns.** Rejected:
+routing, review and remediation read it later (issue #69, point two).
+
+**A new subcommand that creates the folder and prints its path.** Rejected
+as more interface than the gap needs: Control knows the Run id, and the
+helper writes the ignore file at the first dispatch.
+
+**Let `dely log` delete the folder.** Rejected: logging is opt-in on
+`~/.dely/`, and cleanup must not be; an observer that deletes would also hide
+the residue it is meant to show.
+
+**`.tmp/dely/` or another project-chosen directory.** Rejected: one home per
+Run is what makes the close step and the residue check mechanical; a
+directory shared across runs cannot be deleted by one of them.
+
+#### Consequences
+
+- Breaking: a Control that writes prompts anywhere else is refused at
+  dispatch, including the consumer mitigation in issue #69 (`.tmp/dely/`).
+- Between Control writing the first prompt and the first dispatch, the file
+  can show in `git status` when `.dely/local/.gitignore` does not exist yet.
+- `git clean -fdx` deletes an open run's folder, as it deletes any ignored
+  file.
+- Not improved: the helper cannot make a worker write its handoff where the
+  prompt says; `residue` sees only the Run's folder, not a stray file
+  elsewhere. Off-protocol dispatch kinds and verdicts (issue #69, point six)
+  are not addressed.
+
+#### Non-goals
+
+The `wait-bg --out` default in the system temporary directory. Cleaning up
+consumer repositories. A retention policy for reports after close.
+
+#### Deferred
+
+Checking that a handoff landed inside the Run's folder. Trigger: a live row
+or a consumer report shows a handoff written elsewhere under 0.25.0.
 
 ### 2026-10-05 — Pins live in `.dely/`, with a personal file that overrides the team's per phase
 
@@ -2964,7 +3070,10 @@ it, and it changed the design:
 4. The prompt and the handoff stay files inside the worktree. Messages carry a
    short body and a `payload.reportPath`. The reason is this skill's own rule:
    a task spec and a message body are shell arguments, and prompts do not go in
-   shell arguments.
+   shell arguments. Amended 2026-10-10: both files live in the Run's folder,
+   `.dely/local/runs/<run>/`, and are kept until the run closes. See
+   `2026-10-10 — Every dispatch file lives in its Run's folder under
+   .dely/local/runs/, kept until the run closes`.
 5. `references/harnesses.md` keeps only facts verified in this delivery — the
    Orca agent id, the forbidden headless forms, and answers whose wrong choice
    destroys the worker. An unverified per-harness fact is deleted rather than
@@ -4070,7 +4179,8 @@ managed Dely table stays Claude Code for `implement` and Codex CLI for `review`.
 `skills/delivery/SKILL.md` still does not name harnesses. It may carry two
 portable launch rules only: write the worker prompt to an untracked file inside
 the worktree, do not stage it, and delete that same file after the worker
-returns; when composing TUI argv, keep the execution plane's default
+returns (amended 2026-10-10: the file lives in the Run's folder under
+`.dely/local/runs/` and is deleted with that folder when the run closes); when composing TUI argv, keep the execution plane's default
 permission-bypass flags and add no unpinned sandbox. Install documentation
 does not restate those rules. Refresh of an `agy` install is a second
 `agy plugin install` of the same source; the CLI has no `plugin update`.
