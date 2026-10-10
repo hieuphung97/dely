@@ -90,8 +90,10 @@ last workers of every Run open, and the review worker is the last one.
 - A worker that sends `worker_done` and is released cannot be sent a follow-up
   in the same terminal; a rework is a new dispatch, as `SKILL.md` already says
   for a settled terminal.
-- Not covered: a worker whose `worker_done` Orca rejected, an `escalation` or
-  a `question` is not released here; recovery routes release it as before.
+- An `escalation` or `question` releases nothing: that worker is released at
+  its later accepted `worker_done`, or by the `dely log` sweep once Orca
+  lists it `reclaimable`. A worker whose `worker_done` Orca rejected is not
+  settled, so it is left to the recovery routes, as before.
 
 #### Verification, 2026-10-10
 
@@ -111,15 +113,34 @@ GREEN: candidate releases exactly the accepted worker_done and reclaimable dispa
 ```
 
 The existing rejected-message stub row and every closure gate in `AGENTS.md`
-also passed on the same snapshot. The live rows (tabs close without Control
-releasing, `worker-read` still returns output, nothing `reclaimable` after
-`dely log`, launch argv unchanged) are recorded by the probe session, not by
-this delivery.
+also passed on the same snapshot.
 
-#### Deferred
+A separate probe session ran `probe/checklist.md` against a `git archive`
+snapshot of `f48e8ce` on Orca 1.4.224, Claude Code 2.1.296 and Codex CLI
+0.162.1 (report `~/dely-probe/checklist-release-f48e8ce.md`):
 
-Releasing a worker after an `escalation` or `question` is answered. Trigger: a
-measured Run that leaves such a worker open after its reply.
+- **Release stub, rejected-message stub:** PASS, the output above and the
+  rejected row's RED, `LOG PASS` and GREEN lines.
+- **Argv stub against `v0.26.0`**, `DELY_NAMED_INTENDED` empty: PASS, no
+  `INTENDED:` line, so launch is unchanged for every supported entry.
+- **Control row, `background`, Claude Code** (`claude-sonnet-5-5`, `medium`;
+  workers Claude `claude-sonnet-5-5`, `medium`): PASS. Both `settled` events
+  carry `"release":[{"dispatchId":…,"state":"released"}]`; each worker
+  terminal was last listed within 3 s before its `settled` event and never
+  after. Control ran no `worker-release` and no `terminal close`.
+  `worker-read` still returned both workers' transcripts. After close,
+  `worker-list --terminal-state reclaimable` returned no workers, and the
+  `delivery` event carried `"release":[]`.
+- **Control row, `waker`, Codex CLI** (`gpt-5.6-terra`, `medium`): PASS, the
+  same observations, with the releases run from the `wait-bg` waker terminal
+  and no `error` entry, so Orca accepts a release from a terminal that is not
+  the coordinator's.
+
+The `dely log` sweep ran live only in its empty case, because `wait` had
+already released every worker; a non-empty sweep, `releaseError`, and a live
+`retained`/`user_takeover` answer are covered only by the stub row. Not run,
+because launch, pins, attention and stall did not change: the live worker
+rows, the pin-resolution stub, rows 4–7, and every OMP and Pi row.
 
 ### 2026-10-10 — OMP is pinned by Orca's `--model` flag, with the effort joined to the model; the `spec` pin mode is deleted
 
