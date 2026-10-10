@@ -150,6 +150,15 @@ Not run, because the owner scoped the probe to stubs and the Control rows:
 the live worker rows for the Orca, Claude Code and Codex CLI upgrades, rows
 4 to 7, and every OMP and Pi row.
 
+The task review of `162c8b8` found that an unreadable Run folder logged
+`residue: []`, that the `SKILL.md` sentence promised untracked files even
+when an existing `.gitignore` ignores nothing, and that the guard refused an
+in-folder name starting with `..`. The remediation, `c3f131b`, changed the
+guard's boundary and the log's error path only; the launch argv is
+unchanged, so the live Control rows above, run on `4c63776`, were not rerun.
+The argv stub against `v0.24.1` and fixtures for each amended row passed on
+`c3f131b`.
+
 #### Deferred
 
 Checking that a handoff landed inside the Run's folder. Trigger: a live row
