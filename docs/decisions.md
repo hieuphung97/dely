@@ -97,15 +97,20 @@ last workers of every Run open, and the review worker is the last one.
 
 #### Verification, 2026-10-10
 
-The implementer ran the new release stub row against a snapshot of the working
-tree (`probe/checklist.md`, "Stub row — worker release"):
+The implementer ran the release stub row against a snapshot of the working
+tree (`probe/checklist.md`, "Stub row — worker release"). The first version of
+that row let a wrong copy that only drops the rejection test from the settle
+filter pass, so review had its fixture extended; this is the output of the
+remediated row:
 
 ```text
 RED: a: no release at all fails wait: no release of done-ok and done-kept once each
-RED: b: releases every settling message fails wait: asks released
-RED: c: releases rejected worker_done too fails wait: done-rejected released
+RED: b: releases every settling message fails wait: asks and escalates released
+RED: c: the settle filter drops the rejection test fails wait: done-bad released
 RED: d: hard-coded state fails wait: state not Orca's
 RED: e: log lists without the filter fails log: still-running released
+RED: f: releases in a batch that does not settle fails wait: done-rejected released
+RED: g: no de-duplication fails wait: done-ok released twice
 GREEN: wait
 GREEN: log
 GREEN: logListFails

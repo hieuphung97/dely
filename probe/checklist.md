@@ -913,8 +913,13 @@ subject intentionally begins `Rejected `; only the payload marker rejects it.
 
 Run this from the observer shell with `snap` set to the candidate snapshot.
 It uses a fake Orca executable and isolated homes, creates no real Run or
-worker, and checks five deliberately wrong copies before the candidate. Run it
-when `wait`, `log`, or the settle logic changes.
+worker, and checks seven deliberately wrong copies before the candidate. Run it
+when `wait`, `log`, or the settle logic changes. Its fake Orca answers `wait`
+with two batches: a first that never settles, carrying only an Orca-rejected
+`worker_done` for `done-rejected`; then a settling batch with accepted
+`worker_done` for `done-ok` (twice) and `done-kept`, an Orca-rejected
+`worker_done` for `done-bad`, a `question` for `asks` and an `escalation` for
+`escalates`.
 
 ```bash
 stub=$(mktemp -d "$HOME/dely-probe/release.XXXXXX")
@@ -937,7 +942,9 @@ if (cmd === 'check' && !a.includes('--ack')) {
   reply.result = n === 0
     ? {deliveryId:'rejected-batch', messages:[msg('worker_done','done-rejected',true)]}
     : {deliveryId:'accepted-batch', messages:[msg('worker_done','done-ok'),
-        msg('worker_done','done-kept'), msg('question','asks')]};
+        msg('worker_done','done-bad',true), msg('worker_done','done-kept'),
+        msg('worker_done','done-ok'), msg('question','asks'),
+        msg('escalation','escalates')]};
 }
 if (cmd === 'worker-release') {
   const id = arg('--dispatch');
@@ -986,8 +993,12 @@ const checks = {
     assert.equal(r.status, 0, 'wait must exit 0');
     const out = JSON.parse(r.stdout);
     assert.equal(out.SETTLED, 'accepted-batch');
-    assert(!released(r).includes('done-rejected'), 'done-rejected released');
-    assert(!released(r).includes('asks'), 'asks released');
+    for (const id of ['done-rejected', 'done-bad'])
+      assert(!released(r).includes(id), id + ' released');
+    const alive = ['asks', 'escalates'].filter(id => released(r).includes(id));
+    assert(!alive.length, alive.join(' and ') + ' released');
+    for (const id of ['done-ok', 'done-kept'])
+      assert(released(r).filter(x => x === id).length <= 1, id + ' released twice');
     assert.deepEqual(released(r), ['done-kept', 'done-ok'], 'no release of done-ok and done-kept once each');
     assert.deepEqual(Object.keys(out), ['SETTLED', 'messages', 'release']);
     assert.deepEqual(out.release, expectWait, "state not Orca's");
@@ -1026,22 +1037,29 @@ const mutants = [
   ['a: no release at all', none, 'wait', 'no release of done-ok'],
   ['b: releases every settling message', [[
     'const done = msgs.filter((m) => !isRejected(m) && m.type === "worker_done").map(messageDispatchId);',
-    'const done = msgs.filter(settling).map(messageDispatchId);']], 'wait', 'asks released'],
-  ['c: releases rejected worker_done too', [[
-    '      if (msgs.some(settling)) {',
-    lines('      for (const m of msgs) if (m.type === "worker_done" && messageDispatchId(m))',
-      '        releaseWorker(messageDispatchId(m));', '      if (msgs.some(settling)) {')]],
-    'wait', 'done-rejected released'],
+    'const done = msgs.filter(settling).map(messageDispatchId);']], 'wait', 'asks and escalates released'],
+  ['c: the settle filter drops the rejection test', [[
+    'const done = msgs.filter((m) => !isRejected(m) && m.type === "worker_done").map(messageDispatchId);',
+    'const done = msgs.filter((m) => m.type === "worker_done").map(messageDispatchId);']],
+    'wait', 'done-bad released'],
   ['d: hard-coded state', [[
     'const entry = { dispatchId: id, state: res.state };',
     'const entry = { dispatchId: id, state: "released" };']], 'wait', "state not Orca's"],
   ['e: log lists without the filter', [[
     lines('      "--terminal-state",', '      "reclaimable",', ''), '']], 'log', 'still-running released'],
+  ['f: releases in a batch that does not settle', [[
+    '      if (msgs.some(settling)) {',
+    lines('      for (const m of msgs) if (m.type === "worker_done" && messageDispatchId(m))',
+      '        releaseWorker(messageDispatchId(m));', '      if (msgs.some(settling)) {')]],
+    'wait', 'done-rejected released'],
+  ['g: no de-duplication', [[
+    '[...new Set(done.filter(Boolean))].map(releaseWorker)',
+    'done.filter(Boolean).map(releaseWorker)']], 'wait', 'done-ok released twice'],
 ];
-for (const copy of ['candidate', ...mutants.map((m, i) => 'wrong-' + 'abcde'[i])])
+for (const copy of ['candidate', ...mutants.map((m, i) => 'wrong-' + 'abcdefg'[i])])
   fs.cpSync(snap, path.join(root, copy), {recursive: true});
 mutants.forEach(([name, edits, check, token], i) => {
-  const copy = 'wrong-' + 'abcde'[i], file = path.join(root, copy, rel);
+  const copy = 'wrong-' + 'abcdefg'[i], file = path.join(root, copy, rel);
   let source = fs.readFileSync(file, 'utf8');
   for (const [needle, text] of edits) {
     assert(source.includes(needle), 'update the wrong-copy mutation for this candidate: ' + name);
@@ -1061,15 +1079,21 @@ JS
 node "$stub/check.cjs" "$snap" "$stub"
 ```
 
-**Pass:** five `RED` lines print, one per wrong copy, each failing for the
+**Pass:** seven `RED` lines print, one per wrong copy, each failing for the
 named reason; then three `GREEN` lines and the final `GREEN` line; every
 assertion passes. The check proves, mechanically, that `wait` releases exactly
-the accepted `worker_done` dispatches of the settled batch and not an
-Orca-rejected one or a `question`; that `SETTLED` and the `settled` event carry
-the state Orca returned, including `retained` with `user_takeover`; and that
-`log` releases only what Orca lists under `--terminal-state reclaimable`,
-records it, and still writes the event when the listing fails. The wrong
-copies run before the candidate and log into their own homes. Keep the fixture
+`done-ok` and `done-kept`, each once, and never `done-bad` (an Orca-rejected
+`worker_done` inside the settling batch), `done-rejected` (one in a batch that
+never settles), `asks` or `escalates`; that `SETTLED` and the `settled` event
+carry the two states Orca returned, including `retained` with `user_takeover`;
+and that `log` releases only what Orca lists under `--terminal-state
+reclaimable`, records it, and still writes the event when the listing fails.
+The wrong copies are: (a) no release; (b) every settling message released,
+failing on `asks and escalates`; (c) the settle filter without its rejection
+test, failing on `done-bad`; (d) a hard-coded state; (e) `log` without the
+filter; (f) a release loop before the settle check, failing on
+`done-rejected`; (g) no de-duplication, failing on `done-ok` released twice.
+They run before the candidate and log into their own homes. Keep the fixture
 directory and output with the probe report; remove it after recording the
 result.
 
