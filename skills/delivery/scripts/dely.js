@@ -587,20 +587,26 @@ function runFolder(repo, run) {
   return path.join(repo, ".dely", "local", "runs", run);
 }
 
-function listFiles(dir) {
-  const found = [];
-  let entries = [];
+// Lists every file under dir. A missing dir is an empty listing; any other
+// read failure sets err to {code, dir} and the listing is incomplete.
+function listFiles(dir, top = true) {
+  const r = { files: [], err: null };
+  let entries;
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch (_) {
-    return found;
+  } catch (e) {
+    if (!(top && e.code === "ENOENT")) r.err = { code: e.code || "ERROR", dir };
+    return r;
   }
   for (const e of entries) {
     const p = path.join(dir, e.name);
-    if (e.isDirectory()) found.push(...listFiles(p));
-    else found.push(p);
+    if (e.isDirectory()) {
+      const sub = listFiles(p, false);
+      r.files.push(...sub.files);
+      r.err = r.err || sub.err;
+    } else r.files.push(p);
   }
-  return found;
+  return r;
 }
 
 function dispatch(f) {
@@ -608,7 +614,7 @@ function dispatch(f) {
   const specPath = path.resolve(f.repo, f["spec-file"]);
   const folder = runFolder(f.repo, f.run);
   const rel = path.relative(folder, specPath);
-  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+  if (!rel || rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel)) {
     out("REFUSED " + specPath + " is outside this Run's folder; write the prompt and the handoff under " + folder + "/", 3);
   }
   requireHandle({ run: f.run, repo: f.repo });
@@ -972,10 +978,11 @@ function logCmd(f) {
     fail("--json must be an object", { run: f.run });
   }
   const repo = f.repo || payload.repo || null;
-  const residue = repo
-    ? listFiles(runFolder(path.resolve(repo), f.run)).map((p) => path.relative(path.resolve(repo), p)).sort()
-    : null;
-  logEvent("delivery", Object.assign({}, payload, { run: f.run, repo, residue }));
+  const root = repo ? path.resolve(repo) : null;
+  const listed = root ? listFiles(runFolder(root, f.run)) : null;
+  const residue = listed && !listed.err ? listed.files.map((p) => path.relative(root, p)).sort() : null;
+  const extra = listed && listed.err ? { residueError: listed.err.code + " " + path.relative(root, listed.err.dir) } : {};
+  logEvent("delivery", Object.assign({}, payload, { run: f.run, repo, residue }, extra));
   process.exit(0);
 }
 

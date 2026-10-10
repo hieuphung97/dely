@@ -116,8 +116,10 @@ one of at least 300 s.
 
 Write the prompt to a file in the Run's folder,
 `<repo>/.dely/local/runs/<run>/`, where `<run>` is the Orca Run id; `dely
-dispatch` refuses a `--spec-file` anywhere else and makes sure
-`.dely/local/.gitignore` exists, so the file is untracked and never staged.
+dispatch` refuses a `--spec-file` anywhere else. It writes
+`.dely/local/.gitignore` containing `*` when that file is absent and leaves an
+existing one as it is, so the Run's files stay out of `git status` only while
+that file ignores them.
 Never inline it in a shell argument: prompts carry backticks, quotes and
 newlines, and a shell argument mangles them. A path outside the workspace can
 trigger a second permission surface some harnesses still prompt for even when
@@ -348,8 +350,9 @@ At close, after release or when the run stops early, Control deletes the
 Run's folder `<repo>/.dely/local/runs/<run>/`, then runs
 `dely log --run <run> --repo <path> --json '<object>'` rather than
 assembling a line by hand. The log adds `residue`, the files still in that
-folder (`[]` when none, `null` when no repository is known); it deletes
-nothing.
+folder (`[]` when none, `null` when no repository is known or when part of
+the folder could not be read, which also adds `residueError`, the error code
+and the path it failed on); it deletes nothing.
 `dely` with no arguments prints which copy is running, and its usage.
 
 ## Failure and recovery
