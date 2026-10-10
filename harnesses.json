@@ -225,7 +225,7 @@
       "binary": "pi",
       "status": "supported",
       "controlWake": "waker",
-      "limits": "As Control, run Dely's commands with no time limit, and release leftover workers. As a worker, to pin a model, install Dely in Pi, then check the model in Pi's session log.",
+      "limits": "As Control, run Dely's commands with no time limit. As a worker, to pin a model, install Dely in Pi, then check the model in Pi's session log.",
       "trust": "dialog",
       "discovery": {
         "models": "pi --list-models | awk 'NR>1 && $1!=\"\" {print $1\"/\"$2}'",

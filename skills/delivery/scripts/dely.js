@@ -385,6 +385,49 @@ function settling(m) {
   return !isRejected(m) && ["worker_done", "escalation", "question"].includes(m.type);
 }
 
+// Records what Orca printed for one release and never a state it did not. A
+// failed release is an entry, not a failure: callers keep their exit code.
+function releaseWorker(id) {
+  const r = orca(["orchestration", "worker-release", "--dispatch", id]);
+  if (r.ok === false) {
+    const e = r.error || {};
+    return { dispatchId: id, error: e.code || e.message || "release failed" };
+  }
+  const res = r.result || {};
+  if (!res.state) return { dispatchId: id, error: "no state returned" };
+  const entry = { dispatchId: id, state: res.state };
+  if (res.reason) entry.reason = res.reason;
+  return entry;
+}
+
+function releaseReclaimable(run) {
+  const ids = [];
+  let cursor = null;
+  let releaseError = null;
+  for (;;) {
+    const r = orca([
+      "orchestration",
+      "worker-list",
+      "--run",
+      run,
+      "--terminal-state",
+      "reclaimable",
+      ...(cursor ? ["--cursor", cursor] : []),
+    ]);
+    if (r.ok === false) {
+      const e = r.error || {};
+      releaseError = e.code || e.message || "worker-list failed";
+      break;
+    }
+    const res = r.result || {};
+    for (const w of res.workers || []) if (w.dispatchId && !ids.includes(w.dispatchId)) ids.push(w.dispatchId);
+    const page = res.page || {};
+    if (!page.hasMore || !page.nextCursor || page.nextCursor === cursor) break;
+    cursor = page.nextCursor;
+  }
+  return { release: ids.map(releaseWorker), releaseError };
+}
+
 function orcaHint(msg, run) {
   const text = String(msg || "");
   if (text.includes("requires the coordinator terminal currently bound")) {
@@ -715,6 +758,10 @@ function wait(f) {
     if (res.deliveryId) {
       const msgs = res.messages || [];
       if (msgs.some(settling)) {
+        // A worker that settled with an accepted worker_done is finished; an
+        // escalation or question is alive and waiting for a reply.
+        const done = msgs.filter((m) => !isRejected(m) && m.type === "worker_done").map(messageDispatchId);
+        const release = [...new Set(done.filter(Boolean))].map(releaseWorker);
         logEvent("settled", {
           run: f.run,
           deliveryId: res.deliveryId,
@@ -724,6 +771,7 @@ function wait(f) {
             subject: m.subject,
             dispatchId: messageDispatchId(m),
           })),
+          release,
         });
         out(
           {
@@ -735,6 +783,7 @@ function wait(f) {
               subject: m.subject,
               payload: m.payload,
             })),
+            release,
           },
           0
         );
@@ -940,7 +989,10 @@ function logCmd(f) {
   const listed = root ? listFiles(runFolder(root, f.run)) : null;
   const residue = listed && !listed.err ? listed.files.map((p) => path.relative(root, p)).sort() : null;
   const extra = listed && listed.err ? { residueError: listed.err.code + " " + path.relative(root, listed.err.dir) } : {};
-  logEvent("delivery", Object.assign({}, payload, { run: f.run, repo, residue }, extra));
+  const swept = releaseReclaimable(f.run);
+  const released = { release: swept.release };
+  if (swept.releaseError != null) released.releaseError = swept.releaseError;
+  logEvent("delivery", Object.assign({}, payload, { run: f.run, repo, residue }, extra, released));
   process.exit(0);
 }
 
