@@ -217,7 +217,7 @@
         "readsAgentsMd": true,
         "needsImport": false
       },
-      "notes": "Trust is none: no workspace-trust gate. The pin travels as --model selector:level, with no --effort and no dely-pin line; Effort default passes --model selector alone. Orca reports no OMP status or model (stablyai/orca#24436), so dispatch does not check the model. An unknown selector starts OMP with no model and it never acts on the task, so dispatch ends NO_ACK; a level the model does not offer makes OMP exit and the start ends failed at agent_readiness. Without status, dely wait reports a live OMP worker as ATTENTION (unverifiable/missing_status, requiresAction true), the projection a killed worker also shows. Decision sections: 2026-09-27, 2026-09-30, 2026-10-05, 2026-10-10."
+      "notes": "Trust is none: no workspace-trust gate. The pin travels as --model selector:level, with no --effort and no dely-pin line; Effort default passes --model selector alone. Orca reports no OMP status or model (stablyai/orca#24436), so dispatch does not check the model. With a pinned Effort, an unknown selector or a level the model does not offer makes OMP exit at once and dispatch prints NO_ACK within seconds (Orca's receipt shows the start failed at agent_readiness); with Effort default, an unknown selector starts OMP with no model and NO_ACK comes after the acknowledgement window. Without status, dely wait reports a live OMP worker as ATTENTION (unverifiable/missing_status, requiresAction true), the projection a killed worker also shows. Decision sections: 2026-09-27, 2026-09-30, 2026-10-05, 2026-10-10."
     },
     {
       "name": "Pi",

@@ -1084,7 +1084,7 @@ fail.
 
 ## Step 11 — row 11, a second `dely-pin:` line in an interactive OMP session
 
-Run this row when `start()` in `dely.js` or `extensions/dely-pin.ts` changes.
+Run this row when `extensions/dely-pin.ts` changes.
 Open an interactive OMP session (not a `dely dispatch`). After it has
 started, send a second prompt that carries a `dely-pin:` line and read its
 model.
