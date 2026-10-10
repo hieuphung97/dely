@@ -9,6 +9,124 @@ Last updated 2026-10-10.
 
 ## Settled
 
+### 2026-10-10 — OMP is pinned by Orca's `--model` flag, with the effort joined to the model; the `spec` pin mode is deleted
+
+#### Context
+
+Measured on 2026-10-10 with Orca 1.4.224, OMP 18.6.1 and Pi 1.0.2 (evidence
+`~/dely-probe/omp-pi-1424-evidence/NOTES.md`, Run `run_798f4cf5c216`):
+
+- `worker-start --agent omp --model <id>` is accepted
+  (stablyai/orca#24796 has shipped); the receipt's `launch.effective.model`
+  echoes the value. `--effort` is still refused for OMP
+  (stablyai/orca#23388 is open).
+- `--model google-vertex/gemini-3.8-flash:medium` started a session whose log
+  records thinking level `medium`; the same selector without a suffix ran
+  OMP's configured default level (`high`).
+- `--model google-vertex/no-such-model`: OMP warned the model was not found,
+  started with no model and never acted on the task. `--model
+  google-vertex/gemini-3.8-flash:bogus`: OMP exited ("Model … not found") and
+  the start ended `failed` at `agent_readiness`.
+- Every live OMP worker still projects liveness `unverifiable` /
+  `missing_status`, no `provider`, `requiresAction` true
+  (stablyai/orca#24436; PR stablyai/orca#24196 is open).
+- Pi: `--model` is still refused and the projection reports `model: null`.
+  With Dely installed in Pi 1.0.2, a `dely-pin:` line applied
+  `google-vertex/gemini-3.8-flash` `medium`, and an unknown selector printed
+  `DELY-PIN-FAIL` and exited.
+
+Until now OMP's pin travelled as a `dely-pin:` spec line applied by
+`extensions/dely-pin.ts`, so a pinned OMP worker needed Dely installed in
+OMP, and dispatch could not check the model (2026-10-05). No harness has used
+`modelPin: "spec"` since 2026-10-05; its post-acknowledgement check in
+`dely.js` is dormant.
+
+#### Decision
+
+The `omp` entry has `modelFlag: true`, `effortFlag: false`, no `modelPin`,
+and `effortInModel: ":"`. `effortInModel` is a new optional field: a harness
+that has it and `modelFlag: true` receives a pinned Effort joined to the
+pinned Model by that string, in `--model`. With Model `selector` and Effort
+`level` the helper launches `--model selector:level`; with Effort `default`
+it launches `--model selector`; with Model `default` and a pinned Effort it
+refuses as it does for every harness; with both `default` it passes no
+`--model`. It never passes `--effort` for such a harness and never adds a
+`dely-pin:` line. A Model cell that already carries a suffix is passed as
+written; OMP itself rejects a doubled suffix.
+
+The `spec` value of `modelPin` is deleted with its check: `shownModel`,
+`waitShownModel`, `pinCheckMs` and `DELY_PIN_CHECK_S`, and the `pin not
+applied` branch and its `pin_not_applied` log event. `modelPin` may be absent
+or `spec-unchecked`; Pi keeps `spec-unchecked` and the extension. The
+closure gate enforces both fields.
+
+OMP's `limits` require Orca 1.4.224 or newer for an OMP worker and keep the
+caveat that Dely reports a working OMP worker as needing attention; the
+sentence asking the user to install Dely in OMP to pin a model is removed.
+`dely:setup` offers effort levels for an `effortInModel` harness as it does
+for a flag harness.
+
+The intended argv differences against `v0.25.0` are `OMP --model` and `OMP
+preflight --model`; no other entry's argv changes.
+
+This amends the 2026-09-27 record (OMP's pin travels in the spec) and the
+2026-10-05 record (OMP's pin is unchecked), and closes the first Deferred item
+of the 2026-10-05 record. Its "Returning OMP to `spec`" item lapses: no
+`spec` mode remains to return to.
+
+#### Alternatives considered
+
+**Write the effort in the Model cell, as Cursor does.** Rejected. `omp models
+--json` lists selectors and their `thinking` levels separately, so setup
+would have to synthesize `selector:level` strings, which `dely:setup`
+forbids. Existing OMP pins (Model `selector`, Effort `level`) would lose
+their effort silently, because the helper drops an Effort for a harness
+without `effortFlag`. When Orca accepts `--effort` for OMP, every pin would
+need rewriting; with `effortInModel` only the entry changes.
+
+**Keep the spec pin for OMP.** Rejected: it needs Dely installed in every
+OMP that runs a worker, and Orca can now apply the model itself.
+
+**Rename `spec-unchecked` to `spec`.** Rejected: it churns Pi's entry, the
+gate, the docs and the checklist for no change in behaviour.
+
+**Refuse a Model cell that already contains `:` when Effort is pinned.**
+Rejected: some provider ids contain `:`; OMP exits on a doubled suffix, so
+the failure is already loud.
+
+#### Consequences
+
+- A pinned OMP worker needs no Dely install in OMP. OMP as Control still
+  needs it for the skills; the extension still loads there and acts only on
+  a `dely-pin:` line, which OMP no longer receives from the helper.
+- An OMP worker on Orca older than 1.4.224 fails at `worker-start` (Orca
+  refuses `--model`), and dispatch prints `FAILED`.
+- An unknown OMP selector idles and surfaces as `NO_ACK` after the
+  acknowledgement window (60 s by default) rather than as `DELY-PIN-FAIL`.
+- Dispatch still does not check OMP's model: Orca reports none
+  (stablyai/orca#24436). The receipt's `launch.effective` records what Orca
+  launched, not what the session ran.
+- Not improved: the `ATTENTION` a healthy OMP worker shows.
+
+#### Non-goals
+
+Pi's pin, extension and entry, apart from its checked version. OMP as
+Control. The silent drop of a pinned Effort on Cursor and Antigravity.
+
+#### Deferred
+
+Passing OMP's effort by flag. Trigger: an Orca release that accepts
+`--effort` for OMP (stablyai/orca#23388); then `effortFlag: true` and no
+`effortInModel`, with pins unchanged.
+
+A pinned Effort on a harness with `modelFlag` but neither `effortFlag` nor
+`effortInModel` (Cursor, Antigravity) is dropped without a message. Trigger:
+a pin reported to run at the wrong effort, or the next change to `start()`
+that touches effort.
+
+Telling a live OMP worker from a dead one in `dely wait` stays deferred under
+the 2026-10-05 record.
+
 ### 2026-10-10 — Every dispatch file lives in its Run's folder under `.dely/local/runs/`, kept until the run closes
 
 #### Context
