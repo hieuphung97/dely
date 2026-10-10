@@ -100,8 +100,8 @@ last workers of every Run open, and the review worker is the last one.
 The implementer ran the release stub row against a snapshot of the working
 tree (`probe/checklist.md`, "Stub row — worker release"). The first version of
 that row let a wrong copy that only drops the rejection test from the settle
-filter pass, so review had its fixture extended; this is the output of the
-remediated row:
+filter pass, so review had its fixture extended. This is the output of the
+remediated row, run by the implementer at `44ec84b`:
 
 ```text
 RED: a: no release at all fails wait: no release of done-ok and done-kept once each
@@ -124,8 +124,10 @@ A separate probe session ran `probe/checklist.md` against a `git archive`
 snapshot of `f48e8ce` on Orca 1.4.224, Claude Code 2.1.296 and Codex CLI
 0.162.1 (report `~/dely-probe/checklist-release-f48e8ce.md`):
 
-- **Release stub, rejected-message stub:** PASS, the output above and the
-  rejected row's RED, `LOG PASS` and GREEN lines.
+- **Release stub, rejected-message stub:** PASS. The release row was its
+  first version, with wrong copies a to e only; the rejected row printed its
+  RED, `LOG PASS` and GREEN lines. The remediated row changes no runtime
+  file, so the live rows below still apply.
 - **Argv stub against `v0.26.0`**, `DELY_NAMED_INTENDED` empty: PASS, no
   `INTENDED:` line, so launch is unchanged for every supported entry.
 - **Control row, `background`, Claude Code** (`claude-sonnet-5-5`, `medium`;
