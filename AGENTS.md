@@ -77,7 +77,7 @@ jq -e . harnesses.json plugin.json .claude-plugin/plugin.json .claude-plugin/mar
 ```
 
 ```bash
-jq -e '.harnesses | all((.status == "supported" or .status == "deferred") and (.controlWake == "background" or .controlWake == "waker" or .controlWake == "unsupported") and ((has("modelPin") | not) or .modelPin == "spec" or .modelPin == "spec-unchecked"))' harnesses.json >/dev/null
+jq -e '.harnesses | all((.status == "supported" or .status == "deferred") and (.controlWake == "background" or .controlWake == "waker" or .controlWake == "unsupported") and ((has("modelPin") | not) or .modelPin == "spec-unchecked") and ((has("effortInModel") | not) or (((.effortInModel | type) == "string") and .effortInModel != "" and .modelFlag == true and .effortFlag == false and (has("modelPin") | not))))' harnesses.json >/dev/null
 ```
 
 ```bash
@@ -86,9 +86,9 @@ git ls-files -z '*.sh' 'skills/delivery/scripts/dely' | xargs -0 -n1 bash -n
 ```
 
 ```bash
-test "$(jq -r .version .claude-plugin/plugin.json)" = 0.25.0
-test "$(jq -r .version .codex-plugin/plugin.json)" = 0.25.0
-test "$(jq -r .version package.json)" = 0.25.0
+test "$(jq -r .version .claude-plugin/plugin.json)" = 0.26.0
+test "$(jq -r .version .codex-plugin/plugin.json)" = 0.26.0
+test "$(jq -r .version package.json)" = 0.26.0
 ```
 
 ```bash
@@ -100,7 +100,7 @@ test ! -e skills/delivery/references/harnesses.md
 ```
 
 ```bash
-git grep -nE 'adoptCommand|adoptedPermission|adoptPath|readAdopts|writeAdopts|recordAdopt|takeAdopt|closeAdopted|closeCreated|waitQuiet|lastOutputAt|launchKind|hasGate|GATES|pinWhy|ELECTRON|harnessCell' -- skills/ && exit 1 || true
+git grep -nE 'adoptCommand|adoptedPermission|adoptPath|readAdopts|writeAdopts|recordAdopt|takeAdopt|closeAdopted|closeCreated|waitQuiet|lastOutputAt|launchKind|hasGate|GATES|pinWhy|ELECTRON|harnessCell|shownModel|waitShownModel|pinCheckMs|PIN_CHECK|pin_not_applied' -- skills/ && exit 1 || true
 ```
 
 ```bash

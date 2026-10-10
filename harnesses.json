@@ -194,7 +194,7 @@
       "binary": "omp",
       "status": "supported",
       "controlWake": "waker",
-      "limits": "It never asks for trust, so use it only in repositories you trust. As a worker, use Orca 1.4.220 or newer, which does not show OMP's status (stablyai/orca#24436), so Dely reports a working OMP worker as needing attention. As a worker, to pin a model, install Dely in OMP, then check the model in OMP's session log.",
+      "limits": "It never asks for trust, so use it only in repositories you trust. As a worker, use Orca 1.4.224 or newer, which does not show OMP's status (stablyai/orca#24436), so Dely reports a working OMP worker as needing attention.",
       "trust": "none",
       "discovery": {
         "models": "omp models --json",
@@ -202,9 +202,9 @@
         "modelField": "selector",
         "effortFrom": "thinking"
       },
-      "modelFlag": false,
+      "modelFlag": true,
       "effortFlag": false,
-      "modelPin": "spec-unchecked",
+      "effortInModel": ":",
       "permissionDefault": "none",
       "forbiddenHeadless": [
         "omp -p",
@@ -217,7 +217,7 @@
         "readsAgentsMd": true,
         "needsImport": false
       },
-      "notes": "Trust is none: no workspace-trust gate. The pin travels as a spec line. Orca 1.4.220 reports no OMP status or model (stablyai/orca#24436), so dispatch skips the model check; the extension still applies the pin and fails closed on a bad one. Without status, dely wait reports a live OMP worker as ATTENTION (unverifiable/missing_status, requiresAction true), the projection a killed worker also shows. A second-turn dely-pin line in an interactive OMP 18.4.4 session was ignored (row 11). Decision sections: 2026-09-27, 2026-09-30, 2026-10-05."
+      "notes": "Trust is none: no workspace-trust gate. The pin travels as --model selector:level, with no --effort and no dely-pin line; Effort default passes --model selector alone. Orca reports no OMP status or model (stablyai/orca#24436), so dispatch does not check the model. With a pinned Effort, an unknown selector or a level the model does not offer makes OMP exit at once and dispatch prints NO_ACK within seconds (Orca's receipt shows the start failed at agent_readiness); with Effort default, an unknown selector starts OMP with no model and NO_ACK comes after the acknowledgement window. Without status, dely wait reports a live OMP worker as ATTENTION (unverifiable/missing_status, requiresAction true), the projection a killed worker also shows. Decision sections: 2026-09-27, 2026-09-30, 2026-10-05, 2026-10-10."
     },
     {
       "name": "Pi",
