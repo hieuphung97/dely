@@ -174,12 +174,17 @@ last command, then ends the turn (a waker Control never runs `dely wait`);
 terminal it runs in and refuses a waker even when `--control` names another
 one, so `REFUSED … (called with --control …)` means use `wait-bg`.
 
-**Result handling.** `SETTLED`: process the batch, do the guide's completion
-accounting, and pass the settled `deliveryId` as `--ack` to the next
-`dely wait` or `wait-bg`, or run `orca orchestration check --ack` when no
-wait follows. When `wait` (or the `wait-bg` output) prints `ERROR` for
-`--ack`, run `orca orchestration check --ack <settled id>` and wait again
-without `--ack`; a waker Control waits again with `wait-bg`. `ATTENTION` has
+**Result handling.** `SETTLED`: the helper has already released each worker
+whose accepted `worker_done` is in the batch and lists Orca's answer under
+`release`; Control does not release those itself and never closes a worker
+terminal by hand (`terminal close`). `retained` with `user_takeover` means a
+human typed in that tab; Orca keeps it and the human closes it. Process the
+batch, do the guide's completion accounting, and pass the settled
+`deliveryId` as `--ack` to the next `dely wait` or `wait-bg`, or run
+`orca orchestration check --ack` when no wait follows. When `wait` (or the
+`wait-bg` output) prints `ERROR` for `--ack`, run
+`orca orchestration check --ack <settled id>` and wait again without `--ack`;
+a waker Control waits again with `wait-bg`. `ATTENTION` has
 two routes, and the difference is whether the plane can still see the
 worker. With `nextAction.kind` other than `none`, run the argv Orca printed
 and skip that id next time. With `nextAction: none` and
@@ -355,7 +360,9 @@ Run's folder `<repo>/.dely/local/runs/<run>/`, then runs
 assembling a line by hand. The log adds `residue`, the files still in that
 folder (`[]` when none, `null` when no repository is known or when part of
 the folder could not be read, which also adds `residueError`, the error code
-and the path it failed on); it deletes nothing.
+and the path it failed on); it deletes nothing. It also releases every worker
+Orca still lists as `reclaimable` for the Run and records each answer under
+`release` (`releaseError` when the listing failed).
 `dely` with no arguments prints which copy is running, and its usage.
 
 ## Failure and recovery

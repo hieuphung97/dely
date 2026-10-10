@@ -9,6 +9,118 @@ Last updated 2026-10-10.
 
 ## Settled
 
+### 2026-10-10 — The helper releases settled workers
+
+#### Context
+
+A worker's Orca tab closes only when someone runs `orca orchestration
+worker-release --dispatch <id>` after its `worker_done`. On the normal path
+nothing in Dely did that: `SKILL.md` named `worker-release` only in recovery
+routes, and `dely.js` released only in `preflight` and on the `NO_ACK` and
+failed-preflight paths. Whether tabs closed depended on whether Control
+happened to follow Orca's own orchestration guide. Measured on 2026-10-10
+with Orca 1.4.224: one Claude Control session released every worker after
+`worker_done` on 2026-10-02 and 2026-10-07, then released none after its
+context was compacted on 2026-10-08, leaving 18 settled workers `reclaimable`
+with their tabs open in one Run. Earlier records already
+stated the symptom three times and deferred it ("Workers left unreleased by
+Controls", trigger: the next delivery that touches `SKILL.md`'s completion
+accounting).
+
+A second, separate cause: Orca marks a worker terminal `user_owned` as soon
+as a human types or pastes into it (Orca reports it over
+`orchestration.workerTerminalUserInput`). `worker-release` then answers
+`{"state":"retained","reason":"user_takeover"}` and never closes that tab.
+Dely cannot change that.
+
+Orca 1.4.224 answers `worker-release` with `ok: true` and a `state` of
+`released`, `already_released`, `retained` (with a `reason`), `release_pending`
+or `release_unknown` (the CLI exits 1 for the last, and still prints its
+result), or with `ok: false` and an error such as `dispatch_not_found`.
+
+#### Decision
+
+`dely wait`, in the branch that prints `SETTLED`, runs `worker-release
+--dispatch <id>` once per distinct dispatch id for each message in that batch
+that is not Orca-rejected, has type `worker_done`, and names a dispatch. It
+never releases for an `escalation` or a `question` (that worker is alive and
+waiting for a reply), for an Orca-rejected message, or for a batch that does
+not settle. The helper records one entry per release, `{ dispatchId, state }`
+plus `reason` when Orca returns one, or `{ dispatchId, error }` when the call
+returns `ok: false`, and never writes a state Orca did not print. The array
+is `release` on the printed `SETTLED` object (after `messages`) and on the
+`settled` log event. A release failure changes neither the exit code, the
+print nor the flow. `wait-bg` runs the same `wait()` in its waker terminal and
+needed no change.
+
+`dely log` lists `worker-list --run <run> --terminal-state reclaimable`,
+following `result.page.nextCursor` while `hasMore`, and releases each
+`dispatchId` Orca returned under that filter, never a row it chose itself. The
+`delivery` event carries `release` (`[]` when none); when the listing fails it
+carries `releaseError` (the error code, else its message) and the event is
+still written. This runs whether or not `--repo` is given. `dely log` still
+deletes nothing on disk.
+
+`SKILL.md` says in "Result handling" that the helper already released those
+workers, that Control does not release them or close a terminal by hand, and
+what `retained` with `user_takeover` means; the close paragraph says `dely
+log` also releases what Orca still lists as `reclaimable`. The README
+Troubleshooting gains "Worker tab stays open", and Pi's `limits` lose "release
+leftover workers", which is now the helper's job.
+
+#### Alternatives considered
+
+**A `SKILL.md` rule alone.** Rejected: the measured failure is a rule lost
+from Control's context at compaction; a rule cannot fix a rule that was
+forgotten.
+
+**Release in `dely dispatch`, before the next start.** Rejected: it leaves the
+last workers of every Run open, and the review worker is the last one.
+
+**Let Control release by hand.** Rejected: it is the status quo that failed.
+
+#### Consequences
+
+- Worker tabs close at settlement. The terminal output stays readable through
+  `worker-read` afterwards, which the live Control row checks.
+- A tab a human typed or pasted into stays open (`retained`,
+  `user_takeover`); the human closes it. Dely cannot override Orca here.
+- `dely log` at close sweeps anything still `reclaimable`, including a worker
+  whose settlement a Control processed without the helper.
+- A worker that sends `worker_done` and is released cannot be sent a follow-up
+  in the same terminal; a rework is a new dispatch, as `SKILL.md` already says
+  for a settled terminal.
+- Not covered: a worker whose `worker_done` Orca rejected, an `escalation` or
+  a `question` is not released here; recovery routes release it as before.
+
+#### Verification, 2026-10-10
+
+The implementer ran the new release stub row against a snapshot of the working
+tree (`probe/checklist.md`, "Stub row — worker release"):
+
+```text
+RED: a: no release at all fails wait: no release of done-ok and done-kept once each
+RED: b: releases every settling message fails wait: asks released
+RED: c: releases rejected worker_done too fails wait: done-rejected released
+RED: d: hard-coded state fails wait: state not Orca's
+RED: e: log lists without the filter fails log: still-running released
+GREEN: wait
+GREEN: log
+GREEN: logListFails
+GREEN: candidate releases exactly the accepted worker_done and reclaimable dispatches
+```
+
+The existing rejected-message stub row and every closure gate in `AGENTS.md`
+also passed on the same snapshot. The live rows (tabs close without Control
+releasing, `worker-read` still returns output, nothing `reclaimable` after
+`dely log`, launch argv unchanged) are recorded by the probe session, not by
+this delivery.
+
+#### Deferred
+
+Releasing a worker after an `escalation` or `question` is answered. Trigger: a
+measured Run that leaves such a worker open after its reply.
+
 ### 2026-10-10 — OMP is pinned by Orca's `--model` flag, with the effort joined to the model; the `spec` pin mode is deleted
 
 #### Context
@@ -786,7 +898,8 @@ Grok as Control on the 0.23.0 helper. Trigger: a Grok account without the
 free-tier limit.
 
 Workers left unreleased by Controls. Trigger: the next delivery that touches
-`SKILL.md`'s completion accounting.
+`SKILL.md`'s completion accounting. Closed by the 2026-10-10 record "The
+helper releases settled workers", which moves the release into the helper.
 
 ---
 

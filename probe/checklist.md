@@ -46,7 +46,8 @@ per harness when its entry changed, or when that harness upgraded and a
 deployment uses it as Control.
 
 The release floor is the argv stub row, the pin-resolution stub row when its
-trigger fired, the rejected-message stub row, the
+trigger fired, the rejected-message stub row, the worker-release stub row
+when `wait`, `log`, or the settle logic changes, the
 live worker rows the rules above require, the Control rows those rules
 require, and rows 4–7. Rows 8–10 and 12 run when `start()` or the `omp` entry
 changes; row 11 runs when the pin extension changes. Rows 13–16 run when
@@ -514,7 +515,7 @@ handoffs:
 ```bash
 dely preflight --repo <absolute probe path> --run <run>
 dely dispatch --repo <absolute probe path> --run <run> --phase implement --spec-file <implement spec>
-# After processing implement settlement, acknowledging it and releasing:
+# After processing implement settlement and acknowledging it (the helper released the worker):
 dely dispatch --repo <absolute probe path> --run <run> --phase review --spec-file <review spec>
 ```
 
@@ -576,7 +577,10 @@ from a shell: it must print `REFUSED`.
 Observe with `worker-list`, `worker-show`, and `terminal read --screen`.
 **Pass:** the pushed SHA matches the reviewed head, review reports `ACCEPT`,
 no human acts after initial trust, and Control wakes and processes the correct
-batch. For waker Controls, every `wait_bg` log event is followed by `settled`,
+batch. Every settled worker's terminal leaves `orca terminal list` without
+Control running `worker-release`, `worker-read` still returns that worker's
+output afterwards, and `worker-list --run <run> --terminal-state reclaimable`
+is empty after `dely log`. For waker Controls, every `wait_bg` log event is followed by `settled`,
 `attention` or `stalled` before `notify`, and there is no `error` event.
 `ALREADY_WAITING` starts no waiter and has no notify of its own. Confirm the
 next Control turn acts on the wake. Merely seeing `wait_bg` and `notify` does
@@ -905,6 +909,170 @@ separately in `$stub/red-home/.dely/log.jsonl`. Keep the fixture directory
 and output with the probe report; remove it after recording the result. The accepted message's
 subject intentionally begins `Rejected `; only the payload marker rejects it.
 
+## Stub row — worker release
+
+Run this from the observer shell with `snap` set to the candidate snapshot.
+It uses a fake Orca executable and isolated homes, creates no real Run or
+worker, and checks five deliberately wrong copies before the candidate. Run it
+when `wait`, `log`, or the settle logic changes.
+
+```bash
+stub=$(mktemp -d "$HOME/dely-probe/release.XXXXXX")
+cat > "$stub/check.cjs" <<'JS'
+const fs = require('fs'), path = require('path'), assert = require('assert');
+const {spawnSync} = require('child_process');
+const [snap, root] = process.argv.slice(2);
+const rel = 'skills/delivery/scripts/dely.js';
+fs.writeFileSync(path.join(root, 'orca.js'), `
+const fs = require('fs');
+const a = process.argv.slice(2), cmd = a[1], root = process.env.FIXTURE_ROOT;
+fs.appendFileSync(root+'/calls.jsonl', JSON.stringify(a)+'\\n');
+const arg = (k) => a[a.indexOf(k)+1];
+const msg = (type, id, rejected) => ({type, subject: type+' '+id, payload: {dispatchId: id,
+  ...(rejected ? {_orcaLifecycleRejection: {code:'dispatch_capability_invalid'}} : {})}});
+let reply = {ok:true, result:{}};
+if (cmd === 'check' && !a.includes('--ack')) {
+  let n = 0; try {n = +fs.readFileSync(root+'/count','utf8')} catch {}
+  fs.writeFileSync(root+'/count', String(n+1));
+  reply.result = n === 0
+    ? {deliveryId:'rejected-batch', messages:[msg('worker_done','done-rejected',true)]}
+    : {deliveryId:'accepted-batch', messages:[msg('worker_done','done-ok'),
+        msg('worker_done','done-kept'), msg('question','asks')]};
+}
+if (cmd === 'worker-release') {
+  const id = arg('--dispatch');
+  reply.result = id === 'done-kept' ? {dispatchId:id, state:'retained', reason:'user_takeover'}
+    : {dispatchId:id, state:'released', processAction:'none'};
+}
+if (cmd === 'worker-list') {
+  if (process.env.FIXTURE_MODE === 'list-fails')
+    reply = {ok:false, error:{code:'list_failed', message:'fixture list failure'}};
+  else {
+    const workers = [{dispatchId:'reclaimable-a', dispatchStatus:'completed'}];
+    if (arg('--terminal-state') !== 'reclaimable')
+      workers.push({dispatchId:'still-running', dispatchStatus:'dispatched'});
+    reply.result = {workers, page:{hasMore:false}};
+  }
+}
+console.log(JSON.stringify(reply));
+`);
+function run(copy, verb, mode) {
+  const home = path.join(root, 'home-' + copy);
+  fs.mkdirSync(path.join(home, '.dely'), {recursive: true});
+  fs.rmSync(path.join(home, '.dely/log.jsonl'), {force: true});
+  fs.rmSync(path.join(root, 'count'), {force: true});
+  fs.writeFileSync(path.join(root, 'calls.jsonl'), '');
+  const args = [path.join(root, copy, rel), verb, '--run', 'fixture-run'];
+  if (verb === 'wait') args.push('--control', 'claude', '--timeout-min', '0.05');
+  else args.push('--json', '{"outcome":"fixture"}');
+  const r = spawnSync(process.execPath, args, {encoding:'utf8', timeout:10000,
+    env:{...process.env, HOME:home, ORCA_TERMINAL_HANDLE:'fixture-terminal',
+      ORCA_CLI_COMMAND:path.join(root,'orca.js'), FIXTURE_ROOT:root, FIXTURE_MODE:mode,
+      DELY_POLL_S:'0.02'}});
+  assert(!r.error, String(r.error));
+  const lines = fs.readFileSync(path.join(root, 'calls.jsonl'), 'utf8').trim().split('\n');
+  const calls = lines.filter(Boolean).map(l => JSON.parse(l));
+  const logFile = path.join(home, '.dely/log.jsonl');
+  const events = fs.existsSync(logFile) ?
+    fs.readFileSync(logFile, 'utf8').trim().split('\n').map(l => JSON.parse(l)) : [];
+  return {status: r.status, stdout: r.stdout, calls, events};
+}
+const released = (r) => r.calls.filter(c => c[1] === 'worker-release').map(c => c[3]).sort();
+const expectWait = [{dispatchId:'done-ok', state:'released'},
+  {dispatchId:'done-kept', state:'retained', reason:'user_takeover'}];
+const checks = {
+  wait(copy) {
+    const r = run(copy, 'wait', 'wait');
+    assert.equal(r.status, 0, 'wait must exit 0');
+    const out = JSON.parse(r.stdout);
+    assert.equal(out.SETTLED, 'accepted-batch');
+    assert(!released(r).includes('done-rejected'), 'done-rejected released');
+    assert(!released(r).includes('asks'), 'asks released');
+    assert.deepEqual(released(r), ['done-kept', 'done-ok'], 'no release of done-ok and done-kept once each');
+    assert.deepEqual(Object.keys(out), ['SETTLED', 'messages', 'release']);
+    assert.deepEqual(out.release, expectWait, "state not Orca's");
+    const settled = r.events.filter(e => e.event === 'settled');
+    assert.equal(settled.length, 1);
+    assert.deepEqual(settled[0].release, expectWait, "logged state not Orca's");
+  },
+  log(copy) {
+    const r = run(copy, 'log', 'ok');
+    assert.equal(r.status, 0, 'log must exit 0');
+    assert(!released(r).includes('still-running'), 'still-running released');
+    assert.deepEqual(released(r), ['reclaimable-a'], 'no release of reclaimable-a');
+    const listed = r.calls.filter(c => c[1] === 'worker-list');
+    assert(listed.length >= 1 && listed.every(c => c.join(' ').includes('--terminal-state reclaimable')),
+      'worker-list was not filtered');
+    const ev = r.events.filter(e => e.event === 'delivery');
+    assert.equal(ev.length, 1);
+    assert.deepEqual(ev[0].release, [{dispatchId:'reclaimable-a', state:'released'}], 'delivery release');
+    assert(!('releaseError' in ev[0]), 'releaseError without a failure');
+  },
+  logListFails(copy) {
+    const r = run(copy, 'log', 'list-fails');
+    assert.equal(r.status, 0, 'log must exit 0 when the listing fails');
+    const ev = r.events.filter(e => e.event === 'delivery');
+    assert.equal(ev.length, 1, 'delivery event still written');
+    assert.equal(ev[0].releaseError, 'list_failed', 'releaseError');
+    assert.deepEqual(ev[0].release, [], 'release when the listing fails');
+    assert.deepEqual(released(r), []);
+  },
+};
+const lines = (...l) => l.join('\n');
+const none = [['const release = [...new Set(done.filter(Boolean))].map(releaseWorker);',
+    'const release = [];'],
+  ['const swept = releaseReclaimable(f.run);', 'const swept = {release: [], releaseError: null};']];
+const mutants = [
+  ['a: no release at all', none, 'wait', 'no release of done-ok'],
+  ['b: releases every settling message', [[
+    'const done = msgs.filter((m) => !isRejected(m) && m.type === "worker_done").map(messageDispatchId);',
+    'const done = msgs.filter(settling).map(messageDispatchId);']], 'wait', 'asks released'],
+  ['c: releases rejected worker_done too', [[
+    '      if (msgs.some(settling)) {',
+    lines('      for (const m of msgs) if (m.type === "worker_done" && messageDispatchId(m))',
+      '        releaseWorker(messageDispatchId(m));', '      if (msgs.some(settling)) {')]],
+    'wait', 'done-rejected released'],
+  ['d: hard-coded state', [[
+    'const entry = { dispatchId: id, state: res.state };',
+    'const entry = { dispatchId: id, state: "released" };']], 'wait', "state not Orca's"],
+  ['e: log lists without the filter', [[
+    lines('      "--terminal-state",', '      "reclaimable",', ''), '']], 'log', 'still-running released'],
+];
+for (const copy of ['candidate', ...mutants.map((m, i) => 'wrong-' + 'abcde'[i])])
+  fs.cpSync(snap, path.join(root, copy), {recursive: true});
+mutants.forEach(([name, edits, check, token], i) => {
+  const copy = 'wrong-' + 'abcde'[i], file = path.join(root, copy, rel);
+  let source = fs.readFileSync(file, 'utf8');
+  for (const [needle, text] of edits) {
+    assert(source.includes(needle), 'update the wrong-copy mutation for this candidate: ' + name);
+    source = source.replace(needle, () => text);
+  }
+  fs.writeFileSync(file, source);
+  let failed = null;
+  try { checks[check](copy); } catch (e) { failed = e; }
+  assert(failed, 'wrong copy ' + name + ' passed ' + check);
+  assert(String(failed.message).includes(token),
+    'wrong copy ' + name + ' failed for another reason: ' + failed.message);
+  console.log('RED: ' + name + ' fails ' + check + ': ' + failed.message.split('\n')[0]);
+});
+for (const name of Object.keys(checks)) { checks[name]('candidate'); console.log('GREEN: ' + name); }
+console.log('GREEN: candidate releases exactly the accepted worker_done and reclaimable dispatches');
+JS
+node "$stub/check.cjs" "$snap" "$stub"
+```
+
+**Pass:** five `RED` lines print, one per wrong copy, each failing for the
+named reason; then three `GREEN` lines and the final `GREEN` line; every
+assertion passes. The check proves, mechanically, that `wait` releases exactly
+the accepted `worker_done` dispatches of the settled batch and not an
+Orca-rejected one or a `question`; that `SETTLED` and the `settled` event carry
+the state Orca returned, including `retained` with `user_takeover`; and that
+`log` releases only what Orca lists under `--terminal-state reclaimable`,
+records it, and still writes the event when the listing fails. The wrong
+copies run before the candidate and log into their own homes. Keep the fixture
+directory and output with the probe report; remove it after recording the
+result.
+
 ## Step 4 — row 4, a worker that dies after it acknowledges
 
 Run row 4 once per Control wake mode, `background` and `waker`: two runs,
@@ -1172,7 +1340,8 @@ again exactly once. Killing the Pi worker process turns
 - remove the Pi install (`pi remove "$snap"`);
 - delete the candidate and last-release snapshots;
 - keep parameterized worker and Control paths so their trust entries survive;
-- remove the argv and rejected-message fixture directories after recording them;
+- remove the argv, rejected-message and worker-release fixture directories after
+  recording them;
 - remove the row 5, row 7, OMP-row and Pi-row paths, and the trust entries of the
   first two.
 

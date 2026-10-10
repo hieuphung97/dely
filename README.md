@@ -67,7 +67,7 @@ question; Pi asks only when the project or a parent folder has `.pi/` or
 | Cursor Agent CLI | ✓ | ✓ | ✓ | Choose the effort through the model name, for example cursor-grok-4.6-high. |
 | GitHub Copilot CLI | ✓ | ⚠ | ⚠ | At the first launch, answer No, thanks to the app prompt; until then a launch can leave the task unsent. Answer the folder trust question once in every project and choose to remember the folder; Orca does not see it, so a missed one shows as NO_ACK. As a worker, you cannot choose the model. |
 | OMP | ✓ | ⚠ | ⚠ | It never asks for trust, so use it only in repositories you trust. As a worker, use Orca 1.4.224 or newer, which does not show OMP's status (stablyai/orca#24436), so Dely reports a working OMP worker as needing attention. |
-| Pi | ⚠ | ⚠ | ⚠ | As Control, run Dely's commands with no time limit, and release leftover workers. As a worker, to pin a model, install Dely in Pi, then check the model in Pi's session log. |
+| Pi | ⚠ | ⚠ | ⚠ | As Control, run Dely's commands with no time limit. As a worker, to pin a model, install Dely in Pi, then check the model in Pi's session log. |
 
 Other agents Orca can launch may work too;
 [`harnesses.json`](harnesses.json) records what was measured.
@@ -302,6 +302,11 @@ harness printed.
   first launch also shows an app promo: answer No, thanks once;
   Antigravity can lose the prompt on a new path; retry once. Pi asks when
   the path or an ancestor has `.pi/` resources or `.agents/skills`.
+- **Worker tab stays open:** Dely releases each worker when its `worker_done`
+  settles and again at close. A tab you typed or pasted into is yours, so
+  Orca keeps it (`retained`, `user_takeover`); close it yourself. Answer a
+  harness dialog by opening that harness in the same path (as the trust
+  bullet says), not in the worker tab.
 - **Codex helper says "not inside an Orca terminal":** ask Control to look up
   its handle with `orca terminal list --worktree active --json` only when
   that worktree has one agent terminal, then prefix helper and `orca` commands
