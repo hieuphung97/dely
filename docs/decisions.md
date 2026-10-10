@@ -125,14 +125,15 @@ snapshot of `f48e8ce` on Orca 1.4.224, Claude Code 2.1.296 and Codex CLI
   `INTENDED:` line, so launch is unchanged for every supported entry.
 - **Control row, `background`, Claude Code** (`claude-sonnet-5-5`, `medium`;
   workers Claude `claude-sonnet-5-5`, `medium`): PASS. Both `settled` events
-  carry `"release":[{"dispatchId":…,"state":"released"}]`; each worker
-  terminal was last listed within 3 s before its `settled` event and never
-  after. Control ran no `worker-release` and no `terminal close`.
+  carry `"release":[{"dispatchId":…,"state":"released"}]`; a 3 s sampler
+  last listed each worker terminal 3.4 s and 0.9 s before its `settled`
+  event, and never after. Control ran no `worker-release` and no `terminal close`.
   `worker-read` still returned both workers' transcripts. After close,
   `worker-list --terminal-state reclaimable` returned no workers, and the
   `delivery` event carried `"release":[]`.
 - **Control row, `waker`, Codex CLI** (`gpt-5.6-terra`, `medium`): PASS, the
-  same observations, with the releases run from the `wait-bg` waker terminal
+  same observations (last listed 3.3 s and 1.5 s before `settled`), with the
+  releases run from the `wait-bg` waker terminal
   and no `error` entry, so Orca accepts a release from a terminal that is not
   the coordinator's.
 
