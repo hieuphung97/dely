@@ -4,7 +4,7 @@ Decision record: `docs/decisions.md`, section "2026-10-10 — OMP is pinned by
 Orca's `--model` flag, with the effort joined to the model; the `spec` pin
 mode is deleted".
 
-**Baseline:**
+**Baseline:** `286e08e`
 
 ## Goal
 
