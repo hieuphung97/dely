@@ -101,12 +101,57 @@ the failure is already loud.
   a `dely-pin:` line, which OMP no longer receives from the helper.
 - An OMP worker on Orca older than 1.4.224 fails at `worker-start` (Orca
   refuses `--model`), and dispatch prints `FAILED`.
-- An unknown OMP selector idles and surfaces as `NO_ACK` after the
-  acknowledgement window (60 s by default) rather than as `DELY-PIN-FAIL`.
+- A bad OMP pin surfaces as `NO_ACK` rather than as `DELY-PIN-FAIL`. With a
+  pinned Effort, an unknown selector or a level the model does not offer
+  makes OMP exit at once ("Model … not found"), and dispatch prints `NO_ACK`
+  within seconds. With Effort `default`, an unknown selector starts OMP with
+  no model; it never acts, and `NO_ACK` comes after the acknowledgement
+  window (60 s by default).
 - Dispatch still does not check OMP's model: Orca reports none
   (stablyai/orca#24436). The receipt's `launch.effective` records what Orca
   launched, not what the session ran.
 - Not improved: the `ATTENTION` a healthy OMP worker shows.
+
+#### Verification, 2026-10-10
+
+A separate Claude Code session (`claude-sonnet-5-5`, medium) ran
+`probe/checklist.md` on a snapshot of `5ef34de` (Orca 1.4.224, OMP 18.6.1,
+Pi 1.0.2), in the scope the owner chose: the stubs, OMP's worker row and rows
+8, 9, 10 and 12, and Pi rows 13 to 15. Report:
+`~/dely-probe/checklist-omp-flag-5ef34de.md`; raw evidence
+`~/dely-probe/live-omp-flag-5ef34de/`. Every row run passed.
+
+- Argv stub against `v0.25.0`: RED for the `--effort`-dropping mutant;
+  INTENDED `OMP --model` and `OMP preflight --model`, equal to the named
+  list; GREEN, with the candidate-only OMP and Pi assertions passing. The
+  pin-resolution and rejected-message stubs passed.
+- OMP worker row, pin `google-vertex/gemini-3.8-flash` `medium`: preflight
+  PASS in 10 s; implement and review `DISPATCHED`, settled with
+  `worker_done`, review `ACCEPT`. Both receipts:
+  `launch.requested.model` and `launch.effective.model`
+  `google-vertex/gemini-3.8-flash:medium`. Session logs: thinking `medium`
+  before the first user message, no `dely-pin:` line. Each wait printed one
+  `ATTENTION` (`unverifiable` / `missing_status`, `nextAction` `none`) on a
+  healthy worker, as the 2026-10-05 record describes.
+- Row 8, `google-vertex/gemini-3.5-flash` `low` (both differ from OMP's
+  default): receipt model `google-vertex/gemini-3.5-flash:low`; the session
+  ran that model at `low` for every assistant message.
+- Row 9, unknown selector with Effort `low`, and row 12, a level the model
+  does not offer: `NO_ACK` after 0 s quoting `Model "…" not found`; no
+  session was written.
+- Row 10, Model `default`: receipt model `null`; no `dely-pin:` line; the
+  session ran OMP's default.
+- Pi rows 13 to 15 on Pi 1.0.2: the extension applied the pin
+  (`google-vertex/gemini-3.5-flash` `high`, both differing from Pi's
+  default); an unknown selector and a level the model does not offer ended
+  `NO_ACK` quoting `DELY-PIN-FAIL`.
+
+Not run, by the owner's choice: rows 4 to 7, row 11 (OMP no longer receives
+a `dely-pin:` line, and the extension did not change), row 16, every Control
+row, and the Claude Code and Codex CLI worker rows (their entries did not
+change; the argv stub covers their launch). An unknown OMP selector with
+Effort `default` was not run in the candidate; the 2026-10-10 Context
+measured it on Orca directly.
 
 #### Non-goals
 
