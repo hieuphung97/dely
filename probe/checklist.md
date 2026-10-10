@@ -256,8 +256,8 @@ const helper = (tree) => path.join(tree, 'skills/delivery/scripts/dely.js');
 const load = (tree) => JSON.parse(fs.readFileSync(path.join(tree, 'harnesses.json'), 'utf8')).harnesses;
 const candH = load(snap), relH = load(release);
 fs.mkdirSync(path.join(root, 'home/.dely'), {recursive: true});
-fs.mkdirSync(path.join(root, 'repo'));
-fs.writeFileSync(path.join(root, 'repo/spec.md'), 'Fixture only.');
+fs.mkdirSync(path.join(root, 'repo/.dely/local/runs/fixture-run'), {recursive: true});
+fs.writeFileSync(path.join(root, 'repo/.dely/local/runs/fixture-run/spec.md'), 'Fixture only.');
 fs.cpSync(snap, path.join(root, 'wrong'), {recursive: true});
 const wrong = helper(path.join(root, 'wrong'));
 const source = fs.readFileSync(wrong, 'utf8');
@@ -326,7 +326,7 @@ function launch(file, h, other, mode, verb) {
     JSON.stringify({implement: one, review: one}));
   fs.writeFileSync(path.join(root, 'calls.jsonl'), '');
   const args = [file, verb, '--run', 'fixture-run', '--repo', path.join(root, 'repo')];
-  if (verb === 'dispatch') args.push('--phase', 'implement', '--spec-file', 'spec.md');
+  if (verb === 'dispatch') args.push('--phase', 'implement', '--spec-file', '.dely/local/runs/fixture-run/spec.md');
   const r = spawnSync(process.execPath, args,
     {encoding:'utf8', timeout:10000, env:{...process.env,
       HOME:path.join(root, 'home'), ORCA_TERMINAL_HANDLE:'fixture-terminal',
@@ -461,7 +461,9 @@ observer's harness id as `<control-id>` for every wait's `--control`.
 Answer the tested harness's trust dialog at this probe path before dispatch
 (by hand except for Claude's `probe/trust.sh`). OMP and Pi pinned workers
 need their README Dely install, which loads the pin extension. Create two
-spec files under the probe path:
+spec files under `<absolute probe path>/.dely/local/runs/<run>/`, the Run's
+folder, which `dely dispatch` requires and in which the workers write their
+handoffs:
 
 - Implement: fix the `REQUEST.md` defect, add a regression test, run
   `node --test test/`, and commit. Report through the dispatched lifecycle
@@ -600,7 +602,8 @@ function repo(files, agents) {
     fs.writeFileSync(path.join(dir, f), typeof v === 'string' ? v : JSON.stringify(v));
   }
   if (agents) fs.writeFileSync(path.join(dir, 'AGENTS.md'), agents);
-  fs.writeFileSync(path.join(dir, 'spec.md'), 'Fixture only.');
+  fs.mkdirSync(path.join(dir, '.dely/local/runs/fixture-run'), {recursive: true});
+  fs.writeFileSync(path.join(dir, '.dely/local/runs/fixture-run/spec.md'), 'Fixture only.');
   return dir;
 }
 function commit(dir, ...paths) {
@@ -692,7 +695,7 @@ const rows = {
     const dir = repo({'.dely/pins.json': {implement: P('claude', 'a'), review: P('claude', 'b')},
                       '.dely/local/pins.json': {implement: P('codex', 'pin-model', 'high')}}, table);
     fs.writeFileSync(path.join(root, 'calls.jsonl'), '');
-    const d = helper(tree, ['dispatch', '--repo', dir, '--run', 'fixture-run', '--phase', 'implement', '--spec-file', 'spec.md']);
+    const d = helper(tree, ['dispatch', '--repo', dir, '--run', 'fixture-run', '--phase', 'implement', '--spec-file', '.dely/local/runs/fixture-run/spec.md']);
     const s = starts();
     if (!d.out.includes('DISPATCHED') || !s.length || argvOf(s[0], '--agent') !== 'codex' ||
         argvOf(s[0], '--model') !== 'pin-model' || argvOf(s[0], '--effort') !== 'high')
@@ -786,7 +789,8 @@ fs.mkdirSync(path.join(root, 'repo/.dely'));
 fs.writeFileSync(path.join(root, 'repo/.dely/pins.json'), JSON.stringify({
   implement: {harness: 'claude', model: 'default', effort: 'default'},
   review: {harness: 'claude', model: 'default', effort: 'default'}}));
-fs.writeFileSync(path.join(root, 'repo/spec.md'), 'Fixture only.');
+fs.mkdirSync(path.join(root, 'repo/.dely/local/runs/fixture-run'), {recursive: true});
+fs.writeFileSync(path.join(root, 'repo/.dely/local/runs/fixture-run/spec.md'), 'Fixture only.');
 fs.cpSync(snap, path.join(root, 'wrong'), {recursive: true});
 const wrong = path.join(root, 'wrong/skills/delivery/scripts/dely.js');
 const source = fs.readFileSync(wrong, 'utf8');
@@ -818,7 +822,7 @@ function run(file, verb, mode) {
   const args = [file, verb, '--run', 'fixture-run'];
   if (verb === 'wait') args.push('--control', 'claude', '--timeout-min', '0.05');
   else args.push('--repo', path.join(root, 'repo'));
-  if (verb === 'dispatch') args.push('--phase', 'implement', '--spec-file', 'spec.md');
+  if (verb === 'dispatch') args.push('--phase', 'implement', '--spec-file', '.dely/local/runs/fixture-run/spec.md');
   const r = spawnSync(process.execPath, args, {encoding:'utf8', timeout:10000,
     env:{...process.env, HOME:path.join(root,file === wrong ? 'red-home' : 'green-home'),
       ORCA_TERMINAL_HANDLE:'fixture-terminal', ORCA_CLI_COMMAND:path.join(root,'orca.js'),

@@ -19,6 +19,7 @@ this package, from memory, or from `docs/`.
 .dely/pins.json            team pins, tracked
 .dely/local/pins.json      personal pins, never tracked
 .dely/local/.gitignore     contains *, so nothing under .dely/local is tracked
+.dely/local/runs/<run>/    prompts and handoffs of one Orca Run, written by delivery
 ```
 
 Each file is an object whose only keys are `implement` and `review`. Each

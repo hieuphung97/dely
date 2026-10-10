@@ -1,6 +1,6 @@
 ---
 name: delivery
-description: Deliver a change through an approved design contract, sequential implementation, independent review and exact-HEAD release. Use for any Bounded or Architectural change — including a small, one-line behavioral fix, which is the canonical Bounded case — so it gets design approval and independent review. Not for a Spike, which investigates and recommends without starting a delivery run.
+description: Deliver a change through an approved design contract, sequential implementation, independent review and exact-HEAD release. Use for any Bounded or Architectural change — including a small, one-line behavioral fix, which is the canonical Bounded case — so it gets design approval and independent review. Not for a Spike, which investigates and recommends without starting a delivery run; a Spike that dispatches workers still opens its own Run and keeps their files in its folder.
 ---
 
 # Delivery
@@ -114,14 +114,21 @@ and again after a `NO_ACK`; a delivery does not preflight before its first
 dispatch. Run `dely preflight` and `dely dispatch` with no tool timeout, or
 one of at least 300 s.
 
-Write the prompt to an untracked file **inside the worktree**. Never inline
-it in a shell argument: prompts carry backticks, quotes and newlines, and a
-shell argument mangles them. A path outside the workspace can trigger a
-second permission surface some harnesses still prompt for even when tool
-approval is skipped. Do not stage that file. After the worker returns,
-delete it: Control owns that dispatch artifact, not `git clean`. The handoff
-is a file in the worktree; its path travels as `payload.reportPath` and the
-message body stays short. `--spec` and `--body` are shell arguments, which
+Write the prompt to a file in the Run's folder,
+`<repo>/.dely/local/runs/<run>/`, where `<run>` is the Orca Run id; `dely
+dispatch` refuses a `--spec-file` anywhere else. It writes
+`.dely/local/.gitignore` containing `*` when that file is absent and leaves an
+existing one as it is, so the Run's files stay out of `git status` only while
+that file ignores them.
+Never inline it in a shell argument: prompts carry backticks, quotes and
+newlines, and a shell argument mangles them. A path outside the workspace can
+trigger a second permission surface some harnesses still prompt for even when
+tool approval is skipped. The handoff is a file in the same folder; its path
+travels as `payload.reportPath` and the message body stays short. Routing,
+review and remediation read earlier prompts and handoffs, so nothing in the
+folder is deleted when a worker returns; it is kept until the run closes. A
+Spike that dispatches workers opens its own Run, dispatches through `dely
+dispatch` the same way, and closes when it reports its recommendation. `--spec` and `--body` are shell arguments, which
 this skill already forbids for prompts.
 
 The dispatch prompt carries the task, its scope, and the evidence required.
@@ -339,8 +346,13 @@ accepts.
 
 Maintenance logging is machine-local and opt-in at `~/.dely/log.jsonl`. It
 stays opt-in on the presence of `~/.dely/` and is never created by Dely.
-Control closes a delivery with `dely log --run <run> --json '<object>'`,
-after release or when it stops early, rather than assembling a line by hand.
+At close, after release or when the run stops early, Control deletes the
+Run's folder `<repo>/.dely/local/runs/<run>/`, then runs
+`dely log --run <run> --repo <path> --json '<object>'` rather than
+assembling a line by hand. The log adds `residue`, the files still in that
+folder (`[]` when none, `null` when no repository is known or when part of
+the folder could not be read, which also adds `residueError`, the error code
+and the path it failed on); it deletes nothing.
 `dely` with no arguments prints which copy is running, and its usage.
 
 ## Failure and recovery

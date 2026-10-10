@@ -583,12 +583,49 @@ function dropWorker(id) {
   orca(["orchestration", "worker-release", "--dispatch", id]);
 }
 
+function runFolder(repo, run) {
+  return path.join(repo, ".dely", "local", "runs", run);
+}
+
+// Lists every file under dir. A missing dir is an empty listing; any other
+// read failure sets err to {code, dir} and the listing is incomplete.
+function listFiles(dir, top = true) {
+  const r = { files: [], err: null };
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (e) {
+    if (!(top && e.code === "ENOENT")) r.err = { code: e.code || "ERROR", dir };
+    return r;
+  }
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      const sub = listFiles(p, false);
+      r.files.push(...sub.files);
+      r.err = r.err || sub.err;
+    } else r.files.push(p);
+  }
+  return r;
+}
+
 function dispatch(f) {
   f.repo = path.resolve(f.repo);
+  const specPath = path.resolve(f.repo, f["spec-file"]);
+  const folder = runFolder(f.repo, f.run);
+  const rel = path.relative(folder, specPath);
+  if (!rel || rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel)) {
+    out("REFUSED " + specPath + " is outside this Run's folder; write the prompt and the handoff under " + folder + "/", 3);
+  }
   requireHandle({ run: f.run, repo: f.repo });
+  const ignore = path.join(f.repo, ".dely", "local", ".gitignore");
+  if (!fs.existsSync(ignore)) {
+    fs.mkdirSync(path.dirname(ignore), { recursive: true });
+    fs.writeFileSync(ignore, "*\n");
+  }
   const p = pin(f.repo, f.phase);
   const spec =
-    fs.readFileSync(path.resolve(f.repo, f["spec-file"]), "utf8") +
+    fs.readFileSync(specPath, "utf8") +
     "\n\nFirst action, before anything else: send a heartbeat with subject `ack`. The Orca preamble and this spec file are everything the worker needs; read no other skill.";
   const s = start(f.repo, f.run, p, spec, f.phase);
   if (s.error) {
@@ -940,7 +977,12 @@ function logCmd(f) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     fail("--json must be an object", { run: f.run });
   }
-  logEvent("delivery", Object.assign({}, payload, { run: f.run, repo: f.repo || payload.repo || null }));
+  const repo = f.repo || payload.repo || null;
+  const root = repo ? path.resolve(repo) : null;
+  const listed = root ? listFiles(runFolder(root, f.run)) : null;
+  const residue = listed && !listed.err ? listed.files.map((p) => path.relative(root, p)).sort() : null;
+  const extra = listed && listed.err ? { residueError: listed.err.code + " " + path.relative(root, listed.err.dir) } : {};
+  logEvent("delivery", Object.assign({}, payload, { run: f.run, repo, residue }, extra));
   process.exit(0);
 }
 

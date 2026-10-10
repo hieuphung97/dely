@@ -46,7 +46,7 @@ Dely here.
 **Reviewer** is a session Control starts to check the change independently
 before the pull request. The implementer and the reviewer are the workers.
 
-A Spike investigates only — no delivery run.
+A Spike investigates only — no delivery run. One that dispatches workers opens its own Orca Run and keeps their files in that Run's folder.
 
 ## Choose a harness for each role
 
@@ -260,8 +260,15 @@ uses Control's harness and defaults.
 In another worktree of the same clone, Dely looks for your file in that
 worktree first, then in the main checkout.
 
-`.dely/local/` has its own `.gitignore`, so nothing in it shows in `git status`.
+`.dely/local/` has its own `.gitignore` holding `*`, so nothing in it shows in
+`git status`; `dely dispatch` writes it when absent and leaves an existing one alone.
 `git clean -fdx` deletes it, personal pins included.
+
+`.dely/local/runs/<run>/` holds every prompt and handoff of one Orca Run;
+`dely dispatch` refuses a prompt anywhere else. The files stay until the run
+closes, when Control deletes the folder and `dely log` records anything left
+there as `residue`; `null` with a `residueError` means part of the folder could
+not be read.
 
 To see what is in use, ask Control to run `dely pins --repo <path>`. It prints
 each phase's harness, model, effort and source (`local`, `team` or `control`).
