@@ -583,12 +583,43 @@ function dropWorker(id) {
   orca(["orchestration", "worker-release", "--dispatch", id]);
 }
 
+function runFolder(repo, run) {
+  return path.join(repo, ".dely", "local", "runs", run);
+}
+
+function listFiles(dir) {
+  const found = [];
+  let entries = [];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (_) {
+    return found;
+  }
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) found.push(...listFiles(p));
+    else found.push(p);
+  }
+  return found;
+}
+
 function dispatch(f) {
   f.repo = path.resolve(f.repo);
+  const specPath = path.resolve(f.repo, f["spec-file"]);
+  const folder = runFolder(f.repo, f.run);
+  const rel = path.relative(folder, specPath);
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+    out("REFUSED " + specPath + " is outside this Run's folder; write the prompt and the handoff under " + folder + "/", 3);
+  }
   requireHandle({ run: f.run, repo: f.repo });
+  const ignore = path.join(f.repo, ".dely", "local", ".gitignore");
+  if (!fs.existsSync(ignore)) {
+    fs.mkdirSync(path.dirname(ignore), { recursive: true });
+    fs.writeFileSync(ignore, "*\n");
+  }
   const p = pin(f.repo, f.phase);
   const spec =
-    fs.readFileSync(path.resolve(f.repo, f["spec-file"]), "utf8") +
+    fs.readFileSync(specPath, "utf8") +
     "\n\nFirst action, before anything else: send a heartbeat with subject `ack`. The Orca preamble and this spec file are everything the worker needs; read no other skill.";
   const s = start(f.repo, f.run, p, spec, f.phase);
   if (s.error) {
@@ -940,7 +971,11 @@ function logCmd(f) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     fail("--json must be an object", { run: f.run });
   }
-  logEvent("delivery", Object.assign({}, payload, { run: f.run, repo: f.repo || payload.repo || null }));
+  const repo = f.repo || payload.repo || null;
+  const residue = repo
+    ? listFiles(runFolder(path.resolve(repo), f.run)).map((p) => path.relative(path.resolve(repo), p)).sort()
+    : null;
+  logEvent("delivery", Object.assign({}, payload, { run: f.run, repo, residue }));
   process.exit(0);
 }
 
