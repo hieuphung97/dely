@@ -47,7 +47,8 @@ deployment uses it as Control.
 
 The release floor is the argv stub row, the pin-resolution stub row when its
 trigger fired, the rejected-message stub row, the worker-release stub row
-when `wait`, `log`, or the settle logic changes, the
+when `wait`, `log`, or the settle logic changes, the mailbox-shapes stub row
+when its trigger fired, the
 live worker rows the rules above require, the Control rows those rules
 require, and rows 4–7. Rows 8–10 and 12 run when `start()` or the `omp` entry
 changes; row 11 runs when the pin extension changes. Rows 13–16 run when
@@ -1088,6 +1089,342 @@ filter; (f) a release loop before the settle check, failing on
 They run before the candidate and log into their own homes. Keep the fixture
 directory and output with the probe report; remove it after recording the
 result.
+
+## Stub row — Orca mailbox shapes
+
+Run this from the observer shell with `snap` set to the candidate snapshot.
+It uses a fake Orca executable in two measured shapes and isolated homes,
+creates no real Run or worker, and checks fifteen deliberately wrong copies
+before the candidate. Run it when an `orca orchestration` call in `dely.js`,
+the acknowledgement or the settle logic changes, and after an Orca upgrade
+that changes the output of `check`, `worker-list`, `worker-release` or
+`run-show`.
+
+The shapes are the ones measured on 2026-11-03. Orca 1.4.245 rejects `--full`
+on every orchestration command but `inbox`, keeps a heartbeat as unread mail,
+and returns a `deliveryId` whose batch replays until `--ack`. Orca 1.4.247
+stores a heartbeat as read, so neither `check --peek` nor a consuming `check`
+returns it; a consuming `check` marks its batch read and prints `deliveryId`
+only with `--full`; without `--full`, `worker-list` drops `dispatchStatus`,
+`projection` and `page`, `run-show` drops `run`, and `worker-release` prints a
+`release_unknown` as `ok: false` with no `error`; `status` and `terminal list`
+reject `--full`. A third variant of 1.4.247 drops `deliveryId` even under
+`--full`. A worker's `worker_done` arrives at the second consuming check,
+after its `ack`, and a fake Orca stop report is an `escalation` naming the
+dispatch with a `stopReason`.
+
+```bash
+stub=$(mktemp -d "$HOME/dely-probe/mailbox.XXXXXX")
+cat > "$stub/check.cjs" <<'JS'
+const fs = require('fs'), path = require('path'), assert = require('assert');
+const {spawnSync} = require('child_process');
+const [snap, root] = process.argv.slice(2);
+const rel = 'skills/delivery/scripts/dely.js';
+fs.mkdirSync(path.join(root, 'repo/.dely/local/runs/fixture-run'), {recursive: true});
+fs.writeFileSync(path.join(root, 'repo/.dely/pins.json'), JSON.stringify({
+  implement: {harness: 'claude', model: 'default', effort: 'default'},
+  review: {harness: 'codex', model: 'default', effort: 'default'}}));
+fs.writeFileSync(path.join(root, 'repo/.dely/local/runs/fixture-run/spec.md'), 'Fixture only.');
+// A fake Orca in the two measured shapes, selected by FIXTURE_ORCA. 1.4.245:
+// every orchestration command but inbox rejects --full; a heartbeat is unread
+// mail; a consuming check returns a deliveryId and replays the batch until
+// --ack. 1.4.247: a heartbeat is stored read; a consuming check marks its batch
+// read and prints deliveryId only with --full; check, worker-list, run-show and
+// worker-release print a concise view without --full; status and terminal list
+// reject --full. FIXTURE_NOID=1 drops deliveryId even under --full. Mail named
+// in state.deferred arrives at the second consuming check, as a worker's
+// worker_done arrives after its ack.
+fs.writeFileSync(path.join(root, 'orca.js'), `
+const fs = require('fs');
+const a = process.argv.slice(2), root = process.env.FIXTURE_ROOT;
+const v3 = process.env.FIXTURE_ORCA === '1.4.247';
+fs.appendFileSync(root+'/calls.jsonl', JSON.stringify(a)+'\\n');
+const st = JSON.parse(fs.readFileSync(root+'/state.json','utf8'));
+const save = () => fs.writeFileSync(root+'/state.json', JSON.stringify(st));
+const has = (k) => a.includes(k), arg = (k) => a[a.indexOf(k)+1];
+const cmd = a[0] === 'orchestration' ? a[1] : a[1] && !a[1].startsWith('-') ? a[0] + ' ' + a[1] : a[0];
+const print = (o) => { save(); console.log(JSON.stringify(o)); process.exit(o.ok === false ? 1 : 0); };
+const takesFull = v3 ? !['status','terminal list','terminal send','terminal create'].includes(cmd)
+  : a[0] === 'orchestration' && cmd === 'inbox';
+if (has('--full') && !takesFull) print({ok:false, error:{code:'invalid_argument',
+  message:'Unknown flag --full for command: ' + a.filter(x => !x.startsWith('-')).slice(0,2).join(' ')}});
+const full = has('--full') || !v3;
+const insert = (m) => st.msgs.push({id:'msg-'+(++st.seq), type:m.type, subject:m.subject,
+  from_handle:'term-'+m.dispatchId, payload:JSON.stringify(Object.assign({dispatchId:m.dispatchId}, m.extra || {})),
+  read: v3 && m.type === 'heartbeat' ? 1 : 0});
+const view = (m) => full ? {id:m.id, type:m.type, from_handle:m.from_handle, subject:m.subject, payload:m.payload}
+  : {id:m.id, type:m.type, from:m.from_handle, subject:m.subject, payload:JSON.parse(m.payload)};
+const brief = (w) => ({dispatchId:w.dispatchId, state:'running', liveness:'alive'});
+let result = {};
+if (cmd === 'status') result = {runtime:{appVersion: process.env.FIXTURE_ORCA}};
+else if (cmd === 'terminal list') result = {terminals:[{handle:'fixture-terminal', agentIdentity:'claude'}]};
+else if (cmd === 'terminal send') result = {sent:true};
+else if (cmd === 'worker-start') {
+  const id = 'd-' + (++st.starts);
+  const on = process.env.FIXTURE_ON_START || 'ack';
+  if (on.startsWith('ack')) insert({type:'heartbeat', subject:'ack', dispatchId:id});
+  if (on === 'ack+done') insert({type:'worker_done', subject:'done', dispatchId:id});
+  if (on === 'ack+later') st.deferred.push({type:'worker_done', subject:'done', dispatchId:id});
+  if (on === 'stop-escalation') insert({type:'escalation', subject:'Worker stopped', dispatchId:id,
+    extra:{handle:'term-'+id, stopReason:'errored'}});
+  st.workers.push({dispatchId:id, dispatchStatus: process.env.FIXTURE_START_STATUS || 'dispatched',
+    projection:{stage:{worker: process.env.FIXTURE_START_STAGE || 'running'}, nextAction:{kind:'none'}}});
+  result = {dispatchId:id};
+} else if (cmd === 'worker-list' && has('--terminal-state')) {
+  const i = has('--cursor') ? +arg('--cursor') : 0, page = st.pages[i] || [];
+  const rows = page.map(id => ({dispatchId:id, dispatchStatus:'completed'}));
+  const more = i + 1 < st.pages.length;
+  result = full ? {workers:rows, page:{hasMore:more, ...(more ? {nextCursor:String(i+1)} : {})}}
+    : {workers:rows.map(brief), ...(more ? {nextCursor:String(i+1)} : {})};
+} else if (cmd === 'worker-list') {
+  result = full ? {workers:st.workers, page:{hasMore:false}} : {workers:st.workers.map(brief)};
+} else if (cmd === 'worker-release') {
+  const id = arg('--dispatch');
+  if (st.unknownRelease.includes(id)) {
+    const r = {dispatchId:id, state:'release_unknown', lastError:'fixture lost the terminal'};
+    if (!full) print({ok:false, result:r});
+    result = r;
+  } else result = {dispatchId:id, state:'released'};
+}
+else if (cmd === 'worker-stop') result = {dispatchId:arg('--dispatch'), state:'stopped'};
+else if (cmd === 'worker-read') result = {source:'terminal', terminal:{tail:['fixture screen']}};
+else if (cmd === 'run-show') result = full ? {run:{id:arg('--id'), coordinator_handle:'coord-handle'}} : {runId:arg('--id')};
+else if (cmd === 'check') {
+  if (has('--all')) result = {messages: st.msgs.slice().reverse().slice(0,100).map(view)};
+  else if (has('--peek')) result = {messages: st.msgs.filter(m => !m.read).map(view)};
+  else {
+    if (has('--ack') && st.pending && st.pending.id === arg('--ack')) {
+      for (const id of st.pending.ids) st.msgs.find(m => m.id === id).read = 1;
+      st.pending = null;
+    }
+    if (has('--ack') && !has('--wait')) result = {deliveryId:null, messages:[]};
+    else {
+      if (st.checks++ >= 1) { st.deferred.forEach(insert); st.deferred = []; }
+      if (!v3 && st.pending) result = {deliveryId:st.pending.id, messages: st.pending.ids.map(id => view(st.msgs.find(m => m.id === id)))};
+      else {
+        const take = st.msgs.filter(m => !m.read);
+        if (!take.length) result = {messages:[], timedOut:true};
+        else {
+          const id = 'batch-' + (++st.batches);
+          if (v3) take.forEach(m => m.read = 1); else st.pending = {id, ids: take.map(m => m.id)};
+          result = {messages: take.map(view)};
+          if (!v3 || (has('--full') && process.env.FIXTURE_NOID !== '1')) result.deliveryId = id;
+        }
+      }
+    }
+  }
+}
+print({ok:true, result});
+`);
+function run(copy, verb, opts) {
+  const home = path.join(root, 'home-' + copy);
+  fs.mkdirSync(path.join(home, '.dely'), {recursive: true});
+  fs.writeFileSync(path.join(root, 'calls.jsonl'), '');
+  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify(Object.assign({seq: 0, starts: 0,
+    batches: 0, checks: 0, msgs: [], deferred: [], workers: [], pending: null, pages: [], unknownRelease: []},
+    opts.state || {})));
+  const args = [path.join(root, copy, rel), verb, '--run', 'fixture-run'];
+  if (verb === 'wait') args.push('--control', 'claude', '--timeout-min', '0.03');
+  else if (verb === 'notify') args.push('--as', 'fixture-terminal', '--out', path.join(root, 'wait.out'));
+  else if (verb === 'log') args.push('--json', '{"outcome":"fixture"}');
+  else args.push('--repo', path.join(root, 'repo'));
+  if (verb === 'dispatch') args.push('--phase', 'implement', '--spec-file', '.dely/local/runs/fixture-run/spec.md');
+  const r = spawnSync(process.execPath, args, {encoding: 'utf8', timeout: 20000,
+    env: {...process.env, HOME: home, ORCA_TERMINAL_HANDLE: 'fixture-terminal',
+      ORCA_CLI_COMMAND: path.join(root, 'orca.js'), FIXTURE_ROOT: root, FIXTURE_ORCA: opts.orca,
+      FIXTURE_ON_START: opts.onStart || 'ack', FIXTURE_NOID: opts.noid ? '1' : '',
+      FIXTURE_START_STAGE: opts.stage || '', FIXTURE_START_STATUS: opts.status || '',
+      DELY_ACK_S: '1', DELY_PREFLIGHT_S: '1', DELY_POLL_S: '0.02', DELY_PROGRESS_S: '0'}});
+  assert(!r.error, String(r.error));
+  const calls = fs.readFileSync(path.join(root, 'calls.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
+  const logFile = path.join(home, '.dely/log.jsonl');
+  const events = fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').trim().split('\n').map(l => JSON.parse(l)) : [];
+  fs.rmSync(logFile, {force: true});
+  return {status: r.status, stdout: r.stdout, calls, events};
+}
+const msg = (id, type, subject, dispatchId, read) => ({id, type, subject, from_handle: 'term-' + dispatchId,
+  payload: JSON.stringify({dispatchId}), read});
+const ORCAS = ['1.4.245', '1.4.247'];
+const shapes = () => [['1.4.245', false], ['1.4.247', false], ['1.4.247', true]];
+const label = (orca, noid) => orca + (noid ? ' without deliveryId' : '');
+const checks = {
+  dispatchAck(copy) {
+    for (const orca of ORCAS) {
+      const r = run(copy, 'dispatch', {orca, onStart: 'ack'});
+      assert(r.stdout.startsWith('DISPATCHED d-1'), orca + ' dispatch: no DISPATCHED on a heartbeat ack: ' + r.stdout.trim());
+    }
+  },
+  dispatchNotAck(copy) {
+    for (const orca of ORCAS) {
+      const state = {seq: 1, msgs: [msg('msg-1', 'heartbeat', 'ack', 'd-old', orca === '1.4.247' ? 1 : 0)]};
+      let r = run(copy, 'dispatch', {orca, onStart: 'silent', state});
+      assert(r.stdout.startsWith('NO_ACK d-1'), orca + " dispatch: another dispatch's ack counted: " + r.stdout.trim());
+      r = run(copy, 'dispatch', {orca, onStart: 'stop-escalation'});
+      assert(r.stdout.startsWith('NO_ACK d-1'), orca + " dispatch: Orca's stop escalation counted as the ack: " + r.stdout.trim());
+    }
+  },
+  dispatchFailedRow(copy) {
+    for (const orca of ORCAS) {
+      const r = run(copy, 'dispatch', {orca, onStart: 'silent', status: 'failed'});
+      const polls = r.calls.filter(c => c[1] === 'check').length;
+      assert(r.stdout.startsWith('NO_ACK d-1') && polls <= 2, orca + ' dispatch: failed worker row not seen (' + polls + ' polls)');
+    }
+  },
+  preflight(copy) {
+    for (const [orca, noid] of shapes()) {
+      const r = run(copy, 'preflight', {orca, noid, onStart: 'ack+later', stage: 'start_unknown'});
+      const pass = r.stdout.split('\n').filter(l => / PASS /.test(l));
+      assert.equal(pass.length, 2, label(orca, noid) + ' preflight: worker_done not seen: ' + r.stdout.trim());
+      assert.equal(r.status, 0);
+    }
+  },
+  preflightDeadRow(copy) {
+    for (const orca of ORCAS) {
+      const r = run(copy, 'preflight', {orca, onStart: 'silent', stage: 'start_unknown'});
+      const lines = r.stdout.trim().split('\n');
+      assert(lines.length === 2 && lines.every(l => l.includes(' FAIL worker never started a turn')),
+        orca + ' preflight: dead worker row not seen: ' + r.stdout.trim());
+    }
+  },
+  waitSettles(copy) {
+    for (const [orca, noid] of shapes()) {
+      const state = {seq: 1, msgs: [msg('msg-1', 'heartbeat', 'ack', 'd-work', orca === '1.4.247' ? 1 : 0)],
+        deferred: [{type: 'worker_done', subject: 'done', dispatchId: 'd-work'}],
+        workers: [{dispatchId: 'd-work', dispatchStatus: 'dispatched', projection: {nextAction: {kind: 'none'}}}]};
+      const r = run(copy, 'wait', {orca, noid, state});
+      let out = null;
+      try { out = JSON.parse(r.stdout); } catch {}
+      assert(out && 'SETTLED' in out, label(orca, noid) + ' wait: worker_done not settled: ' + r.stdout.trim());
+      assert.equal(r.status, 0);
+      assert.equal(out.SETTLED, noid ? null : orca === '1.4.245' ? 'batch-2' : 'batch-1');
+      assert(out.messages.some(m => m.type === 'worker_done' && m.from === 'term-d-work'), orca + ' wait: settled batch lacks the worker_done');
+      assert.deepEqual(out.release, [{dispatchId: 'd-work', state: 'released'}]);
+    }
+  },
+  waitReleaseUnknown(copy) {
+    for (const orca of ORCAS) {
+      const state = {seq: 1, msgs: [msg('msg-1', 'worker_done', 'done', 'd-unk', 0)], unknownRelease: ['d-unk']};
+      const r = run(copy, 'wait', {orca, state});
+      const out = JSON.parse(r.stdout);
+      assert.deepEqual(out.release, [{dispatchId: 'd-unk', state: 'release_unknown'}],
+        orca + " wait: release state not Orca's: " + JSON.stringify(out.release));
+    }
+  },
+  waitAttention(copy) {
+    for (const orca of ORCAS) {
+      const state = {workers: [{dispatchId: 'd-ask', dispatchStatus: 'dispatched',
+        projection: {nextAction: {kind: 'reply', argv: ['orca', 'orchestration', 'reply']}, attention: {requiresAction: true}}}]};
+      const r = run(copy, 'wait', {orca, state});
+      assert(r.stdout.includes('"ATTENTION"') && r.status === 8, orca + ' wait: attention row not seen: ' + r.stdout.trim());
+    }
+  },
+  logPages(copy) {
+    for (const orca of ORCAS) {
+      const r = run(copy, 'log', {orca, state: {pages: [['r-a'], ['r-b']]}});
+      const ev = r.events.filter(e => e.event === 'delivery');
+      assert.equal(ev.length, 1);
+      assert.deepEqual(ev[0].release.map(x => x.dispatchId), ['r-a', 'r-b'], orca + ' log: second reclaimable page not read');
+    }
+  },
+  notify(copy) {
+    for (const orca of ORCAS) {
+      const r = run(copy, 'notify', {orca});
+      const sent = r.calls.filter(c => c[0] === 'terminal' && c[1] === 'send');
+      assert.equal(sent.length, 1);
+      assert.equal(sent[0][sent[0].indexOf('--terminal') + 1], 'coord-handle', orca + ' notify: coordinator not read from run-show');
+    }
+  },
+};
+const IS_BATCH = 'function isBatch(res) {\n  return !!res.deliveryId || (Array.isArray(res.messages) && res.messages.length > 0);';
+const CHECK_WAIT = 'const r = orcaFull([\n      "orchestration",\n      "check",\n      "--wait",';
+const ACK_PREFLIGHT = 'if (res.deliveryId) orca(["orchestration", "check", "--run", f.run, "--ack", res.deliveryId]);';
+const ACK_WAIT = 'if (res.deliveryId) orca(["orchestration", "check", ...as, "--run", f.run, "--ack", res.deliveryId]);';
+const mutants = [
+  ['a: dispatch peeks for the ack (0.27.0)', [['if (recentMail(f.run).some((m) => acknowledges(m, s.id))) {',
+    'if (((orca(["orchestration", "check", "--peek", "--run", f.run]).result || {}).messages || []).some((m) => liveNamesDispatch(m, s.id))) {']],
+    'dispatchAck', '1.4.247 dispatch: no DISPATCHED'],
+  ['b: consuming checks read the concise view and need a deliveryId (0.27.0)', [
+    [IS_BATCH, 'function isBatch(res) {\n  return !!res.deliveryId;'],
+    [CHECK_WAIT, CHECK_WAIT.replace('orcaFull', 'orca')]], 'preflight', '1.4.247 preflight: worker_done not seen'],
+  ['c: a batch needs a deliveryId', [[IS_BATCH, 'function isBatch(res) {\n  return !!res.deliveryId;']],
+    'waitSettles', '1.4.247 without deliveryId wait: worker_done not settled'],
+  ['d: --full on every Orca call', [['const argv = /\\.m?js$/i.test(bin) ? [bin, ...args, "--json"] : [...args, "--json"];',
+    'const argv = /\\.m?js$/i.test(bin) ? [bin, ...args, "--json", "--full"] : [...args, "--json", "--full"];']],
+    'dispatchAck', '1.4.245 dispatch: no DISPATCHED'],
+  ['e: --full without the fallback', [['if (!/^Unknown flag --full\\b/.test(msg)) return r;', 'return r;']],
+    'dispatchAck', '1.4.245 dispatch: no DISPATCHED'],
+  ['f: wait reads the concise worker-list', [['const rows = ((orcaFull(["orchestration", "worker-list", "--run", f.run]).result || {}).workers || []).filter(',
+    'const rows = ((orca(["orchestration", "worker-list", "--run", f.run]).result || {}).workers || []).filter(']],
+    'waitAttention', '1.4.247 wait: attention row not seen'],
+  ['g: dispatch counts any ack', [['if (recentMail(f.run).some((m) => acknowledges(m, s.id))) {',
+    'if (recentMail(f.run).some((m) => m.subject === "ack")) {']], 'dispatchNotAck', "dispatch: another dispatch's ack counted"],
+  ['h: notify reads the concise run-show', [['(orcaFull(["orchestration", "run-show", "--id", f.run])',
+    '(orca(["orchestration", "run-show", "--id", f.run])']], 'notify', '1.4.247 notify: coordinator not read'],
+  ['i: no --ack for a 1.4.245 batch', [[ACK_PREFLIGHT, ''], [ACK_WAIT, '']],
+    'preflight', '1.4.245 preflight: worker_done not seen'],
+  ['j: preflight learns of an ack only from consuming checks', [
+    ['for (const [id, rec] of Object.entries(open)) if (recent.some((m) => acknowledges(m, id))) rec.messaged = true;', '']],
+    'preflight', '1.4.247 preflight: worker_done not seen'],
+  ['k: an escalation counts as the ack', [['return liveNamesDispatch(m, id) && m.type !== "escalation";',
+    'return liveNamesDispatch(m, id);']], 'dispatchNotAck', "1.4.245 dispatch: Orca's stop escalation counted"],
+  ['l: dispatch reads the concise worker-list', [['const row = ((orcaFull(["orchestration", "worker-list", "--run", f.run])',
+    'const row = ((orca(["orchestration", "worker-list", "--run", f.run])']], 'dispatchFailedRow', '1.4.247 dispatch: failed worker row not seen'],
+  ['m: preflight reads the concise worker-list', [['const rows = ((orcaFull(["orchestration", "worker-list", "--run", f.run]).result || {}).workers || []);',
+    'const rows = ((orca(["orchestration", "worker-list", "--run", f.run]).result || {}).workers || []);']],
+    'preflightDeadRow', '1.4.247 preflight: dead worker row not seen'],
+  ['n: log reads the concise reclaimable list', [['const r = orcaFull([\n      "orchestration",\n      "worker-list",',
+    'const r = orca([\n      "orchestration",\n      "worker-list",']], 'logPages', '1.4.247 log: second reclaimable page not read'],
+  ['o: release reads the concise view', [['const r = orcaFull(["orchestration", "worker-release", "--dispatch", id]);',
+    'const r = orca(["orchestration", "worker-release", "--dispatch", id]);']], 'waitReleaseUnknown', "1.4.247 wait: release state not Orca's"],
+];
+const letters = 'abcdefghijklmno';
+for (const copy of ['candidate', ...mutants.map((m, i) => 'wrong-' + letters[i])])
+  fs.cpSync(snap, path.join(root, copy), {recursive: true});
+mutants.forEach(([name, edits, check, token], i) => {
+  const copy = 'wrong-' + letters[i], file = path.join(root, copy, rel);
+  let source = fs.readFileSync(file, 'utf8');
+  for (const [needle, text] of edits) {
+    assert(source.includes(needle), 'update the wrong-copy mutation for this candidate: ' + name);
+    source = source.replace(needle, () => text);
+  }
+  fs.writeFileSync(file, source);
+  let failed = null;
+  try { checks[check](copy); } catch (e) { failed = e; }
+  assert(failed, 'wrong copy ' + name + ' passed ' + check);
+  assert(String(failed.message).includes(token), 'wrong copy ' + name + ' failed for another reason: ' + failed.message);
+  console.log('RED: ' + name + ' fails ' + check + ': ' + failed.message.split('\n')[0]);
+});
+for (const name of Object.keys(checks)) { checks[name]('candidate'); console.log('GREEN: ' + name); }
+console.log('GREEN: candidate reads both Orca mailbox shapes');
+JS
+node "$stub/check.cjs" "$snap" "$stub"
+```
+
+**Pass:** fifteen `RED` lines print, one per wrong copy, each failing for the
+named reason; then ten `GREEN` lines and the final `GREEN` line; every
+assertion passes. The check proves, mechanically and on both shapes, that
+`dispatch` prints `DISPATCHED` on a heartbeat `ack` alone, never on another
+dispatch's `ack` or on Orca's stop escalation, and stops at once on a failed
+worker row; that `preflight` passes both pins when their `worker_done`
+arrives after the `ack`, including from workers Orca shows as
+`start_unknown` and when Orca returns no `deliveryId`, and fails a silent
+`start_unknown` worker as one that never started a turn; that `wait` settles
+a `worker_done` with its sender and release, printing `SETTLED: null` when
+Orca returns no `deliveryId`, records Orca's `release_unknown`, and still
+reports `ATTENTION`; that `log` reads every page of reclaimable workers; and
+that `notify` sends to the Run's coordinator. The wrong copies are: (a)
+`dispatch` peeks for the `ack`, as 0.27.0 did; (b) consuming checks read the
+concise view and need a `deliveryId`, as 0.27.0 did; (c) a batch needs a
+`deliveryId`; (d) `--full` on every Orca call; (e) `--full` without the
+fallback when Orca rejects it; (f) `wait` reads the concise `worker-list`;
+(g) `dispatch` counts any `ack`; (h) `notify` reads the concise `run-show`;
+(i) no `--ack` for a 1.4.245 batch; (j) `preflight` learns of an `ack` only
+from consuming checks; (k) an escalation counts as the `ack`; (l) `dispatch`
+reads the concise `worker-list`; (m) `preflight` reads the concise
+`worker-list`; (n) `log` reads the concise reclaimable list; (o) the release
+reads the concise view. They run before the candidate and log into their own
+homes. Keep the fixture directory and output with the probe report; remove it
+after recording the result.
 
 ## Step 4 — row 4, a worker that dies after it acknowledges
 
