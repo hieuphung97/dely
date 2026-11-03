@@ -165,6 +165,13 @@ plugin or in a separate probe session.
   `preflight` acknowledgement guard, Orca's escalation counted as an `ack`,
   the release state, two gaps in the stub row (the 1.4.245 `--ack` and the
   other `worker-list` reads), and three statements in this record.
+- The whole-change review of `9c10152`, dispatched through the candidate
+  helper on the review pin (Codex CLI, `gpt-6.1-sol`, `high`; `DISPATCHED`,
+  then `SETTLED` and `released`), returned `ACCEPT` with three Minor
+  findings. Two changed the candidate: the fake 1.4.245 `--ack` without
+  `--wait` now takes the next batch, as `check-run.ts` does, and the "Not
+  run" paragraph below no longer counts unused harnesses' worker rows as
+  required. The third concerned only the pull-request text.
 - Live on the final candidate, Run `run_0d484f8373ae`: `dely preflight --repo
   ~/Projects/coach-skills` printed `PREFLIGHT implement claude PASS 5s` and
   `PREFLIGHT review codex PASS 17s`, exit 0; `dely dispatch` of the
