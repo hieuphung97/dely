@@ -174,14 +174,16 @@ plugin or in a separate probe session.
   (`released`), exit 0. All three workers of the Run ended `completed` and
   `released`.
 
-Not run: every live row of `probe/checklist.md` as the checklist defines
-them — the parameterized worker row for the deployment's implement and
-review pins, the parameterized Control row for `background` (Claude Code)
-and `waker` (Codex CLI), rows 4 to 7, the Pi rows 13 to 16, and the worker
-rows of the other supported harnesses — all of which the release floor
-requires after an Orca upgrade, from a separate session against an installed
-snapshot. The live runs above are this session's probes, not those rows. A
-release runs them or names them as skipped.
+Not run: the live rows of `probe/checklist.md` that its release floor
+requires after an Orca upgrade, from a separate session against an
+installed snapshot — the parameterized worker row for each harness this
+deployment uses (Claude Code for implement, Codex CLI for review), the
+parameterized Control row once per wake mode (`background` with Claude Code,
+`waker` with Codex CLI), rows 4 to 7, and the Pi rows 13 to 16. The worker
+rows of supported harnesses this deployment does not use are not required by
+the Orca upgrade; the argv stub row covers their unchanged entries. The live
+runs above are this session's probes, not those rows. A release runs them or
+names them as skipped.
 
 ### 2026-10-12 — The dely:begin migration shim is removed; AGENTS.md is no longer read for pins
 

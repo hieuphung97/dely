@@ -1102,8 +1102,9 @@ that changes the output of `check`, `worker-list`, `worker-release` or
 
 The shapes are the ones measured on 2026-11-03. Orca 1.4.245 rejects `--full`
 on every orchestration command but `inbox`, keeps a heartbeat as unread mail,
-and returns a `deliveryId` whose batch replays until `--ack`. Orca 1.4.247
-stores a heartbeat as read, so neither `check --peek` nor a consuming `check`
+and returns a `deliveryId` whose batch replays until `--ack`; an `--ack`
+without `--wait` then takes the next batch. Orca 1.4.247 stores a heartbeat
+as read, so neither `check --peek` nor a consuming `check`
 returns it; a consuming `check` marks its batch read and prints `deliveryId`
 only with `--full`; without `--full`, `worker-list` drops `dispatchStatus`,
 `projection` and `page`, `run-show` drops `run`, and `worker-release` prints a
@@ -1197,7 +1198,7 @@ else if (cmd === 'check') {
       for (const id of st.pending.ids) st.msgs.find(m => m.id === id).read = 1;
       st.pending = null;
     }
-    if (has('--ack') && !has('--wait')) result = {deliveryId:null, messages:[]};
+    if (v3 && has('--ack') && !has('--wait')) result = {deliveryId:null, messages:[]};
     else {
       if (st.checks++ >= 1) { st.deferred.forEach(insert); st.deferred = []; }
       if (!v3 && st.pending) result = {deliveryId:st.pending.id, messages: st.pending.ids.map(id => view(st.msgs.find(m => m.id === id)))};
