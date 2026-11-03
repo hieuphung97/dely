@@ -36,6 +36,23 @@ function orca(args) {
   }
 }
 
+// Orca 1.4.246 prints a concise view of orchestration records unless --full
+// is passed: it drops deliveryId from an acknowledged check, and dispatchStatus,
+// projection and page from worker-list. Orca 1.4.245 rejects --full with
+// "Unknown flag --full for command: ...". Ask for the full record, and stop
+// asking for that command once Orca rejects the flag.
+const _noFull = new Set();
+function orcaFull(args) {
+  const key = args.slice(0, 2).join(" ");
+  if (!_noFull.has(key)) {
+    const r = orca([...args, "--full"]);
+    const msg = (r.ok === false && r.error && r.error.message) || "";
+    if (!/^Unknown flag --full\b/.test(msg)) return r;
+    _noFull.add(key);
+  }
+  return orca(args);
+}
+
 function flags(argv) {
   const f = {};
   for (let i = 0; i < argv.length; i++) {
@@ -363,9 +380,29 @@ function liveNamesDispatch(m, id) {
   return !isRejected(m) && namesDispatch(m, id);
 }
 
+// A message that shows the worker is alive and following its brief. From Orca
+// 1.4.246, Orca itself sends an escalation from the worker's handle, naming
+// the dispatch, when the worker's turn ends without a worker_done, so an
+// escalation is never an acknowledgement.
+function acknowledges(m, id) {
+  return liveNamesDispatch(m, id) && m.type !== "escalation";
+}
+
+// The Run's newest 100 rows, read or not; marks nothing. Orca 1.4.246 stores a
+// heartbeat as already read, so --peek and a consuming check never return one.
+function recentMail(run) {
+  return (orcaFull(["orchestration", "check", "--all", "--run", run]).result || {}).messages || [];
+}
+
 function messageDispatchId(m) {
   const id = payloadOf(m).dispatchId;
   return id == null || id === "" ? null : id;
+}
+
+// A batch is a check that returned mail. Orca 1.4.245 needs its deliveryId
+// acknowledged; 1.4.246 and later mark the batch handled when they return it.
+function isBatch(res) {
+  return !!res.deliveryId || (Array.isArray(res.messages) && res.messages.length > 0);
 }
 
 function settling(m) {
@@ -375,7 +412,7 @@ function settling(m) {
 // Records what Orca printed for one release and never a state it did not. A
 // failed release is an entry, not a failure: callers keep their exit code.
 function releaseWorker(id) {
-  const r = orca(["orchestration", "worker-release", "--dispatch", id]);
+  const r = orcaFull(["orchestration", "worker-release", "--dispatch", id]);
   if (r.ok === false) {
     const e = r.error || {};
     return { dispatchId: id, error: e.code || e.message || "release failed" };
@@ -392,7 +429,7 @@ function releaseReclaimable(run) {
   let cursor = null;
   let releaseError = null;
   for (;;) {
-    const r = orca([
+    const r = orcaFull([
       "orchestration",
       "worker-list",
       "--run",
@@ -524,7 +561,7 @@ function preflight(f) {
     failed++;
   };
   const pollDead = () => {
-    const rows = ((orca(["orchestration", "worker-list", "--run", f.run]).result || {}).workers || []);
+    const rows = ((orcaFull(["orchestration", "worker-list", "--run", f.run]).result || {}).workers || []);
     for (const [id, rec] of Object.entries(open)) {
       if (rec.messaged) continue;
       const w = rows.find((x) => x.dispatchId === id);
@@ -539,7 +576,7 @@ function preflight(f) {
   };
   const t0 = Date.now();
   while (Object.keys(open).length && Date.now() - t0 < PREFLIGHT_S * 1000) {
-    const r = orca([
+    const r = orcaFull([
       "orchestration",
       "check",
       "--wait",
@@ -554,10 +591,10 @@ function preflight(f) {
       process.exit(failed ? 1 : 0);
     }
     const res = r.result || {};
-    if (res.deliveryId) {
+    if (isBatch(res)) {
       for (const m of res.messages || []) {
         const hit = Object.keys(open).find((id) => liveNamesDispatch(m, id));
-        if (hit) open[hit].messaged = true;
+        if (hit && acknowledges(m, hit)) open[hit].messaged = true;
         if (hit && m.type === "worker_done") {
           const secs = Math.round((Date.now() - t0) / 1000);
           logEvent("preflight", {
@@ -573,8 +610,10 @@ function preflight(f) {
           delete open[hit];
         }
       }
-      orca(["orchestration", "check", "--run", f.run, "--ack", res.deliveryId]);
+      if (res.deliveryId) orca(["orchestration", "check", "--run", f.run, "--ack", res.deliveryId]);
     }
+    const recent = recentMail(f.run);
+    for (const [id, rec] of Object.entries(open)) if (recent.some((m) => acknowledges(m, id))) rec.messaged = true;
     pollDead();
   }
   for (const [id, rec] of Object.entries(open)) {
@@ -640,8 +679,7 @@ function dispatch(f) {
   const interval = Math.max(20, Math.min(5000, Math.floor(POLL_S * 1000)));
   const t0 = Date.now();
   for (; Date.now() - t0 < ACK_S * 1000; sleep(interval)) {
-    const peek = orca(["orchestration", "check", "--peek", "--run", f.run]);
-    if (((peek.result || {}).messages || []).some((m) => liveNamesDispatch(m, s.id))) {
+    if (recentMail(f.run).some((m) => acknowledges(m, s.id))) {
       logEvent("dispatch", {
         run: f.run,
         repo: f.repo,
@@ -652,7 +690,7 @@ function dispatch(f) {
       });
       out("DISPATCHED " + s.id, 0);
     }
-    const row = ((orca(["orchestration", "worker-list", "--run", f.run]).result || {}).workers || []).find((w) => w.dispatchId === s.id);
+    const row = ((orcaFull(["orchestration", "worker-list", "--run", f.run]).result || {}).workers || []).find((w) => w.dispatchId === s.id);
     if (row && row.dispatchStatus === "failed") break;
   }
   const raw = screenText(s.id);
@@ -725,7 +763,7 @@ function wait(f) {
   while (Date.now() < deadline) {
     const ack = pendingAck;
     pendingAck = null;
-    const r = orca([
+    const r = orcaFull([
       "orchestration",
       "check",
       ...as,
@@ -742,7 +780,7 @@ function wait(f) {
       waiting = true;
     }
     const res = r.result || {};
-    if (res.deliveryId) {
+    if (isBatch(res)) {
       const msgs = res.messages || [];
       if (msgs.some(settling)) {
         // A worker that settled with an accepted worker_done is finished; an
@@ -762,11 +800,11 @@ function wait(f) {
         });
         out(
           {
-            SETTLED: res.deliveryId,
+            SETTLED: res.deliveryId || null,
             messages: msgs.map((m) => ({
               id: m.id,
               type: m.type,
-              from: m.from_handle,
+              from: m.from_handle || m.from,
               subject: m.subject,
               payload: m.payload,
             })),
@@ -787,10 +825,10 @@ function wait(f) {
           })),
         });
       }
-      orca(["orchestration", "check", ...as, "--run", f.run, "--ack", res.deliveryId]);
+      if (res.deliveryId) orca(["orchestration", "check", ...as, "--run", f.run, "--ack", res.deliveryId]);
       continue;
     }
-    const rows = ((orca(["orchestration", "worker-list", "--run", f.run]).result || {}).workers || []).filter(
+    const rows = ((orcaFull(["orchestration", "worker-list", "--run", f.run]).result || {}).workers || []).filter(
       (w) => !skip.includes(w.dispatchId)
     );
     // dispatched is load-bearing: pending+requiresAction is the start
@@ -934,7 +972,7 @@ function waitBg(f) {
 }
 
 function notify(f) {
-  const run = (orca(["orchestration", "run-show", "--id", f.run]).result || {}).run || {};
+  const run = (orcaFull(["orchestration", "run-show", "--id", f.run]).result || {}).run || {};
   const to = run.coordinator_handle || f.as;
   const text = "dely wait finished for " + f.run + ". Finish your current step, then read " + f.out + " and continue.";
   const retryMs = Math.max(1, Math.floor(NOTIFY_RETRY_S * 1000));

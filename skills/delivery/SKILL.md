@@ -181,7 +181,10 @@ terminal by hand (`terminal close`). `retained` with `user_takeover` means a
 human typed in that tab; Orca keeps it and the human closes it. Process the
 batch, do the guide's completion accounting, and pass the settled
 `deliveryId` as `--ack` to the next `dely wait` or `wait-bg`, or run
-`orca orchestration check --ack` when no wait follows. When `wait` (or the
+`orca orchestration check --ack` when no wait follows. Orca 1.4.246 and
+later mark a batch handled when they return it, so that `--ack` is a no-op
+Orca accepts; `SETTLED: null` means Orca returned no `deliveryId`, and the
+next wait takes no `--ack`. When `wait` (or the
 `wait-bg` output) prints `ERROR` for `--ack`, run
 `orca orchestration check --ack <settled id>` and wait again without `--ack`;
 a waker Control waits again with `wait-bg`. `ATTENTION` has

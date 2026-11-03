@@ -3,11 +3,194 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-10-12.
+Last updated 2026-11-03.
 
 ---
 
 ## Settled
+
+### 2026-11-03 — The helper reads both Orca mailbox shapes: `--all` for the acknowledgement, `--full` with a fallback, and batches without a `deliveryId`
+
+#### Context
+
+On 2026-11-03 every delivery on this machine stopped at its first dispatch.
+`dely dispatch` printed `NO_ACK … stopped after 64s`, and `dely preflight`
+printed `FAIL no worker_done in 150s` for both pins three times, while the
+workers' screens and `orca orchestration inbox --terminal run:<run>` showed
+each worker had sent its `ack` and its `worker_done`. Orca had updated itself
+from 1.4.245 to 1.4.246 during the session, then to 1.4.247. The machine log
+shows the last 1.4.245 delivery (Run `run_406496b00b0e`, 2026-10-31) settling
+normally and every 1.4.246 event failing.
+
+Orca 1.4.246 shipped Orchestrator version 3 (stablyai/orca#36137 and #36498). Three
+changes break the 0.27.0 helper:
+
+- A heartbeat is stored already read (`message-insert.ts`: `handled = type
+  === 'heartbeat' ? 1 : 0`), and `check --peek` returns only unread rows.
+  `dispatch` looked for the `ack` heartbeat with `--peek`, so it never saw
+  one; it printed `DISPATCHED` only when a worker sent other mail naming its
+  dispatch, such as a `worker_done`, within `ACK_S`.
+- A consuming `check` takes the batch and marks it read in one transaction,
+  and the concise `--json` view omits `deliveryId` once the batch is
+  acknowledged (`message-agent-views.ts`). `preflight` and `wait` processed a
+  batch only `if (res.deliveryId)`, so they consumed every `worker_done`,
+  `escalation` and `question` and dropped it. `wait` could never print
+  `SETTLED`.
+- The concise view of `worker-list` drops `dispatchStatus`, `projection` and
+  `page`, and that of `run-show` drops `run`. `wait` could never print
+  `ATTENTION` or `STALLED`, `preflight` could not fail fast on a dead worker,
+  `dispatch` could not break on a failed start, and `notify` fell back to
+  `--as`.
+
+`--full` restores the full records on 1.4.246 and later, but Orca 1.4.245
+rejects it on every orchestration command except `inbox` (`Unknown flag
+--full for command: …`), and 1.4.247 rejects it on `status` and `terminal
+list`.
+
+#### Decision
+
+- `dispatch` looks for the acknowledgement with `check --all --run`, which
+  returns the Run's newest 100 rows whatever their state and marks nothing.
+  It counts a message that names this dispatch, that Orca did not reject,
+  and that is not an `escalation`: from 1.4.246 Orca sends its own
+  `escalation`, from the worker's handle and naming the dispatch, when a
+  worker's turn ends without a `worker_done`
+  (`worker-turn-stop-report.ts`), so a worker that errors before it acts
+  would otherwise count as acknowledged.
+- `preflight` reads the same rows on every poll and marks a worker that has
+  acknowledged, so its dead-worker check (a `failed` row or a
+  `start_unknown` worker) skips a worker that has acked, as it did on 1.4.245
+  when the heartbeat arrived in a consuming batch.
+- A new `orcaFull()` asks for `--full` on `check`, `worker-list`,
+  `worker-release` and `run-show`, and stops asking for that command when
+  Orca answers `Unknown flag --full`. `status`, `terminal *`, `worker-read`,
+  `worker-start` and `worker-stop` keep their plain form.
+- `preflight` and `wait` treat any check that returned mail as a batch,
+  whether or not it carries a `deliveryId`, and send `--ack` only when it
+  does. `SETTLED` prints `null` when Orca returned no `deliveryId`, and its
+  `from` falls back to the concise `from` field.
+- `SKILL.md` says that on Orca 1.4.246 and later the `--ack` is a no-op Orca
+  accepts, and that after `SETTLED: null` the next wait takes no `--ack`.
+  That sentence is the only interface change: every other output keeps its
+  form, and under `--full` Orca still returns the `deliveryId` the skill
+  passes back.
+- A new stub row, "Orca mailbox shapes", in `probe/checklist.md`, and a
+  trigger for it in the release floor.
+
+#### Alternatives considered
+
+- Detect the Orca version from `status` and branch on it. Rejected: the
+  breakage came from a self-update mid-session, and an unknown later version
+  would need a new branch; asking for the flag and falling back follows
+  whatever the installed CLI accepts.
+- Append `--full` inside `orca()`. Rejected: it fails every call on 1.4.245
+  and `status` and `terminal list` on 1.4.247 (wrong copy (d) of the new
+  stub row).
+- Read the acknowledgement from `worker-show`'s `dispatch.lastHeartbeatAt`.
+  Both versions expose it (1.4.245 without `--full`, 1.4.247 with it), and it
+  ignores Orca's escalations by construction. Rejected for this fix: it
+  costs one call per open worker per poll where `--all` costs one per Run,
+  and it would drop the existing rule that a fast worker's `worker_done`
+  also acknowledges.
+- Move `wait` to `check --peek --wait`, which Orca's help now asks of a script
+  that only watches. Rejected for this fix: `dely wait` is Control's consumer
+  by design, and a peeking waiter returns at once while any unread mail
+  remains, so it would need to track seen ids. It is listed under
+  consequences.
+
+#### Consequences
+
+- This changes `skills/`, so the version advances to 0.27.1 in both plugin
+  manifests, `package.json` and the `AGENTS.md` gate. No interface is
+  removed; the patch advances.
+- A worker that sends an `escalation` before its `ack` is now `NO_ACK` and is
+  stopped; on 1.4.245 that escalation counted. The brief makes the `ack` the
+  worker's first action.
+- Orca now types `You have N orchestration message(s). Run orca
+  orchestration check --run <run>` into the coordinator's terminal for unread
+  mail when no unfiltered waiter is active, for example after `DISPATCHED`
+  and in the gaps between `wait`'s 15 s polls. Measured in this session: the
+  pointer arrived in this Control's terminal as if typed by the user. A
+  Control that obeys consumes the batch before the helper. "Never act on an
+  Orca nudge" is still the only guard; this record does not change it.
+- Orca's stop-report `escalation` names the dispatch, so `wait` settles on it
+  and Control takes the escalation route. Measured: none arrived in this
+  session's runs. Not measured: whether a worker that ends its turn on a
+  background job draws one.
+- Read from Orca's source, not measured: under `--full` a cancelled or
+  disconnected `check --wait` prints `ok: true` with `cancelled` and no
+  messages, so `wait` and `preflight` treat it as an empty poll and keep
+  waiting; they do not print `ERROR`.
+- A consuming `check` that the helper loses (a killed `dely wait`) loses its
+  batch on 1.4.246 and later, because the batch is already marked read. The
+  rows stay readable with `orca orchestration inbox --terminal run:<run>
+  --full`.
+- `dispatch` and `preflight` read the newest 100 rows of the Run. More than
+  100 messages arriving in the Run between a start and its `ack` would hide
+  the `ack`; Dely dispatches one worker at a time, and a preflight starts at
+  most two.
+
+#### Verification, 2026-11-03
+
+"Release" is the installed 0.27.0 (`dely.js` sha256 `95c98326…`, equal to
+`c1e733e`); "candidate" is the edited working tree (`dely.js` sha256
+`a966d996…`), run from a `git archive` snapshot of `git stash create`. Orca
+1.4.247 throughout. Every live run below was made by this investigating
+Claude Code session, from its own Orca terminal; none ran from an installed
+plugin or in a separate probe session.
+
+- Reproduction on the release, Run `run_c24073df55dc`. `dely preflight --repo
+  ~/Projects/coach-skills` (the reported repository and pins, read only):
+  both pins `FAIL no worker_done in 150s`, exit 1; the inbox shows both
+  `worker_done` rows sent within 30 s, `read=1` and `delivered_at=null`, so
+  the helper's own consuming check took them. `dely dispatch` of a worker told
+  to `sleep 90` after its `ack`: `NO_ACK … stopped after 63s`, exit 4; its
+  `ack` heartbeat was stored `read=1` at 15:18:09Z. A worker told to finish at
+  once printed `DISPATCHED` in 14 s, on its `worker_done`.
+- Direct measurement: a heartbeat sent to a fresh Run is absent from `check
+  --peek` and present in `check --all`; a status message is present in both.
+  A consuming `check --json` returned `{"messages": […]}` with no
+  `deliveryId`.
+- The new stub row on a candidate snapshot: fifteen wrong copies each
+  printed `RED` for their own reason, then ten `GREEN` checks. Its first six
+  checks against the release snapshot: `dispatchAck`, `preflight`,
+  `waitSettles`, `waitAttention` and `notify` fail on the 1.4.247 shape with
+  the reported symptoms (`NO_ACK`, `FAIL no worker_done`) and pass on the
+  1.4.245 shape.
+- The four existing stub rows (launch argv against `v0.27.0`, pin
+  resolution, Orca-rejected messages, worker release) pass on the candidate
+  snapshot; the argv row reports no difference from the release.
+- An independent review of the first candidate (three reviewers, two
+  refuters per finding) confirmed eight findings, all addressed above: the
+  `preflight` acknowledgement guard, Orca's escalation counted as an `ack`,
+  the release state, two gaps in the stub row (the 1.4.245 `--ack` and the
+  other `worker-list` reads), and three statements in this record.
+- The whole-change review of `9c10152`, dispatched through the candidate
+  helper on the review pin (Codex CLI, `gpt-6.1-sol`, `high`; `DISPATCHED`,
+  then `SETTLED` and `released`), returned `ACCEPT` with three Minor
+  findings. Two changed the candidate: the fake 1.4.245 `--ack` without
+  `--wait` now takes the next batch, as `check-run.ts` does, and the "Not
+  run" paragraph below no longer counts unused harnesses' worker rows as
+  required. The third concerned only the pull-request text.
+- Live on the final candidate, Run `run_0d484f8373ae`: `dely preflight --repo
+  ~/Projects/coach-skills` printed `PREFLIGHT implement claude PASS 5s` and
+  `PREFLIGHT review codex PASS 17s`, exit 0; `dely dispatch` of the
+  `sleep 90` worker printed `DISPATCHED` in 8 s, while the Run's newest row
+  was its `ack` heartbeat; `dely wait --control claude` printed
+  `SETTLED` 94 s later with the worker's `worker_done` and its release
+  (`released`), exit 0. All three workers of the Run ended `completed` and
+  `released`.
+
+Not run: the live rows of `probe/checklist.md` that its release floor
+requires after an Orca upgrade, from a separate session against an
+installed snapshot — the parameterized worker row for each harness this
+deployment uses (Claude Code for implement, Codex CLI for review), the
+parameterized Control row once per wake mode (`background` with Claude Code,
+`waker` with Codex CLI), rows 4 to 7, and the Pi rows 13 to 16. The worker
+rows of supported harnesses this deployment does not use are not required by
+the Orca upgrade; the argv stub row covers their unchanged entries. The live
+runs above are this session's probes, not those rows. A release runs them or
+names them as skipped.
 
 ### 2026-10-12 — The dely:begin migration shim is removed; AGENTS.md is no longer read for pins
 

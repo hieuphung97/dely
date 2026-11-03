@@ -225,7 +225,7 @@ Update by installing the new tag. At startup, check that Skills names
 Invoke `/skill:delivery` or `/skill:setup`. Check a pinned worker's model in
 `~/.pi/agent/sessions/`.
 
-Checked versions (observations, not minimums): Orca 1.4.218, 1.4.220, 1.4.224 (OMP and Pi worker); Claude Code
+Checked versions (observations, not minimums): Orca 1.4.218, 1.4.220, 1.4.224 (OMP and Pi worker), 1.4.247; Claude Code
 2.1.286; Codex CLI 0.159.3; Cursor Agent CLI 2026.09.28-64d2043; Copilot CLI
 1.0.89; Antigravity CLI 1.2.13 (install), 1.2.14 (worker, Control); Grok
 Build 1.0.44; OMP 18.4.8 (Control), 18.6.1 (worker); Pi 0.99.1, 1.0.2.
