@@ -60,9 +60,12 @@ this list. Rerun OMP pin rows and its Control row after an OMP upgrade;
 rerun Pi pin rows and its Control row after a Pi upgrade. A release that
 skips required rows names them and the reason in its decision record;
 structural gates cannot substitute for them. Row 5 and row 7 were retired on
-2026-11-04 because Orca 1.4.220 and later pre-trust the folder when they start
-an agent, so a Claude Code worker never reaches its trust dialog; the other
-rows keep their numbers.
+2026-11-04 as a choice: by default Orca 1.4.220 and later pre-trust the folder
+when they start an agent, so under that default and a successful trust write
+there is no Claude Code dialog for them to observe. With Orca's "Trust the
+folder when Orca starts an agent" setting off, or a failed write, or an older
+Orca, the dialog still appears and the `PREFLIGHT … FAIL` route covers it; no
+row exercises that now. The other rows keep their numbers.
 
 ## Step 1 — install the candidate from a snapshot
 
@@ -1645,8 +1648,9 @@ returns one batch. An OMP worker on Orca older than 1.4.224, which refuses `--mo
 upgrade reruns the live worker row for each deployment harness, the Control row
 once per wake mode, row 4, and Pi rows 13–16, so the other supported
 harnesses are not re-verified against the new Orca. A Claude Code trust dialog
-on a worker path is no longer observable, because Orca 1.4.220 and later
-pre-trust agent folders.
+on a worker path is not observed under Orca's default pre-trust (1.4.220 and
+later, setting on, write succeeds); the setting off, a failed write and Orca
+older than 1.4.220 are not covered.
 
 ## Results
 
