@@ -1,7 +1,11 @@
 #!/bin/bash
-# Act as the human for row 7 of probe/checklist.md: open the harness in an Orca
-# terminal, answer its own trust dialog, and verify the answer in the harness's
-# store.
+# Pre-trust Claude Code at a probe path for the parameterized rows of
+# probe/checklist.md: open the harness in an Orca terminal, answer its own trust
+# dialog, and verify the answer in the harness's store. An Orca terminal opened
+# this way is not an agent start, so the dialog still appears. By default, Orca
+# 1.4.220 and later trust the folder themselves when they start a Claude Code
+# worker; with their "Trust the folder when Orca starts an agent" setting off,
+# or a failed trust write, the worker still shows it.
 #
 # Usage: probe/trust.sh <repo path under ~/dely-probe> [harness]
 #

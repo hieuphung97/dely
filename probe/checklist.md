@@ -50,16 +50,22 @@ trigger fired, the rejected-message stub row, the worker-release stub row
 when `wait`, `log`, or the settle logic changes, the mailbox-shapes stub row
 when its trigger fired, the
 live worker rows the rules above require, the Control rows those rules
-require, and rows 4–7. Rows 8–10 and 12 run when `start()` or the `omp` entry
+require, and rows 4 and 6. Rows 8–10 and 12 run when `start()` or the `omp` entry
 changes; row 11 runs when the pin extension changes. Rows 13–16 run when
 `start()`, the extension or the Pi entry changes, after a Pi upgrade, and
 after an Orca upgrade. After an Orca upgrade, run the live worker row for
-each harness a deployment uses, the Control row once per wake mode, rows 4
-and 5, and Pi rows 13 to 16. The argv stub does not test Orca and is not on
+each harness a deployment uses, the Control row once per wake mode, row 4,
+and Pi rows 13 to 16. The argv stub does not test Orca and is not on
 this list. Rerun OMP pin rows and its Control row after an OMP upgrade;
 rerun Pi pin rows and its Control row after a Pi upgrade. A release that
 skips required rows names them and the reason in its decision record;
-structural gates cannot substitute for them.
+structural gates cannot substitute for them. Row 5 and row 7 were retired on
+2026-11-04 as a choice: by default Orca 1.4.220 and later pre-trust the folder
+when they start an agent, so under that default and a successful trust write
+there is no Claude Code dialog for them to observe. With Orca's "Trust the
+folder when Orca starts an agent" setting off, or a failed write, or an older
+Orca, the dialog still appears and the `PREFLIGHT … FAIL` route covers it; no
+row exercises that now. The other rows keep their numbers.
 
 ## Step 1 — install the candidate from a snapshot
 
@@ -1484,24 +1490,6 @@ Measured on Orca 1.4.203 during this delivery's design:
 were both measured against the killed worker and neither moves, so
 neither is a substitute.
 
-## Step 5 — row 5, a pin that has not answered its dialog
-
-Use a path that no harness has trusted — a new directory each time, never
-the parameterized worker or Control paths — with a Claude Code pin, and run `dely preflight` inside a Run.
-
-**Pass:** `PREFLIGHT … FAIL` in under 60 s, the printed `last output` contains
-at least one line of the dialog, and `orca terminal list` shows nothing left
-behind. One line is enough, and on Claude Code it is often only the tail: Orca's
-prompt delivery presses Enter into the dialog, where `No, exit` is preselected,
-so Claude has exited to a shell before the helper reads the last 400
-characters. On `90fc7a9` the quote held `Security guide`, a line of that
-dialog and one `probe/trust.sh` matches on; `harnesses.json` records the
-mechanism.
-
-The quote is the point, not the verdict. A failure that arrives on time with an
-empty quote tells the human nothing, and that is exactly how this failed before
-the launch-gate fix: 150 s and no cause.
-
 ## Step 6 — row 6, a worker that goes quiet
 
 Dispatch a Claude Code worker whose spec is to acknowledge and then stay silent
@@ -1513,60 +1501,6 @@ this row exists for.
 
 Terminal workers are out of scope here: a redrawing TUI keeps the stream
 advancing, so their stall surfaces at `DEADLINE` instead.
-
-## Step 7 — row 7, the trust intervention loop
-
-This row checks the whole loop, not just the refusal: a delivery stops on an
-untrusted pin, a human trusts it, and the same Run continues to `ACCEPT`.
-
-Setup:
-
-- a path no harness has trusted, `~/dely-probe/t-<sha>`;
-- Control is Codex CLI or Cursor Agent CLI, **never Claude Code**, because
-  Claude's own startup dialog is the trust step: answering it would pre-trust
-  the path and the row would test nothing;
-- the `implement` pin is Claude Code.
-
-Steps and their pass conditions:
-
-1. Control starts the delivery and dispatches the implementer, which cannot
-   acknowledge behind Claude's dialog. From 0.20.0 a delivery does not
-   preflight first, so the sequence is `NO_ACK` after `ACK_S` (60 s), then one
-   `dely preflight` that fails the Claude pin. The clock starts at the Run's
-   `no_ack` event: a dispatch that never acknowledges writes `no_ack`, not
-   `dispatch`. **Pass:** within 150 s of the `no_ack` event, the log for the
-   Run shows a `preflight` failing the Claude pin and Control has stopped on a
-   message naming the harness, the path, and what the human must do; there is
-   exactly one `no_ack` before that `preflight` and **no `dispatch` after
-   it**; `orca orchestration worker-list` shows every dispatch released;
-   `orca terminal list` has no leftover terminal. Measured on `b8094bf`: 63 s
-   from the dispatch to `no_ack`, 79 s more to the failing `preflight` — a
-   Control turn and a 56 s preflight — and 25 s more to the stop, 104 s from
-   `no_ack`. The 150 s leaves room for a slower Control turn. On `90fc7a9`,
-   whose skill had lost the `PREFLIGHT … FAIL` route, Control dispatched a
-   second time into the same dialog and stopped about 4 min after the first
-   dispatch.
-2. Act as the human: `probe/trust.sh ~/dely-probe/t-<sha>`. It opens Claude in
-   an Orca terminal, answers the dialog, verifies
-   `projects[<path>].hasTrustDialogAccepted` in `~/.claude.json`, and closes
-   the terminal. **Pass:** it prints `TRUSTED`. On `NOT_TRUSTED`, stop and
-   call the human — do not loop.
-3. Send Control one line: `Claude Code is trusted in this repository. Run
-   preflight again and continue.` followed by Enter. If Orca answers
-   `agent_prompt_blocked`, Control is holding a menu: send `\r` first, then the
-   text.
-4. **Pass:** the same Run gets a second preflight, it passes both pins, the
-   delivery reaches `ACCEPT`, the SHA is on the remote, and nothing else was
-   sent to Control.
-
-Ways of failing that this row separates from passing: failing at 150 s with an
-empty quote; telling the human to answer in a terminal that has already been
-released; opening a new Run or dispatching without preflighting again; and
-hanging because a batch was never acknowledged.
-
-**Leaves behind:** a trust entry for `t-<sha>` in `~/.claude.json` and a
-repository registered in Orca. Remove both by hand; Orca has no command for the
-second.
 
 ## Step 8 — row 8, OMP worker with a valid pin
 
@@ -1696,8 +1630,7 @@ again exactly once. Killing the Pi worker process turns
 - keep parameterized worker and Control paths so their trust entries survive;
 - remove the argv, rejected-message and worker-release fixture directories after
   recording them;
-- remove the row 5, row 7, OMP-row and Pi-row paths, and the trust entries of the
-  first two.
+- remove the OMP-row and Pi-row paths.
 
 ## What this cannot see
 
@@ -1713,8 +1646,11 @@ not load the extension, which runs its own default unseen. A preflight that leak
 its worker. A heartbeat-only acknowledgement, because the argv stub's fixture
 returns one batch. An OMP worker on Orca older than 1.4.224, which refuses `--model`. An Orca
 upgrade reruns the live worker row for each deployment harness, the Control row
-once per wake mode, rows 4 and 5, and Pi rows 13–16, so the other supported
-harnesses are not re-verified against the new Orca.
+once per wake mode, row 4, and Pi rows 13–16, so the other supported
+harnesses are not re-verified against the new Orca. A Claude Code trust dialog
+on a worker path is not observed under Orca's default pre-trust (1.4.220 and
+later, setting on, write succeeds); the setting off, a failed write and Orca
+older than 1.4.220 are not covered.
 
 ## Results
 

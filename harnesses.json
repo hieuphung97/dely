@@ -8,7 +8,7 @@
       "status": "supported",
       "controlWake": "background",
       "limits": "Put @AGENTS.md in CLAUDE.md.",
-      "trust": "dialog",
+      "trust": "orca-preflight",
       "discovery": {
         "models": "claude -p \"/model\" --output-format json",
         "effort": "claude -p \"/effort\" --output-format json",
@@ -26,7 +26,7 @@
         "needsImport": true,
         "importLine": "@AGENTS.md"
       },
-      "notes": "worker-start --model pin honoured. The two discovery probes are answered locally (num_turns 0, total_cost_usd 0, no model turn); do not treat them as a dispatch. Claude Code 2.1.273 and 2.1.274 word the trust dialog 'Quick safety check: Is this a project you created or one you trust?' with 'No, exit' preselected, so Enter refuses and exits the harness. Orca's prompt delivery sends Enter into that dialog, which is why a NO_ACK or PREFLIGHT FAIL quote on an untrusted path ends at a shell prompt and may hold only the tail 'Security guide' within the helper's 400-character quote (measured 2026-09-16 and 2026-09-17). Decision sections: 2026-09-14, 2026-09-16, 2026-09-17."
+      "notes": "worker-start --model pin honoured. The two discovery probes are answered locally (num_turns 0, total_cost_usd 0, no model turn); do not treat them as a dispatch. By default, Orca 1.4.220 and later pre-trust the folder when Orca starts an agent (stablyai/orca#23744, merged 2026-09-29; it writes hasTrustDialogAccepted into the config file Claude reads, normally ~/.claude.json), so a Claude Code worker usually opens without its trust dialog. That holds while Orca's setting 'Trust the folder when Orca starts an agent' is on (the default) and the trust write succeeds. With the setting off, or a write that misses its time limit or meets a held lock or an unparseable file, the worker still asks and PREFLIGHT FAIL covers it. Measured 2026-11-04 on this machine, Orca 1.4.247 with Claude Code 2.1.318 and the setting at its default: with no trust entry for a new path or any ancestor, a worker's dely preflight passed in 6 s with no dialog and the path's entry appeared, while the same claude --dangerously-skip-permissions opened by orca terminal create --command in a fresh git init directory still showed the dialog. The rest of this paragraph about the dialog applies when Claude Code is opened outside an Orca agent start, to Orca before 1.4.220, and to current Orca with the setting off or a failed trust write: Claude Code 2.1.273 and 2.1.274 word the trust dialog 'Quick safety check: Is this a project you created or one you trust?' with 'No, exit' preselected, so Enter refuses and exits the harness. Orca's prompt delivery sends Enter into that dialog, which is why a NO_ACK or PREFLIGHT FAIL quote on an untrusted path ends at a shell prompt and may hold only the tail 'Security guide' within the helper's 400-character quote (measured 2026-09-16 and 2026-09-17). Decision sections: 2026-09-14, 2026-09-16, 2026-09-17, 2026-11-04."
     },
     {
       "name": "Codex CLI",
