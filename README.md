@@ -51,8 +51,9 @@ A Spike investigates only — no delivery run. One that dispatches workers opens
 ## Choose a harness for each role
 
 Before the first delivery in a project, open each harness you chose there once
-and answer its trust question. Setup opens them for you. OMP has no trust
-question; Pi asks only when the project or a parent folder has `.pi/` or
+and answer its trust question. Setup opens them for you. Claude Code needs no
+such step on Orca 1.4.220 and later, which trusts the folder when it starts
+Claude. OMP has no trust question; Pi asks only when the project or a parent folder has `.pi/` or
 `.agents/skills`.
 
 ✓ works · ⚠ works, read the note · ✗ not supported

@@ -3,11 +3,100 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-11-03.
+Last updated 2026-11-04.
 
 ---
 
 ## Settled
+
+### 2026-11-04 — Checklist rows 5 and 7 are retired; Claude Code's trust is `orca-preflight`
+
+#### Context
+
+`probe/checklist.md` rows 5 and 7 need Claude Code's trust dialog: row 5 runs
+`dely preflight` on a path no harness has trusted and expects `PREFLIGHT …
+FAIL` quoting the dialog; row 7 runs the whole intervention loop from that
+failure to `ACCEPT`. `harnesses.json` marked Claude Code `trust: "dialog"`.
+
+Orca 1.4.220 and later pre-trust the folder whenever Orca starts an agent
+(stablyai/orca#23744, commit `21d4ae944`, merged 2026-09-29;
+`src/main/claude/claude-folder-trust-file.ts` writes
+`hasTrustDialogAccepted` into `~/.claude.json`). `gh api
+repos/stablyai/orca/compare/21d4ae944...v1.4.218` reports `diverged` (the
+commit is not in 1.4.218) and `...v1.4.220` reports `ahead` (it is in
+1.4.220). Row 5 last passed on 2026-10-01 on Orca 1.4.218.
+
+Measured on 2026-11-04 on Orca 1.4.247 with Claude Code 2.1.318: with no trust
+entry for a new probe path or any ancestor, a Claude worker's `dely preflight`
+passed in 6 s with no dialog, and the path's trust entry appeared. The same
+`claude --dangerously-skip-permissions`, opened by `orca terminal create
+--command` (not an agent start) in a fresh `git init` directory, still showed
+the dialog. So a Claude Code worker started by Orca never reaches its trust
+dialog, and rows 5 and 7 cannot occur. Evidence:
+`~/dely-probe/checklist-0271-ec1986e.md`, sections "Rows 5 and 7 (second
+session)" and "Observer note".
+
+#### Decision
+
+- `harnesses.json`: the `claude` entry's `trust` becomes `orca-preflight`, the
+  value `skills/setup/SKILL.md` already defines as needing no step. Its
+  `notes` state the measured fact and say that the dialog's wording and the
+  `No, exit` behaviour apply when Claude Code is opened outside an Orca agent
+  start, and to Orca before 1.4.220. No other entry or field changes.
+- `probe/checklist.md`: the sections for rows 5 and 7 are deleted. No other
+  row or step is renumbered. One sentence in the release floor records the
+  retirement. The release floor now reads rows 4 and 6, the Orca-upgrade list
+  names row 4, the Cleanup list loses the row 5 and row 7 paths, and "What
+  this cannot see" says a Claude Code trust dialog on a worker path is no
+  longer observable.
+- `probe/trust.sh` keeps its behaviour; its header now says it pre-trusts
+  Claude Code at a probe path for the parameterized rows, opened outside an
+  agent start.
+- `README.md` says Claude Code needs no trust step on Orca 1.4.220 and later.
+- The version advances to 0.27.2: `harnesses.json` changed, so both plugin
+  manifests, `package.json` and the `AGENTS.md` gate move together.
+
+#### Alternatives considered
+
+- Renumber the remaining rows. Rejected: this file's history cites rows by
+  number, and a renumbering would make those citations point at other rows.
+- Redefine rows 5 and 7 on another harness. Rejected for now: Orca's PR says
+  it also pre-trusts Cursor, Copilot, Qoder and Antigravity on their common
+  launch path, and that is unmeasured here. Redefining the rows before
+  measuring would encode a guess.
+- Set Claude Code's `trust` to `none`, or a new value. Rejected: `none` says
+  the harness has no trust step at all, which is false when Claude Code is
+  opened outside an agent start, and setup names only `dialog`,
+  `orca-preflight` and `none`.
+- Keep `dialog` and leave the rows. Rejected: setup would open Claude Code for
+  a dialog that does not appear, and the rows would fail on every Orca that
+  starts agents the current way.
+
+#### Consequences
+
+- Setup no longer opens Claude Code for trust; it needs no step for an entry
+  marked `orca-preflight`.
+- A user on Orca older than 1.4.220 meets the dialog at preflight. The
+  existing `PREFLIGHT … FAIL` route covers it: the failure quotes the dialog
+  and Control stops for the human. Nothing in the helper changes.
+- The other harnesses' `trust` stays `dialog` until each is measured.
+- No live row now exercises the `PREFLIGHT … FAIL` quote of a trust dialog.
+  The route stays in the skill, unexercised on current Orca.
+
+#### Verification, 2026-11-04
+
+- The measurement above, from the second 0.27.1 session on Orca 1.4.247.
+- Against the diff from `ec1986e`: Claude's `trust` reads `orca-preflight`;
+  every other entry is identical, and the Claude entry is identical apart from
+  `trust` and `notes`; no row or step reference to rows 5 and 7 remains in
+  `probe/checklist.md` except the retirement sentence; the step count falls
+  from 14 to 12 and Step 6 remains; the launch-argv stub row against snapshots
+  of this change and of `v0.27.1` printed `GREEN`; and each acceptance
+  instrument rejected its named wrong implementation on a scratch copy.
+- Not run: any live row. The change alters no launch, and the argv stub stands
+  in for the live worker row of an unchanged entry.
+
+---
 
 ### 2026-11-03 — The helper reads both Orca mailbox shapes: `--all` for the acknowledgement, `--full` with a fallback, and batches without a `deliveryId`
 

@@ -1,7 +1,9 @@
 #!/bin/bash
-# Act as the human for row 7 of probe/checklist.md: open the harness in an Orca
-# terminal, answer its own trust dialog, and verify the answer in the harness's
-# store.
+# Pre-trust Claude Code at a probe path for the parameterized rows of
+# probe/checklist.md: open the harness in an Orca terminal, answer its own trust
+# dialog, and verify the answer in the harness's store. An Orca terminal opened
+# this way is not an agent start, so the dialog still appears; on Orca 1.4.220
+# and later a Claude Code worker started by Orca never shows it.
 #
 # Usage: probe/trust.sh <repo path under ~/dely-probe> [harness]
 #
