@@ -120,8 +120,18 @@ session)" and "Observer note".
   from 14 to 12 and Step 6 remains; the launch-argv stub row against snapshots
   of this change and of `v0.27.1` printed `GREEN`; and each acceptance
   instrument rejected its named wrong implementation on a scratch copy.
-- Not run: any live row. The change alters no launch, and the argv stub stands
-  in for the live worker row of an unchanged entry.
+- Live, by a separate probe session on a `git archive` snapshot of `4cb2a7a`
+  (Orca 1.4.247, Claude Code 2.1.318, `claude-sonnet-5-5` / `medium`): the
+  parameterized worker row for Claude Code, whose entry changed, PASS —
+  preflight PASS, implement and review `DISPATCHED`, both `SETTLED` and
+  `released`, the regression passes, review `ACCEPT`
+  (`~/dely-probe/checklist-0272-4cb2a7a.md`).
+- Skipped, with this reason: the Control row for Claude Code (its entry
+  changed) and rows 4 and 6, which the release floor asks for. `git diff
+  ec1986e -- skills/ extensions/` is empty, so the helper and both skills are
+  byte-identical to `v0.27.1`, where all three passed on 2026-11-04 on the
+  same Orca (`~/dely-probe/checklist-0271-ec1986e.md`); the only changed field
+  is `trust`, which only `dely:setup` reads and none of those rows exercises.
 
 ---
 
