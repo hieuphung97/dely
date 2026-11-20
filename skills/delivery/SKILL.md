@@ -261,7 +261,7 @@ fits one session. A task needing continuation is a decomposition failure.
 
 ```text
 Status: DONE | BLOCKED | NEEDS_REPLAN
-Harness:            name, model, effort, sandbox
+Harness:            the launch line's harness, model, effort and sources, word for word; sandbox
 Session:            the dispatch id
 Baseline:
 Changed paths:
@@ -274,7 +274,12 @@ END OF HANDOFF
 ```
 
 `END OF HANDOFF` is the last line and load-bearing: the only thing that
-distinguishes a handoff from one cut off mid-write. Under `Residue`, a claim
+distinguishes a handoff from one cut off mid-write. The `Harness:` line holds
+the harness, model and effort of the launch line `dely dispatch` put in your
+prompt, each with its source, word for word and not retyped from a project
+document; the line's label and the sentences after its values may be dropped or
+kept. The launch line records what was asked for, not what the
+session proves it ran with. Under `Residue`, a claim
 of nothing left needs evidence: name the check that returned empty. Under
 `Verification`, cite the dispatch-bound command, output, and outcome that
 Orca recovers for that task — the transcript or terminal it selects, and
@@ -297,11 +302,13 @@ identity, and release readiness. Only that final review is release-binding
 for Architectural work; Bounded work has no earlier task review and no
 duplicate integration review. No worker runs while a review of the same
 working tree runs. The working tree and its gate surface are shared mutable
-state, and a review reproduces gates in that tree, so a concurrent edit
+state, and a review reproduces instruments in that tree, so a concurrent edit
 makes another task's work look like this one's result.
 
-**Reproduce, do not accept.** Run the gates yourself. A claim you did not
-reproduce is not evidence. The reviewer observes the counterexample
+**Reproduce, do not accept.** Reproduce the acceptance instruments and each
+counterexample. Check the head the gate logs name against the head under
+review, and rerun a gate you doubt or one the logs do not cover. A claim you
+did not reproduce is not evidence. The reviewer observes the counterexample
 discriminate for itself — an implementation that is present, runs, returns
 a pass, and is wrong. An instrument red only because the behaviour was
 absent is not that observation.
@@ -326,8 +333,9 @@ For an in-contract `CHANGES_REQUESTED` finding, remediation is a fresh
 dispatch on the implement pin whose prompt names the original task prompt,
 the implement handoff, and the finding as the reviewer wrote it. That worker
 is the original implementer for every rule here: it verifies the finding,
-fixes the root cause, reruns the affected instruments and closure gates, and
-writes a separate remediation commit. Control owns the plan and the decision
+fixes the root cause, reruns the instruments and the gates that can observe
+its change, and writes a separate remediation commit. A project may name that
+subset, as it may for the release; a fix does not rerun every closure gate. Control owns the plan and the decision
 record for the whole run, including remediating findings inside them;
 amending them is not implementing the candidate.
 
@@ -338,6 +346,12 @@ briefed with that handoff is not the scoped re-review. It checks the
 finding's reproduction, the fix, and any defect the fix introduced, and
 scope-checks a Control amendment the same way. If it does not accept,
 Control routes to `REPLAN_OR_SPLIT` — it does not start another repair loop.
+The scoped re-review may be Control's recorded check instead of a dispatch
+only when every fixed finding is Minor and a deterministic check proves that
+the fix changes text only; Control records the check and its output. A
+reopened finding is a replan: a new task that carries a reopened finding, or a
+ruling that reopens an accepted task, goes to the human beside
+`REPLAN_OR_SPLIT`.
 `BLOCKED` preserves the candidate and escalates the unresolved dependency or
 authority question to Control separately from a failed worker process; it is
 not remediated. The Architectural integration review is always a fresh
@@ -358,9 +372,10 @@ no LLM worker and makes no post-review candidate edit.
 7. Mark the pull request ready and report it for human merge.
 
 Any candidate mutation after the applicable final review invalidates that
-verdict; Control reruns the affected gates and review on the new exact HEAD.
-Affected gates are those that can observe the change class; a project may
-name that subset. Dely never merges, force-pushes, or publishes outside the
+verdict; Control reruns the gates that can observe the change, and the review,
+on the new exact HEAD. A project may name that subset for every rerun, not
+only the release. One full closure run happens at the final exact HEAD, by
+Control; the final review does not repeat it. Dely never merges, force-pushes, or publishes outside the
 approved target and authority. If project policy cannot publish work in
 progress, Dely delays the push and pull request until the applicable review
 accepts.
@@ -387,6 +402,7 @@ from an ambiguous, missing, or merely transport-level outcome.
 | --- | --- |
 | In-contract implementation defect | Original implementer remediates |
 | Scoped remediation re-review does not accept | `REPLAN_OR_SPLIT` |
+| A new task carries a reopened finding, or a ruling reopens an accepted task | Replan: ask the human |
 | Scope or architecture must change | Return to the design gate |
 | New authority or destructive action is required | Ask the human |
 | Orca or a required capability is unavailable | Stop; no headless fallback |

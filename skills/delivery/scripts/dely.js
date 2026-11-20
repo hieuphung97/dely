@@ -653,7 +653,77 @@ function listFiles(dir, top = true) {
   return r;
 }
 
+// A harness takes an effort when it has a flag for it, joins it to the model,
+// or receives it as a spec pin. Anything else would drop the level silently.
+function takesEffort(p) {
+  return !!(p.effortFlag || p.effortInModel || p.modelPin === "spec-unchecked");
+}
+
+function pinsFileLabel(repo, p) {
+  if (p.source === "control") return "Control's own harness, no pins file";
+  const rel = path.relative(repo, p.file);
+  return rel && rel !== ".." && !rel.startsWith(".." + path.sep) && !path.isAbsolute(rel) ? rel : p.file;
+}
+
+// What one dispatch asked for, and where each value came from. `set` is the
+// effort given to this dispatch alone; the pinned value stays on record.
+function launchOf(repo, p, set) {
+  const from = pinsFileLabel(repo, p);
+  const l = {
+    phase: p.phase,
+    harness: p.agent,
+    harnessFrom: from,
+    model: p.model,
+    modelFrom: from,
+    effort: set == null ? p.effort : set,
+    effortFrom: set == null ? from : "dispatch --effort",
+  };
+  if (set != null) {
+    l.effortPinned = p.effort;
+    l.effortPinnedFrom = from;
+  }
+  return l;
+}
+
+// A value shown in the launch line stays on the physical line. A pins-file
+// path or a pinned value that holds a control character, or a character that
+// ends a line in a reader, is shown with that character spelled out, so the
+// line is not split. The backslash is spelled `\\` too, so every spelling
+// begins with one unambiguous backslash and the shown text turns back into the
+// value: `\\`, `\n`, `\r`, `\t`, `\xNN`, `\uNNNN`. Text with none of these is
+// returned as is.
+function oneLine(v) {
+  return String(v).replace(/[\\\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, (c) => {
+    const k = c.charCodeAt(0);
+    if (c === "\\") return "\\\\";
+    if (c === "\n") return "\\n";
+    if (c === "\r") return "\\r";
+    if (c === "\t") return "\\t";
+    return k < 0x100 ? "\\x" + k.toString(16).padStart(2, "0") : "\\u" + k.toString(16).padStart(4, "0");
+  });
+}
+
+// One line of its own, built where the prompt is assembled. It carries the
+// instruction to copy it, because a worker reads its prompt and no skill.
+// Every value is shown through oneLine, so the line is one physical line.
+function launchLine(raw) {
+  const l = {};
+  for (const k of Object.keys(raw)) l[k] = oneLine(raw[k]);
+  const effortFrom = l.effortPinned == null
+    ? "from " + l.effortFrom
+    : "set for this dispatch with --effort; pinned " + l.effortPinned + " in " + l.effortPinnedFrom;
+  return (
+    "Launch line: harness " + l.harness + " (from " + l.harnessFrom + "), model " + l.model +
+    " (from " + l.modelFrom + "), effort " + l.effort + " (" + effortFrom + "). " +
+    "Copy this line as it is into the Harness: line of your handoff. " +
+    "It records what Dely asked for, not what this session proves it ran with."
+  );
+}
+
 function dispatch(f) {
+  if (!PHASES.includes(f.phase)) {
+    out("REFUSED unknown phase " + JSON.stringify(f.phase) + "; the phases are " + PHASES.join(", ") + ", and nothing was started", 3);
+  }
   f.repo = path.resolve(f.repo);
   const specPath = path.resolve(f.repo, f["spec-file"]);
   const folder = runFolder(f.repo, f.run);
@@ -662,14 +732,26 @@ function dispatch(f) {
     out("REFUSED " + specPath + " is outside this Run's folder; write the prompt and the handoff under " + folder + "/", 3);
   }
   requireHandle({ run: f.run, repo: f.repo });
+  const pinned = pin(f.repo, f.phase);
+  let p = pinned;
+  let setEffort = null;
+  if ("effort" in f) {
+    if (typeof f.effort !== "string" || !f.effort.trim()) out("REFUSED --effort needs a level", 3);
+    if (!takesEffort(pinned)) {
+      out("REFUSED " + pinned.agent + " takes no effort; --effort is for a harness that does, and nothing was started", 3);
+    }
+    setEffort = f.effort;
+    p = Object.assign({}, pinned, { effort: setEffort });
+  }
+  const launch = launchOf(f.repo, pinned, setEffort);
   const ignore = path.join(f.repo, ".dely", "local", ".gitignore");
   if (!fs.existsSync(ignore)) {
     fs.mkdirSync(path.dirname(ignore), { recursive: true });
     fs.writeFileSync(ignore, "*\n");
   }
-  const p = pin(f.repo, f.phase);
   const spec =
     fs.readFileSync(specPath, "utf8") +
+    "\n\n" + launchLine(launch) +
     "\n\nFirst action, before anything else: send a heartbeat with subject `ack`. The Orca preamble and this spec file are everything the worker needs; read no other skill.";
   const s = start(f.repo, f.run, p, spec, f.phase);
   if (s.error) {
@@ -687,8 +769,9 @@ function dispatch(f) {
         agent: p.agent,
         dispatchId: s.id,
         seconds: Math.round((Date.now() - t0) / 1000),
+        launch,
       });
-      out("DISPATCHED " + s.id, 0);
+      out("DISPATCHED " + s.id + "\n" + launchLine(launch), 0);
     }
     const row = ((orcaFull(["orchestration", "worker-list", "--run", f.run]).result || {}).workers || []).find((w) => w.dispatchId === s.id);
     if (row && row.dispatchStatus === "failed") break;
@@ -696,8 +779,8 @@ function dispatch(f) {
   const raw = screenText(s.id);
   const secs = Math.round((Date.now() - t0) / 1000);
   dropWorker(s.id);
-  logEvent("no_ack", { run: f.run, repo: f.repo, dispatchId: s.id, seconds: secs, text: raw });
-  out("NO_ACK " + s.id + " stopped after " + secs + "s; last output: " + clip(raw), 4);
+  logEvent("no_ack", { run: f.run, repo: f.repo, dispatchId: s.id, seconds: secs, text: raw, launch });
+  out("NO_ACK " + s.id + " stopped after " + secs + "s; last output: " + clip(raw) + "\n" + launchLine(launch), 4);
 }
 
 function advance(track, id) {
@@ -1031,7 +1114,7 @@ const COMMANDS = {
       ["phase", "implement|review"],
       ["spec-file", "FILE"],
     ],
-    optional: [],
+    optional: [["effort", "LEVEL"]],
   },
   wait: {
     required: [["run", "RUN"], ["control", "HARNESS"]],

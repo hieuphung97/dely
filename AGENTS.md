@@ -46,10 +46,6 @@ Repository artifacts are written in English.
   manifests, `package.json`, and the version gate below, within that same
   delivery.
 
-## Phase dispatch
-
-Name the model and reasoning effort on every dispatch.
-
 ## Dely
 
 Bounded or Architectural work invokes `dely:delivery`; Spike starts no
@@ -86,9 +82,9 @@ git ls-files -z '*.sh' 'skills/delivery/scripts/dely' | xargs -0 -n1 bash -n
 ```
 
 ```bash
-test "$(jq -r .version .claude-plugin/plugin.json)" = 0.27.2
-test "$(jq -r .version .codex-plugin/plugin.json)" = 0.27.2
-test "$(jq -r .version package.json)" = 0.27.2
+test "$(jq -r .version .claude-plugin/plugin.json)" = 0.28.0
+test "$(jq -r .version .codex-plugin/plugin.json)" = 0.28.0
+test "$(jq -r .version package.json)" = 0.28.0
 ```
 
 ```bash

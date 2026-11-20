@@ -3,11 +3,320 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-11-04.
+Last updated 2026-11-20.
 
 ---
 
 ## Settled
+
+### 2026-11-20 — The launch line, one dispatch's effort, and the rerun wording (0.28.0)
+
+#### Context
+
+Three faults in how a delivery reads cost a consuming project time, and would
+cost any project the same.
+
+- A worker cannot see the model and effort it was launched with, and `dely
+  dispatch` did not tell it. Handoffs filled the `Harness:` line from a project
+  document, and two of them stated an effort the worker was not launched with.
+- Effort is one value per phase. A project that wants a higher effort for one
+  dispatch had to edit a pins file and put it back, with no record that it did.
+- The skill said "run the gates yourself" to a reviewer and "reruns the
+  affected gates" after a fix without saying which gates, so each role reran
+  the project's whole gate set and one delivery ran the same head three times.
+  This repository's `AGENTS.md` also carried a one-sentence dispatch section,
+  the pattern other projects copied, that repeated a rule the skill holds.
+
+#### Decision
+
+- `dely dispatch` appends one line to every prompt it assembles, for every
+  harness, before the acknowledgement paragraph. The line starts `Launch line:`
+  and never `dely-pin:`, which the pin extension reads. It names the harness,
+  model and effort the dispatch asked for, each with its source (the personal
+  pins file, the team pins file, this dispatch's `--effort`, or Control's own
+  harness when no file names the phase), and tells the worker to copy it into
+  the handoff's
+  `Harness:` line. The dispatch's printed result repeats the line, whether the
+  dispatch is acknowledged or ends `NO_ACK`, and the `dispatch` and `no_ack`
+  records in `~/.dely/log.jsonl` carry the same fields under `launch`. The line
+  is one physical line: a value or a pins-file path that holds a control
+  character, a line-ending character or a backslash is shown with it spelled
+  out (`\\`, `\n`, `\r`, `\t`, `\xNN`, `\uNNNN`), so two different values
+  are always shown differently and the shown text turns back into the value;
+  text with none of these is shown as it is. The launch arguments carry the raw
+  value, not the spelled one. The line is built where the prompt is assembled; the function
+  that starts a worker, `wait`, `wait-bg`, `notify` and the acknowledgement and
+  settle logic are unchanged. The skill's handoff form says the `Harness:` line
+  holds the line's harness, model and effort, each with its source, word for
+  word, and that the label and the sentences after the values may be dropped or
+  kept; one sentence says the line records what was asked for, not
+  what the session proves it ran with, because a harness cannot prove that to
+  Dely.
+- `dely dispatch --effort LEVEL` sets the effort of that one dispatch. The
+  harness and the model stay as pinned. The line marks the effort as set for
+  the dispatch and names the pinned value and its file. A harness that takes no
+  effort (no effort flag, no effort joined to the model, no spec pin) is
+  refused before any worker starts. Where effort is joined to the model, the
+  level goes into the `--model` argument as a pinned effort does. No list of
+  levels exists anywhere: a level the model does not offer fails as a wrong pin
+  fails today, as `NO_ACK` and then the preflight route. The usage text
+  documents the option.
+- A project may name the subset of gates for every rerun, not only the release.
+  A fix reruns the instruments and the gates that can observe its change. One
+  full closure run happens at the final exact HEAD, by Control; the final review
+  does not repeat it.
+- A reviewer reproduces the acceptance instruments and each counterexample,
+  checks that the head the gate logs name is the head under review, and reruns a
+  gate it doubts or one the logs do not cover.
+- A scoped re-review may be Control's recorded check instead of a dispatch only
+  when every fixed finding is Minor and a deterministic check proves the fix
+  changes text only.
+- A reopened finding is a replan: a new task that carries a reopened finding, or
+  a ruling that reopens an accepted task, goes to the human beside
+  `REPLAN_OR_SPLIT`. The failure table has a row for it.
+- This repository's `AGENTS.md` loses its dispatch section, and the setup skill
+  says a project document should not restate the pins. The skill's own sentence
+  that Control names the model and effort on every dispatch stays: it is
+  addressed to Control and sits in the section whose edits would require a
+  Control row for each wake mode.
+- The version advances to 0.28.0 in both plugin manifests, `package.json` and
+  the `AGENTS.md` version gate. No field of a `harnesses.json` entry changes.
+- `probe/checklist.md`: the argv stub row lists `<name> launch line` as an
+  intended difference per entry, and only for an entry whose last release has
+  no line (an entry whose last release prints one is compared with the
+  candidate as it stands, both lines kept, and a line that differs is an
+  unexpected difference), asserts the line and its copy instruction on the
+  candidate for every supported entry, and turns RED on a line for one harness
+  only, on a line that starts `dely-pin:`, on a copy instruction replaced by a
+  mention of the `Harness:` line, on a last release that has a different line
+  for every entry or for one entry, and, through its own assertion, on a
+  comparison that discards the lines. A new stub row,
+  "launch line and dispatch effort", has a team and a personal pins fixture and
+  one row each for the file named in the line and its copy instruction, the
+  printed result and the log record, `--effort` over a pin, the refusal, the
+  effort joined to the model, two pins-file paths that differ only by a
+  newline against a backslash and `n`, a `NO_ACK` dispatch whose record is
+  checked field by field, and an unknown phase. Each row has a named wrong implementation that
+  turns it RED. The release floor lists the new row.
+
+For this release `DELY_NAMED_INTENDED` is one line per supported entry,
+`<name> launch line`: `Claude Code launch line`, `Codex CLI launch line`,
+`Grok Build launch line`, `Antigravity CLI launch line`, `Cursor Agent CLI
+launch line`, `GitHub Copilot CLI launch line`, `OMP launch line` and
+`Pi launch line`; the last release, 450e874, prints none for any of them.
+
+#### Alternatives considered
+
+- A list of effort levels per harness in `harnesses.json`, so `--effort`
+  refuses a level a harness does not take. Rejected: no such list exists, the
+  levels differ per model, and a list would go stale on the first model
+  release. The refusal is limited to a harness that takes no effort at all.
+- A per-dispatch model or harness, a table from task kind to effort, or an
+  automatic raise. Rejected: each adds a decision the pins files were made to
+  hold in one place, and none was needed to fix the recorded fault.
+- Put the line on the pin-extension channel (`dely-pin:`) for every harness.
+  Rejected: the extension reads that prefix to set a model and fails the
+  session on a line it cannot parse.
+- Delete the skill's sentence that Control names the model and effort on every
+  dispatch together with the `AGENTS.md` section. Rejected: only the
+  `AGENTS.md` copy was a restatement; the skill's sentence is the rule.
+- A gate runner, a gate selector or a change-class table in Dely. Rejected:
+  which gates observe which change is a fact about the project.
+
+#### Consequences
+
+- A handoff now carries a `Harness:` line that Dely wrote, so it shows what was
+  asked for and from which file. It is still not proof of what the session ran
+  with, and the skill says so. A reviewer cannot learn more from it than that.
+- A project that wants high effort for one dispatch passes `--effort` and
+  leaves its pins files alone; the log records the dispatch with both values.
+- The skill's section "Orca and the helper", which this change does not edit,
+  still lists what the helper appends to the prompt without the launch line.
+  The launch line's own text and the handoff form carry the rule; that section
+  is reconciled the next time it is edited for another reason.
+- A level the model does not offer still surfaces late, as `NO_ACK`.
+- Reviewers and remediation workers rerun fewer gates, so a gate that observes
+  a fix indirectly is not rerun until the one full run at the final HEAD. That
+  run is Control's and its logs name the head.
+
+#### Verification, 2026-11-20
+
+- Stub rows run against `450e874` (the `v0.27.2` tag) as the last release: the
+  argv row, the new row, and the rows whose triggers did not fire. Every
+  wrong implementation named above printed RED before the candidate printed
+  GREEN. The output is kept with the run's evidence; it is not part of the
+  repository.
+- Live rows the checklist's rules require for this candidate, and what ran:
+  the rules ask for the live worker row for Claude Code and for Codex (each
+  harness a deployment uses, and each upgraded since its newest live report),
+  for the Control row once per wake mode (after an Orca upgrade from 1.4.247 to
+  1.4.261), rows 4 and 6, and for the other harnesses the rows below. The
+  owner limited this release's live rows to Claude Code and Codex, so Control
+  runs those and no other live row.
+- The `waker` Control row is skipped as well. It would run Codex CLI as
+  Control. The owner chose to skip it for this release: his deployment's
+  Control is Claude Code. The `background` Control row runs on Claude Code. A
+  `waker` Control is therefore not verified on Orca 1.4.261 by this release.
+- Live rows run on 2026-11-20 at `0b6b245`, on Orca 1.4.261, by a separate
+  verification session. All passed:
+  - the worker row on Claude Code 2.1.328 (`claude-sonnet-5-5`, high) and on
+    Codex CLI 0.170.0 (`gpt-6.2-sol`, high), implement and review each;
+  - the `background` Control row on Claude Code, with row 4 inside it:
+    `ATTENTION` came 15 s after the kill, and the task was dispatched again
+    exactly once;
+  - row 6: `STALLED` at the configured threshold, with Orca's liveness `live`
+    throughout.
+- What the rows showed about the launch line. Every dispatch printed it, logged
+  it and put it in the worker's prompt. The Codex workers copied the whole line
+  into their handoff. The Claude Code workers copied its values and sources
+  word for word and dropped the label and the two trailing sentences. In the
+  Control row no handoff file was written, because that Control's own prompts
+  named no path for one, so the copy was not observed there.
+- Two deviations from the checklist, both the owner's choice:
+  - Nothing was installed. The Control row loaded the candidate with
+    `--plugin-dir` on the snapshot, because every Claude Code session on the
+    machine shares one plugin store and one of them was running a delivery
+    from the installed release. The checklist's rule that every installed
+    hash equals the snapshot could not hold. The proof that the candidate ran
+    is the skill's base directory in the Control's transcript, the helper path
+    of every call it made, and the `launch` field in its dispatch records,
+    which only this version writes. The installed release was byte-identical
+    before and after.
+  - Row 6 used one `sleep 590` and `--stall-min 6`, as the 0.27.1 release did.
+    Claude Code 2.1.328 refuses a long foreground sleep, so the worker started
+    it in the background and sat idle. A stall at the default ten minutes is
+    still not reachable with that prompt.
+- Not seen by this release: `probe/trust.sh` reads `~/.claude.json` only. Under
+  an Orca profile the worker's trust store is the profile's own file, where
+  Orca's pre-trust wrote the new row 6 path.
+- Live rows skipped, each with the reason "the owner limited this release's
+  live rows to Claude Code and Codex": the OMP pin rows 8, 9, 10, 11 and 12
+  and OMP's Control row (OMP moved from 18.6.1 to 19.0.1 since its newest live
+  report); Pi rows 13, 14, 15 and 16 (required after an Orca upgrade); and
+  every per-harness live worker and Control row for an entry other than Claude
+  Code and Codex that an upgrade would ask for.
+
+#### Review remediation, 2026-11-20
+
+The independent review of the candidate returned five findings; one pass fixed
+them.
+
+- A pins-file path that holds a newline, or another control character, split
+  the launch line over several physical lines in the prompt and in the printed
+  result, so the copy instruction no longer sat on the first one. Every value
+  and every source is now shown with each control character, and each character
+  that ends a line for a reader, spelled out (`\n`, `\r`, `\xNN`, `\uNNNN`);
+  the path is kept and the log holds the raw value. The first pass left the
+  backslash as it was, so a path that held a literal backslash and `n` read
+  the same as one that held a newline; the second pass (below) closed that.
+- A dispatch that ended `NO_ACK` logged the launch fields and printed none. It
+  now prints the same line on the line after the `NO_ACK` result. The other
+  exits of `dispatch` that write a record are the failed start, which logs no
+  launch fields and prints none, and a pin that cannot be resolved, which does
+  the same; the record and the printed result agree on each.
+- The argv stub dropped the launch line on both sides and decided from the
+  candidate alone that the difference was intended, so a last release that
+  already printed a line gave a false green; and it, like the launch-line row,
+  passed when the copy instruction was replaced by a nearby mention of the
+  field. The argv stub now drops the line only where the last release has none
+  and names the difference only then. Both stubs assert the copy sentence
+  itself.
+- The live rows showed that Claude Code workers copy the launch line's values
+  and sources word for word and drop its label and its two trailing sentences,
+  and that Codex workers copy the whole line. The contract's purpose is that a
+  handoff states what Dely asked for, from Dely's own line, and both forms do.
+  The rule therefore changed from "copied as it is" to: the `Harness:` line
+  holds the line's harness, model, effort and sources, word for word; the label
+  and the trailing sentences may be dropped or kept. The launch line's own text
+  did not change, and the live rows ran with it. Rejected: holding the Claude
+  Code workers to the whole line, which would fail a handoff that carries
+  everything Dely asked for.
+- An unknown phase ended in an uncaught error. It is now refused with a line
+  that names the phase, a non-zero exit and no worker started.
+
+When no rendered value and no rendered source holds a control character, a
+line-ending character or a backslash, the prompt, the launch arguments and the
+printed result of an acknowledged dispatch are byte for byte what 82d3cf4
+produces, for every supported entry, so the live rows needed no rerun. The argv
+stub with 82d3cf4 as its last release reports no difference for any supported
+entry. Otherwise the launch line shows the escaped form, and the launch
+arguments still carry the raw value.
+
+#### Second remediation, 2026-11-20
+
+The scoped re-review of the first remediation returned five findings; one more
+pass, limited to them, fixed them.
+
+- The escaping lost information: a newline and a literal backslash followed by
+  `n` were shown the same. The backslash is now spelled `\\` too, in every
+  value and every source, so each spelling begins with one unambiguous
+  backslash, two different values are always shown differently, and the shown
+  text turns back into the value. The ambiguity is no longer accepted.
+- The guarantee the first pass recorded was too wide: it held only for a path
+  with no control character, and a value itself, such as an effort that holds
+  a tab, also changes the prompt (the line shows `\t`, and the worker-start
+  call carries the tab). It is now stated as above, over every rendered value
+  and every rendered source, in terms of 82d3cf4.
+- The argv stub named `launch line` intended for every entry when the last
+  release printed a line for only some. The decision is now per entry, and
+  only an entry whose last release prints no line is named; an entry that has
+  one is compared with both lines kept. The self-check now requires a
+  differing line to be reported as an unexpected difference, so a comparison
+  that discards both lines fails it. The named list changed from one line to
+  one line per supported entry.
+- The `NO_ACK` row claimed parity for all the launch fields and checked only
+  the efforts. It now compares the whole record: the phase, the harness, the
+  model, the effort and the source of each, and the pinned effort with its
+  source.
+- The skill's copy sentence and the decision summary said the file each value
+  came from. A source can also be this dispatch's `--effort`, or Control's own
+  harness when no pins file names one. Both now say that each value has its
+  source, as the handoff form does.
+
+#### Released without an accepting review, 2026-11-20
+
+This release had three reviews by an independent reviewer: one whole-change
+review and two scoped re-reviews, each after one remediation. None of the three
+ended in `ACCEPT`. After the first re-review the owner chose one more
+remediation with a closed scope. After the second re-review he chose to release
+with what was left recorded here, and not to start another round.
+
+What the last re-review confirmed at `b3cc5b1`: every earlier finding is
+closed; the helper has no open finding; an acknowledged dispatch with ordinary
+values is byte for byte what the live rows ran; the six stub blocks and the
+closure gates pass.
+
+Known limits, left open by the owner's choice:
+
+- The argv stub decides whether the launch line is an intended difference from
+  the pinned dispatch of each entry. A release that printed the line in only
+  one mode of an entry (pinned but not default, or the reverse) would be
+  compared wrongly: a real difference in the other mode could pass, or an
+  intended difference could be named where none exists. No release behaves so:
+  0.27.2 prints no launch line, and this one prints it in every mode. The stub
+  compares both lines directly from the next release on.
+- The `NO_ACK` stub row compares the logged launch record as text, so it fails
+  if the record's keys are written in another order with the same values. The
+  helper writes them in one fixed order.
+
+Control corrected one sentence of the decision above after that re-review, at
+the reviewer's note: it said the line names the file each value came from, and
+a value's source can also be this dispatch's `--effort` or Control's own
+harness.
+
+#### Non-goals
+
+No gate runner, gate selector or change-class table; no new phase key; no table
+from task kind to effort; no automatic raise; no per-dispatch model or harness;
+no list of effort levels; no change to `wait`, `wait-bg`, `notify`, the
+acknowledgement and settle logic or the function that starts a worker.
+
+#### Deferred
+
+Reconciling the "Orca and the helper" sentence with the launch line waits for
+the next edit of that section. Whether a later reviewer reads the new
+reproduction rule as intended is not something an instrument observes; the
+first delivery on this version shows it.
 
 ### 2026-11-04 — Checklist rows 5 and 7 are retired; Claude Code's trust is `orca-preflight`
 
