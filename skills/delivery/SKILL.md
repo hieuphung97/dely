@@ -276,9 +276,9 @@ END OF HANDOFF
 `END OF HANDOFF` is the last line and load-bearing: the only thing that
 distinguishes a handoff from one cut off mid-write. The `Harness:` line holds
 the harness, model and effort of the launch line `dely dispatch` put in your
-prompt, and the file each came from, word for word and not retyped from a
-project document; the line's label and the sentences after its values may be
-dropped or kept. The launch line records what was asked for, not what the
+prompt, each with its source, word for word and not retyped from a project
+document; the line's label and the sentences after its values may be dropped or
+kept. The launch line records what was asked for, not what the
 session proves it ran with. Under `Residue`, a claim
 of nothing left needs evidence: name the check that returned empty. Under
 `Verification`, cite the dispatch-bound command, output, and outcome that

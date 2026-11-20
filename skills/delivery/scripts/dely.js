@@ -687,11 +687,15 @@ function launchOf(repo, p, set) {
 
 // A value shown in the launch line stays on the physical line. A pins-file
 // path or a pinned value that holds a control character, or a character that
-// ends a line in a reader, is shown with that character spelled out, so its
-// meaning is kept and the line is not split. Text with none is returned as is.
+// ends a line in a reader, is shown with that character spelled out, so the
+// line is not split. The backslash is spelled `\\` too, so every spelling
+// begins with one unambiguous backslash and the shown text turns back into the
+// value: `\\`, `\n`, `\r`, `\t`, `\xNN`, `\uNNNN`. Text with none of these is
+// returned as is.
 function oneLine(v) {
-  return String(v).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, (c) => {
+  return String(v).replace(/[\\\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, (c) => {
     const k = c.charCodeAt(0);
+    if (c === "\\") return "\\\\";
     if (c === "\n") return "\\n";
     if (c === "\r") return "\\r";
     if (c === "\t") return "\\t";

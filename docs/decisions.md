@@ -39,13 +39,16 @@ cost any project the same.
   dispatch is acknowledged or ends `NO_ACK`, and the `dispatch` and `no_ack`
   records in `~/.dely/log.jsonl` carry the same fields under `launch`. The line
   is one physical line: a value or a pins-file path that holds a control
-  character is shown with the character spelled out, and text with none is
-  shown as it is. The line is built where the prompt is assembled; the function
+  character, a line-ending character or a backslash is shown with it spelled
+  out (`\\`, `\n`, `\r`, `\t`, `\xNN`, `\uNNNN`), so two different values
+  are always shown differently and the shown text turns back into the value;
+  text with none of these is shown as it is. The launch arguments carry the raw
+  value, not the spelled one. The line is built where the prompt is assembled; the function
   that starts a worker, `wait`, `wait-bg`, `notify` and the acknowledgement and
   settle logic are unchanged. The skill's handoff form says the `Harness:` line
-  holds the line's harness, model and effort and the file each came from, word
-  for word, and that the label and the sentences after the values may be
-  dropped or kept; one sentence says the line records what was asked for, not
+  holds the line's harness, model and effort, each with its source, word for
+  word, and that the label and the sentences after the values may be dropped or
+  kept; one sentence says the line records what was asked for, not
   what the session proves it ran with, because a harness cannot prove that to
   Dely.
 - `dely dispatch --effort LEVEL` sets the effort of that one dispatch. The
@@ -77,20 +80,29 @@ cost any project the same.
   Control row for each wake mode.
 - The version advances to 0.28.0 in both plugin manifests, `package.json` and
   the `AGENTS.md` version gate. No field of a `harnesses.json` entry changes.
-- `probe/checklist.md`: the argv stub row lists `launch line` as an intended
-  difference only where the last release has no line (a release that already
-  prints one is compared with the candidate as it stands), asserts the line and
-  its copy instruction on the candidate for every supported entry, and turns RED
-  on a line for one harness only, on a line that starts `dely-pin:` and on a
-  copy instruction replaced by a mention of the `Harness:` line. A new stub row,
+- `probe/checklist.md`: the argv stub row lists `<name> launch line` as an
+  intended difference per entry, and only for an entry whose last release has
+  no line (an entry whose last release prints one is compared with the
+  candidate as it stands, both lines kept, and a line that differs is an
+  unexpected difference), asserts the line and its copy instruction on the
+  candidate for every supported entry, and turns RED on a line for one harness
+  only, on a line that starts `dely-pin:`, on a copy instruction replaced by a
+  mention of the `Harness:` line, on a last release that has a different line
+  for every entry or for one entry, and, through its own assertion, on a
+  comparison that discards the lines. A new stub row,
   "launch line and dispatch effort", has a team and a personal pins fixture and
   one row each for the file named in the line and its copy instruction, the
   printed result and the log record, `--effort` over a pin, the refusal, the
-  effort joined to the model, a pins-file path that holds a newline, a `NO_ACK`
-  dispatch, and an unknown phase. Each row has a named wrong implementation that
+  effort joined to the model, two pins-file paths that differ only by a
+  newline against a backslash and `n`, a `NO_ACK` dispatch whose record is
+  checked field by field, and an unknown phase. Each row has a named wrong implementation that
   turns it RED. The release floor lists the new row.
 
-For this release `DELY_NAMED_INTENDED` is the single line `launch line`.
+For this release `DELY_NAMED_INTENDED` is one line per supported entry,
+`<name> launch line`: `Claude Code launch line`, `Codex CLI launch line`,
+`Grok Build launch line`, `Antigravity CLI launch line`, `Cursor Agent CLI
+launch line`, `GitHub Copilot CLI launch line`, `OMP launch line` and
+`Pi launch line`; the last release, 450e874, prints none for any of them.
 
 #### Alternatives considered
 
@@ -193,10 +205,9 @@ them.
   result, so the copy instruction no longer sat on the first one. Every value
   and every source is now shown with each control character, and each character
   that ends a line for a reader, spelled out (`\n`, `\r`, `\xNN`, `\uNNNN`);
-  the path is kept and the log holds the raw value. A backslash is not escaped,
-  so a path with none of those characters is shown as before, and a path that
-  holds a literal backslash and `n` reads the same as one that holds a newline.
-  That ambiguity is accepted: the alternative changes every clean path.
+  the path is kept and the log holds the raw value. The first pass left the
+  backslash as it was, so a path that held a literal backslash and `n` read
+  the same as one that held a newline; the second pass (below) closed that.
 - A dispatch that ended `NO_ACK` logged the launch fields and printed none. It
   now prints the same line on the line after the `NO_ACK` result. The other
   exits of `dispatch` that write a record are the failed start, which logs no
@@ -222,11 +233,44 @@ them.
 - An unknown phase ended in an uncaught error. It is now refused with a line
   that names the phase, a non-zero exit and no worker started.
 
-For a dispatch that is acknowledged, on a pins path with no control character,
-the prompt, the launch arguments and the printed result are byte for byte what
-the candidate produced before this pass, so the live rows needed no rerun. The
-argv stub with the earlier candidate as its last release reports no difference
-for any supported entry.
+When no rendered value and no rendered source holds a control character, a
+line-ending character or a backslash, the prompt, the launch arguments and the
+printed result of an acknowledged dispatch are byte for byte what 82d3cf4
+produces, for every supported entry, so the live rows needed no rerun. The argv
+stub with 82d3cf4 as its last release reports no difference for any supported
+entry. Otherwise the launch line shows the escaped form, and the launch
+arguments still carry the raw value.
+
+#### Second remediation, 2026-11-20
+
+The scoped re-review of the first remediation returned five findings; one more
+pass, limited to them, fixed them.
+
+- The escaping lost information: a newline and a literal backslash followed by
+  `n` were shown the same. The backslash is now spelled `\\` too, in every
+  value and every source, so each spelling begins with one unambiguous
+  backslash, two different values are always shown differently, and the shown
+  text turns back into the value. The ambiguity is no longer accepted.
+- The guarantee the first pass recorded was too wide: it held only for a path
+  with no control character, and a value itself, such as an effort that holds
+  a tab, also changes the prompt (the line shows `\t`, and the worker-start
+  call carries the tab). It is now stated as above, over every rendered value
+  and every rendered source, in terms of 82d3cf4.
+- The argv stub named `launch line` intended for every entry when the last
+  release printed a line for only some. The decision is now per entry, and
+  only an entry whose last release prints no line is named; an entry that has
+  one is compared with both lines kept. The self-check now requires a
+  differing line to be reported as an unexpected difference, so a comparison
+  that discards both lines fails it. The named list changed from one line to
+  one line per supported entry.
+- The `NO_ACK` row claimed parity for all the launch fields and checked only
+  the efforts. It now compares the whole record: the phase, the harness, the
+  model, the effort and the source of each, and the pinned effort with its
+  source.
+- The skill's copy sentence and the decision summary said the file each value
+  came from. A source can also be this dispatch's `--effort`, or Control's own
+  harness when no pins file names one. Both now say that each value has its
+  source, as the handoff form does.
 
 #### Non-goals
 
