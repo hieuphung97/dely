@@ -241,8 +241,10 @@ line (empty if it names none). The row prints only these line forms:
 candidate`, `<name> deferred in candidate`, and the preflight-labelled flag
 forms `<name> preflight --model` and `<name> preflight --effort`, and the
 single line `launch line`, printed when the candidate's dispatch prompt and
-printed result carry the launch line for every supported entry and the last
-release's carry none. Only differences of those kinds go in
+printed result carry the launch line, with its copy instruction, for every
+supported entry and the last release's carry none. A last release that already
+prints a launch line has no such difference: its line is compared with the
+candidate's as it stands, and `launch line` is not printed. Only differences of those kinds go in
 `DELY_NAMED_INTENDED`. "This release" means
 the `docs/decisions.md` sections dated after the commit date of the newest
 `v*` tag. Write the list from the record before the row runs; never edit it
@@ -313,15 +315,18 @@ function flagsOf(argv) {
   }
   return f;
 }
-function stripped(argv) {
+// A spec pin line is compared by the candidate-only assertions below. The
+// launch line is dropped only when the last release has none; when the release
+// already has one, both sides keep theirs and a difference is a difference.
+function stripped(argv, keepLine) {
   const out = [];
   if (!argv) return out;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--model' || argv[i] === '--effort') { i++; continue; }
-    // A spec pin line and the launch line are compared by the candidate-only
-    // assertions below.
     if (argv[i] === '--spec') {
-      out.push(argv[++i].replace(/\ndely-pin: .*/, '').replace(/\n\nLaunch line: [^\n]*/, ''));
+      let t = argv[++i].replace(/\ndely-pin: .*/, '');
+      if (!keepLine) t = t.replace(/\n\nLaunch line: [^\n]*/, '');
+      out.push(t);
       continue;
     }
     out.push(argv[i]);
@@ -360,27 +365,32 @@ function launch(file, h, other, mode, verb) {
   if (verb === 'preflight') out = out.replace(/PASS \d+s/g, 'PASS');
   const lineOf = (text) => String(text || '').split('\n').find((l) => l.startsWith('Launch line: ')) || null;
   const printed = lineOf(out);
+  const rawOut = out;
   out = out.split('\n').filter((l) => !l.startsWith('Launch line: ')).join('\n');
   const ok = verb === 'preflight' ? / PASS/.test(out) && starts.length > 0
     : out.includes('DISPATCHED') && starts.length > 0;
   const startArgv = starts[0] || null;
   const si = startArgv ? startArgv.indexOf('--spec') : -1;
   const spec = si < 0 ? null : startArgv[si + 1];
-  return {out, startArgv, starts, ok, status: r.status, spec, printed, line: lineOf(spec)};
+  return {out, rawOut, startArgv, starts, ok, status: r.status, spec, printed, line: lineOf(spec)};
 }
 function diffLaunch(label, cand, rel, h, other, intended, unexpected, mode) {
   const tag = label === 'dispatch' ? h.name : h.name + ' ' + label;
   const okNeedle = label === 'preflight' ? 'preflight' : 'dispatch';
   const ftag = label === 'preflight' ? h.name + ' preflight' : h.name;
+  // The release's own launch line, if it has one, stays in the comparison.
+  const keep = !!(rel.line || rel.printed);
+  const norm = (a) => stripped(a, keep);
+  const shown = (r) => keep ? r.rawOut : r.out;
   if (mode === 'effort') {
-    if (cand.out !== rel.out) add(unexpected, tag + ' stdout');
-    if (JSON.stringify(cand.starts.map(stripped)) !== JSON.stringify(rel.starts.map(stripped)))
+    if (shown(cand) !== shown(rel)) add(unexpected, tag + ' stdout');
+    if (JSON.stringify(cand.starts.map(norm)) !== JSON.stringify(rel.starts.map(norm)))
       add(unexpected, tag + ' argv');
   } else {
     if (!cand.ok) add(unexpected, tag + ' candidate did not ' + okNeedle + ': ' + cand.out);
     if (!rel.ok) add(unexpected, tag + ' last release did not ' + okNeedle + ': ' + rel.out);
-    if (cand.ok && rel.ok && cand.out !== rel.out) add(unexpected, tag + ' stdout');
-    if (JSON.stringify(cand.starts.map(stripped)) !== JSON.stringify(rel.starts.map(stripped)))
+    if (cand.ok && rel.ok && shown(cand) !== shown(rel)) add(unexpected, tag + ' stdout');
+    if (JSON.stringify(cand.starts.map(norm)) !== JSON.stringify(rel.starts.map(norm)))
       add(unexpected, tag + ' argv');
   }
   const cf = flagsOf(cand.startArgv), rf = flagsOf(rel.startArgv);
@@ -393,6 +403,9 @@ function diffLaunch(label, cand, rel, h, other, intended, unexpected, mode) {
 }
 // Candidate-only: what the candidate's own entries must launch. The release
 // comparison cannot see these, because the release launched them differently.
+// The instruction itself, in the words the launch line carries. A nearby
+// mention of the field is not the instruction.
+const COPY = 'Copy this line as it is into the Harness: line of your handoff.';
 function assertCandidate(candTree, unexpected) {
   let lined = true;
   for (const h of load(candTree).filter((x) => x.status === 'supported')) {
@@ -403,7 +416,7 @@ function assertCandidate(candTree, unexpected) {
     if (!d.line) { lined = false; add(unexpected, h.name + ' dispatch has no launch line'); }
     else {
       for (const want of ['harness ' + h.id, 'model ' + pin.model, 'effort ' + pin.effort,
-        '.dely/pins.json', 'Harness: line'])
+        '.dely/pins.json', COPY])
         if (!d.line.includes(want)) add(unexpected, h.name + ' launch line lacks ' + want);
       if (d.printed !== d.line) add(unexpected, h.name + ' printed result does not carry the launch line');
     }
@@ -439,7 +452,16 @@ function compare(candTree, relTree) {
   const candHs = load(candTree), relHs = load(relTree);
   const supported = candHs.filter((h) => h.status === 'supported');
   assert(supported.length, 'candidate has no supported entries');
-  if (assertCandidate(candTree, unexpected)) add(intended, 'launch line');
+  const lined = assertCandidate(candTree, unexpected);
+  // The line is a difference only where the last release has none.
+  let gained = false;
+  for (const h of supported) {
+    const other = relHs.find((x) => x.name === h.name);
+    if (!other) continue;
+    const r = launch(helper(relTree), h, other, 'pinned', 'dispatch');
+    if (!r.line && !r.printed) gained = true;
+  }
+  if (lined && gained) add(intended, 'launch line');
   for (const h of supported) {
     const other = relHs.find((x) => x.name === h.name);
     if (!other) {
@@ -484,6 +506,8 @@ for (const [name, needle, repl] of [
   ['line for one harness only', '    "\\n\\n" + launchLine(launch) +\n',
     '    (p.agent === "claude" ? "\\n\\n" + launchLine(launch) : "") +\n'],
   ['line starting dely-pin:', '"Launch line: harness "', '"dely-pin: harness "'],
+  ['copy instruction replaced by a mention', 'Copy this line as it is into the Harness: line of your handoff. ',
+    'See the Harness: line of your handoff. '],
 ]) {
   const dir = path.join(root, 'mutant-' + name.replace(/\W+/g, '-'));
   fs.cpSync(snap, dir, {recursive: true});
@@ -494,6 +518,35 @@ for (const [name, needle, repl] of [
   const m = compare(dir, release);
   assert(m.unexpected.length, 'mutant "' + name + '" must fail');
   console.log('RED: mutant "' + name + '": ' + m.unexpected.slice(0, 2).join('; '));
+}
+// A last release that already prints a launch line: the line is no
+// difference, so the stub must not name it, and the two lines are compared.
+// Checked against a last release made to print one; when the real last
+// release already does, the real comparison below is that case.
+const probeH = candH.find((h) => h.status === 'supported' && relH.some((x) => x.name === h.name));
+const releaseHasLine = probeH && (() => {
+  const r = launch(helper(release), probeH, relH.find((x) => x.name === probeH.name), 'pinned', 'dispatch');
+  return !!(r.line || r.printed);
+})();
+if (releaseHasLine) console.log('SKIP: the last release already prints a launch line; it is compared as it stands');
+else {
+  const dir = path.join(root, 'release-with-line');
+  fs.cpSync(release, dir, {recursive: true});
+  const file = helper(dir);
+  let src = fs.readFileSync(file, 'utf8');
+  for (const [needle, repl] of [
+    ['  const spec =\n    fs.readFileSync(specPath, "utf8") +',
+      '  const oldLine = "Launch line: harness " + p.agent + ", model " + p.model + ", effort " + p.effort;\n' +
+      '  const spec =\n    fs.readFileSync(specPath, "utf8") + "\\n\\n" + oldLine +'],
+    ['out("DISPATCHED " + s.id, 0);', 'out("DISPATCHED " + s.id + "\\n" + oldLine, 0);'],
+  ]) {
+    assert(src.includes(needle), 'update the "release already has the line" mutation for this last release');
+    src = src.replace(needle, () => repl);
+  }
+  fs.writeFileSync(file, src);
+  const m = compare(snap, dir);
+  assert(!m.intended.includes('launch line'), 'a last release that already has the line must not leave "launch line" as an intended difference');
+  console.log('RED: last release already prints a launch line: ' + (m.unexpected.slice(0, 2).join('; ') || 'compared as it stands'));
 }
 const green = compare(snap, release);
 assert.equal(green.unexpected.length, 0, green.unexpected.join('; ') || 'unexpected');
@@ -517,10 +570,13 @@ pin-model<sep>high`, or `--model pin-model` with Effort `default`, with no
 `dely-pin: pin-model high` with no flag), every
 release-supported entry missing or `deferred` in the candidate is reported,
 every supported entry's dispatch prompt carries one launch line of its own
-(naming the harness, model, effort and pins file, with the instruction to copy
-it, never starting `dely-pin:`) that the printed result repeats, the mutants
-that put the line on one harness only or start it `dely-pin:` print RED, and
-the printed INTENDED lines equal `DELY_NAMED_INTENDED`. An argv or stdout
+(naming the harness, model, effort and pins file, with the copy instruction in
+its own words, never starting `dely-pin:`) that the printed result repeats, the
+mutants that put the line on one harness only, start it `dely-pin:` or replace
+the copy instruction by a mention of the `Harness:` line print RED, a last
+release that already prints a line does not leave `launch line` intended
+(printed as RED too, or SKIP when the real last release already prints one), and the printed INTENDED lines equal
+`DELY_NAMED_INTENDED`. An argv or stdout
 difference always fails the row; the live worker rows it routes to replace the
 row for those entries, and the floor is met when they pass. If the `--effort`
 mutation assert fires, update the needle; it is not a candidate failure. Keep
@@ -540,11 +596,14 @@ candidate before the candidate itself:
 
 | Row | Requirement | Mutant that must turn it RED |
 | --- | --- | --- |
-| 1 | the line names the file each value came from: a team and a personal pins file, each phase answered by a different one | `line-names-team`: the line always names the team file |
+| 1 | the line names the file each value came from: a team and a personal pins file, each phase answered by a different one, and it carries the copy instruction itself | `line-names-team`: the line always names the team file; `copy-mention`: the instruction is replaced by a mention of the `Harness:` line |
 | 2 | the printed result and the `dispatch` record in `~/.dely/log.jsonl` carry the same fields as the line the worker's prompt holds | `printed-not-logged`: the record has no `launch`; `logged-not-printed`: the printed result has no line |
 | 3 | `--effort high` over a pin of medium: the worker-start call carries `--effort high` and the pinned model; without the flag it carries medium; the line marks the effort as set for this dispatch and names the pinned value | `line-only`: the line changes and the arguments do not; `changes-model`: the flag also replaces the model |
 | 4 | `--effort` on a harness that takes no effort exits non-zero, prints `REFUSED` and starts no worker | `effort-dropped`: the option is accepted and ignored |
 | 5 | `--effort` on a harness whose effort is joined to the model puts the level into the `--model` argument and passes no `--effort` | `effort-own-flag`: the level goes to `--effort` there |
+| 6 | a personal pins file whose path holds a newline, reached from a linked worktree: the line, in the printed result and in the prompt, is one physical line, shows the path with the newline spelled out, and the worker starts with the personal file's model | `line-unescaped`: values are shown as they are |
+| 7 | a dispatch that ends `NO_ACK` with `--effort high` over a pin of medium: the printed result carries the same launch line as the prompt, and the `no_ack` record carries the same fields | `no-ack-unprinted`: the printed result has no line; `no-ack-unlogged`: the record has no `launch` |
+| 8 | an unknown phase exits non-zero, names the phase in a `REFUSED` line, starts no worker and prints no stack trace | `phase-unchecked`: the phase is not checked |
 
 ```bash
 stub=$(mktemp -d "$HOME/dely-probe/launch.XXXXXX")
@@ -568,13 +627,17 @@ const a = process.argv.slice(2), cmd = a[1], root = process.env.FIXTURE_ROOT;
 fs.appendFileSync(root+'/calls.jsonl', JSON.stringify(a)+'\\n');
 let result = {};
 if (cmd === 'worker-start') result = {dispatchId:'d-1'};
-if (cmd === 'check') result = {deliveryId:'batch-1',messages:[
+if (cmd === 'check') result = {deliveryId:'batch-1',messages: process.env.FIXTURE_NO_ACK ? [] : [
   {type:'heartbeat',subject:'ack',payload:{dispatchId:'d-1'}}]};
 if (cmd === 'worker-list') result = {workers:[]};
 if (cmd === 'worker-read') result = {terminal:{tail:[]}};
 if (cmd === 'status') result = {runtime:{appVersion:'stub'}};
 console.log(JSON.stringify({ok:true,result}));
 `);
+// The instruction itself, as the launch line words it.
+const COPY = 'Copy this line as it is into the Harness: line of your handoff.';
+// Any character a reader treats as ending a line.
+const physical = (t) => String(t).split(/[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/);
 let n = 0;
 function repo(team, personal) {
   const dir = path.join(root, 'r' + (++n));
@@ -585,7 +648,7 @@ function repo(team, personal) {
   if (personal) fs.writeFileSync(path.join(dir, '.dely/local/pins.json'), JSON.stringify(personal));
   return dir;
 }
-function run(tree, dir, phase, extra) {
+function run(tree, dir, phase, extra, noAck) {
   fs.writeFileSync(path.join(root, 'calls.jsonl'), '');
   fs.writeFileSync(path.join(root, 'home/.dely/log.jsonl'), '');
   const r = spawnSync(process.execPath, [path.join(tree, 'skills/delivery/scripts/dely.js'), 'dispatch',
@@ -593,7 +656,8 @@ function run(tree, dir, phase, extra) {
     '--spec-file', '.dely/local/runs/fixture-run/spec.md', ...(extra || [])],
     {encoding: 'utf8', timeout: 10000, env: {...process.env, HOME: path.join(root, 'home'),
       ORCA_TERMINAL_HANDLE: 'fixture-terminal', ORCA_CLI_COMMAND: path.join(root, 'orca.js'),
-      FIXTURE_ROOT: root, DELY_ACK_S: '0.2', DELY_POLL_S: '0.02'}});
+      FIXTURE_ROOT: root, DELY_ACK_S: '0.2', DELY_POLL_S: '0.02',
+      ...(noAck ? {FIXTURE_NO_ACK: '1'} : {})}});
   const calls = fs.readFileSync(path.join(root, 'calls.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
   const starts = calls.filter((a) => a[1] === 'worker-start');
   const out = (r.stdout || '').trim();
@@ -601,8 +665,26 @@ function run(tree, dir, phase, extra) {
   const spec = arg('--spec');
   const lines = (t) => String(t || '').split('\n').filter((l) => l.startsWith('Launch line: '));
   const events = fs.readFileSync(path.join(root, 'home/.dely/log.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
-  return {status: r.status, out, starts, arg, spec, printed: lines(out), line: lines(spec),
-    logged: events.find((e) => e.event === 'dispatch') || null};
+  return {status: r.status, out, err: r.stderr || '', starts, arg, spec, printed: lines(out), line: lines(spec),
+    logged: events.find((e) => e.event === 'dispatch') || null,
+    noAck: events.find((e) => e.event === 'no_ack') || null};
+}
+// A personal pins file in a main checkout whose directory name holds a newline,
+// reached from a linked worktree: a valid path that splits a line if shown raw.
+function worktreeBehindOddPath(personal) {
+  const main = path.join(root, 'main\ncheckout' + (++n));
+  fs.mkdirSync(main);
+  const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+    '-c', 'commit.gpgsign=false', ...a], {cwd, stdio: 'pipe'});
+  git(main, 'init', '-q', '-b', 'main');
+  git(main, 'commit', '-q', '--allow-empty', '-m', 'fixture');
+  const wt = path.join(root, 'linked' + n);
+  git(main, 'worktree', 'add', '-q', '-b', 'fixture-' + n, wt);
+  fs.mkdirSync(path.join(main, '.dely/local'), {recursive: true});
+  fs.writeFileSync(path.join(main, '.dely/local/pins.json'), JSON.stringify(personal));
+  fs.mkdirSync(path.join(wt, '.dely/local/runs/fixture-run'), {recursive: true});
+  fs.writeFileSync(path.join(wt, '.dely/local/runs/fixture-run/spec.md'), 'Fixture only.');
+  return wt;
 }
 const P = (h, model, effort) => ({harness: h.id, model, effort});
 const pinsFixture = (h) => ({implement: P(h, 'team-model', 'medium'), review: P(h, 'team-model', 'medium')});
@@ -620,6 +702,8 @@ const rows = {
     if (rev.line.length !== 1 || !rev.line[0].includes('harness ' + withFlag.id + from(LOCAL) +
         ', model own-model' + from(LOCAL) + ', effort low' + from(LOCAL)))
       return 'review is answered by the personal file: ' + rev.line.join('|');
+    if (!imp.line[0].includes(COPY)) return 'the line lacks the copy instruction: ' + imp.line[0];
+    if (!imp.printed[0] || !imp.printed[0].includes(COPY)) return 'the printed line lacks the copy instruction';
     return null;
   },
   2(tree) {
@@ -667,6 +751,43 @@ const rows = {
       return joined.id + ' --model ' + d.arg('--model') + ', --effort ' + d.arg('--effort') + ': ' + d.out;
     return null;
   },
+  6(tree) {
+    const wt = worktreeBehindOddPath({implement: P(withFlag, 'own-model', 'low'), review: P(withFlag, 'own-model', 'low')});
+    const d = run(tree, wt, 'implement');
+    if (d.status !== 0 || d.starts.length !== 1) return 'status ' + d.status + ', ' + d.starts.length + ' worker-start calls: ' + d.out;
+    if (d.arg('--model') !== 'own-model' || d.arg('--effort') !== 'low')
+      return 'the worker started with ' + d.arg('--model') + ' ' + d.arg('--effort');
+    for (const [what, text] of [['printed result', d.out], ['prompt', d.spec]]) {
+      const l = physical(text).find((x) => x.startsWith('Launch line: '));
+      if (!l || !l.includes(COPY) || !l.includes('It records what Dely asked for'))
+        return 'the launch line in the ' + what + ' is not one physical line: ' + JSON.stringify(physical(text).slice(0, 5));
+      if (!l.includes('main\\ncheckout')) return 'the ' + what + ' does not show the path with its newline spelled out: ' + l;
+    }
+    return null;
+  },
+  7(tree) {
+    const dir = repo(pinsFixture(withFlag));
+    const d = run(tree, dir, 'implement', ['--effort', 'high'], true);
+    if (d.status === 0 || !d.out.startsWith('NO_ACK ') || d.starts.length !== 1)
+      return 'status ' + d.status + ', ' + d.starts.length + ' worker-start calls: ' + d.out;
+    const l = d.noAck && d.noAck.launch;
+    if (!l || l.effort !== 'high' || l.effortPinned !== 'medium') return 'the no_ack record carries ' + JSON.stringify(l);
+    if (d.line.length !== 1) return 'the prompt carries ' + d.line.length + ' launch lines';
+    if (d.printed.length !== 1) return 'the printed NO_ACK result carries ' + d.printed.length + ' launch lines: ' + d.out;
+    if (d.printed[0] !== d.line[0]) return 'the printed line differs from the prompt line';
+    if (!d.printed[0].includes('effort high (set for this dispatch with --effort; pinned medium in ' + TEAM + ')'))
+      return 'the printed line does not name both levels: ' + d.printed[0];
+    return null;
+  },
+  8(tree) {
+    const dir = repo(pinsFixture(withFlag));
+    const d = run(tree, dir, 'unexpected');
+    const text = d.out + '\n' + d.err;
+    if (d.status === 0 || d.starts.length) return 'status ' + d.status + ', ' + d.starts.length + ' worker-start calls: ' + text;
+    if (!d.out.startsWith('REFUSED') || !d.out.includes('unexpected')) return 'no refusal naming the phase: ' + text.slice(0, 200);
+    if (/TypeError|\.js:\d+/.test(text)) return 'an uncaught error: ' + text.slice(0, 200);
+    return null;
+  },
 };
 
 function mutant(name, edits) {
@@ -692,6 +813,12 @@ const mutants = [
   ['effort-own-flag', 5, [
     ['joinsEffort ? p.model + p.effortInModel + p.effort : p.model', 'p.model'],
     ['if (wantsEffort) args.push("--effort", p.effort);', 'if (wantsEffort || joinsEffort) args.push("--effort", p.effort);']]],
+  ['copy-mention', 1, [['Copy this line as it is into the Harness: line of your handoff. ',
+    'See the Harness: line of your handoff. ']]],
+  ['line-unescaped', 6, [['for (const k of Object.keys(raw)) l[k] = oneLine(raw[k]);', 'for (const k of Object.keys(raw)) l[k] = String(raw[k]);']]],
+  ['no-ack-unprinted', 7, [['clip(raw) + "\\n" + launchLine(launch), 4);', 'clip(raw), 4);']]],
+  ['no-ack-unlogged', 7, [['text: raw, launch });', 'text: raw });']]],
+  ['phase-unchecked', 8, [['if (!PHASES.includes(f.phase)) {', 'if (false) {']]],
 ];
 const redRows = new Set();
 for (const [name, row, edits] of mutants) {
@@ -700,8 +827,8 @@ for (const [name, row, edits] of mutants) {
   redRows.add(row);
   console.log('RED: mutant ' + name + ' fails row ' + row + ': ' + String(why).split('\n')[0].slice(0, 170));
 }
-for (const r of [1, 2, 3, 4, 5]) assert(redRows.has(r), 'no mutant turned row ' + r + ' RED');
-for (const r of [1, 2, 3, 4, 5]) {
+for (const r of [1, 2, 3, 4, 5, 6, 7, 8]) assert(redRows.has(r), 'no mutant turned row ' + r + ' RED');
+for (const r of [1, 2, 3, 4, 5, 6, 7, 8]) {
   const why = rows[r](snap);
   assert.equal(why, null, 'candidate fails row ' + r + ': ' + why);
   console.log('GREEN: row ' + r);
@@ -712,7 +839,7 @@ node "$stub/check.cjs" "$snap" "$stub"
 ```
 
 **Pass:** every mutant prints RED for the row it is named for, and the candidate
-prints GREEN for rows 1 to 5. The refusal row uses the first supported entry
+prints GREEN for rows 1 to 8. The refusal row uses the first supported entry
 that takes no effort, and the joined row the first whose effort is joined to
 the model; the script stops when the candidate has none, so a row never passes
 vacuously. If a mutation assert fires, update that needle; it is not a

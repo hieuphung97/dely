@@ -35,14 +35,19 @@ cost any project the same.
   model and effort the dispatch asked for and the file each came from (the
   personal pins file, the team pins file, or Control's own harness when no file
   names the phase), and tells the worker to copy it into the handoff's
-  `Harness:` line. The dispatch's printed result repeats the line, and the
-  `dispatch` and `no_ack` records in `~/.dely/log.jsonl` carry the same fields
-  under `launch`. The line is built where the prompt is assembled; the function
+  `Harness:` line. The dispatch's printed result repeats the line, whether the
+  dispatch is acknowledged or ends `NO_ACK`, and the `dispatch` and `no_ack`
+  records in `~/.dely/log.jsonl` carry the same fields under `launch`. The line
+  is one physical line: a value or a pins-file path that holds a control
+  character is shown with the character spelled out, and text with none is
+  shown as it is. The line is built where the prompt is assembled; the function
   that starts a worker, `wait`, `wait-bg`, `notify` and the acknowledgement and
   settle logic are unchanged. The skill's handoff form says the `Harness:` line
-  is that line, copied, and one sentence says the line records what was asked
-  for, not what the session proves it ran with, because a harness cannot prove
-  that to Dely.
+  holds the line's harness, model and effort and the file each came from, word
+  for word, and that the label and the sentences after the values may be
+  dropped or kept; one sentence says the line records what was asked for, not
+  what the session proves it ran with, because a harness cannot prove that to
+  Dely.
 - `dely dispatch --effort LEVEL` sets the effort of that one dispatch. The
   harness and the model stay as pinned. The line marks the effort as set for
   the dispatch and names the pinned value and its file. A harness that takes no
@@ -73,12 +78,16 @@ cost any project the same.
 - The version advances to 0.28.0 in both plugin manifests, `package.json` and
   the `AGENTS.md` version gate. No field of a `harnesses.json` entry changes.
 - `probe/checklist.md`: the argv stub row lists `launch line` as an intended
-  difference, asserts the line on the candidate for every supported entry, and
-  turns RED on a line for one harness only and on a line that starts
-  `dely-pin:`. A new stub row, "launch line and dispatch effort", has a team and
-  a personal pins fixture and one row each for the file named in the line, the
-  printed result and the log record, `--effort` over a pin, the refusal, and the
-  effort joined to the model. Each row has a named wrong implementation that
+  difference only where the last release has no line (a release that already
+  prints one is compared with the candidate as it stands), asserts the line and
+  its copy instruction on the candidate for every supported entry, and turns RED
+  on a line for one harness only, on a line that starts `dely-pin:` and on a
+  copy instruction replaced by a mention of the `Harness:` line. A new stub row,
+  "launch line and dispatch effort", has a team and a personal pins fixture and
+  one row each for the file named in the line and its copy instruction, the
+  printed result and the log record, `--effort` over a pin, the refusal, the
+  effort joined to the model, a pins-file path that holds a newline, a `NO_ACK`
+  dispatch, and an unknown phase. Each row has a named wrong implementation that
   turns it RED. The release floor lists the new row.
 
 For this release `DELY_NAMED_INTENDED` is the single line `launch line`.
@@ -173,6 +182,51 @@ For this release `DELY_NAMED_INTENDED` is the single line `launch line`.
   report); Pi rows 13, 14, 15 and 16 (required after an Orca upgrade); and
   every per-harness live worker and Control row for an entry other than Claude
   Code and Codex that an upgrade would ask for.
+
+#### Review remediation, 2026-11-20
+
+The independent review of the candidate returned five findings; one pass fixed
+them.
+
+- A pins-file path that holds a newline, or another control character, split
+  the launch line over several physical lines in the prompt and in the printed
+  result, so the copy instruction no longer sat on the first one. Every value
+  and every source is now shown with each control character, and each character
+  that ends a line for a reader, spelled out (`\n`, `\r`, `\xNN`, `\uNNNN`);
+  the path is kept and the log holds the raw value. A backslash is not escaped,
+  so a path with none of those characters is shown as before, and a path that
+  holds a literal backslash and `n` reads the same as one that holds a newline.
+  That ambiguity is accepted: the alternative changes every clean path.
+- A dispatch that ended `NO_ACK` logged the launch fields and printed none. It
+  now prints the same line on the line after the `NO_ACK` result. The other
+  exits of `dispatch` that write a record are the failed start, which logs no
+  launch fields and prints none, and a pin that cannot be resolved, which does
+  the same; the record and the printed result agree on each.
+- The argv stub dropped the launch line on both sides and decided from the
+  candidate alone that the difference was intended, so a last release that
+  already printed a line gave a false green; and it, like the launch-line row,
+  passed when the copy instruction was replaced by a nearby mention of the
+  field. The argv stub now drops the line only where the last release has none
+  and names the difference only then. Both stubs assert the copy sentence
+  itself.
+- The live rows showed that Claude Code workers copy the launch line's values
+  and sources word for word and drop its label and its two trailing sentences,
+  and that Codex workers copy the whole line. The contract's purpose is that a
+  handoff states what Dely asked for, from Dely's own line, and both forms do.
+  The rule therefore changed from "copied as it is" to: the `Harness:` line
+  holds the line's harness, model, effort and sources, word for word; the label
+  and the trailing sentences may be dropped or kept. The launch line's own text
+  did not change, and the live rows ran with it. Rejected: holding the Claude
+  Code workers to the whole line, which would fail a handoff that carries
+  everything Dely asked for.
+- An unknown phase ended in an uncaught error. It is now refused with a line
+  that names the phase, a non-zero exit and no worker started.
+
+For a dispatch that is acknowledged, on a pins path with no control character,
+the prompt, the launch arguments and the printed result are byte for byte what
+the candidate produced before this pass, so the live rows needed no rerun. The
+argv stub with the earlier candidate as its last release reports no difference
+for any supported entry.
 
 #### Non-goals
 

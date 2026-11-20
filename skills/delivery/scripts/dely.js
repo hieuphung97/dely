@@ -685,9 +685,26 @@ function launchOf(repo, p, set) {
   return l;
 }
 
+// A value shown in the launch line stays on the physical line. A pins-file
+// path or a pinned value that holds a control character, or a character that
+// ends a line in a reader, is shown with that character spelled out, so its
+// meaning is kept and the line is not split. Text with none is returned as is.
+function oneLine(v) {
+  return String(v).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, (c) => {
+    const k = c.charCodeAt(0);
+    if (c === "\n") return "\\n";
+    if (c === "\r") return "\\r";
+    if (c === "\t") return "\\t";
+    return k < 0x100 ? "\\x" + k.toString(16).padStart(2, "0") : "\\u" + k.toString(16).padStart(4, "0");
+  });
+}
+
 // One line of its own, built where the prompt is assembled. It carries the
 // instruction to copy it, because a worker reads its prompt and no skill.
-function launchLine(l) {
+// Every value is shown through oneLine, so the line is one physical line.
+function launchLine(raw) {
+  const l = {};
+  for (const k of Object.keys(raw)) l[k] = oneLine(raw[k]);
   const effortFrom = l.effortPinned == null
     ? "from " + l.effortFrom
     : "set for this dispatch with --effort; pinned " + l.effortPinned + " in " + l.effortPinnedFrom;
@@ -700,6 +717,9 @@ function launchLine(l) {
 }
 
 function dispatch(f) {
+  if (!PHASES.includes(f.phase)) {
+    out("REFUSED unknown phase " + JSON.stringify(f.phase) + "; the phases are " + PHASES.join(", ") + ", and nothing was started", 3);
+  }
   f.repo = path.resolve(f.repo);
   const specPath = path.resolve(f.repo, f["spec-file"]);
   const folder = runFolder(f.repo, f.run);
@@ -756,7 +776,7 @@ function dispatch(f) {
   const secs = Math.round((Date.now() - t0) / 1000);
   dropWorker(s.id);
   logEvent("no_ack", { run: f.run, repo: f.repo, dispatchId: s.id, seconds: secs, text: raw, launch });
-  out("NO_ACK " + s.id + " stopped after " + secs + "s; last output: " + clip(raw), 4);
+  out("NO_ACK " + s.id + " stopped after " + secs + "s; last output: " + clip(raw) + "\n" + launchLine(launch), 4);
 }
 
 function advance(track, id) {
