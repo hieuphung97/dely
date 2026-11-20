@@ -77,6 +77,9 @@ Then make sure `AGENTS.md` carries the routing line. If it has no
 > Bounded or Architectural work invokes `dely:delivery`; Spike starts no
 > delivery run.
 
+A project document, `AGENTS.md` included, should not restate the pins: the
+files above are the one place they live, and a copy in prose goes stale.
+
 If `AGENTS.md` contains an old `<!-- dely:begin -->` block, the helper no
 longer reads it. Offer to replace the block, from its begin marker through its
 end marker, with the routing line, and carry its table over to

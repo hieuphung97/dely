@@ -18,7 +18,8 @@ Run rows by what changed, against **every supported entry** in the candidate's
 `harnesses.json`. The argv stub row compares stdout and `worker-start` argv
 for every supported entry to the last release snapshot, and also runs
 `dely preflight` for each entry and compares its output and launches; it
-stands in for the live worker row of every entry whose `harnesses.json`
+also asserts, on the candidate alone, the launch line of `dely dispatch` for
+every supported entry; it stands in for the live worker row of every entry whose `harnesses.json`
 entry did not change. An **entry changed** when one of these fields differs
 from the last release: `id`, `name`, `binary`, `status`, `controlWake`,
 `modelFlag`, `effortFlag`, `effortInModel`, `modelPin`, `permissionDefault`, `discovery`,
@@ -46,7 +47,8 @@ per harness when its entry changed, or when that harness upgraded and a
 deployment uses it as Control.
 
 The release floor is the argv stub row, the pin-resolution stub row when its
-trigger fired, the rejected-message stub row, the worker-release stub row
+trigger fired, the launch-line stub row when its trigger fired, the
+rejected-message stub row, the worker-release stub row
 when `wait`, `log`, or the settle logic changes, the mailbox-shapes stub row
 when its trigger fired, the
 live worker rows the rules above require, the Control rows those rules
@@ -237,8 +239,11 @@ differences the candidate's decision record names for this release, one per
 line (empty if it names none). The row prints only these line forms:
 `<name> --model`, `<name> --effort`, `<name> is new`, `<name> missing from
 candidate`, `<name> deferred in candidate`, and the preflight-labelled flag
-forms `<name> preflight --model` and `<name> preflight --effort`. Only
-differences of those kinds go in `DELY_NAMED_INTENDED`. "This release" means
+forms `<name> preflight --model` and `<name> preflight --effort`, and the
+single line `launch line`, printed when the candidate's dispatch prompt and
+printed result carry the launch line for every supported entry and the last
+release's carry none. Only differences of those kinds go in
+`DELY_NAMED_INTENDED`. "This release" means
 the `docs/decisions.md` sections dated after the commit date of the newest
 `v*` tag. Write the list from the record before the row runs; never edit it
 from the row's output. A mismatch is a finding against the record or the
@@ -313,8 +318,12 @@ function stripped(argv) {
   if (!argv) return out;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--model' || argv[i] === '--effort') { i++; continue; }
-    // A spec pin line is compared by the candidate-only assertions below.
-    if (argv[i] === '--spec') { out.push(argv[++i].replace(/\ndely-pin: .*/, '')); continue; }
+    // A spec pin line and the launch line are compared by the candidate-only
+    // assertions below.
+    if (argv[i] === '--spec') {
+      out.push(argv[++i].replace(/\ndely-pin: .*/, '').replace(/\n\nLaunch line: [^\n]*/, ''));
+      continue;
+    }
     out.push(argv[i]);
   }
   return out;
@@ -349,11 +358,15 @@ function launch(file, h, other, mode, verb) {
   }
   let out = (r.stdout || '').trim();
   if (verb === 'preflight') out = out.replace(/PASS \d+s/g, 'PASS');
+  const lineOf = (text) => String(text || '').split('\n').find((l) => l.startsWith('Launch line: ')) || null;
+  const printed = lineOf(out);
+  out = out.split('\n').filter((l) => !l.startsWith('Launch line: ')).join('\n');
   const ok = verb === 'preflight' ? / PASS/.test(out) && starts.length > 0
     : out.includes('DISPATCHED') && starts.length > 0;
   const startArgv = starts[0] || null;
   const si = startArgv ? startArgv.indexOf('--spec') : -1;
-  return {out, startArgv, starts, ok, status: r.status, spec: si < 0 ? null : startArgv[si + 1]};
+  const spec = si < 0 ? null : startArgv[si + 1];
+  return {out, startArgv, starts, ok, status: r.status, spec, printed, line: lineOf(spec)};
 }
 function diffLaunch(label, cand, rel, h, other, intended, unexpected, mode) {
   const tag = label === 'dispatch' ? h.name : h.name + ' ' + label;
@@ -381,7 +394,21 @@ function diffLaunch(label, cand, rel, h, other, intended, unexpected, mode) {
 // Candidate-only: what the candidate's own entries must launch. The release
 // comparison cannot see these, because the release launched them differently.
 function assertCandidate(candTree, unexpected) {
+  let lined = true;
   for (const h of load(candTree).filter((x) => x.status === 'supported')) {
+    // The launch line: on every supported entry, its own line, naming what was
+    // pinned and the file it came from, the same line in the printed result.
+    const d = launch(helper(candTree), h, null, 'pinned', 'dispatch');
+    const pin = pinOf(h, null, 'pinned');
+    if (!d.line) { lined = false; add(unexpected, h.name + ' dispatch has no launch line'); }
+    else {
+      for (const want of ['harness ' + h.id, 'model ' + pin.model, 'effort ' + pin.effort,
+        '.dely/pins.json', 'Harness: line'])
+        if (!d.line.includes(want)) add(unexpected, h.name + ' launch line lacks ' + want);
+      if (d.printed !== d.line) add(unexpected, h.name + ' printed result does not carry the launch line');
+    }
+    const pinLines = String(d.spec || '').split('\n').filter((l) => /^dely-pin:/.test(l)).length;
+    if (pinLines !== (h.modelPin ? 1 : 0)) add(unexpected, h.name + ' spec has ' + pinLines + ' dely-pin: lines');
     for (const verb of ['dispatch', 'preflight']) {
       const tag = verb === 'dispatch' ? h.name : h.name + ' preflight';
       if (h.effortInModel && h.modelFlag) {
@@ -405,13 +432,14 @@ function assertCandidate(candTree, unexpected) {
       }
     }
   }
+  return lined;
 }
 function compare(candTree, relTree) {
   const intended = [], unexpected = [];
   const candHs = load(candTree), relHs = load(relTree);
   const supported = candHs.filter((h) => h.status === 'supported');
   assert(supported.length, 'candidate has no supported entries');
-  assertCandidate(candTree, unexpected);
+  if (assertCandidate(candTree, unexpected)) add(intended, 'launch line');
   for (const h of supported) {
     const other = relHs.find((x) => x.name === h.name);
     if (!other) {
@@ -452,6 +480,21 @@ const named = process.env.DELY_NAMED_INTENDED.split('\n').map((s) => s.trim()).f
 const red = compare(path.join(root, 'wrong'), release);
 assert(red.unexpected.length, 'mutant dropping --effort must fail');
 console.log('RED: mutant dropping --effort: ' + red.unexpected.join('; '));
+for (const [name, needle, repl] of [
+  ['line for one harness only', '    "\\n\\n" + launchLine(launch) +\n',
+    '    (p.agent === "claude" ? "\\n\\n" + launchLine(launch) : "") +\n'],
+  ['line starting dely-pin:', '"Launch line: harness "', '"dely-pin: harness "'],
+]) {
+  const dir = path.join(root, 'mutant-' + name.replace(/\W+/g, '-'));
+  fs.cpSync(snap, dir, {recursive: true});
+  const file = helper(dir);
+  const src = fs.readFileSync(file, 'utf8');
+  assert(src.includes(needle), 'update the "' + name + '" mutation for this candidate');
+  fs.writeFileSync(file, src.replace(needle, () => repl));
+  const m = compare(dir, release);
+  assert(m.unexpected.length, 'mutant "' + name + '" must fail');
+  console.log('RED: mutant "' + name + '": ' + m.unexpected.slice(0, 2).join('; '));
+}
 const green = compare(snap, release);
 assert.equal(green.unexpected.length, 0, green.unexpected.join('; ') || 'unexpected');
 for (const line of green.intended) console.log('INTENDED: ' + line);
@@ -472,13 +515,210 @@ for the candidate alone: an `effortInModel` entry launches `--model
 pin-model<sep>high`, or `--model pin-model` with Effort `default`, with no
 `--effort` and no `dely-pin:` line, and a `modelPin` entry's spec carries
 `dely-pin: pin-model high` with no flag), every
-release-supported entry missing or `deferred` in the candidate is reported, and
+release-supported entry missing or `deferred` in the candidate is reported,
+every supported entry's dispatch prompt carries one launch line of its own
+(naming the harness, model, effort and pins file, with the instruction to copy
+it, never starting `dely-pin:`) that the printed result repeats, the mutants
+that put the line on one harness only or start it `dely-pin:` print RED, and
 the printed INTENDED lines equal `DELY_NAMED_INTENDED`. An argv or stdout
 difference always fails the row; the live worker rows it routes to replace the
 row for those entries, and the floor is met when they pass. If the `--effort`
 mutation assert fires, update the needle; it is not a candidate failure. Keep
 the fixture directory and output with the probe report; remove it after
 recording the result.
+
+## Stub row — launch line and dispatch effort
+
+Run this when the dispatch's options, the prompt it assembles, its printed
+result or its `dely log` record change. It runs from the observer shell with
+`snap` set to the candidate snapshot, against a fake Orca executable and an
+isolated home; it creates no real Run or worker. The argv stub row above
+asserts the launch line on every supported entry; this row checks where the
+line's values come from, that the printed result and the log agree, and the
+`--effort` option. Each row runs against a deliberately wrong copy of the
+candidate before the candidate itself:
+
+| Row | Requirement | Mutant that must turn it RED |
+| --- | --- | --- |
+| 1 | the line names the file each value came from: a team and a personal pins file, each phase answered by a different one | `line-names-team`: the line always names the team file |
+| 2 | the printed result and the `dispatch` record in `~/.dely/log.jsonl` carry the same fields as the line the worker's prompt holds | `printed-not-logged`: the record has no `launch`; `logged-not-printed`: the printed result has no line |
+| 3 | `--effort high` over a pin of medium: the worker-start call carries `--effort high` and the pinned model; without the flag it carries medium; the line marks the effort as set for this dispatch and names the pinned value | `line-only`: the line changes and the arguments do not; `changes-model`: the flag also replaces the model |
+| 4 | `--effort` on a harness that takes no effort exits non-zero, prints `REFUSED` and starts no worker | `effort-dropped`: the option is accepted and ignored |
+| 5 | `--effort` on a harness whose effort is joined to the model puts the level into the `--model` argument and passes no `--effort` | `effort-own-flag`: the level goes to `--effort` there |
+
+```bash
+stub=$(mktemp -d "$HOME/dely-probe/launch.XXXXXX")
+cat > "$stub/check.cjs" <<'JS'
+const fs = require('fs'), path = require('path'), assert = require('assert');
+const {spawnSync, execFileSync} = require('child_process');
+const [snap, rootArg] = process.argv.slice(2);
+assert(snap && rootArg, 'usage: check.cjs <candidate-snap> <fixture-root>');
+const root = fs.realpathSync(rootArg);
+const hs = JSON.parse(fs.readFileSync(path.join(snap, 'harnesses.json'), 'utf8')).harnesses
+  .filter((h) => h.status === 'supported');
+const takes = (h) => h.effortFlag || h.effortInModel || h.modelPin;
+const withFlag = hs.find((h) => h.effortFlag && h.modelFlag);
+const none = hs.find((h) => !takes(h));
+const joined = hs.find((h) => h.effortInModel && h.modelFlag);
+assert(withFlag && none && joined, 'the candidate needs an entry that takes an effort flag, one that takes no effort and one that joins effort to the model');
+fs.mkdirSync(path.join(root, 'home/.dely'), {recursive: true});
+fs.writeFileSync(path.join(root, 'orca.js'), `
+const fs = require('fs');
+const a = process.argv.slice(2), cmd = a[1], root = process.env.FIXTURE_ROOT;
+fs.appendFileSync(root+'/calls.jsonl', JSON.stringify(a)+'\\n');
+let result = {};
+if (cmd === 'worker-start') result = {dispatchId:'d-1'};
+if (cmd === 'check') result = {deliveryId:'batch-1',messages:[
+  {type:'heartbeat',subject:'ack',payload:{dispatchId:'d-1'}}]};
+if (cmd === 'worker-list') result = {workers:[]};
+if (cmd === 'worker-read') result = {terminal:{tail:[]}};
+if (cmd === 'status') result = {runtime:{appVersion:'stub'}};
+console.log(JSON.stringify({ok:true,result}));
+`);
+let n = 0;
+function repo(team, personal) {
+  const dir = path.join(root, 'r' + (++n));
+  fs.mkdirSync(path.join(dir, '.dely/local/runs/fixture-run'), {recursive: true});
+  execFileSync('git', ['init', '-q', '-b', 'main'], {cwd: dir});
+  fs.writeFileSync(path.join(dir, '.dely/local/runs/fixture-run/spec.md'), 'Fixture only.');
+  if (team) fs.writeFileSync(path.join(dir, '.dely/pins.json'), JSON.stringify(team));
+  if (personal) fs.writeFileSync(path.join(dir, '.dely/local/pins.json'), JSON.stringify(personal));
+  return dir;
+}
+function run(tree, dir, phase, extra) {
+  fs.writeFileSync(path.join(root, 'calls.jsonl'), '');
+  fs.writeFileSync(path.join(root, 'home/.dely/log.jsonl'), '');
+  const r = spawnSync(process.execPath, [path.join(tree, 'skills/delivery/scripts/dely.js'), 'dispatch',
+    '--repo', dir, '--run', 'fixture-run', '--phase', phase,
+    '--spec-file', '.dely/local/runs/fixture-run/spec.md', ...(extra || [])],
+    {encoding: 'utf8', timeout: 10000, env: {...process.env, HOME: path.join(root, 'home'),
+      ORCA_TERMINAL_HANDLE: 'fixture-terminal', ORCA_CLI_COMMAND: path.join(root, 'orca.js'),
+      FIXTURE_ROOT: root, DELY_ACK_S: '0.2', DELY_POLL_S: '0.02'}});
+  const calls = fs.readFileSync(path.join(root, 'calls.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  const starts = calls.filter((a) => a[1] === 'worker-start');
+  const out = (r.stdout || '').trim();
+  const arg = (name) => { const a = starts[0]; const i = a ? a.indexOf(name) : -1; return i < 0 ? null : a[i + 1]; };
+  const spec = arg('--spec');
+  const lines = (t) => String(t || '').split('\n').filter((l) => l.startsWith('Launch line: '));
+  const events = fs.readFileSync(path.join(root, 'home/.dely/log.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  return {status: r.status, out, starts, arg, spec, printed: lines(out), line: lines(spec),
+    logged: events.find((e) => e.event === 'dispatch') || null};
+}
+const P = (h, model, effort) => ({harness: h.id, model, effort});
+const pinsFixture = (h) => ({implement: P(h, 'team-model', 'medium'), review: P(h, 'team-model', 'medium')});
+const TEAM = '.dely/pins.json', LOCAL = '.dely/local/pins.json';
+
+// Each row returns null on pass or a string on failure.
+const rows = {
+  1(tree) {
+    const dir = repo(pinsFixture(withFlag), {review: P(withFlag, 'own-model', 'low')});
+    const imp = run(tree, dir, 'implement'), rev = run(tree, dir, 'review');
+    const from = (f) => ' (from ' + f + ')';
+    if (imp.line.length !== 1 || !imp.line[0].includes('harness ' + withFlag.id + from(TEAM) +
+        ', model team-model' + from(TEAM) + ', effort medium' + from(TEAM)))
+      return 'implement is answered by the team file: ' + imp.line.join('|');
+    if (rev.line.length !== 1 || !rev.line[0].includes('harness ' + withFlag.id + from(LOCAL) +
+        ', model own-model' + from(LOCAL) + ', effort low' + from(LOCAL)))
+      return 'review is answered by the personal file: ' + rev.line.join('|');
+    return null;
+  },
+  2(tree) {
+    const dir = repo(pinsFixture(withFlag), {review: P(withFlag, 'own-model', 'low')});
+    const d = run(tree, dir, 'review');
+    const l = d.logged && d.logged.launch;
+    if (!l) return 'the dispatch record has no launch: ' + JSON.stringify(d.logged);
+    const want = {phase: 'review', harness: withFlag.id, harnessFrom: LOCAL, model: 'own-model', modelFrom: LOCAL,
+      effort: 'low', effortFrom: LOCAL};
+    if (JSON.stringify(l) !== JSON.stringify(want)) return 'record ' + JSON.stringify(l) + ' != ' + JSON.stringify(want);
+    if (d.printed.length !== 1) return 'the printed result carries ' + d.printed.length + ' launch lines: ' + d.out;
+    if (d.printed[0] !== d.line[0]) return 'printed line differs from the prompt line';
+    for (const v of [want.harness, want.model, want.effort, LOCAL])
+      if (!d.printed[0].includes(v)) return 'printed line lacks ' + v;
+    return null;
+  },
+  3(tree) {
+    const dir = repo(pinsFixture(withFlag));
+    const hi = run(tree, dir, 'implement', ['--effort', 'high']);
+    const lo = run(tree, dir, 'implement');
+    if (hi.out.split('\n')[0] !== 'DISPATCHED d-1' || hi.arg('--effort') !== 'high')
+      return 'with --effort high the worker-start call carries --effort ' + hi.arg('--effort') + ': ' + hi.out;
+    if (hi.arg('--model') !== 'team-model') return 'with --effort the model is ' + hi.arg('--model');
+    if (lo.arg('--effort') !== 'medium' || lo.arg('--model') !== 'team-model')
+      return 'without --effort the call carries ' + lo.arg('--model') + ' ' + lo.arg('--effort');
+    const L = hi.line[0] || '';
+    if (!L.includes('effort high (set for this dispatch with --effort; pinned medium in ' + TEAM + ')'))
+      return 'the line does not mark the effort as set for this dispatch: ' + L;
+    const l = hi.logged && hi.logged.launch;
+    if (!l || l.effort !== 'high' || l.effortPinned !== 'medium') return 'record ' + JSON.stringify(l);
+    return null;
+  },
+  4(tree) {
+    const dir = repo(pinsFixture(none));
+    const d = run(tree, dir, 'implement', ['--effort', 'high']);
+    if (d.status === 0 || !d.out.startsWith('REFUSED') || d.starts.length)
+      return none.id + ' takes no effort; status ' + d.status + ', ' + d.starts.length + ' worker-start calls: ' + d.out;
+    return null;
+  },
+  5(tree) {
+    const dir = repo(pinsFixture(joined));
+    const d = run(tree, dir, 'implement', ['--effort', 'high']);
+    const want = 'team-model' + joined.effortInModel + 'high';
+    if (d.arg('--model') !== want || d.starts[0].includes('--effort'))
+      return joined.id + ' --model ' + d.arg('--model') + ', --effort ' + d.arg('--effort') + ': ' + d.out;
+    return null;
+  },
+};
+
+function mutant(name, edits) {
+  const dir = path.join(root, 'mutant-' + name);
+  fs.cpSync(snap, dir, {recursive: true});
+  const file = path.join(dir, 'skills/delivery/scripts/dely.js');
+  let src = fs.readFileSync(file, 'utf8');
+  for (const [needle, repl] of edits) {
+    assert(src.includes(needle), 'update the ' + name + ' mutation for this candidate: ' + needle);
+    src = src.replace(needle, () => repl);
+  }
+  fs.writeFileSync(file, src);
+  return dir;
+}
+const mutants = [
+  ['line-names-team', 1, [['const from = pinsFileLabel(repo, p);', 'const from = ".dely/pins.json";']]],
+  ['printed-not-logged', 2, [['        launch,\n      });\n      out("DISPATCHED', '      });\n      out("DISPATCHED']]],
+  ['logged-not-printed', 2, [['out("DISPATCHED " + s.id + "\\n" + launchLine(launch), 0);', 'out("DISPATCHED " + s.id, 0);']]],
+  ['line-only', 3, [['p = Object.assign({}, pinned, { effort: setEffort });', 'p = pinned;']]],
+  ['changes-model', 3, [['p = Object.assign({}, pinned, { effort: setEffort });',
+    'p = Object.assign({}, pinned, { effort: setEffort, model: "other-model" });']]],
+  ['effort-dropped', 4, [['if (!takesEffort(pinned)) {', 'if (false) {']]],
+  ['effort-own-flag', 5, [
+    ['joinsEffort ? p.model + p.effortInModel + p.effort : p.model', 'p.model'],
+    ['if (wantsEffort) args.push("--effort", p.effort);', 'if (wantsEffort || joinsEffort) args.push("--effort", p.effort);']]],
+];
+const redRows = new Set();
+for (const [name, row, edits] of mutants) {
+  const why = rows[row](mutant(name, edits));
+  assert(why, 'mutant ' + name + ' must fail row ' + row);
+  redRows.add(row);
+  console.log('RED: mutant ' + name + ' fails row ' + row + ': ' + String(why).split('\n')[0].slice(0, 170));
+}
+for (const r of [1, 2, 3, 4, 5]) assert(redRows.has(r), 'no mutant turned row ' + r + ' RED');
+for (const r of [1, 2, 3, 4, 5]) {
+  const why = rows[r](snap);
+  assert.equal(why, null, 'candidate fails row ' + r + ': ' + why);
+  console.log('GREEN: row ' + r);
+}
+console.log('GREEN: candidate launches as specified');
+JS
+node "$stub/check.cjs" "$snap" "$stub"
+```
+
+**Pass:** every mutant prints RED for the row it is named for, and the candidate
+prints GREEN for rows 1 to 5. The refusal row uses the first supported entry
+that takes no effort, and the joined row the first whose effort is joined to
+the model; the script stops when the candidate has none, so a row never passes
+vacuously. If a mutation assert fires, update that needle; it is not a
+candidate failure. A GREEN candidate with a row that no mutant turned RED proves
+nothing, and the script refuses it. Keep the fixture directory and output with
+the probe report; remove it after recording the result.
 
 ## Parameterized worker row
 
@@ -770,7 +1010,7 @@ const agentsTable = (phaseExpr) => `{ const md = fs.readFileSync(path.join(f.rep
     const row = md.split("\\n").find((l) => new RegExp("^\\\\|\\\\s*\`?" + ${phaseExpr} + "\`?\\\\s*\\\\|").test(l));
     const [, hn, mo, ef] = row.split("|").slice(1).map((c) => c.trim().replace(/\`/g, ""));
     const hh = loadHarnesses().find((x) => x.name === hn);
-    return { phase: ${phaseExpr}, agent: hh.id, model: mo, effort: ef, modelFlag: hh.modelFlag, effortFlag: hh.effortFlag, modelPin: hh.modelPin }; }`;
+    return { phase: ${phaseExpr}, agent: hh.id, model: mo, effort: ef, modelFlag: hh.modelFlag, effortFlag: hh.effortFlag, modelPin: hh.modelPin, source: "control", file: null }; }`;
 const mutants = [
   ['first-file-only', 1, [['const hit = sources.find((s) => phase in s[2]);',
     'const hit = sources.length && phase in sources[0][2] ? sources[0] : undefined;']]],
@@ -779,8 +1019,8 @@ const mutants = [
   ['control-throws', 3, [['const id = selfHarness();', 'const id = null;']]],
   ['control-claude', 3, [['const id = selfHarness();', 'const id = "claude";']]],
   ['typo-ignored', 4, [['if (!PHASES.includes(k)) fail(', 'if (false) fail(']]],
-  ['dispatch-agents-md', 5, [['const p = pin(f.repo, f.phase);',
-    'const p = (() => ' + agentsTable('f.phase') + ')();']]],
+  ['dispatch-agents-md', 5, [['const pinned = pin(f.repo, f.phase);',
+    'const pinned = (() => ' + agentsTable('f.phase') + ')();']]],
   ['preflight-agents-md', 5, [['const pins = PHASES.map((ph) => resolved[ph]);',
     'const pins = PHASES.map((ph) => (() => ' + agentsTable('ph') + ')());']]],
 ];

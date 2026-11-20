@@ -3,11 +3,154 @@
 What has been settled, what is still open, and what was rejected and why.
 Rationale is kept because the reasons are the reusable part.
 
-Last updated 2026-11-04.
+Last updated 2026-11-20.
 
 ---
 
 ## Settled
+
+### 2026-11-20 — The launch line, one dispatch's effort, and the rerun wording (0.28.0)
+
+#### Context
+
+Three faults in how a delivery reads cost a consuming project time, and would
+cost any project the same.
+
+- A worker cannot see the model and effort it was launched with, and `dely
+  dispatch` did not tell it. Handoffs filled the `Harness:` line from a project
+  document, and two of them stated an effort the worker was not launched with.
+- Effort is one value per phase. A project that wants a higher effort for one
+  dispatch had to edit a pins file and put it back, with no record that it did.
+- The skill said "run the gates yourself" to a reviewer and "reruns the
+  affected gates" after a fix without saying which gates, so each role reran
+  the project's whole gate set and one delivery ran the same head three times.
+  This repository's `AGENTS.md` also carried a one-sentence dispatch section,
+  the pattern other projects copied, that repeated a rule the skill holds.
+
+#### Decision
+
+- `dely dispatch` appends one line to every prompt it assembles, for every
+  harness, before the acknowledgement paragraph. The line starts `Launch line:`
+  and never `dely-pin:`, which the pin extension reads. It names the harness,
+  model and effort the dispatch asked for and the file each came from (the
+  personal pins file, the team pins file, or Control's own harness when no file
+  names the phase), and tells the worker to copy it into the handoff's
+  `Harness:` line. The dispatch's printed result repeats the line, and the
+  `dispatch` and `no_ack` records in `~/.dely/log.jsonl` carry the same fields
+  under `launch`. The line is built where the prompt is assembled; the function
+  that starts a worker, `wait`, `wait-bg`, `notify` and the acknowledgement and
+  settle logic are unchanged. The skill's handoff form says the `Harness:` line
+  is that line, copied, and one sentence says the line records what was asked
+  for, not what the session proves it ran with, because a harness cannot prove
+  that to Dely.
+- `dely dispatch --effort LEVEL` sets the effort of that one dispatch. The
+  harness and the model stay as pinned. The line marks the effort as set for
+  the dispatch and names the pinned value and its file. A harness that takes no
+  effort (no effort flag, no effort joined to the model, no spec pin) is
+  refused before any worker starts. Where effort is joined to the model, the
+  level goes into the `--model` argument as a pinned effort does. No list of
+  levels exists anywhere: a level the model does not offer fails as a wrong pin
+  fails today, as `NO_ACK` and then the preflight route. The usage text
+  documents the option.
+- A project may name the subset of gates for every rerun, not only the release.
+  A fix reruns the instruments and the gates that can observe its change. One
+  full closure run happens at the final exact HEAD, by Control; the final review
+  does not repeat it.
+- A reviewer reproduces the acceptance instruments and each counterexample,
+  checks that the head the gate logs name is the head under review, and reruns a
+  gate it doubts or one the logs do not cover.
+- A scoped re-review may be Control's recorded check instead of a dispatch only
+  when every fixed finding is Minor and a deterministic check proves the fix
+  changes text only.
+- A reopened finding is a replan: a new task that carries a reopened finding, or
+  a ruling that reopens an accepted task, goes to the human beside
+  `REPLAN_OR_SPLIT`. The failure table has a row for it.
+- This repository's `AGENTS.md` loses its dispatch section, and the setup skill
+  says a project document should not restate the pins. The skill's own sentence
+  that Control names the model and effort on every dispatch stays: it is
+  addressed to Control and sits in the section whose edits would require a
+  Control row for each wake mode.
+- The version advances to 0.28.0 in both plugin manifests, `package.json` and
+  the `AGENTS.md` version gate. No field of a `harnesses.json` entry changes.
+- `probe/checklist.md`: the argv stub row lists `launch line` as an intended
+  difference, asserts the line on the candidate for every supported entry, and
+  turns RED on a line for one harness only and on a line that starts
+  `dely-pin:`. A new stub row, "launch line and dispatch effort", has a team and
+  a personal pins fixture and one row each for the file named in the line, the
+  printed result and the log record, `--effort` over a pin, the refusal, and the
+  effort joined to the model. Each row has a named wrong implementation that
+  turns it RED. The release floor lists the new row.
+
+For this release `DELY_NAMED_INTENDED` is the single line `launch line`.
+
+#### Alternatives considered
+
+- A list of effort levels per harness in `harnesses.json`, so `--effort`
+  refuses a level a harness does not take. Rejected: no such list exists, the
+  levels differ per model, and a list would go stale on the first model
+  release. The refusal is limited to a harness that takes no effort at all.
+- A per-dispatch model or harness, a table from task kind to effort, or an
+  automatic raise. Rejected: each adds a decision the pins files were made to
+  hold in one place, and none was needed to fix the recorded fault.
+- Put the line on the pin-extension channel (`dely-pin:`) for every harness.
+  Rejected: the extension reads that prefix to set a model and fails the
+  session on a line it cannot parse.
+- Delete the skill's sentence that Control names the model and effort on every
+  dispatch together with the `AGENTS.md` section. Rejected: only the
+  `AGENTS.md` copy was a restatement; the skill's sentence is the rule.
+- A gate runner, a gate selector or a change-class table in Dely. Rejected:
+  which gates observe which change is a fact about the project.
+
+#### Consequences
+
+- A handoff now carries a `Harness:` line that Dely wrote, so it shows what was
+  asked for and from which file. It is still not proof of what the session ran
+  with, and the skill says so. A reviewer cannot learn more from it than that.
+- A project that wants high effort for one dispatch passes `--effort` and
+  leaves its pins files alone; the log records the dispatch with both values.
+- The skill's section "Orca and the helper", which this change does not edit,
+  still lists what the helper appends to the prompt without the launch line.
+  The launch line's own text and the handoff form carry the rule; that section
+  is reconciled the next time it is edited for another reason.
+- A level the model does not offer still surfaces late, as `NO_ACK`.
+- Reviewers and remediation workers rerun fewer gates, so a gate that observes
+  a fix indirectly is not rerun until the one full run at the final HEAD. That
+  run is Control's and its logs name the head.
+
+#### Verification, 2026-11-20
+
+- Stub rows run against `450e874` (the `v0.27.2` tag) as the last release: the
+  argv row, the new row, and the rows whose triggers did not fire. Every
+  wrong implementation named above printed RED before the candidate printed
+  GREEN. The output is kept with the run's evidence; it is not part of the
+  repository.
+- Live rows the checklist's rules require for this candidate, and what ran:
+  the rules ask for the live worker row for Claude Code and for Codex (each
+  harness a deployment uses, and each upgraded since its newest live report),
+  for the Control row once per wake mode (after an Orca upgrade from 1.4.247 to
+  1.4.261), rows 4 and 6, and for the other harnesses the rows below. The
+  owner limited this release's live rows to Claude Code and Codex, so Control
+  runs those and no other live row.
+- Live rows skipped, each with the reason "the owner limited this release's
+  live rows to Claude Code and Codex": the OMP pin rows 8, 9, 10, 11 and 12
+  and OMP's Control row (OMP moved from 18.6.1 to 19.0.1 since its newest live
+  report); Pi rows 13, 14, 15 and 16 (required after an Orca upgrade); and
+  every per-harness live worker and Control row for an entry other than Claude
+  Code and Codex that an upgrade would ask for.
+
+#### Non-goals
+
+No gate runner, gate selector or change-class table; no new phase key; no table
+from task kind to effort; no automatic raise; no per-dispatch model or harness;
+no list of effort levels; no change to `wait`, `wait-bg`, `notify`, the
+acknowledgement and settle logic or the function that starts a worker.
+
+#### Deferred
+
+Reconciling the "Orca and the helper" sentence with the launch line waits for
+the next edit of that section. Whether a later reviewer reads the new
+reproduction rule as intended is not something an instrument observes; the
+first delivery on this version shows it.
 
 ### 2026-11-04 — Checklist rows 5 and 7 are retired; Claude Code's trust is `orca-preflight`
 
