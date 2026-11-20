@@ -32,9 +32,10 @@ cost any project the same.
 - `dely dispatch` appends one line to every prompt it assembles, for every
   harness, before the acknowledgement paragraph. The line starts `Launch line:`
   and never `dely-pin:`, which the pin extension reads. It names the harness,
-  model and effort the dispatch asked for and the file each came from (the
-  personal pins file, the team pins file, or Control's own harness when no file
-  names the phase), and tells the worker to copy it into the handoff's
+  model and effort the dispatch asked for, each with its source (the personal
+  pins file, the team pins file, this dispatch's `--effort`, or Control's own
+  harness when no file names the phase), and tells the worker to copy it into
+  the handoff's
   `Harness:` line. The dispatch's printed result repeats the line, whether the
   dispatch is acknowledged or ends `NO_ACK`, and the `dispatch` and `no_ack`
   records in `~/.dely/log.jsonl` carry the same fields under `launch`. The line
@@ -271,6 +272,37 @@ pass, limited to them, fixed them.
   came from. A source can also be this dispatch's `--effort`, or Control's own
   harness when no pins file names one. Both now say that each value has its
   source, as the handoff form does.
+
+#### Released without an accepting review, 2026-11-20
+
+This release had three reviews by an independent reviewer: one whole-change
+review and two scoped re-reviews, each after one remediation. None of the three
+ended in `ACCEPT`. After the first re-review the owner chose one more
+remediation with a closed scope. After the second re-review he chose to release
+with what was left recorded here, and not to start another round.
+
+What the last re-review confirmed at `b3cc5b1`: every earlier finding is
+closed; the helper has no open finding; an acknowledged dispatch with ordinary
+values is byte for byte what the live rows ran; the six stub blocks and the
+closure gates pass.
+
+Known limits, left open by the owner's choice:
+
+- The argv stub decides whether the launch line is an intended difference from
+  the pinned dispatch of each entry. A release that printed the line in only
+  one mode of an entry (pinned but not default, or the reverse) would be
+  compared wrongly: a real difference in the other mode could pass, or an
+  intended difference could be named where none exists. No release behaves so:
+  0.27.2 prints no launch line, and this one prints it in every mode. The stub
+  compares both lines directly from the next release on.
+- The `NO_ACK` stub row compares the logged launch record as text, so it fails
+  if the record's keys are written in another order with the same values. The
+  helper writes them in one fixed order.
+
+Control corrected one sentence of the decision above after that re-review, at
+the reviewer's note: it said the line names the file each value came from, and
+a value's source can also be this dispatch's `--effort` or Control's own
+harness.
 
 #### Non-goals
 
