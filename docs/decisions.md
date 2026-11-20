@@ -131,6 +131,10 @@ For this release `DELY_NAMED_INTENDED` is the single line `launch line`.
   1.4.261), rows 4 and 6, and for the other harnesses the rows below. The
   owner limited this release's live rows to Claude Code and Codex, so Control
   runs those and no other live row.
+- The `waker` Control row is skipped as well. It would run Codex CLI as
+  Control. The owner chose to skip it for this release: his deployment's
+  Control is Claude Code. The `background` Control row runs on Claude Code. A
+  `waker` Control is therefore not verified on Orca 1.4.261 by this release.
 - Live rows skipped, each with the reason "the owner limited this release's
   live rows to Claude Code and Codex": the OMP pin rows 8, 9, 10, 11 and 12
   and OMP's Control row (OMP moved from 18.6.1 to 19.0.1 since its newest live
