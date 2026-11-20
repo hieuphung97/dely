@@ -135,6 +135,38 @@ For this release `DELY_NAMED_INTENDED` is the single line `launch line`.
   Control. The owner chose to skip it for this release: his deployment's
   Control is Claude Code. The `background` Control row runs on Claude Code. A
   `waker` Control is therefore not verified on Orca 1.4.261 by this release.
+- Live rows run on 2026-11-20 at `0b6b245`, on Orca 1.4.261, by a separate
+  verification session. All passed:
+  - the worker row on Claude Code 2.1.328 (`claude-sonnet-5-5`, high) and on
+    Codex CLI 0.170.0 (`gpt-6.2-sol`, high), implement and review each;
+  - the `background` Control row on Claude Code, with row 4 inside it:
+    `ATTENTION` came 15 s after the kill, and the task was dispatched again
+    exactly once;
+  - row 6: `STALLED` at the configured threshold, with Orca's liveness `live`
+    throughout.
+- What the rows showed about the launch line. Every dispatch printed it, logged
+  it and put it in the worker's prompt. The Codex workers copied the whole line
+  into their handoff. The Claude Code workers copied its values and sources
+  word for word and dropped the label and the two trailing sentences. In the
+  Control row no handoff file was written, because that Control's own prompts
+  named no path for one, so the copy was not observed there.
+- Two deviations from the checklist, both the owner's choice:
+  - Nothing was installed. The Control row loaded the candidate with
+    `--plugin-dir` on the snapshot, because every Claude Code session on the
+    machine shares one plugin store and one of them was running a delivery
+    from the installed release. The checklist's rule that every installed
+    hash equals the snapshot could not hold. The proof that the candidate ran
+    is the skill's base directory in the Control's transcript, the helper path
+    of every call it made, and the `launch` field in its dispatch records,
+    which only this version writes. The installed release was byte-identical
+    before and after.
+  - Row 6 used one `sleep 590` and `--stall-min 6`, as the 0.27.1 release did.
+    Claude Code 2.1.328 refuses a long foreground sleep, so the worker started
+    it in the background and sat idle. A stall at the default ten minutes is
+    still not reachable with that prompt.
+- Not seen by this release: `probe/trust.sh` reads `~/.claude.json` only. Under
+  an Orca profile the worker's trust store is the profile's own file, where
+  Orca's pre-trust wrote the new row 6 path.
 - Live rows skipped, each with the reason "the owner limited this release's
   live rows to Claude Code and Codex": the OMP pin rows 8, 9, 10, 11 and 12
   and OMP's Control row (OMP moved from 18.6.1 to 19.0.1 since its newest live
